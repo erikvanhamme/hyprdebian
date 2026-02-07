@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian installer v0.2 ==="
+echo "=== Erik's nifty debian installer v0.3 ==="
 
 TARGET=/mnt
 
@@ -282,7 +282,7 @@ in_target_actions() {
     in_target apt -y install yazi eza
 
     echo "Install ZFS support."
-    in_target apt install -y dpkg-dev linux-headers-generic linux-image-generic zfs-initramfs
+    in_target apt install -y dpkg-dev linux-headers-generic linux-image-generic zfs-initramfs firmware-linux
 
     echo "Install grub."
     in_target mkdir /boot/efi
@@ -326,7 +326,7 @@ EOF
     in_target chown $username:$username /var/log/hyprland.log
 
     echo "Install audio subsystem + tools and multimedia."
-    in_target apt install -y pipewire wireplumber pulseaudio-utils audacious audacity vlc-bin
+    in_target apt install -y pipewire wireplumber pulseaudio-utils audacious audacity vlc
     mkdir -p /mnt/home/$username/.config/systemd/user/default.target.wants
     ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/$username/.config/systemd/user/default.target.wants/
     ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/$username/.config/systemd/user/default.target.wants/
