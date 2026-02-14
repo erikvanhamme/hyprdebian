@@ -269,13 +269,14 @@ in_target_actions() {
     mount --bind /run/systemd/journal/dev-log /mnt/dev/log
 
     echo "Install additional package sources."
+    in_target apt update
     in_target apt install -y curl gpg
     in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
-    in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
     in_target apt update
 
     echo "System update."
-    in_target apt -y upgrade
+    in_target apt upgrade -y
 
     echo "Install basic console support."
     in_target apt install -y console-setup locales command-not-found bash-completion man-db psmisc yazi eza
