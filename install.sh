@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.5 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.6 ==="
 
 TARGET=/mnt
 
@@ -316,6 +316,13 @@ EOF
 #!/bin/bash
 exec sudo -u cargo -H cargo "$@"
 EOF
+
+    echo "Install file tools."
+    in_target apt -y install curl gpg
+    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
+    in_target apt update
+    in_target apt -y install yazi eza
 
     echo "Install greetd and autologin related items."
     in_target apt install -y greetd dbus-user-session
