@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian installer v0.3 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.4 ==="
 
 TARGET=/mnt
 
@@ -23,7 +23,7 @@ write_file() {
 }
 
 prerequisites() {
-    echo "Configuring APT for Debian testing (main + contrib)..."
+    echo "Configuring APT for Debian stable (main + contrib)..."
 
     # Backup existing sources
     mkdir -p /etc/apt/backup
@@ -274,13 +274,6 @@ in_target_actions() {
     in_target dpkg-reconfigure tzdata keyboard-configuration console-setup locales
     in_target apt-file update
 
-    echo "Install file tools."
-    in_target apt -y install curl gpg
-    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
-    in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
-    in_target apt update
-    in_target apt -y install yazi eza
-
     echo "Install ZFS support."
     in_target apt install -y dpkg-dev linux-headers-generic linux-image-generic zfs-initramfs firmware-linux
 
@@ -299,13 +292,39 @@ in_target_actions() {
     in_target apt install -y netplan.io
     in_target netplan generate
 
+    echo "Install support for managed cargo system packages."
+    in_target apt install -y rustup
+    zfs create rpool/home/cargo
+    in_target useradd -m -r -s /bin/bash cargo
+    in_target chown -R cargo:cargo /home/cargo
+    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
+    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
+[install]
+root = "/usr/local"
+EOF
+    in_target sudo -u cargo rustup default stable
+
+    in_target chown -R root:cargo /usr/local
+    in_target chmod -R g+w /usr/local
+
+    write_file /mnt/usr/local/bin/syscargo 0755 <<EOF
+#!/bin/bash
+exec sudo -u cargo -H cargo "$@"
+EOF
+
+    echo "Install file tools."
+    # in_target apt -y install curl gpg
+    # in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
+    # in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
+    # in_target apt update
+    # in_target apt -y install yazi eza
+
     echo "Install greetd and autologin related items."
     in_target apt install -y greetd dbus-user-session
     in_target systemctl enable greetd
 
     echo "Install hyprland and related packages."
     in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin # TODO: Add and fix hyprlock.
-    in_target gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
     echo "Creating user."
     read -rp "Enter username: " username
@@ -319,17 +338,20 @@ in_target_actions() {
 vt = 7
 
 [default_session]
-command = "dbus-run-session Hyprland > /var/log/hyprland.log 2>&1"
+command = "dbus-run-session start-hyprland > /var/log/hyprland.log 2>&1"
 user = "$username"
 EOF
     touch /mnt/var/log/hyprland.log
     in_target chown $username:$username /var/log/hyprland.log
+    in_target sudo -u $username gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
     echo "Install audio subsystem + tools and multimedia."
     in_target apt install -y pipewire wireplumber pulseaudio-utils audacious audacity vlc
     mkdir -p /mnt/home/$username/.config/systemd/user/default.target.wants
     ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/$username/.config/systemd/user/default.target.wants/
     ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/$username/.config/systemd/user/default.target.wants/
+    in_target apt install pkg-config libpipewire-0.3-dev libclang-dev
+    in_target syscargo install wiremix
 
     echo "Install browser."
     in_target apt install -y firefox
