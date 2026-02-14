@@ -304,20 +304,14 @@ root = "/usr/local"
 EOF
     in_target sudo -u cargo rustup default stable
 
+    mkdir -p /mnt/usr/local/bin
     in_target chown -R root:cargo /usr/local
     in_target chmod -R g+w /usr/local
 
-    write_file /mnt/usr/local/bin/syscargo 0755 <<EOF
+    write_file /mnt/usr/local/bin/syscargo 0755 <<'EOF'
 #!/bin/bash
 exec sudo -u cargo -H cargo "$@"
 EOF
-
-    echo "Install file tools."
-    # in_target apt -y install curl gpg
-    # in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
-    # in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
-    # in_target apt update
-    # in_target apt -y install yazi eza
 
     echo "Install greetd and autologin related items."
     in_target apt install -y greetd dbus-user-session
@@ -350,14 +344,18 @@ EOF
     mkdir -p /mnt/home/$username/.config/systemd/user/default.target.wants
     ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/$username/.config/systemd/user/default.target.wants/
     ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/$username/.config/systemd/user/default.target.wants/
-    in_target apt install pkg-config libpipewire-0.3-dev libclang-dev
-    in_target syscargo install wiremix
+    in_target apt install -y pkg-config libpipewire-0.3-dev libclang-dev
 
     echo "Install browser."
     in_target apt install -y firefox
 
     echo "Install misc. wanted packages."
     in_target apt install -y nfs-common
+
+    echo "Install managed cargo crates."
+    in_target sudo -u cargo cargo install wiremix
+    in_target sudo -u cargo cargo install eza
+    in_target sudo -u cargo carho install yazi-build
 
     echo "Save snapshots."
     in_target zfs snapshot bpool/hyprdebian@install
