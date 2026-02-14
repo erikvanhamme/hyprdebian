@@ -304,10 +304,6 @@ root = "/usr/local"
 EOF
     in_target sudo -u cargo rustup default stable
 
-    mkdir -p /mnt/usr/local/bin
-    in_target chown -R root:cargo /usr/local
-    in_target chmod -R g+w /usr/local
-
     write_file /mnt/usr/local/bin/syscargo 0755 <<'EOF'
 #!/bin/bash
 exec sudo -u cargo -H cargo "$@"
@@ -353,6 +349,9 @@ EOF
     in_target apt install -y nfs-common
 
     echo "Install managed cargo crates."
+    mkdir -p /mnt/usr/local/bin
+    in_target chown -R root:cargo /usr/local
+    in_target chmod -R g+w /usr/local
     in_target sudo -u cargo cargo install wiremix
     in_target sudo -u cargo cargo install eza
     in_target sudo -u cargo carho install yazi-build
