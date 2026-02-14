@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.4 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.5 ==="
 
 TARGET=/mnt
 
@@ -268,9 +268,17 @@ in_target_actions() {
     in_target touch /dev/log
     mount --bind /run/systemd/journal/dev-log /mnt/dev/log
 
-    echo "Update and install basic console support."
+    echo "Install additional package sources."
+    in_target apt install -y curl gpg
+    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt $(lsb_release -sc 2>/dev/null) main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
     in_target apt update
-    in_target apt install -y console-setup locales command-not-found bash-completion man-db psmisc
+
+    echo "System update."
+    in_target apt -y upgrade
+
+    echo "Install basic console support."
+    in_target apt install -y console-setup locales command-not-found bash-completion man-db psmisc yazi eza
     in_target dpkg-reconfigure tzdata keyboard-configuration console-setup locales
     in_target apt-file update
 
@@ -353,8 +361,6 @@ EOF
     in_target chown -R root:cargo /usr/local
     in_target chmod -R g+w /usr/local
     in_target sudo -u cargo cargo install wiremix
-    in_target sudo -u cargo cargo install eza
-    in_target sudo -u cargo carho install yazi-build
 
     echo "Save snapshots."
     in_target zfs snapshot bpool/hyprdebian@install
