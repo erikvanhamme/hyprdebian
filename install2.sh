@@ -49,6 +49,17 @@ STEPS=(
     configure_netplan
     configure_zfs_cache
     deploy_files
+    tgt_mount
+    tgt_add_sources
+    tgt_upgrade
+    tgt_console
+    tgt_zfs_support
+    tgt_grub2
+    tgt_netplan
+    tgt_syscargo
+    tgt_filetools
+    tgt_greetd
+    tgt_hyprland
 )
 
 # Steps disabled by default (optional)
@@ -411,6 +422,88 @@ deploy_files() {
 
     cp -v deploy/etc/apt/sources.list /mnt/etc/apt/
     cp -rv deploy/etc/skel/. /mnt/etc/skel
+}
+
+# tgt
+
+tgt_mount() { # TODO: Split?
+    mount --make-private --rbind /dev  /mnt/dev
+    mount --make-private --rbind /proc /mnt/proc
+    mount --make-private --rbind /sys  /mnt/sys
+
+    in_target rm /dev/log
+    in_target touch /dev/log
+    mount --bind /run/systemd/journal/dev-log /mnt/dev/log
+}
+
+tgt_add_sources() { # TODO: Split?
+    in_target apt update
+    in_target apt install -y curl gpg
+    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
+    in_target apt update
+}
+
+tgt_upgrade() {
+    apt upgrade -y
+}
+
+tgt_console() { # TODO: Split?
+    in_target apt install -y console-setup locales command-not-found bash-completion man-db psmisc yazi eza
+    in_target dpkg-reconfigure tzdata keyboard-configuration console-setup locales
+    in_target apt-file update
+}
+
+tgt_zfs_support() {
+    in_target apt install -y dpkg-dev linux-headers-generic linux-image-generic zfs-initramfs firmware-linux
+}
+
+tgt_grub2() { # TODO: Split?
+    in_target mkdir /boot/efi
+    in_target mount /boot/efi
+    in_target apt install -y grub-efi-amd64 shim-signed
+    in_target apt purge -y os-prober
+    in_target update-initramfs -c -k all
+    cp -v deploy/etc/default/grub /mnt/etc/default
+    in_target update-grub
+    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
+}
+
+tgt_netplan() { # TODO: Split?
+    in_target apt purge -y ifupdown
+    in_target apt install -y netplan.io
+    in_target netplan generate
+}
+
+tgt_syscargo() { # TODO: Split?
+    in_target apt install -y rustup
+    zfs create rpool/home/cargo
+    in_target useradd -m -r -s /bin/bash cargo
+    in_target chown -R cargo:cargo /home/cargo
+    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
+    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
+[install]
+root = "/usr/local"
+EOF
+    in_target sudo -u cargo rustup default stable
+
+    write_file /mnt/usr/local/bin/syscargo 0755 <<'EOF'
+#!/bin/bash
+exec sudo -u cargo -H cargo "$@"
+EOF
+}
+
+tgt_filetools() {
+    in_target apt install -y yazi eza
+}
+
+tgt_greetd() { # TODO: Split?
+    in_target apt install -y greetd dbus-user-session
+    in_target systemctl enable greetd
+}
+
+tgt_hyprland() {
+    in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin # TODO: Add and fix hyprlock.
 }
 
 # ---------------------------
