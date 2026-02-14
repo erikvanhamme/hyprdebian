@@ -20,6 +20,9 @@ STEPS=(
     question_disk
     question_swap
     question_username
+    question_hostname
+    question_fqdn
+    question_iface
     prerequisites_backup_sources
     prerequisites_remove_sources
     prerequisites_install_sources
@@ -40,6 +43,12 @@ STEPS=(
     filesystem_root_pool
     filesystem_datasets
     bootstrap
+    configure_fstab
+    configure_hostname
+    configure_hosts
+    configure_netplan
+    configure_zfs_cache
+    deploy_files
 )
 
 # Steps disabled by default (optional)
@@ -174,17 +183,31 @@ save_config() {
 question_disk() {
     echo "Available block devices:"
     find /dev/disk/by-id
-    ask DISK "Target disk (e.g. /dev/sda)"
+    ask DISK "Target disk (e.g. /dev/sda): "
     read -rp "All data on $DISK will be destroyed. Continue? [y/N]: " confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborting."; return 1; }
 }
 
 question_swap() {
-    ask SWAP "Enter size of swap partition (in GiB). Must be > 0!"
+    ask SWAP "Enter size of swap partition (in GiB, must be > 0): "
 }
 
 question_username() {
-    ask USERNAME "Username"
+    ask USERNAME "Username: "
+}
+
+question_hostname() {
+    ask HOSTNAME "Hostname: "
+}
+
+question_fqdn() {
+    ask FQDN "Fully qualified domain name: "
+}
+
+question_iface() {
+    echo "Available wired interfaces:"
+    ip -o link show | awk -F': ' '{print $2}' | grep -E '^(en|eth)'
+    ask IFACE "Select wired interface for DHCP (e.g. enp0s3): "
 }
 
 # prerequisites
@@ -316,6 +339,78 @@ bootstrap() {
     mkdir -p /mnt/var/lib
 
     debootstrap testing /mnt
+}
+
+# configure
+
+configure_fstab() {
+    local efi_part swap_part
+    local efi_uuid swap_uuid
+
+    efi_part=${DISK}-part1
+    swap_part=${DISK}-part2
+    efi_uuid=$(blkid -s UUID -o value ${efi_part})
+    swap_uuid=$(blkid -s UUID -o value ${swap_part})
+
+    if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
+        echo "ERROR: Unable to determine UUIDs for fstab."
+        return 1
+    fi
+
+    write_file /mnt/etc/fstab 0644 <<EOF
+# /etc/fstab: static file system information
+#
+# <file system>  <mount point>  <type>  <options>         <dump> <pass>
+
+UUID=${efi_uuid}   /boot/efi   vfat   umask=0077        0      1
+UUID=${swap_uuid}  none        swap   sw                0      0
+EOF
+}
+
+configure_hostname() {
+    write_file /mnt/etc/hostname 0644 <<EOF
+${HOSTNAME}
+EOF
+}
+
+configure_hosts() {
+    write_file /mnt/etc/hosts 0644 <<EOF
+127.0.0.1   localhost
+127.0.1.1   ${FQDN} ${HOSTNAME}
+
+# IPv6
+::1         localhost ip6-localhost ip6-loopback
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+EOF
+}
+
+configure_netplan() {
+    mkdir /mnt/etc/netplan
+    write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ${IFACE}:
+      dhcp4: true
+      dhcp6: true
+EOF
+}
+
+configure_zfs_cache() {
+    mkdir /mnt/etc/zfs
+    cp /etc/zfs/zpool.cache /mnt/etc/zfs
+}
+
+# deploy
+
+deploy_files() {
+    mkdir -p /mnt/etc/default
+    mkdir -p /mnt/etc/apt
+
+    cp -v deploy/etc/apt/sources.list /mnt/etc/apt/
+    cp -rv deploy/etc/skel/. /mnt/etc/skel
 }
 
 # ---------------------------
