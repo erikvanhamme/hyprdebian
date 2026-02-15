@@ -68,6 +68,13 @@ STEPS=(
     user_greetd
     user_log
     user_dark
+    tgt_audio
+    tgt_browser
+    tgt_misc
+    tgt_syscargo_permissions
+    tgt_wiremix
+    tgt_snapshots
+    umount_all
 )
 
 # Steps disabled by default (optional)
@@ -557,7 +564,44 @@ user_dark() { # TODO: Find out why this does not work.
 
 # tgt
 
+tgt_audio() {
+    in_target apt install -y pipewire wireplumber pulseaudio-utils audacious audacity vlc
+    mkdir -p /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants
+    ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
+    ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
+    in_target apt install -y pkg-config libpipewire-0.3-dev libclang-dev
+}
 
+tgt_browser() {
+    in_target apt install -y firefox
+}
+
+tgt_misc() {
+    in_target apt install -y nfs-common
+}
+
+tgt_syscargo_permissions() {
+    mkdir -p /mnt/usr/local/bin
+    in_target chown -R root:cargo /usr/local
+    in_target chmod -R g+w /usr/local
+}
+
+tgt_wiremix() {
+    in_target sudo -u cargo cargo install wiremix
+}
+
+tgt_snapshots() {
+    in_target zfs snapshot bpool/hyprdebian@install
+    in_target zfs snapshot rpool/hyprdebian@install
+}
+
+# cleanup
+
+umount_all() {
+    umount /mnt/dev/log
+    mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
+    zpool export -a
+}
 
 # ---------------------------
 # CLI parsing
