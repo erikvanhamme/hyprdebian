@@ -600,7 +600,7 @@ tgt_snapshots() {
 umount_all() {
     umount /mnt/dev/log
     mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
-    zpool export -a
+    zpool export -a || true
 }
 
 # ---------------------------
