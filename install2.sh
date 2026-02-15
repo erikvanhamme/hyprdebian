@@ -60,11 +60,18 @@ STEPS=(
     tgt_filetools
     tgt_greetd
     tgt_hyprland
+    user_filesystem
+    user_add
+    user_skel
+    user_chown
+    user_groups
+    user_greetd
+    user_log
+    user_dark
 )
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
-    question_username
 )
 
 # ---------------------------
@@ -505,6 +512,52 @@ tgt_greetd() { # TODO: Split?
 tgt_hyprland() {
     in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin # TODO: Add and fix hyprlock.
 }
+
+# user
+
+user_filesystem() {
+    zfs create rpool/home/${USERNAME}
+}
+
+user_add() {
+    in_target STDOUTMSGLEVEL=fatal STDERRMSGLEVEL=fatal adduser ${USERNAME}
+}
+
+user_skel() {
+    in_target cp -a /etc/skel/. /home/${USERNAME}/
+}
+
+user_chown() {
+    in_target chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+}
+
+user_groups() {
+    in_target usermod -a -G audio,cdrom,dip,floppy,netdev,plugdev,sudo,video ${USERNAME}
+}
+
+user_greetd() {
+    write_file /mnt/etc/greetd/config.toml 0644 <<EOF
+[terminal]
+vt = 7
+
+[default_session]
+command = "dbus-run-session start-hyprland > /var/log/hyprland.log 2>&1"
+user = "${USERNAME}"
+EOF
+}
+
+user_log() {
+    touch /mnt/var/log/hyprland.log
+    in_target chown ${USERNAME}:${USERNAME} /var/log/hyprland.log
+}
+
+user_dark() { # TODO: Find out why this does not work.
+    in_target sudo -u ${USERNAME} gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+}
+
+# tgt
+
+
 
 # ---------------------------
 # CLI parsing
