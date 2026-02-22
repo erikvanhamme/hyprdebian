@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Launch the screensaver in kitty
+
+# Exit early if we don't have the tte show
+if ! command -v tte &>/dev/null; then
+  exit 1
+fi
+
+# Exit early if screensaver is already running
+pgrep -f hyprdebian.screensaver && exit 0
+
+focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
+
+for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+  hyprctl dispatch focusmonitor $m
+
+  hyprctl dispatch exec -- \
+    kitty --class=hyprdebian.screensaver \
+    --override font_size=18 \
+    --override window_padding_width=0 \
+    -e cmd-screensaver
+done
+
+hyprctl dispatch focusmonitor $focused
