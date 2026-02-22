@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.7 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.8 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -517,7 +517,7 @@ tgt_greetd() { # TODO: Split?
 }
 
 tgt_hyprland() {
-    in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin # TODO: Add and fix hyprlock.
+    in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects # TODO: Add and fix hyprlock.
 }
 
 # user
