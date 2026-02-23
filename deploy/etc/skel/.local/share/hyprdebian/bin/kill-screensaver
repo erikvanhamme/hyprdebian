@@ -1,0 +1,10 @@
+#!/bin/bash
+
+exit_screensaver() {
+    hyprctl keyword cursor:invisible false &>/dev/null || true
+    pkill -x tte 2>/dev/null
+    pkill -f hyprdebian.screensaver 2>/dev/null
+    exit 0
+}
+
+exit_screensaver
