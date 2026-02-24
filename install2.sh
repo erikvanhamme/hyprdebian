@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.10 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.11 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -58,6 +58,7 @@ STEPS=(
     tgt_zfs_support
     tgt_console
     tgt_grub2
+    tgt_systemd
     tgt_netplan
     tgt_syscargo
     tgt_filetools
@@ -82,6 +83,7 @@ STEPS=(
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
+    tgt_wiremix
 )
 
 # ---------------------------
@@ -467,14 +469,15 @@ tgt_upgrade() {
 
 tgt_locales() {
     in_target apt install -y locales
+    in_target dpkg-reconfigure locales
 }
 
 tgt_buildtools() {
-    in_target apt install -y build-essential cmake ninja meson git
+    in_target apt install -y build-essential cmake meson git pkg-config
 }
 
 tgt_kernel() {
-    in target apt install -y linux-image-generic linux-headers-generic firmware-linux
+    in_target apt install -y linux-image-generic linux-headers-generic firmware-linux
 }
 
 tgt_zfs_support() {
@@ -490,6 +493,10 @@ tgt_grub2() { # TODO: Split?
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
     in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
+}
+
+tgt_systemd() {
+    in_target apt install -y systemd-timesyncd
 }
 
 tgt_console() { # TODO: Split?
@@ -524,11 +531,17 @@ EOF
 
 tgt_uwsm() {
     in_target apt install -y python3-dbus python3-xdg scdoc
-    mkdir -p /mnt/usr/src
-    in_target git clone https://github.com/Vladimir-csp/uwsm.git /usr/src
-    in_target cd /usr/src/uwsm && meson setup build --buildtype=release
-    in_target cd /usr/src/uwsm && ninja -C build
-    in_target cd /usr/src/uwsm && meson install -C build
+    write_file /mnt/tmp/uwsm.sh 0755 <<EOF
+#!/bin/bash
+cd /usr/src
+git clone https://github.com/Vladimir-csp/uwsm.git
+cd uwsm
+ls -alh
+meson setup build --buildtype=release
+ninja -C build
+meson install -C build
+EOF
+    in_target /tmp/uwsm.sh
 }
 
 tgt_filetools() {
