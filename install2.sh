@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.9 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.10 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -52,12 +52,16 @@ STEPS=(
     tgt_mount
     tgt_add_sources
     tgt_upgrade
-    tgt_console
+    tgt_locales
+    tgt_buildtools
+    tgt_kernel
     tgt_zfs_support
+    tgt_console
     tgt_grub2
     tgt_netplan
     tgt_syscargo
     tgt_filetools
+    tgt_uwsm
     tgt_greetd
     tgt_hyprland
     user_filesystem
@@ -65,7 +69,6 @@ STEPS=(
     user_skel
     user_chown
     user_groups
-    user_greetd
     user_log
     user_dark
     tgt_audio
@@ -462,14 +465,20 @@ tgt_upgrade() {
     apt upgrade -y
 }
 
-tgt_console() { # TODO: Split?
-    in_target apt install -y console-setup locales command-not-found bash-completion man-db psmisc yazi eza
-    in_target dpkg-reconfigure tzdata keyboard-configuration console-setup locales
-    in_target apt-file update
+tgt_locales() {
+    in_target apt install -y locales
+}
+
+tgt_buildtools() {
+    in_target apt install -y build-essential cmake ninja meson git
+}
+
+tgt_kernel() {
+    in target apt install -y linux-image-generic linux-headers-generic firmware-linux
 }
 
 tgt_zfs_support() {
-    in_target apt install -y dpkg-dev linux-headers-generic linux-image-generic zfs-initramfs firmware-linux
+    in_target apt install -y dpkg-dev zfs-initramfs
 }
 
 tgt_grub2() { # TODO: Split?
@@ -481,6 +490,12 @@ tgt_grub2() { # TODO: Split?
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
     in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
+}
+
+tgt_console() { # TODO: Split?
+    in_target apt install -y console-setup command-not-found bash-completion man-db psmisc yazi eza
+    in_target dpkg-reconfigure tzdata keyboard-configuration console-setup
+    in_target apt-file update
 }
 
 tgt_netplan() { # TODO: Split?
@@ -507,13 +522,30 @@ exec sudo -u cargo -H cargo "$@"
 EOF
 }
 
+tgt_uwsm() {
+    in_target apt install -y python3-dbus python3-xdg scdoc
+    mkdir -p /mnt/usr/src
+    in_target git clone https://github.com/Vladimir-csp/uwsm.git /usr/src
+    in_target cd /usr/src/uwsm && meson setup build --buildtype=release
+    in_target cd /usr/src/uwsm && ninja -C build
+    in_target cd /usr/src/uwsm && meson install -C build
+}
+
 tgt_filetools() {
     in_target apt install -y yazi eza
 }
 
 tgt_greetd() { # TODO: Split?
-    in_target apt install -y greetd dbus-user-session
+    in_target apt install -y greetd
     in_target systemctl enable greetd
+    write_file /mnt/etc/greetd/config.toml 0644 <<EOF
+[terminal]
+vt = 7
+
+[default_session]
+command = "uwsm start hyprland.desktop > /var/log/hyprland.log 2>&1"
+user = "${USERNAME}"
+EOF
 }
 
 tgt_hyprland() {
@@ -540,17 +572,6 @@ user_chown() {
 
 user_groups() {
     in_target usermod -a -G audio,cdrom,dip,floppy,netdev,plugdev,sudo,video ${USERNAME}
-}
-
-user_greetd() {
-    write_file /mnt/etc/greetd/config.toml 0644 <<EOF
-[terminal]
-vt = 7
-
-[default_session]
-command = "dbus-run-session start-hyprland > /var/log/hyprland.log 2>&1"
-user = "${USERNAME}"
-EOF
 }
 
 user_log() {
