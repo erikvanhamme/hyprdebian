@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.12 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.13 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -369,7 +369,7 @@ bootstrap() {
     mkdir /mnt/run/lock
     mkdir -p /mnt/var/lib
 
-    debootstrap testing /mnt
+    debootstrap --arch=amd64 --variant=minbase --exclude=dracut,turnstile,ifupdown unstable /mnt http://deb.debian.org/debian
 }
 
 # configure
@@ -440,7 +440,7 @@ deploy_files() {
     mkdir -p /mnt/etc/default
     mkdir -p /mnt/etc/apt
 
-    cp -v deploy/etc/apt/sources.list /mnt/etc/apt/
+    cp -rv deploy/etc/apt/. /mnt/etc/apt/
     cp -rv deploy/etc/skel/. /mnt/etc/skel
 }
 
@@ -474,22 +474,21 @@ tgt_locales() {
 }
 
 tgt_buildtools() {
-    in_target apt install -y build-essential cmake meson git pkg-config
+    in_target apt install -y build-essential cmake meson ninja-build git pkg-config
 }
 
 tgt_kernel() {
-    in_target apt install -y linux-image-generic linux-headers-generic firmware-linux initramfs-tools
+    in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux initramfs-tools
 }
 
 tgt_zfs_support() {
-    in_target apt install -y dpkg-dev zfs-initramfs
+    in_target apt install -y zfs-initramfs
 }
 
 tgt_grub2() { # TODO: Split?
     in_target mkdir /boot/efi
     in_target mount /boot/efi
     in_target apt install -y grub-efi-amd64 shim-signed
-    in_target apt purge -y os-prober
     in_target update-initramfs -c -k all
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
@@ -501,13 +500,12 @@ tgt_systemd() {
 }
 
 tgt_console() { # TODO: Split?
-    in_target apt install -y console-setup command-not-found bash-completion man-db psmisc yazi eza
+    in_target apt install -y console-setup command-not-found man-db
     in_target dpkg-reconfigure tzdata keyboard-configuration console-setup
     in_target apt-file update
 }
 
-tgt_netplan() { # TODO: Split?
-    in_target apt purge -y ifupdown
+tgt_netplan() {
     in_target apt install -y netplan.io
     in_target netplan generate
 }
@@ -530,7 +528,7 @@ exec sudo -u cargo -H cargo "$@"
 EOF
 }
 
-tgt_uwsm() {
+tgt_uwsm() #TODO: Can we find a package? {
     in_target apt install -y python3-dbus python3-xdg scdoc
     write_file /mnt/tmp/uwsm.sh 0755 <<EOF
 #!/bin/bash
@@ -549,7 +547,7 @@ tgt_filetools() {
     in_target apt install -y yazi eza
 }
 
-tgt_greetd() { # TODO: Split?
+tgt_greetd() {
     in_target apt install -y greetd
     in_target systemctl enable greetd
     write_file /mnt/etc/greetd/config.toml 0644 <<EOF
@@ -563,7 +561,7 @@ EOF
 }
 
 tgt_hyprland() {
-    in_target apt install -y kitty desktop-base dbus-user-session dbus-session-bus-common hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
+    in_target apt install -y kitty desktop-base dbus-user-session hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
 }
 
 tgt_mako() {
@@ -608,7 +606,6 @@ tgt_audio() {
     mkdir -p /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants
     ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
     ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
-    in_target apt install -y pkg-config libpipewire-0.3-dev libclang-dev
 }
 
 tgt_browser() {
@@ -616,7 +613,7 @@ tgt_browser() {
 }
 
 tgt_misc() {
-    in_target apt install -y nfs-common
+    in_target apt install -y nfs-common psmisc net-tools
 }
 
 tgt_syscargo_permissions() {
@@ -626,6 +623,7 @@ tgt_syscargo_permissions() {
 }
 
 tgt_wiremix() {
+    in_target apt install -y libpipewire-0.3-dev libclang-dev
     in_target sudo -u cargo cargo install wiremix
 }
 
