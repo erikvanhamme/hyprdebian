@@ -1,0 +1,14 @@
+font=JetBrains Mono NL Medium 18
+text-color=#0066cc
+
+background-color=#000000
+
+border-size=3
+border-color=#ff6600
+width=400
+height=200
+
+default-timeout=5000
+ignore-timeout=1
+
+margin=30

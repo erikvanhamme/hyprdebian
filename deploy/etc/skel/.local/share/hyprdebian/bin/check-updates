@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Update package lists quietly
+apt update -qq
+
+# Count upgradable packages
+UPDATES=$(apt list --upgradable 2>/dev/null | grep -v Listing | wc -l)
+
+if [ "$UPDATES" -gt 0 ]; then
+    notify-send "Updates Available" "$UPDATES packages can be upgraded."
+fi

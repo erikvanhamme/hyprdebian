@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.11 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.12 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -65,6 +65,7 @@ STEPS=(
     tgt_uwsm
     tgt_greetd
     tgt_hyprland
+    tgt_mako
     user_filesystem
     user_add
     user_skel
@@ -477,7 +478,7 @@ tgt_buildtools() {
 }
 
 tgt_kernel() {
-    in_target apt install -y linux-image-generic linux-headers-generic firmware-linux
+    in_target apt install -y linux-image-generic linux-headers-generic firmware-linux initramfs-tools
 }
 
 tgt_zfs_support() {
@@ -562,7 +563,11 @@ EOF
 }
 
 tgt_hyprland() {
-    in_target apt install -y kitty desktop-base hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
+    in_target apt install -y kitty desktop-base dbus-user-session dbus-session-bus-common hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
+}
+
+tgt_mako() {
+    in_target apt install -y libnotify-bin mako-notifier
 }
 
 # user
