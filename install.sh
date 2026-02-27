@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.14 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.15 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -50,7 +50,7 @@ STEPS=(
     configure_zfs_cache
     deploy_files
     tgt_mount
-    tgt_apt
+    tgt_apt_init
     tgt_add_sources
     tgt_upgrade
     tgt_locales
@@ -383,7 +383,7 @@ bootstrap() {
     mkdir /mnt/run/lock
     mkdir -p /mnt/var/lib
 
-    debootstrap --arch=amd64 --variant=minbase --exclude=ifupdown unstable /mnt http://deb.debian.org/debian
+    debootstrap --arch=amd64 --exclude=ifupdown unstable /mnt http://deb.debian.org/debian
 }
 
 # configure
@@ -470,9 +470,8 @@ tgt_mount() { # TODO: Split?
     mount --bind /run/systemd/journal/dev-log /mnt/dev/log
 }
 
-tgt_apt() {
+tgt_apt_init() {
     in_target apt update
-    in_target apt install -y dialog
 }
 
 tgt_add_sources() {
