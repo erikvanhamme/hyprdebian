@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.13 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.14 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -50,6 +50,7 @@ STEPS=(
     configure_zfs_cache
     deploy_files
     tgt_mount
+    tgt_apt
     tgt_add_sources
     tgt_upgrade
     tgt_locales
@@ -84,6 +85,19 @@ STEPS=(
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
+    tgt_add_sources
+    tgt_upgrade
+    tgt_syscargo
+    tgt_filetools
+    tgt_uwsm
+    tgt_greetd
+    tgt_hyprland
+    tgt_mako
+    user_dark
+    tgt_audio
+    tgt_browser
+    tgt_misc
+    tgt_syscargo_permissions
     tgt_wiremix
 )
 
@@ -369,7 +383,7 @@ bootstrap() {
     mkdir /mnt/run/lock
     mkdir -p /mnt/var/lib
 
-    debootstrap --arch=amd64 --variant=minbase --exclude=dracut,turnstile,ifupdown unstable /mnt http://deb.debian.org/debian
+    debootstrap --arch=amd64 --variant=minbase --exclude=ifupdown unstable /mnt http://deb.debian.org/debian
 }
 
 # configure
@@ -456,8 +470,12 @@ tgt_mount() { # TODO: Split?
     mount --bind /run/systemd/journal/dev-log /mnt/dev/log
 }
 
-tgt_add_sources() { # TODO: Split?
+tgt_apt() {
     in_target apt update
+    in_target apt install -y dialog
+}
+
+tgt_add_sources() {
     in_target apt install -y curl gpg
     in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
     in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
@@ -478,18 +496,18 @@ tgt_buildtools() {
 }
 
 tgt_kernel() {
-    in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux initramfs-tools
+    in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
 }
 
 tgt_zfs_support() {
-    in_target apt install -y zfs-initramfs
+    in_target apt install -y zfs-dkms zfsutils-linux
 }
 
 tgt_grub2() { # TODO: Split?
     in_target mkdir /boot/efi
     in_target mount /boot/efi
     in_target apt install -y grub-efi-amd64 shim-signed
-    in_target update-initramfs -c -k all
+    in_target dracut -f
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
     in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
@@ -528,7 +546,7 @@ exec sudo -u cargo -H cargo "$@"
 EOF
 }
 
-tgt_uwsm() #TODO: Can we find a package? {
+tgt_uwsm() { #TODO: Can we find a package?
     in_target apt install -y python3-dbus python3-xdg scdoc
     write_file /mnt/tmp/uwsm.sh 0755 <<EOF
 #!/bin/bash
