@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.15 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.16 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/my-installer"
@@ -52,7 +52,6 @@ STEPS=(
     tgt_mount
     tgt_apt_init
     tgt_add_sources
-    tgt_upgrade
     tgt_locales
     tgt_buildtools
     tgt_kernel
@@ -85,19 +84,6 @@ STEPS=(
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
-    tgt_add_sources
-    tgt_upgrade
-    tgt_syscargo
-    tgt_filetools
-    tgt_uwsm
-    tgt_greetd
-    tgt_hyprland
-    tgt_mako
-    user_dark
-    tgt_audio
-    tgt_browser
-    tgt_misc
-    tgt_syscargo_permissions
     tgt_wiremix
 )
 
@@ -460,7 +446,7 @@ deploy_files() {
 
 # tgt
 
-tgt_mount() { # TODO: Split?
+tgt_mount() {
     mount --make-private --rbind /dev  /mnt/dev
     mount --make-private --rbind /proc /mnt/proc
     mount --make-private --rbind /sys  /mnt/sys
@@ -481,17 +467,13 @@ tgt_add_sources() {
     in_target apt update
 }
 
-tgt_upgrade() {
-    apt upgrade -y
-}
-
 tgt_locales() {
     in_target apt install -y locales
     in_target dpkg-reconfigure locales
 }
 
 tgt_buildtools() {
-    in_target apt install -y build-essential cmake meson ninja-build git pkg-config
+    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
 }
 
 tgt_kernel() {
@@ -499,14 +481,14 @@ tgt_kernel() {
 }
 
 tgt_zfs_support() {
-    in_target apt install -y zfs-dkms zfsutils-linux
+    in_target apt install -y zfs-dkms zfsutils-linux zfs-initramfs
 }
 
 tgt_grub2() { # TODO: Split?
     in_target mkdir /boot/efi
     in_target mount /boot/efi
     in_target apt install -y grub-efi-amd64 shim-signed
-    in_target dracut -f
+    in_target update-initramfs -c -k all
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
     in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
@@ -604,7 +586,7 @@ user_chown() {
 }
 
 user_groups() {
-    in_target usermod -a -G audio,cdrom,dip,floppy,netdev,plugdev,sudo,video ${USERNAME}
+    in_target usermod -a -G audio,cdrom,dip,floppy,plugdev,sudo,video ${USERNAME}
 }
 
 user_log() {
