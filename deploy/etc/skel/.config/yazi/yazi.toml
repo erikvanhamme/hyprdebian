@@ -3,31 +3,31 @@
 # Video
 
 vlc_open = [
-  { run = 'vlc "$@"', orphan = true, desc = "Open (VLC) }
+  { run = 'vlc %s', orphan = true, desc = "Open (VLC)" },
 ]
 
 vlc_enqueue = [
-  { run = 'vlc --playlist-enqueue "$@"', orphan = true, desc = "Enqueue (VLC)" }
+  { run = 'vlc --playlist-enqueue %s', orphan = true, desc = "Enqueue (VLC)" },
 ]
 
 # Audio
 
 audacious_open = [
-  { run = 'audacious "$@"', orphan = true, desc = "Open (Audacious)" }
+  { run = 'audacious %s', orphan = true, desc = "Open (Audacious)" },
 ]
 
 audacious_enqueue = [
-  { run = 'audacious --enqueue "$@"', orphan = true, desc = "Enqueue (Audacious)" }
+  { run = 'audacious --enqueue %s', orphan = true, desc = "Enqueue (Audacious)" },
 ]
 
 # Images
 
 imv_open = [
-  { run = 'imv-wayland "$@"', orphan = true, desc = "Open (Imv)" }
+  { run = 'imv-wayland %s', orphan = true, desc = "Open (Imv)" },
 ]
 
 imv_open_dir = [
-  { run = 'imv-dir "$@"', orphan = true, desc = "Open (Imv) }
+  { run = 'imv-dir %s', orphan = true, desc = "Open (Imv)" },
 ]
 
 [open]
@@ -36,5 +36,5 @@ rules = [
   { mime = "video/*", use = ["vlc_enqueue", "vlc_open"] },
   { mime = "audio/*", use = ["audacious_open", "audacious_enqueue"] },
   { mime = "image/*", use = "imv_open" },
-  { mime = "inode/directory", use = ["vlc_enqueue", "vlc_open", "audacious_enqueue", "audacious_open", "imv_open_dir"] }
+  { mime = "inode/directory", use = ["vlc_enqueue", "vlc_open", "audacious_enqueue", "audacious_open", "imv_open_dir"] },
 ]
