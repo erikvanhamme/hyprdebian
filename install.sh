@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.16 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.17 ==="
 
 TARGET=/mnt
-STATE_DIR="/tmp/my-installer"
+STATE_DIR="/tmp/hyprdebian"
 mkdir -p "$STATE_DIR"
 CONFIG_FILE="$STATE_DIR/config"
 
@@ -73,7 +73,11 @@ STEPS=(
     user_groups
     user_log
     user_dark
-    tgt_audio
+    tgt_pipewire
+    tgt_audacity
+    tgt_audacious
+    tgt_vlc
+    tgt_imv
     tgt_browser
     tgt_misc
     tgt_syscargo_permissions
@@ -600,11 +604,27 @@ user_dark() { # TODO: Find out why this does not work.
 
 # tgt
 
-tgt_audio() {
-    in_target apt install -y pipewire wireplumber pulseaudio-utils audacious audacity vlc
+tgt_pipewire() {
+    in_target apt install -y pipewire wireplumber pulseaudio-utils
     mkdir -p /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants
     ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
     ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
+}
+
+tgt_audacity() {
+    in_target apt install -y audacity
+}
+
+tgt_audacious() {
+    in_target apt install -y audacious
+}
+
+tgt_vlc() {
+    in_target apt install -y vlc
+}
+
+tgt_imv() {
+    in_target apt install -y imv
 }
 
 tgt_browser() {
