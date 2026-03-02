@@ -26,15 +26,10 @@ imv_open = [
   { run = 'imv-wayland %s', orphan = true, desc = "Open (Imv)" },
 ]
 
-imv_open_dir = [
-  { run = 'imv-dir %s', orphan = true, desc = "Open (Imv)" },
-]
-
 [open]
 
 rules = [
   { mime = "video/*", use = ["vlc_enqueue", "vlc_open"] },
   { mime = "audio/*", use = ["audacious_open", "audacious_enqueue"] },
   { mime = "image/*", use = "imv_open" },
-  { mime = "inode/directory", use = ["vlc_enqueue", "vlc_open", "audacious_enqueue", "audacious_open", "imv_open_dir"] },
 ]

@@ -82,6 +82,7 @@ STEPS=(
     tgt_misc
     tgt_syscargo_permissions
     tgt_wiremix
+    tgt_lumen
     tgt_snapshots
     umount_all
 )
@@ -89,6 +90,7 @@ STEPS=(
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
     tgt_wiremix
+    tgt_lumen
 )
 
 # ---------------------------
