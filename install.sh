@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.17 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.18 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -89,8 +89,6 @@ STEPS=(
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
-    tgt_wiremix
-    tgt_lumen
 )
 
 # ---------------------------
@@ -549,7 +547,7 @@ EOF
 }
 
 tgt_filetools() {
-    in_target apt install -y yazi eza
+    in_target apt install -y yazi eza fzf
 }
 
 tgt_greetd() {
