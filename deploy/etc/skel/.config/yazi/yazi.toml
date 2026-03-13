@@ -2,12 +2,8 @@
 
 # Video
 
-vlc_open = [
-  { run = 'vlc %s', orphan = true, desc = "Open (VLC)" },
-]
-
-vlc_enqueue = [
-  { run = 'vlc --playlist-enqueue %s', orphan = true, desc = "Enqueue (VLC)" },
+mpv_open = [
+  { run = 'mpv %s', orphan = true, desc = "Open (MPV)" },
 ]
 
 # Audio
@@ -29,7 +25,7 @@ imv_open = [
 [open]
 
 rules = [
-  { mime = "video/*", use = ["vlc_enqueue", "vlc_open"] },
+  { mime = "video/*", use = "mpv_open" },
   { mime = "audio/*", use = ["audacious_open", "audacious_enqueue"] },
   { mime = "image/*", use = "imv_open" },
 ]

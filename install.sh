@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.18 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.19 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -57,6 +57,7 @@ STEPS=(
     tgt_kernel
     tgt_zfs_support
     tgt_console
+    tgt_font
     tgt_grub2
     tgt_systemd
     tgt_netplan
@@ -76,19 +77,19 @@ STEPS=(
     tgt_pipewire
     tgt_audacity
     tgt_audacious
-    tgt_vlc
+    tgt_mpv
     tgt_imv
     tgt_browser
     tgt_misc
     tgt_syscargo_permissions
     tgt_wiremix
-    tgt_lumen
     tgt_snapshots
     umount_all
 )
 
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
+    tgt_wiremix
 )
 
 # ---------------------------
@@ -266,7 +267,7 @@ EOF
 }
 
 prerequisites_install_packages() {
-    apt install -y gdisk dosfstools linux-headers-amd64 zfsutils-linux debootstrap
+    apt install -y gdisk dosfstools linux-headers-amd64 zfsutils-linux debootstrap unzip
 }
 
 # partition
@@ -502,10 +503,17 @@ tgt_systemd() {
     in_target apt install -y systemd-timesyncd
 }
 
-tgt_console() { # TODO: Split?
+tgt_console() {
     in_target apt install -y console-setup command-not-found man-db
     in_target dpkg-reconfigure tzdata keyboard-configuration console-setup
     in_target apt-file update
+}
+
+tgt_font() {
+    in_target apt install -y fontconfig
+    mkidr /mnt/usr/local/share/fonts
+    curl https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip
+    unzip JetBrainsMono.zip -d /mnt/usr/local/share/fonts
 }
 
 tgt_netplan() {
@@ -564,7 +572,7 @@ EOF
 }
 
 tgt_hyprland() {
-    in_target apt install -y kitty desktop-base dbus-user-session hyprland hyprland-qtutils fonts-jetbrains-mono wofi swaybg libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
+    in_target apt install -y kitty desktop-base dbus-user-session hyprland hyprland-qtutils wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
 }
 
 tgt_mako() {
@@ -590,7 +598,7 @@ user_chown() {
 }
 
 user_groups() {
-    in_target usermod -a -G audio,cdrom,dip,floppy,plugdev,sudo,video ${USERNAME}
+    in_target usermod -a -G audio,cdrom,dip,input,plugdev,sudo,video ${USERNAME}
 }
 
 user_log() {
@@ -619,8 +627,8 @@ tgt_audacious() {
     in_target apt install -y audacious
 }
 
-tgt_vlc() {
-    in_target apt install -y vlc
+tgt_mpv() {
+    in_target apt install -y mpv
 }
 
 tgt_imv() {
