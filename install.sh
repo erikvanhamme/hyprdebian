@@ -511,8 +511,8 @@ tgt_console() {
 
 tgt_font() {
     in_target apt install -y fontconfig
-    mkidr /mnt/usr/local/share/fonts
-    curl https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip
+    mkdir /mnt/usr/local/share/fonts
+    wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip
     unzip JetBrainsMono.zip -d /mnt/usr/local/share/fonts
 }
 
