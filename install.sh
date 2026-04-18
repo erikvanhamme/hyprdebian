@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.19 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.20 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -444,9 +444,11 @@ configure_zfs_cache() {
 deploy_files() {
     mkdir -p /mnt/etc/default
     mkdir -p /mnt/etc/apt
+    mkdir -p /mnt/etc/dconf/db/local.d
 
     cp -rv deploy/etc/apt/. /mnt/etc/apt/
-    cp -rv deploy/etc/skel/. /mnt/etc/skel
+    cp -rv deploy/etc/skel/. /mnt/etc/skel/
+    cp -rv deploy/etc/dconf/db/local.d/. /mnt/etc/dconf/local.d/
 }
 
 # tgt
@@ -606,8 +608,9 @@ user_log() {
     in_target chown ${USERNAME}:${USERNAME} /var/log/hyprland.log
 }
 
-user_dark() { # TODO: Find out why this does not work.
-    in_target sudo -u ${USERNAME} gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+user_dark() {
+    in_target apt install -y qt6ct qt5ct
+    in_target dconf update
 }
 
 # tgt
@@ -637,6 +640,7 @@ tgt_imv() {
 
 tgt_browser() {
     in_target apt install -y firefox
+    cp deploy/usr/share/firefox/distribution/distribution.ini /mnt/usr/share/firefox/distribution/
 }
 
 tgt_misc() {
