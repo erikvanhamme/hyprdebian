@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.26 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.27 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -504,9 +504,9 @@ tgt_kernel() {
     else
         mkdir -p ${TARGET}/tmp/deb
         cp kernels/*${KERNEL}* ${TARGET}/tmp/deb/
-        in_target dpkg -i /tmp/deb/*deb
-        in_target apt install -f
-        exit 0
+        in_target dpkg -R -i /tmp/deb/
+        in_target apt install -y -f
+        in_target apt install -y firmware-linux
     fi
 }
 
