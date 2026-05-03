@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.21 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.22 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -27,6 +27,7 @@ STEPS=(
     prerequisites_remove_sources
     prerequisites_install_sources
     prerequisites_install_packages
+    question_kernel
     partition_unmount_swap
     partition_wipe
     partition_discard
@@ -220,31 +221,31 @@ save_config() {
 question_disk() {
     echo "Available block devices:"
     find /dev/disk/by-id
-    ask DISK "Target disk (e.g. /dev/sda): "
-    read -rp "All data on $DISK will be destroyed. Continue? [y/N]: " confirm
+    ask DISK "Target disk (e.g. /dev/sda)"
+    read -rp "All data on $DISK will be destroyed. Continue? [y/N]" confirm
     [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborting."; return 1; }
 }
 
 question_swap() {
-    ask SWAP "Enter size of swap partition (in GiB, must be > 0): "
+    ask SWAP "Enter size of swap partition (in GiB, must be > 0)"
 }
 
 question_username() {
-    ask USERNAME "Username: "
+    ask USERNAME "Username"
 }
 
 question_hostname() {
-    ask HOSTNAME "Hostname: "
+    ask HOSTNAME "Hostname"
 }
 
 question_fqdn() {
-    ask FQDN "Fully qualified domain name: "
+    ask FQDN "Fully qualified domain name"
 }
 
 question_iface() {
     echo "Available wired interfaces:"
     ip -o link show | awk -F': ' '{print $2}' | grep -E '^(en|eth)'
-    ask IFACE "Select wired interface for DHCP (e.g. enp0s3): "
+    ask IFACE "Select wired interface for DHCP (e.g. enp0s3)"
 }
 
 # prerequisites
@@ -269,6 +270,15 @@ EOF
 
 prerequisites_install_packages() {
     apt install -y gdisk dosfstools linux-headers-amd64 zfsutils-linux debootstrap unzip
+}
+
+# kernel question
+
+question_kernel() {
+    echo "Available kernel versions:"
+    apt-cache search -n "^linux-(image|headers)-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64$" | awk -F'[-+]' '{print $3}' | sort -uV
+    echo "latest"
+    ask KERNEL "Select kernel version"
 }
 
 # partition
@@ -485,14 +495,18 @@ tgt_buildtools() {
 }
 
 tgt_kernel() {
-    in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
+    if [[ "${KERNEL}" == "latest" ]]; then
+        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
+    else
+        in_target apt install -y linux-image-${KERNEL}+deb14-amd64 linux-headers-${KERNEL}+deb14-amd64 firmware-linux
+    fi
 }
 
 tgt_zfs_support() {
     in_target apt install -y zfs-dkms zfsutils-linux zfs-initramfs
 }
 
-tgt_grub2() { # TODO: Split?
+tgt_grub2() {
     in_target mkdir /boot/efi
     in_target mount /boot/efi
     in_target apt install -y grub-efi-amd64 shim-signed
