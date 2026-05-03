@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.23 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.24 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -85,6 +85,7 @@ STEPS=(
     tgt_syscargo_permissions
     tgt_wiremix
     tgt_sniptool
+    tgt_cups
     tgt_snapshots
     umount_all
 )
@@ -604,7 +605,7 @@ user_chown() {
 }
 
 user_groups() {
-    in_target usermod -a -G audio,cdrom,dip,input,plugdev,sudo,video ${USERNAME}
+    in_target usermod -a -G audio,cdrom,dip,input,plugdev,sudo,video,lpadmin ${USERNAME}
 }
 
 user_log() {
@@ -665,6 +666,10 @@ tgt_wiremix() {
 tgt_sniptool() {
     in_target apt install -y grim slurp swappy wl-clipboard
     mkdir -p /mnt/home/${USERNAME}/Pictures/Screenshots
+}
+
+tgt_cups() {
+    in_target apt install -y cups
 }
 
 tgt_snapshots() {
