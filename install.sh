@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.20 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.21 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -83,6 +83,7 @@ STEPS=(
     tgt_misc
     tgt_syscargo_permissions
     tgt_wiremix
+    tgt_sniptool
     tgt_snapshots
     umount_all
 )
@@ -656,6 +657,11 @@ tgt_syscargo_permissions() {
 tgt_wiremix() {
     in_target apt install -y libpipewire-0.3-dev libclang-dev
     in_target sudo -u cargo cargo install wiremix
+}
+
+tgt_sniptool() {
+    in_target apt install -y grim slurp swappy wl-clipboard
+    mkdir -p /mnt/home/${USERNAME}/Pictures/Screenshots
 }
 
 tgt_snapshots() {
