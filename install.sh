@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.27 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.28 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -10,6 +10,23 @@ CONFIG_FILE="$STATE_DIR/config"
 
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
+fi
+
+if [[ -n "${USER_GROUPS:-}" ]]; then
+    # Convert string back to array
+    read -r -a USER_GROUPS <<< "$USER_GROUPS"
+fi
+
+if [[ -z "${USER_GROUPS:-}" ]]; then
+    USER_GROUPS=(
+        audio
+        cdrom
+        dip
+        input
+        plugdev
+        sudo
+        video
+    )
 fi
 
 # ---------------------------
@@ -72,7 +89,6 @@ STEPS=(
     user_add
     user_skel
     user_chown
-    user_groups
     user_log
     user_dark
     tgt_pipewire
@@ -86,6 +102,7 @@ STEPS=(
     tgt_wiremix
     tgt_sniptool
     tgt_cups
+    user_groups
     tgt_snapshots
     umount_all
 )
@@ -93,6 +110,7 @@ STEPS=(
 # Steps disabled by default (optional)
 DISABLED_STEPS=(
     tgt_wiremix
+    tgt_cups
 )
 
 # ---------------------------
@@ -125,11 +143,26 @@ log_status() {
     printf "%b[%s]%b %s\n" "$color" "$label" "$COLOR_RESET" "$step"
 }
 
+is_enabled() {
+    local step="$1"
+    for s in "${ENABLE_LIST[@]}"; do
+        [[ "$s" == "$step" ]] && return 0
+    done
+    return 1
+}
+
 is_disabled() {
     local step="$1"
+
+    # Explicit enable always wins
+    if is_enabled "$step"; then
+        return 1
+    fi
+
     for s in "${DISABLED_STEPS[@]}"; do
         [[ "$s" == "$step" ]] && return 0
     done
+
     return 1
 }
 
@@ -211,6 +244,19 @@ save_config() {
     printf '%s="%s"\n' "$key" "$value" >> "$CONFIG_FILE.tmp"
 
     mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+}
+
+add_user_group() {
+    local group="$1"
+
+    for g in "${USER_GROUPS[@]}"; do
+        [[ "$g" == "$group" ]] && return 0
+    done
+
+    USER_GROUPS+=("$group")
+
+    # Persist as space-separated string
+    save_config USER_GROUPS "${USER_GROUPS[*]}"
 }
 
 # ---------------------------
@@ -612,7 +658,10 @@ user_chown() {
 }
 
 user_groups() {
-    in_target usermod -a -G audio,cdrom,dip,input,plugdev,sudo,video,lpadmin ${USERNAME}
+    local groups
+    groups=$(IFS=,; echo "${USER_GROUPS[*]}")
+
+    in_target usermod -a -G "$groups" "${USERNAME}"
 }
 
 user_log() {
@@ -678,6 +727,7 @@ tgt_sniptool() {
 
 tgt_cups() {
     in_target apt install -y cups
+    add_user_group lpadmin
 }
 
 tgt_snapshots() {
@@ -700,6 +750,7 @@ umount_all() {
 FROM=""
 ONLY=""
 SKIP_LIST=()
+ENABLE_LIST=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -713,6 +764,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip)
             SKIP_LIST+=("$2")
+            shift 2
+            ;;
+        --enable)
+            ENABLE_LIST+=("$2")
             shift 2
             ;;
         --list)
