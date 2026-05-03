@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.25 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.26 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -491,7 +491,9 @@ tgt_buildtools() {
 
 question_kernel() {
     echo "Available kernel versions:"
-    in_target apt-cache search -n "^linux-(image|headers)-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64$" | awk -F'[-+]' '{print $3}' | sort -uV
+    if [[ -d kernels ]]; then
+        find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
+    fi
     echo "latest"
     ask KERNEL "Select kernel version"
 }
@@ -500,7 +502,11 @@ tgt_kernel() {
     if [[ "${KERNEL}" == "latest" ]]; then
         in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
     else
-        in_target apt install -y linux-image-${KERNEL}+deb14-amd64 linux-headers-${KERNEL}+deb14-amd64 firmware-linux
+        mkdir -p ${TARGET}/tmp/deb
+        cp kernels/*${KERNEL}* ${TARGET}/tmp/deb/
+        in_target dpkg -i /tmp/deb/*deb
+        in_target apt install -f
+        exit 0
     fi
 }
 
