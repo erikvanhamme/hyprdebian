@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.22 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.23 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -556,19 +556,8 @@ exec sudo -u cargo -H cargo "$@"
 EOF
 }
 
-tgt_uwsm() { #TODO: Can we find a package?
-    in_target apt install -y python3-dbus python3-xdg scdoc
-    write_file /mnt/tmp/uwsm.sh 0755 <<EOF
-#!/bin/bash
-cd /usr/src
-git clone https://github.com/Vladimir-csp/uwsm.git
-cd uwsm
-ls -alh
-meson setup build --buildtype=release
-ninja -C build
-meson install -C build
-EOF
-    in_target /tmp/uwsm.sh
+tgt_uwsm() {
+    in_target apt install -y uwsm
 }
 
 tgt_filetools() {
