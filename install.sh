@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.24 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.25 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -27,7 +27,6 @@ STEPS=(
     prerequisites_remove_sources
     prerequisites_install_sources
     prerequisites_install_packages
-    question_kernel
     partition_unmount_swap
     partition_wipe
     partition_discard
@@ -55,6 +54,7 @@ STEPS=(
     tgt_add_sources
     tgt_locales
     tgt_buildtools
+    question_kernel
     tgt_kernel
     tgt_zfs_support
     tgt_console
@@ -270,16 +270,8 @@ EOF
 }
 
 prerequisites_install_packages() {
-    apt install -y gdisk dosfstools linux-headers-amd64 zfsutils-linux debootstrap unzip
-}
-
-# kernel question
-
-question_kernel() {
-    echo "Available kernel versions:"
-    apt-cache search -n "^linux-(image|headers)-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64$" | awk -F'[-+]' '{print $3}' | sort -uV
-    echo "latest"
-    ask KERNEL "Select kernel version"
+    local INSTALL_KVER="$(uname -r)"
+    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip
 }
 
 # partition
@@ -495,6 +487,15 @@ tgt_buildtools() {
     in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
 }
 
+# kernel question
+
+question_kernel() {
+    echo "Available kernel versions:"
+    in_target apt-cache search -n "^linux-(image|headers)-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64$" | awk -F'[-+]' '{print $3}' | sort -uV
+    echo "latest"
+    ask KERNEL "Select kernel version"
+}
+
 tgt_kernel() {
     if [[ "${KERNEL}" == "latest" ]]; then
         in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
@@ -614,7 +615,7 @@ user_log() {
 }
 
 user_dark() {
-    in_target apt install -y qt6ct qt5ct
+    in_target apt install -y qt6ct qt5ct dconf-cli
     in_target dconf update
 }
 
@@ -666,6 +667,7 @@ tgt_wiremix() {
 tgt_sniptool() {
     in_target apt install -y grim slurp swappy wl-clipboard
     mkdir -p /mnt/home/${USERNAME}/Pictures/Screenshots
+    in_target chown ${USERNAME}:${USERNAME} /home/${USERNAME}/Pictures/Screenshots
 }
 
 tgt_cups() {
