@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.28 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.29 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -40,6 +40,7 @@ STEPS=(
     question_hostname
     question_fqdn
     question_iface
+    question_kernel
     prerequisites_backup_sources
     prerequisites_remove_sources
     prerequisites_install_sources
@@ -71,7 +72,6 @@ STEPS=(
     tgt_add_sources
     tgt_locales
     tgt_buildtools
-    question_kernel
     tgt_kernel
     tgt_zfs_support
     tgt_console
@@ -102,6 +102,7 @@ STEPS=(
     tgt_wiremix
     tgt_sniptool
     tgt_cups
+    tgt_wifi
     user_groups
     tgt_snapshots
     umount_all
@@ -111,6 +112,7 @@ STEPS=(
 DISABLED_STEPS=(
     tgt_wiremix
     tgt_cups
+    tgt_wifi
 )
 
 # ---------------------------
@@ -293,6 +295,15 @@ question_iface() {
     echo "Available wired interfaces:"
     ip -o link show | awk -F': ' '{print $2}' | grep -E '^(en|eth)'
     ask IFACE "Select wired interface for DHCP (e.g. enp0s3)"
+}
+
+question_kernel() {
+    echo "Available kernel versions:"
+    if [[ -d kernels ]]; then
+        find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
+    fi
+    echo "latest"
+    ask KERNEL "Select kernel version"
 }
 
 # prerequisites
@@ -481,6 +492,7 @@ network:
     ${IFACE}:
       dhcp4: true
       dhcp6: true
+      optional: true
 EOF
 }
 
@@ -533,17 +545,6 @@ tgt_buildtools() {
     in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
 }
 
-# kernel question
-
-question_kernel() {
-    echo "Available kernel versions:"
-    if [[ -d kernels ]]; then
-        find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
-    fi
-    echo "latest"
-    ask KERNEL "Select kernel version"
-}
-
 tgt_kernel() {
     if [[ "${KERNEL}" == "latest" ]]; then
         in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
@@ -592,7 +593,7 @@ tgt_netplan() {
     in_target netplan generate
 }
 
-tgt_syscargo() { # TODO: Split?
+tgt_syscargo() {
     in_target apt install -y rustup
     zfs create rpool/home/cargo
     in_target useradd -m -r -s /bin/bash cargo
@@ -705,7 +706,7 @@ tgt_browser() {
 }
 
 tgt_misc() {
-    in_target apt install -y nfs-common psmisc net-tools
+    in_target apt install -y nfs-common psmisc net-tools pciutils usbutils
 }
 
 tgt_syscargo_permissions() {
@@ -728,6 +729,14 @@ tgt_sniptool() {
 tgt_cups() {
     in_target apt install -y cups
     add_user_group lpadmin
+}
+
+tgt_wifi() {
+    in_target apt install -y iwd firmware-iwlwifi
+    write_file /mnt/etc/iwd/main.conf 0644 <<EOF
+[General]
+EnableNetworkConfiguration=true
+EOF
 }
 
 tgt_snapshots() {
