@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.33 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.34 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -10,6 +10,14 @@ CONFIG_FILE="$STATE_DIR/config"
 
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
+
+    # Reload previously enabled optional features into ENABLE_LIST
+    for step in "${DISABLED_STEPS[@]}"; do
+        var_name="ENABLE_OPTIONAL_$step"
+        if [[ "${!var_name:-}" == "true" ]]; then
+            ENABLE_LIST+=("$step")
+        fi
+    done
 fi
 
 if [[ -n "${USER_GROUPS:-}" ]]; then
@@ -41,6 +49,7 @@ STEPS=(
     question_fqdn
     question_iface
     question_kernel
+    question_optional_features
     prerequisites_backup_sources
     prerequisites_remove_sources
     prerequisites_install_sources
@@ -308,6 +317,23 @@ question_kernel() {
     fi
     echo "latest"
     ask KERNEL "Select kernel version"
+}
+
+question_optional_features() {
+    echo "--- Optional Features ---"
+    for step in "${DISABLED_STEPS[@]}"; do
+        # Check if already enabled via command line to avoid double-asking
+        if is_enabled "$step"; then
+            continue
+        fi
+
+        read -rp "Enable optional feature '$step'? [y/N]: " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            ENABLE_LIST+=("$step")
+            # Persist the choice to the config file so it survives restarts
+            save_config "ENABLE_OPTIONAL_$step" "true"
+        fi
+    done
 }
 
 # prerequisites

@@ -22,6 +22,8 @@ Feel free to experiment with it.
 9.  Basic notification system using mako.
 10. Optional printing support through cups. (Configured via cups web interface)
 11. Some laptop friendly optimization.
+12. Optional docker support.
+13. Optional QEMU/KVM support.
 
 ## Installation
 
