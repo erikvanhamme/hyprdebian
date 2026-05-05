@@ -11,15 +11,17 @@ Feel free to experiment with it.
 
 ## Highlights
 
-1. Clean installation of Hyprland.
-2. No animations, eye candy or other unneeded crap.
-3. Support for wired networks only (WIFI support is planned).
-4. Uses yazi as file manager.
-5. No pointy-clicky GUI's for any configuration. Nano is your configuration tool.
-6. Automatic login to graphical session.
-7. Keyboard shortcuts for the commonly used tools.
-8. Wofi launcher for the other tools.
-9. Basic notification system using mako.
+1.  Clean installation of Hyprland.
+2.  No animations, eye candy or other unneeded crap.
+3.  Support for wired networks and (optional) wifi networks.
+4.  Uses yazi as file manager.
+5.  No pointy-clicky GUI's for any configuration. Nano is your configuration tool.
+6.  Automatic login to graphical session.
+7.  Keyboard shortcuts for the commonly used tools.
+8.  Wofi launcher for the other tools.
+9.  Basic notification system using mako.
+10. Optional printing support through cups. (Configured via cups web interface)
+11. Some laptop friendly optimization.
 
 ## Installation
 
@@ -59,4 +61,6 @@ Subsequent boots will be normal.
 
 SUPER + ENTER: terminal
 SUPER + B: firefox
+
+Other shortcuts are defined in ~/.config/hypr/hyprland.conf
 

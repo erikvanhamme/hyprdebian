@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.29 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.31 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -507,10 +507,12 @@ deploy_files() {
     mkdir -p /mnt/etc/default
     mkdir -p /mnt/etc/apt
     mkdir -p /mnt/etc/dconf/db/local.d
+    mkdir -p /mnt/usr/local/bin
 
     cp -rv deploy/etc/apt/. /mnt/etc/apt/
     cp -rv deploy/etc/skel/. /mnt/etc/skel/
     cp -rv deploy/etc/dconf/db/local.d/. /mnt/etc/dconf/local.d/
+    cp -rv deploy/usr/local/bin/. /mnt/usr/local/bin/
 }
 
 # tgt
@@ -706,7 +708,7 @@ tgt_browser() {
 }
 
 tgt_misc() {
-    in_target apt install -y nfs-common psmisc net-tools pciutils usbutils
+    in_target apt install -y nfs-common psmisc net-tools pciutils usbutils acpi
 }
 
 tgt_syscargo_permissions() {
@@ -737,6 +739,7 @@ tgt_wifi() {
 [General]
 EnableNetworkConfiguration=true
 EOF
+    in_target systemctl enable iwd
 }
 
 tgt_snapshots() {

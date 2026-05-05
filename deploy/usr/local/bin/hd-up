@@ -1,0 +1,36 @@
+#!/bin/bash
+
+DATASET="rpool/hyprdebian"
+SNAP_NAME="pre-upgrade-$(date +%Y-%m-%d_%H%M)"
+
+echo "--- 1. Syncing Repositories ---"
+sudo apt update
+
+# Check for upgradable packages
+UPGRADABLE=$(apt list --upgradable 2>/dev/null | grep -v "Listing..." | wc -l)
+
+if [ "$UPGRADABLE" -eq 0 ]; then
+    echo "Everything is current. Exiting."
+    exit 0
+fi
+
+echo -e "\n--- 2. Pending Upgrades ($UPGRADABLE packages) ---"
+apt list --upgradable
+
+echo -ne "\nProceed with Snapshot and Upgrade? (y/N): "
+read -r CONFIRM
+
+if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo -e "\n--- 3. Creating ZFS Snapshot ---"
+    if sudo zfs snapshot "$DATASET@$SNAP_NAME"; then
+        echo "Snapshot $SNAP_NAME created successfully."
+
+        echo -e "\n--- 4. Executing Upgrade ---"
+        sudo apt upgrade -y
+    else
+        echo "Error: Could not create snapshot. Upgrade cancelled."
+        exit 1
+    fi
+else
+    echo "Upgrade cancelled by user."
+fi
