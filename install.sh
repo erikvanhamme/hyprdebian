@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.32 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.33 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -104,6 +104,7 @@ STEPS=(
     tgt_cups
     tgt_wifi
     tgt_docker
+    tgt_virt
     user_groups
     tgt_snapshots
     umount_all
@@ -115,6 +116,7 @@ DISABLED_STEPS=(
     tgt_cups
     tgt_wifi
     tgt_docker
+    tgt_virt
 )
 
 # ---------------------------
@@ -485,8 +487,31 @@ EOF
 }
 
 configure_netplan() {
-    mkdir /mnt/etc/netplan
-    write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
+    mkdir -p /mnt/etc/netplan
+
+    if is_enabled "tgt_virt"; then
+        # Virtualization enabled: Create a bridge (br0) for VM networking
+        write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ${IFACE}:
+      dhcp4: false
+      dhcp6: false
+  bridges:
+    br0:
+      interfaces: [${IFACE}]
+      dhcp4: true
+      dhcp6: true
+      parameters:
+        stp: false
+        forward-delay: 0
+      optional: true
+EOF
+    else
+        # Standard installation: DHCP directly on the physical interface
+        write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
 network:
   version: 2
   renderer: networkd
@@ -496,6 +521,7 @@ network:
       dhcp6: true
       optional: true
 EOF
+    fi
 }
 
 configure_zfs_cache() {
@@ -755,6 +781,15 @@ tgt_docker() {
 EOF
 
     add_user_group docker
+}
+
+tgt_virt() {
+    in_target apt install -y qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients virt-manager bridge-utils ovmf
+
+    add_user_group libvirt
+    add_user_group kvm
+
+    in_target systemctl enable libvirtd
 }
 
 tgt_snapshots() {
