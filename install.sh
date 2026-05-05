@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Erik's nifty debian+hyprland installer v0.31 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.32 ==="
 
 TARGET=/mnt
 STATE_DIR="/tmp/hyprdebian"
@@ -103,6 +103,7 @@ STEPS=(
     tgt_sniptool
     tgt_cups
     tgt_wifi
+    tgt_docker
     user_groups
     tgt_snapshots
     umount_all
@@ -113,6 +114,7 @@ DISABLED_STEPS=(
     tgt_wiremix
     tgt_cups
     tgt_wifi
+    tgt_docker
 )
 
 # ---------------------------
@@ -740,6 +742,19 @@ tgt_wifi() {
 EnableNetworkConfiguration=true
 EOF
     in_target systemctl enable iwd
+}
+
+tgt_docker() {
+    in_target apt install -y docker.io docker-compose
+
+    mkdir -p /mnt/etc/docker
+    write_file /mnt/etc/docker/daemon.json 0644 <<EOF
+{
+  "bip": "192.168.253.1/24"
+}
+EOF
+
+    add_user_group docker
 }
 
 tgt_snapshots() {
