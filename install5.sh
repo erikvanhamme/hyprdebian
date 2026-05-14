@@ -242,14 +242,13 @@ execute_task() {
 
 # Packages task.
 t_packages() {
-    in_target "apt install -y $PACKAGES"
-    return 0
+    in_target apt install -y ${PACKAGES[*]}
 }
 
 # Services task.
 t_services() {
-    for svc in $SERVICES; do
-        in_target "systemctl enable $svc"
+    for svc in ${SERVICES}; do
+        in_target systemctl enable $svc
     done
 }
 
