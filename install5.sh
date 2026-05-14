@@ -6,7 +6,7 @@ exec 2>&1
 echo "=== Erik's nifty debian+hyprland installer v0.35 ==="
 
 # Set up idempotency and config paths.
-TARGET_DIR=/tmp
+TARGET_DIR=/mnt
 STATE_DIR="/tmp/hyprdebian"
 mkdir -p "$STATE_DIR"
 CONFIG_FILE="$STATE_DIR/config"
@@ -78,9 +78,9 @@ mark_done() {
 }
 
 in_target() {
-    chroot "$TARGET" /usr/bin/env -i \
+    chroot "${TARGET_DIR}" /usr/bin/env -i \
         HOME=/root \
-        TERM="$TERM" \
+        TERM="${TERM}" \
         PATH=/usr/sbin:/usr/bin:/sbin:/bin \
         "$@"
 }

@@ -24,7 +24,7 @@ EOF
 
 p_install_packages() {
     local INSTALL_KVER="$(uname -r)"
-    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip pyton3-jinja2
+    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip python3-jinja2
 }
 
 add_dependencies "t_prereq" "p_backup_sources" "p_remove_sources" "p_install_sources" "p_install_packages"

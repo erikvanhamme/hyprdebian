@@ -5,12 +5,12 @@ t_base() {
 }
 
 bootstrap() {
-    mkdir /mnt/run
-    mount -t tmpfs tmpfs /mnt/run
-    mkdir /mnt/run/lock
-    mkdir -p /mnt/var/lib
+    mkdir ${TARGET_DIR}/run
+    mount -t tmpfs tmpfs ${TARGET_DIR}/run
+    mkdir ${TARGET_DIR}/run/lock
+    mkdir -p ${TARGET_DIR}/var/lib
 
-    debootstrap --arch=amd64 --exclude=ifupdown unstable /mnt http://deb.debian.org/debian
+    debootstrap --arch=amd64 --exclude=ifupdown unstable ${TARGET_DIR} http://deb.debian.org/debian
 }
 
 configure_fstab() {
@@ -88,8 +88,8 @@ tgt_apt_init() {
 
 tgt_add_sources() {
     in_target apt install -y curl gpg
-    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C4125>
-    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.l>
+    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
     in_target apt update
 }
 
@@ -99,15 +99,15 @@ tgt_locales() {
 }
 
 tgt_buildtools() {
-    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs->
+    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
 }
 
 tgt_kernel() {
-    if [[ "${KERNEL}" == "latest" ]]; then
+    if [[ "${Q_KERNEL}" == "latest" ]]; then
         in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
     else
-        mkdir -p ${TARGET}/tmp/deb
-        cp kernels/*${KERNEL}* ${TARGET}/tmp/deb/
+        mkdir -p ${TARGET_DIR}/tmp/deb
+        cp kernels/*${Q_KERNEL}* ${TARGET_DIR}/tmp/deb/
         in_target dpkg -R -i /tmp/deb/
         in_target apt install -y -f
         in_target apt install -y firmware-linux
@@ -125,7 +125,7 @@ tgt_grub2() {
     in_target update-initramfs -c -k all
     cp -v deploy/etc/default/grub /mnt/etc/default
     in_target update-grub
-    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprd>
+    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
 }
 
 tgt_systemd() {
