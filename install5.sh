@@ -257,7 +257,7 @@ t_services() {
 
 
 # Installation task.
-install() {
+t_install() {
     return 0
 }
 
@@ -268,5 +268,7 @@ source scripts/t_disk.sh
 source scripts/t_base.sh
 source scripts/t_optional.sh
 
+source scripts/t_cleanup.sh
+
 # Start Installation.
-execute_task "install"
+execute_task "t_install"

@@ -102,5 +102,5 @@ q_cups() {
 }
 
 add_dependencies "t_info" "q_disk" "q_swap" "q_user" "q_hostname" "q_fqdn" "q_kernel" "q_iface" "q_wifi" "q_desktop" "q_docker" "q_qemu_kvm" "q_cups"
-add_dependencies "install" "t_info"
+add_dependencies "t_install" "t_info"
 

@@ -98,4 +98,4 @@ f_datasets() {
 
 
 add_dependencies "t_disk" "s_unmount" "d_wipe" "d_discard" "p_prepare" "p_efi" "p_swap" "p_boot" "p_root" "p_probe" "p_review" "f_efi" "f_swap" "f_boot_pool" "f_root_pool" "f_datasets"
-add_dependencies "install" "t_disk"
+add_dependencies "t_install" "t_disk"

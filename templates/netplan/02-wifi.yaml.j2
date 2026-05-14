@@ -1,0 +1,13 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ Q_WIFACE }}:
+      dhcp4: true
+      dhcp6: true
+      optional: true
+      ignore-carrier: no
+      dhcp4-overrides:
+        route-metric: 200
+      dhcp6-overrides:
+        route-metric: 200

@@ -46,4 +46,4 @@ o_cups() {
     add_user_groups lpadmin
 }
 
-add_dependencies "install" "t_optional"
+add_dependencies "t_install" "t_optional"

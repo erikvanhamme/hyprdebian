@@ -55,80 +55,108 @@ ff02::2     ip6-allrouters
 EOF
 }
 
-configure_netplan() {
-    mkdir -p /mnt/etc/netplan
-
-    if ${Q_QEMU_KVM}; then
-        # Virtualization enabled: Create a bridge (br0) for VM networking.
-        write_file /mnt/etc/netplan/01-wired.yaml 0600 <<EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ${Q_IFACE}:
-      dhcp4: false
-      dhcp6: false
-      optional: true
-      ignore-carrier: no
-  bridges:
-    br0:
-      interfaces: [${Q_IFACE}]
-      dhcp4: true
-      dhcp6: true
-      parameters:
-        stp: false
-        forward-delay: 0
-      optional: true
-      dhcp4-overrides:
-        route-metric: 100
-      dhcp6-overrides:
-        route-metric: 100
-EOF
-
-        mkdir -p /mnt/etc/systemd/network/10-netplan-br0.network.d
-        write_file /mnt/etc/systemd/network/10-netplan-br0.network.d/forced_carrier.conf 0600 <<EOF
-[Network]
-KeepConfiguration=no
-EOF
-    else
-        # Standard installation: DHCP directly on the physical interface.
-        write_file /mnt/etc/netplan/01-wired.yaml 0600 <<EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ${Q_IFACE}:
-      dhcp4: true
-      dhcp6: true
-      optional: true
-      ignore-carrier: no
-EOF
-    fi
-
-    if Q_WIFI; then
-        # Wifi enabled: Link will be managed by iwd, but netplan deals with it as a DHCP Ethernet interface.
-        write_file /mnt/etc/netplan/02-wifi.yaml 0600 <<EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ${Q_WIFACE}:
-      dhcp4: true
-      dhcp6: true
-      optional: true
-      ignore-carrier: no
-      dhcp4-overrides:
-        route-metric: 200
-      dhcp6-overrides:
-        route-metric: 200
-EOF
-    fi
-}
-
 configure_zfs_cache() {
     mkdir /mnt/etc/zfs
     cp /etc/zfs/zpool.cache /mnt/etc/zfs
 }
 
-add_dependencies "t_base" "bootstrap" "configure_fstab" "configure_hostname" "configure_hosts" "configure_netplan" "configure_zfs_cache"
-add_dependencies "install" "t_base"
+deploy_files() {
+    mkdir -p /mnt/etc/default
+    mkdir -p /mnt/etc/apt
+    mkdir -p /mnt/etc/dconf/db/local.d
+    mkdir -p /mnt/usr/local/bin
+
+    cp -rv deploy/etc/apt/. /mnt/etc/apt/
+    cp -rv deploy/etc/skel/. /mnt/etc/skel/
+    cp -rv deploy/etc/dconf/db/local.d/. /mnt/etc/dconf/local.d/
+    cp -rv deploy/usr/local/bin/. /mnt/usr/local/bin/
+}
+
+tgt_mount() {
+    mount --make-private --rbind /dev  /mnt/dev
+    mount --make-private --rbind /proc /mnt/proc
+    mount --make-private --rbind /sys  /mnt/sys
+
+    in_target rm /dev/log
+    in_target touch /dev/log
+    mount --bind /run/systemd/journal/dev-log /mnt/dev/log
+}
+
+tgt_apt_init() {
+    in_target apt update
+}
+
+tgt_add_sources() {
+    in_target apt install -y curl gpg
+    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C4125>
+    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.l>
+    in_target apt update
+}
+
+tgt_locales() {
+    in_target apt install -y locales
+    in_target dpkg-reconfigure locales
+}
+
+tgt_buildtools() {
+    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs->
+}
+
+tgt_kernel() {
+    if [[ "${KERNEL}" == "latest" ]]; then
+        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
+    else
+        mkdir -p ${TARGET}/tmp/deb
+        cp kernels/*${KERNEL}* ${TARGET}/tmp/deb/
+        in_target dpkg -R -i /tmp/deb/
+        in_target apt install -y -f
+        in_target apt install -y firmware-linux
+    fi
+}
+
+tgt_zfs_support() {
+    in_target apt install -y zfs-dkms zfsutils-linux zfs-initramfs
+}
+
+tgt_grub2() {
+    in_target mkdir /boot/efi
+    in_target mount /boot/efi
+    in_target apt install -y grub-efi-amd64 shim-signed
+    in_target update-initramfs -c -k all
+    cp -v deploy/etc/default/grub /mnt/etc/default
+    in_target update-grub
+    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprd>
+}
+
+tgt_systemd() {
+    in_target apt install -y systemd-timesyncd
+}
+
+tgt_console() {
+    in_target apt install -y console-setup command-not-found man-db
+    in_target dpkg-reconfigure tzdata keyboard-configuration console-setup
+    in_target apt-file update
+}
+
+tgt_netplan() {
+    in_target apt install -y netplan.io
+
+    python3 render.py templates/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM}
+
+    if ${Q_WIFI}; then
+        python3 render.py templates/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE}
+    fi
+
+    in_target chmod 0600 /etc/netplan/*.yaml
+
+    if ${Q_QEMU_KVM}; then
+        mkdir -p ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
+        cp deploy/etc/systemd/network/10-netplan-br0.network.d/forced_carrier.conf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d/
+    fi
+
+    in_target netplan generate
+}
+
+add_dependencies "t_base" "bootstrap" "configure_fstab" "configure_hostname" "configure_hosts" "configure_zfs_cache" "deploy_files" "tgt_mount" "tgt_apt_init" "tgt_add_sources" "tgt_locales" "tgt_buildtools" "tgt_kernel"
+add_dependencies "t_base" "tgt_zfs_support" "tgt_grub2" "tgt_systemd" "tgt_console" "tgt_netplan"
+add_dependencies "t_install" "t_base"
