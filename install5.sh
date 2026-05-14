@@ -240,21 +240,18 @@ execute_task() {
     fi
 }
 
-
-
-
+# Packages task.
 t_packages() {
-    #in_target "apt install -y $PACKAGES"
+    in_target "apt install -y $PACKAGES"
     return 0
 }
 
+# Services task.
 t_services() {
     for svc in $SERVICES; do
         in_target "systemctl enable $svc"
     done
 }
-
-
 
 # Installation task.
 t_install() {
@@ -267,7 +264,8 @@ source scripts/t_prereq.sh
 source scripts/t_disk.sh
 source scripts/t_base.sh
 source scripts/t_optional.sh
-
+add_dependencies "t_install" "t_packages" "t_services"
+source scripts/t_user.sh
 source scripts/t_cleanup.sh
 
 # Start Installation.

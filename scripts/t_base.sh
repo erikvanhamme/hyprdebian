@@ -56,8 +56,8 @@ EOF
 }
 
 configure_zfs_cache() {
-    mkdir /mnt/etc/zfs
-    cp /etc/zfs/zpool.cache /mnt/etc/zfs
+    mkdir ${TARGET_DIR}/etc/zfs
+    cp /etc/zfs/zpool.cache ${TARGET_DIR}/etc/zfs
 }
 
 deploy_files() {
@@ -143,13 +143,13 @@ tgt_netplan() {
 
     python3 render.py templates/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM}
 
-    if ${Q_WIFI}; then
+    if [[ "${Q_WIFI}" == "true" ]]; then
         python3 render.py templates/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE}
     fi
 
     in_target chmod 0600 /etc/netplan/*.yaml
 
-    if ${Q_QEMU_KVM}; then
+    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
         mkdir -p ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
         cp deploy/etc/systemd/network/10-netplan-br0.network.d/forced_carrier.conf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d/
     fi

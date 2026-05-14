@@ -34,7 +34,7 @@ EOF
 
 o_qemu_kvm() {
     add_packages qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients bridge-utils ovmf
-    if ${Q_DESKTOP}; then
+    if [[ "${Q_DESKTOP}" == "true" ]]; then
         add_packages virt-manager
     fi
     add_user_groups libvirt kvm
