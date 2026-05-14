@@ -14,7 +14,7 @@ d_wipe() {
 }
 
 d_discard() {
-    blkdiskcard -f ${Q_DISK}
+    blkdiscard -f ${Q_DISK}
 }
 
 p_prepare() {

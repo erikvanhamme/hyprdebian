@@ -265,6 +265,7 @@ install() {
 source scripts/t_info.sh
 source scripts/t_prereq.sh
 source scripts/t_disk.sh
+source scripts/t_base.sh
 source scripts/t_optional.sh
 
 # Start Installation.
