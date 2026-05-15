@@ -35,7 +35,7 @@ tgt_greetd() {
 
     mkdir -p ${TARGET_DIR}/etc/greetd
 
-    python3 render.py templates/greetd/config.toml.j2 ${TARGET_DIR}/etc/greetd/config.toml -v Q_USER=${Q_USER}
+    python3 render.py templates/etc/greetd/config.toml.j2 ${TARGET_DIR}/etc/greetd/config.toml -v Q_USER=${Q_USER}
 }
 
 tgt_hyprland() {
@@ -57,7 +57,7 @@ tgt_pipewire() {
 }
 
 tgt_sniptool() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USERN}/Pictures/Screenshots
+    mkdir -p ${TARGET_DIR}/home/${Q_USER}/Pictures/Screenshots
     in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/Pictures/Screenshots
 }
 
