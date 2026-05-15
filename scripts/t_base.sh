@@ -10,7 +10,7 @@ bootstrap() {
     mkdir ${TARGET_DIR}/run/lock
     mkdir -p ${TARGET_DIR}/var/lib
 
-    debootstrap --arch=amd64 --exclude=ifupdown unstable ${TARGET_DIR} http://deb.debian.org/debian
+    debootstrap --arch=amd64 --exclude=ifupdown --include=ca-certificates unstable ${TARGET_DIR} http://deb.debian.org/debian
 }
 
 configure_fstab() {

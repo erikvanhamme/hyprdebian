@@ -86,7 +86,7 @@ q_docker() {
 }
 
 q_qemu_kvm() {
-    if ask_yes_no Q_DOCKER "Enable Qemu/KVM"; then
+    if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM"; then
         add_dependencies "t_optional" "o_qemu_kvm"
     else
         return 0
@@ -94,7 +94,7 @@ q_qemu_kvm() {
 }
 
 q_cups() {
-    if ask_yes_no Q_DOCKER "Enable CUPS"; then
+    if ask_yes_no Q_CUPS "Enable CUPS"; then
         add_dependencies "t_optional" "o_cups"
     else
         return 0
