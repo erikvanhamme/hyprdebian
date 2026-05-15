@@ -27,7 +27,7 @@ user_groups() {
     in_target usermod -a -G "$groups" "${Q_USER}"
 }
 
-user_desktop() {
+user_post() {
     return 0 # Empty task that will be used for the optional desktop install to append dependencies to.
 }
 
@@ -37,7 +37,7 @@ add_dependencies "t_user" \
     "user_skel" \
     "user_chown" \
     "user_groups" \
-    "user_desktop"
+    "user_post"
 
 add_dependencies "t_install" \
     "t_user"

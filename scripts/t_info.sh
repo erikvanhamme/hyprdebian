@@ -101,6 +101,27 @@ q_cups() {
     fi
 }
 
-add_dependencies "t_info" "q_disk" "q_swap" "q_user" "q_hostname" "q_fqdn" "q_kernel" "q_iface" "q_wifi" "q_desktop" "q_docker" "q_qemu_kvm" "q_cups"
-add_dependencies "t_install" "t_info"
+q_rust() {
+    if ask_yes_no Q_RUST "Enable rust and syscargo support"; then
+        add_dependencies "t_optional" "o_rust"
+    fi
+}
+
+add_dependencies "t_info" \
+    "q_disk" \
+    "q_swap" \
+    "q_user" \
+    "q_hostname" \
+    "q_fqdn" \
+    "q_kernel" \
+    "q_iface" \
+    "q_wifi" \
+    "q_desktop" \
+    "q_docker" \
+    "q_qemu_kvm" \
+    "q_cups" \
+    "q_rust"
+
+add_dependencies "t_install" \
+    "t_info"
 

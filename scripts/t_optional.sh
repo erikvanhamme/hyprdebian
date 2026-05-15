@@ -16,7 +16,7 @@ EOF
 }
 
 o_desktop() {
-    add_dependencies "user_desktop" \
+    add_dependencies "user_post" \
         "user_log" \
         "tgt_pipewire" \
         "tgt_sniptool"
@@ -85,6 +85,36 @@ o_qemu_kvm() {
 o_cups() {
     add_packages cups
     add_user_groups lpadmin
+}
+
+o_rust() {
+    add_packages rustup
+
+    add_dependencies "user_post" \
+        "tgt_syscargo" \
+        "tgt_syscargo_permissions"
+}
+
+tgt_syscargo() {
+    zfs create rpool/home/cargo
+    in_target useradd -m -r -s /bin/bash cargo
+    in_target chown -R cargo:cargo /home/cargo
+    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
+    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
+[install]
+root = "/usr/local"
+EOF
+    in_target sudo -u cargo rustup default stable
+
+    write_file ${TARGET_DIR}/usr/local/bin/syscargo 0755 <<'EOF'
+#!/bin/bash
+exec sudo -u cargo -H cargo "$@"
+EOF
+}
+
+tgt_syscargo_permissions() {
+    in_target chown -R root:cargo /usr/local
+    in_target chmod -R g+w /usr/local
 }
 
 add_dependencies "o_desktop" \
