@@ -1,0 +1,6 @@
+# /etc/fstab: static file system information
+#
+# <file system>  <mount point>  <type>  <options>         <dump> <pass>
+
+UUID={{ efi_uuid }}   /boot/efi   vfat   umask=0077        0      1
+UUID={{ swap_uuid }}  none        swap   sw                0      0

@@ -27,32 +27,15 @@ configure_fstab() {
         return 1
     fi
 
-    write_file /mnt/etc/fstab 0644 <<EOF
-# /etc/fstab: static file system information
-#
-# <file system>  <mount point>  <type>  <options>         <dump> <pass>
-
-UUID=${efi_uuid}   /boot/efi   vfat   umask=0077        0      1
-UUID=${swap_uuid}  none        swap   sw                0      0
-EOF
+    python3 render.py templates/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
 }
 
 configure_hostname() {
-    write_file /mnt/etc/hostname 0644 <<EOF
-${Q_HOSTNAME}
-EOF
+    python3 render.py templates/hostname.j2 ${TARGET_DIR}/etc/hostname -v Q_HOSTNAME=${Q_HOSTNAME}
 }
 
 configure_hosts() {
-    write_file /mnt/etc/hosts 0644 <<EOF
-127.0.0.1   localhost
-127.0.1.1   ${Q_FQDN} ${Q_HOSTNAME}
-
-# IPv6
-::1         localhost ip6-localhost ip6-loopback
-ff02::1     ip6-allnodes
-ff02::2     ip6-allrouters
-EOF
+    python3 render.py templates/hosts.j2 ${TARGET_DIR}/etc/hosts -v Q_FQDN=${Q_FQDN} -v Q_HOSTNAME=${Q_HOSTNAME}
 }
 
 configure_zfs_cache() {
@@ -61,25 +44,25 @@ configure_zfs_cache() {
 }
 
 deploy_files() {
-    mkdir -p /mnt/etc/default
-    mkdir -p /mnt/etc/apt
-    mkdir -p /mnt/etc/dconf/db/local.d
-    mkdir -p /mnt/usr/local/bin
+    mkdir -p ${TARGET_DIR}/etc/default
+    mkdir -p ${TARGET_DIR}/etc/apt
+    mkdir -p ${TARGET_DIR}/etc/dconf/db/local.d
+    mkdir -p ${TARGET_DIR}/usr/local/bin
 
-    cp -rv deploy/etc/apt/. /mnt/etc/apt/
-    cp -rv deploy/etc/skel/. /mnt/etc/skel/
-    cp -rv deploy/etc/dconf/db/local.d/. /mnt/etc/dconf/local.d/
-    cp -rv deploy/usr/local/bin/. /mnt/usr/local/bin/
+    cp -rv deploy/etc/apt/. ${TARGET_DIR}/etc/apt/
+    cp -rv deploy/etc/skel/. ${TARGET_DIR}/etc/skel/
+    cp -rv deploy/etc/dconf/db/local.d/. ${TARGET_DIR}/etc/dconf/local.d/
+    cp -rv deploy/usr/local/bin/. ${TARGET_DIR}/usr/local/bin/
 }
 
 tgt_mount() {
-    mount --make-private --rbind /dev  /mnt/dev
-    mount --make-private --rbind /proc /mnt/proc
-    mount --make-private --rbind /sys  /mnt/sys
+    mount --make-private --rbind /dev  ${TARGET_DIR}/dev
+    mount --make-private --rbind /proc ${TARGET_DIR}/proc
+    mount --make-private --rbind /sys  ${TARGET_DIR}/sys
 
     in_target rm /dev/log
     in_target touch /dev/log
-    mount --bind /run/systemd/journal/dev-log /mnt/dev/log
+    mount --bind /run/systemd/journal/dev-log ${TARGET_DIR}/dev/log
 }
 
 tgt_apt_init() {
@@ -116,7 +99,7 @@ tgt_grub2() {
     in_target mount /boot/efi
     in_target apt install -y grub-efi-amd64 shim-signed
     in_target update-initramfs -c -k all
-    cp -v deploy/etc/default/grub /mnt/etc/default
+    cp -v deploy/etc/default/grub ${TARGET_DIR}/etc/default
     in_target update-grub
     in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
 }
@@ -146,34 +129,45 @@ base_utilities() {
     in_target apt-file update
     # Note: command-not-found requires an update to the apt-file cache to work.
     in_target update-command-not-found
+
+    add_packages eza yazi
 }
 
 tgt_netplan() {
     in_target apt install -y netplan.io
 
-    echo "Q_IFACE=${Q_IFACE}"
-    echo "Q_WIFACE=${Q_WIFACE}"
-    echo "Q_QEMU_KVM=${Q_QEMU_KVM}"
-
-    python3 render.py templates/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM}
+    python3 render.py templates/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0600
 
     if [[ "${Q_WIFI}" == "true" ]]; then
-        python3 render.py templates/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE}
+        python3 render.py templates/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE} -m 0600
     fi
-
-    in_target chmod 0600 /etc/netplan/*.yaml
 
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
         mkdir -p ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
         cp deploy/etc/systemd/network/10-netplan-br0.network.d/forced_carrier.conf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d/
     fi
 
-    read -n 1 -s -r -p "Press any key to continue..."
-    echo "" # Adds a newline so the next output starts on a fresh line
-
     in_target netplan generate
 }
 
-add_dependencies "t_base" "bootstrap" "configure_fstab" "configure_hostname" "configure_hosts" "configure_zfs_cache" "deploy_files" "tgt_mount" "tgt_apt_init" "tgt_locales" "tgt_buildtools" "tgt_kernel"
-add_dependencies "t_base" "tgt_zfs_support" "tgt_grub2" "tgt_systemd" "tgt_console" "base_utilities" "tgt_netplan"
-add_dependencies "t_install" "t_base"
+add_dependencies "t_base" \
+    "bootstrap" \
+    "configure_fstab" \
+    "configure_hostname" \
+    "configure_hosts" \
+    "configure_zfs_cache" \
+    "deploy_files" \
+    "tgt_mount" \
+    "tgt_apt_init" \
+    "tgt_locales" \
+    "tgt_buildtools" \
+    "tgt_kernel" \
+    "tgt_zfs_support" \
+    "tgt_grub2" \
+    "tgt_systemd" \
+    "tgt_console" \
+    "base_utilities" \
+    "tgt_netplan"
+
+add_dependencies "t_install" \
+    "t_base"
