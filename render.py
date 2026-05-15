@@ -15,11 +15,13 @@ def render_template():
     if args.var:
         for item in args.var:
             key, value = item.split("=", 1)
+            print(f"DEBUG: Input Received -> Key: '{key}', Raw Value: '{value}'")
             # Convert "true"/"false" strings to actual Booleans for Jinja logic
             if value.lower() == "true":
                 value = True
             elif value.lower() == "false":
                 value = False
+            print(f"DEBUG: Context Mapping -> {key}: {value} (Type: {type(value).__name__})")
             context[key] = value
 
     # Ensure output directory exists
