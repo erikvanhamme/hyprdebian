@@ -27,15 +27,15 @@ configure_fstab() {
         return 1
     fi
 
-    python3 render.py templates/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
+    python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
 }
 
 configure_hostname() {
-    python3 render.py templates/hostname.j2 ${TARGET_DIR}/etc/hostname -v Q_HOSTNAME=${Q_HOSTNAME}
+    python3 render.py templates/etc/hostname.j2 ${TARGET_DIR}/etc/hostname -v Q_HOSTNAME=${Q_HOSTNAME}
 }
 
 configure_hosts() {
-    python3 render.py templates/hosts.j2 ${TARGET_DIR}/etc/hosts -v Q_FQDN=${Q_FQDN} -v Q_HOSTNAME=${Q_HOSTNAME}
+    python3 render.py templates/etc/hosts.j2 ${TARGET_DIR}/etc/hosts -v Q_FQDN=${Q_FQDN} -v Q_HOSTNAME=${Q_HOSTNAME}
 }
 
 configure_zfs_cache() {
@@ -44,14 +44,10 @@ configure_zfs_cache() {
 }
 
 deploy_files() {
-    mkdir -p ${TARGET_DIR}/etc/default
-    mkdir -p ${TARGET_DIR}/etc/apt
-    mkdir -p ${TARGET_DIR}/etc/dconf/db/local.d
+    mkdir -p ${TARGET_DIR}/etc
     mkdir -p ${TARGET_DIR}/usr/local/bin
 
-    cp -rv deploy/etc/apt/. ${TARGET_DIR}/etc/apt/
-    cp -rv deploy/etc/skel/. ${TARGET_DIR}/etc/skel/
-    cp -rv deploy/etc/dconf/db/local.d/. ${TARGET_DIR}/etc/dconf/local.d/
+    cp -rv deploy/etc/. ${TARGET_DIR}/etc/
     cp -rv deploy/usr/local/bin/. ${TARGET_DIR}/usr/local/bin/
 }
 
@@ -130,21 +126,20 @@ base_utilities() {
     # Note: command-not-found requires an update to the apt-file cache to work.
     in_target update-command-not-found
 
-    add_packages eza yazi
+    add_packages eza yazi fzf nfs-common psmisc net-tools pciutils usbutils acpi
 }
 
 tgt_netplan() {
     in_target apt install -y netplan.io
 
-    python3 render.py templates/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0600
+    python3 render.py templates/etc/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0600
 
     if [[ "${Q_WIFI}" == "true" ]]; then
-        python3 render.py templates/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE} -m 0600
+        python3 render.py templates/etc/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE} -m 0600
     fi
 
-    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
-        mkdir -p ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
-        cp deploy/etc/systemd/network/10-netplan-br0.network.d/forced_carrier.conf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d/
+    if [[ "${Q_QEMU_KVM}" == "false" ]]; then
+        rm -rf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
     fi
 
     in_target netplan generate
