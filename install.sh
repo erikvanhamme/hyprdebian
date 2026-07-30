@@ -1,28 +1,32 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -eo pipefail
+exec 2>&1
 
-echo "=== Erik's nifty debian+hyprland installer v0.34 ==="
+# Start banner.
+echo "=== Erik's nifty debian+hyprland installer v0.36 ==="
 
-TARGET=/mnt
+# Set up idempotency and config paths.
+TARGET_DIR=/mnt
 STATE_DIR="/tmp/hyprdebian"
 mkdir -p "$STATE_DIR"
 CONFIG_FILE="$STATE_DIR/config"
+declare -A TASK_DEPS
 
+# Load config and restore/default variables.
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
-
-    # Reload previously enabled optional features into ENABLE_LIST
-    for step in "${DISABLED_STEPS[@]}"; do
-        var_name="ENABLE_OPTIONAL_$step"
-        if [[ "${!var_name:-}" == "true" ]]; then
-            ENABLE_LIST+=("$step")
-        fi
-    done
 fi
 
 if [[ -n "${USER_GROUPS:-}" ]]; then
-    # Convert string back to array
-    read -r -a USER_GROUPS <<< "$USER_GROUPS"
+    read -r -a USER_GROUPS <<< "$USER_GROUPS" # Convert string back to array.
+fi
+
+if [[ -n "${PACKAGES:-}" ]]; then
+    read -r -a PACKAGES <<< "$PACKAGES" # Convert string back to array.
+fi
+
+if [[ -n "${SERVICES:-}" ]]; then
+    read -r -a SERVICESS <<< "$SERVICES" # Convert string back to array.
 fi
 
 if [[ -z "${USER_GROUPS:-}" ]]; then
@@ -37,101 +41,7 @@ if [[ -z "${USER_GROUPS:-}" ]]; then
     )
 fi
 
-# ---------------------------
-# Step registry (ORDERED)
-# ---------------------------
-
-STEPS=(
-    question_disk
-    question_swap
-    question_username
-    question_hostname
-    question_fqdn
-    question_iface
-    question_kernel
-    question_optional_features
-    prerequisites_backup_sources
-    prerequisites_remove_sources
-    prerequisites_install_sources
-    prerequisites_install_packages
-    partition_unmount_swap
-    partition_wipe
-    partition_discard
-    partition_prepare
-    partition_efi
-    partition_swap
-    partition_boot
-    partition_root
-    partition_probe
-    partition_review
-    filesystem_efi
-    filesystem_swap
-    filesystem_boot_pool
-    filesystem_root_pool
-    filesystem_datasets
-    bootstrap
-    configure_fstab
-    configure_hostname
-    configure_hosts
-    configure_netplan
-    configure_zfs_cache
-    deploy_files
-    tgt_mount
-    tgt_apt_init
-    tgt_add_sources
-    tgt_locales
-    tgt_buildtools
-    tgt_kernel
-    tgt_zfs_support
-    tgt_console
-    tgt_font
-    tgt_grub2
-    tgt_systemd
-    tgt_netplan
-    tgt_syscargo
-    tgt_filetools
-    tgt_uwsm
-    tgt_greetd
-    tgt_hyprland
-    tgt_mako
-    user_filesystem
-    user_add
-    user_skel
-    user_chown
-    user_log
-    user_dark
-    tgt_pipewire
-    tgt_audacity
-    tgt_audacious
-    tgt_mpv
-    tgt_imv
-    tgt_browser
-    tgt_misc
-    tgt_syscargo_permissions
-    tgt_wiremix
-    tgt_sniptool
-    tgt_cups
-    tgt_wifi
-    tgt_docker
-    tgt_virt
-    user_groups
-    tgt_snapshots
-    umount_all
-)
-
-# Steps disabled by default (optional)
-DISABLED_STEPS=(
-    tgt_wiremix
-    tgt_cups
-    tgt_wifi
-    tgt_docker
-    tgt_virt
-)
-
-# ---------------------------
 # Color constants
-# ---------------------------
-
 if [[ -t 1 ]]; then
     COLOR_RESET="\033[0m"
     COLOR_GREEN="\033[32m"
@@ -146,39 +56,17 @@ else
     COLOR_RED=""
 fi
 
-# ---------------------------
-# Utility helpers
-# ---------------------------
-
 log_status() {
     local color="$1"
     local label="$2"
     local step="$3"
+    local timestamp
 
-    printf "%b[%s]%b %s\n" "$color" "$label" "$COLOR_RESET" "$step"
-}
+    # Use Bash built-in for current time (H:M:S).
+    printf -v timestamp "%(%H:%M:%S)T" -1
 
-is_enabled() {
-    local step="$1"
-    for s in "${ENABLE_LIST[@]}"; do
-        [[ "$s" == "$step" ]] && return 0
-    done
-    return 1
-}
-
-is_disabled() {
-    local step="$1"
-
-    # Explicit enable always wins
-    if is_enabled "$step"; then
-        return 1
-    fi
-
-    for s in "${DISABLED_STEPS[@]}"; do
-        [[ "$s" == "$step" ]] && return 0
-    done
-
-    return 1
+    # Formatting: [LABEL] <TIMESTAMP> STEP.
+    printf "%b[%s]%b <%s> %s\n" "$color" "$label" "$COLOR_RESET" "$timestamp" "$step"
 }
 
 is_done() {
@@ -189,34 +77,10 @@ mark_done() {
     touch "$STATE_DIR/$1.done"
 }
 
-run_step() {
-    local step="$1"
-
-    if is_disabled "$step"; then
-        log_status "$COLOR_BLUE" "DISABLED" "$step"
-        return 0
-    fi
-
-    if is_done "$step"; then
-        log_status "$COLOR_YELLOW" "SKIPPED " "$step"
-        return 0
-    fi
-
-    log_status "" "RUN     " "$step"
-
-    if "$step"; then
-        mark_done "$step"
-        log_status "$COLOR_GREEN" "OK      " "$step"
-    else
-        log_status "$COLOR_RED" "FAIL    " "$step"
-        return 1
-    fi
-}
-
 in_target() {
-    chroot "$TARGET" /usr/bin/env -i \
+    chroot "${TARGET_DIR}" /usr/bin/env -i \
         HOME=/root \
-        TERM="$TERM" \
+        TERM="${TERM}" \
         PATH=/usr/sbin:/usr/bin:/sbin:/bin \
         "$@"
 }
@@ -249,655 +113,159 @@ ask() {
     save_config "$var_name" "$input"
 }
 
+ask_yes_no() {
+    local var_name=$1
+    local prompt=$2
+    local input
+
+    while true; do
+        read -rp "$prompt (y/n): " input
+        case "$input" in
+            [Yy]*)
+                printf -v "$var_name" "true"
+                save_config "$var_name" "true"
+                return 0 # Success (True).
+                ;;
+            [Nn]*)
+                printf -v "$var_name" "false"
+                save_config "$var_name" "false"
+                return 1 # Failure (False).
+                ;;
+            *)
+                echo "Please answer y or n."
+                ;;
+        esac
+    done
+}
+
 save_config() {
     local key="$1"
     local value="$2"
 
-    # Remove existing entry
-    grep -v "^${key}=" "$CONFIG_FILE" 2>/dev/null > "$CONFIG_FILE.tmp" || true
+    # Use a regex that matches the key even if preceded by 'declare ... '
+    # This removes lines like 'key="val"' OR 'declare -A key=(...)'
+    grep -Ev "^(declare [-a-zA-Z]+ )?${key}=" "$CONFIG_FILE" 2>/dev/null > "$CONFIG_FILE.tmp" || true
 
-    printf '%s="%s"\n' "$key" "$value" >> "$CONFIG_FILE.tmp"
+    if [[ "$key" == "TASK_DEPS" ]]; then
+        declare -p TASK_DEPS >> "$CONFIG_FILE.tmp"
+    else
+        printf '%s="%s"\n' "$key" "$value" >> "$CONFIG_FILE.tmp"
+    fi
 
     mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
 }
 
-add_user_group() {
-    local group="$1"
+add_user_groups() {
+    for group in "$@"; do
+        for check in "${USER_GROUPS[@]}"; do
+            [[ "$check" == "$group" ]] && continue
+        done
 
-    for g in "${USER_GROUPS[@]}"; do
-        [[ "$g" == "$group" ]] && return 0
+        USER_GROUPS+=("$group")
     done
 
-    USER_GROUPS+=("$group")
-
-    # Persist as space-separated string
-    save_config USER_GROUPS "${USER_GROUPS[*]}"
+    save_config USER_GROUPS "${USER_GROUPS[*]}" # Persist as space-separated string.
 }
 
-# ---------------------------
-# Installation steps
-# ---------------------------
+add_packages() {
+    for package in "$@"; do
+        for check in "${PACKAGES[@]}"; do
+            [[ "$check" == "$package" ]] && continue
+        done
 
-# questions
+        PACKAGES+=("$package")
+    done
 
-question_disk() {
-    echo "Available block devices:"
-    find /dev/disk/by-id
-    ask DISK "Target disk (e.g. /dev/sda)"
-    read -rp "All data on $DISK will be destroyed. Continue? [y/N]" confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborting."; return 1; }
+    save_config PACKAGES "${PACKAGES[*]}" # Persist as space-separated string.
 }
 
-question_swap() {
-    ask SWAP "Enter size of swap partition (in GiB, must be > 0)"
+add_services() {
+    for service in "$@"; do
+        for check in "${SERVICES[@]}"; do
+            [[ "$check" == "$service" ]] && continue
+        done
+
+        SERVICES+=("$service")
+    done
+
+    save_config SERVICES "${SERVICES[*]}" # Persist as space-separated string.
 }
 
-question_username() {
-    ask USERNAME "Username"
+# Task and dependency handling.
+add_dependencies() {
+    local task_id=$1
+    shift # Remove the first argument (task_id), leaving only dependencies.
+
+    local current_deps=${TASK_DEPS["$task_id"]}
+
+    for new_dep in "$@"; do
+        # Check if the dependency is already in the string to avoid duplicates.
+        if [[ ! ",$current_deps," =~ ",$new_dep," ]]; then
+            current_deps="${current_deps}${current_deps:+,}$new_dep"
+        fi
+    done
+
+    # Update the array and save.
+    TASK_DEPS["$task_id"]="$current_deps"
+    save_config "TASK_DEPS" ""
 }
 
-question_hostname() {
-    ask HOSTNAME "Hostname"
-}
+execute_task() {
+    local func_name=$1
+    local display_name=${2:-$func_name}
 
-question_fqdn() {
-    ask FQDN "Fully qualified domain name"
-}
-
-question_iface() {
-    echo "Available wired interfaces:"
-    ip -o link show | awk -F': ' '{print $2}' | grep -E '^(en|eth)'
-    ask IFACE "Select wired interface for DHCP (e.g. enp0s3)"
-}
-
-question_kernel() {
-    echo "Available kernel versions:"
-    if [[ -d kernels ]]; then
-        find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
+    # Handle Dependencies first.
+    local deps_list=${TASK_DEPS["$func_name"]}
+    if [[ -n "$deps_list" ]]; then
+        IFS=',' read -ra ADDR <<< "$deps_list"
+        for dep in "${ADDR[@]}"; do
+            execute_task "$dep"
+        done
     fi
-    echo "latest"
-    ask KERNEL "Select kernel version"
-}
 
-question_optional_features() {
-    echo "--- Optional Features ---"
-    for step in "${DISABLED_STEPS[@]}"; do
-        # Check if already enabled via command line to avoid double-asking
-        if is_enabled "$step"; then
-            continue
-        fi
+    # Idempotency check.
+    if is_done "$func_name"; then
+        log_status "$COLOR_BLUE" "SKIPPED" "$display_name"
+        return 0
+    fi
 
-        read -rp "Enable optional feature '$step'? [y/N]: " confirm
-        if [[ "$confirm" =~ ^[Yy]$ ]]; then
-            ENABLE_LIST+=("$step")
-            # Persist the choice to the config file so it survives restarts
-            save_config "ENABLE_OPTIONAL_$step" "true"
-        fi
-    done
-}
+    log_status "$COLOR_YELLOW" "START  " "$display_name"
 
-# prerequisites
-
-prerequisites_backup_sources() {
-    mkdir -p /etc/apt/backup
-    cp -a /etc/apt/sources.list /etc/apt/backup/sources.list.$(date +%s) 2>/dev/null || true
-    cp -a /etc/apt/sources.list.d /etc/apt/backup/sources.list.d.$(date +%s) 2>/dev/null || true
-}
-
-prerequisites_remove_sources() {
-    rm -f /etc/apt/sources.list
-    rm -f /etc/apt/sources.list.d/*.list
-}
-
-prerequisites_install_sources() {
-    cat > /etc/apt/sources.list <<'EOF'
-deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware
-EOF
-    apt update
-}
-
-prerequisites_install_packages() {
-    local INSTALL_KVER="$(uname -r)"
-    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip
-}
-
-# partition
-
-partition_unmount_swap() {
-    swapoff -a
-}
-
-partition_wipe() {
-    wipefs -af ${DISK}
-    sgdisk --zap-all ${DISK}
-}
-
-partition_discard() {
-    blkdiscard -f ${DISK}
-}
-
-partition_prepare() {
-    sgdisk --clear ${DISK}
-}
-
-partition_efi() {
-    sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" ${DISK}
-}
-
-partition_swap() {
-    sgdisk -n 2:0:+${SWAP}G -t 2:8200 -c 2:"Swap" ${DISK}
-}
-
-partition_boot() {
-    sgdisk -n 3:0:+4G -t 3:BF01 -c 3:"Boot Pool" ${DISK}
-}
-
-partition_root() {
-    sgdisk -n 4:0:0 -t 4:BF01 -c 4:"Root Pool" ${DISK}
-}
-
-partition_probe() {
-    partprobe ${DISK}
-}
-
-partition_review() {
-    udevadm settle
-    lsblk ${DISK}
-}
-
-# filesystem
-
-filesystem_efi() {
-    local efi_part=${DISK}-part1
-    mkfs.fat -F32 ${efi_part}
-}
-
-filesystem_swap() {
-    local swap_part=${DISK}-part2
-    mkswap ${swap_part}
-    swapon ${swap_part}
-}
-
-filesystem_boot_pool() {
-    local boot_pool_part=${DISK}-part3
-    zpool create -f \
-        -o ashift=12 \
-        -o autotrim=on \
-        -o compatibility=grub2 \
-        -o cachefile=/etc/zfs/zpool.cache \
-        -O devices=off \
-        -O acltype=posixacl -O xattr=sa \
-        -O compression=lz4 \
-        -O normalization=formD \
-        -O relatime=on \
-        -O canmount=off -O mountpoint=/boot -R /mnt \
-        bpool ${boot_pool_part}
-}
-
-filesystem_root_pool() {
-    local root_pool_part=${DISK}-part4
-    zpool create -f \
-        -o ashift=12 \
-        -o autotrim=on \
-        -O encryption=on -O keylocation=prompt -O keyformat=passphrase \
-        -O acltype=posixacl -O xattr=sa -O dnodesize=auto \
-        -O compression=lz4 \
-        -O normalization=formD \
-        -O relatime=on \
-        -O canmount=off -O mountpoint=/ -R /mnt \
-        rpool ${root_pool_part}
-}
-
-filesystem_datasets() {
-    zfs create -o canmount=noauto -o mountpoint=/ rpool/hyprdebian
-    zfs mount rpool/hyprdebian
-
-    zfs create -o mountpoint=/boot bpool/hyprdebian
-
-    zfs create rpool/home
-}
-
-# bootstrap
-
-bootstrap() {
-    mkdir /mnt/run
-    mount -t tmpfs tmpfs /mnt/run
-    mkdir /mnt/run/lock
-    mkdir -p /mnt/var/lib
-
-    debootstrap --arch=amd64 --exclude=ifupdown unstable /mnt http://deb.debian.org/debian
-}
-
-# configure
-
-configure_fstab() {
-    local efi_part swap_part
-    local efi_uuid swap_uuid
-
-    efi_part=${DISK}-part1
-    swap_part=${DISK}-part2
-    efi_uuid=$(blkid -s UUID -o value ${efi_part})
-    swap_uuid=$(blkid -s UUID -o value ${swap_part})
-
-    if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
-        echo "ERROR: Unable to determine UUIDs for fstab."
+    if "$func_name"; then
+        mark_done "$func_name"
+        log_status "$COLOR_GREEN" "DONE   " "$display_name"
+    else
+        log_status "$COLOR_RED" "FAIL   " "$display_name"
         return 1
     fi
-
-    write_file /mnt/etc/fstab 0644 <<EOF
-# /etc/fstab: static file system information
-#
-# <file system>  <mount point>  <type>  <options>         <dump> <pass>
-
-UUID=${efi_uuid}   /boot/efi   vfat   umask=0077        0      1
-UUID=${swap_uuid}  none        swap   sw                0      0
-EOF
 }
 
-configure_hostname() {
-    write_file /mnt/etc/hostname 0644 <<EOF
-${HOSTNAME}
-EOF
+# Packages task.
+t_packages() {
+    in_target apt install -y ${PACKAGES[*]}
 }
 
-configure_hosts() {
-    write_file /mnt/etc/hosts 0644 <<EOF
-127.0.0.1   localhost
-127.0.1.1   ${FQDN} ${HOSTNAME}
-
-# IPv6
-::1         localhost ip6-localhost ip6-loopback
-ff02::1     ip6-allnodes
-ff02::2     ip6-allrouters
-EOF
+# Services task.
+t_services() {
+    for svc in ${SERVICES}; do
+        in_target systemctl enable $svc
+    done
 }
 
-configure_netplan() {
-    mkdir -p /mnt/etc/netplan
-
-    if is_enabled "tgt_virt"; then
-        # Virtualization enabled: Create a bridge (br0) for VM networking
-        write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ${IFACE}:
-      dhcp4: false
-      dhcp6: false
-  bridges:
-    br0:
-      interfaces: [${IFACE}]
-      dhcp4: true
-      dhcp6: true
-      parameters:
-        stp: false
-        forward-delay: 0
-      optional: true
-EOF
-    else
-        # Standard installation: DHCP directly on the physical interface
-        write_file /mnt/etc/netplan/01-netcfg.yaml 0600 <<EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    ${IFACE}:
-      dhcp4: true
-      dhcp6: true
-      optional: true
-EOF
-    fi
+# Installation task.
+t_install() {
+    return 0
 }
 
-configure_zfs_cache() {
-    mkdir /mnt/etc/zfs
-    cp /etc/zfs/zpool.cache /mnt/etc/zfs
-}
-
-# deploy
-
-deploy_files() {
-    mkdir -p /mnt/etc/default
-    mkdir -p /mnt/etc/apt
-    mkdir -p /mnt/etc/dconf/db/local.d
-    mkdir -p /mnt/usr/local/bin
-
-    cp -rv deploy/etc/apt/. /mnt/etc/apt/
-    cp -rv deploy/etc/skel/. /mnt/etc/skel/
-    cp -rv deploy/etc/dconf/db/local.d/. /mnt/etc/dconf/local.d/
-    cp -rv deploy/usr/local/bin/. /mnt/usr/local/bin/
-}
-
-# tgt
-
-tgt_mount() {
-    mount --make-private --rbind /dev  /mnt/dev
-    mount --make-private --rbind /proc /mnt/proc
-    mount --make-private --rbind /sys  /mnt/sys
-
-    in_target rm /dev/log
-    in_target touch /dev/log
-    mount --bind /run/systemd/journal/dev-log /mnt/dev/log
-}
-
-tgt_apt_init() {
-    in_target apt update
-}
-
-tgt_add_sources() {
-    in_target apt install -y curl gpg
-    in_target sh -c 'curl -sS https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/debian.griffo.io.gpg'
-    in_target sh -c 'echo "deb https://debian.griffo.io/apt sid main" | tee /etc/apt/sources.list.d/debian.griffo.io.list'
-    in_target apt update
-}
-
-tgt_locales() {
-    in_target apt install -y locales
-    in_target dpkg-reconfigure locales
-}
-
-tgt_buildtools() {
-    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
-}
-
-tgt_kernel() {
-    if [[ "${KERNEL}" == "latest" ]]; then
-        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
-    else
-        mkdir -p ${TARGET}/tmp/deb
-        cp kernels/*${KERNEL}* ${TARGET}/tmp/deb/
-        in_target dpkg -R -i /tmp/deb/
-        in_target apt install -y -f
-        in_target apt install -y firmware-linux
-    fi
-}
-
-tgt_zfs_support() {
-    in_target apt install -y zfs-dkms zfsutils-linux zfs-initramfs
-}
-
-tgt_grub2() {
-    in_target mkdir /boot/efi
-    in_target mount /boot/efi
-    in_target apt install -y grub-efi-amd64 shim-signed
-    in_target update-initramfs -c -k all
-    cp -v deploy/etc/default/grub /mnt/etc/default
-    in_target update-grub
-    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
-}
-
-tgt_systemd() {
-    in_target apt install -y systemd-timesyncd
-}
-
-tgt_console() {
-    in_target apt install -y console-setup command-not-found man-db
-    in_target dpkg-reconfigure tzdata keyboard-configuration console-setup
-    in_target apt-file update
-}
-
-tgt_font() {
-    in_target apt install -y fontconfig
-    mkdir /mnt/usr/local/share/fonts
-    wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip
-    unzip JetBrainsMono.zip -d /mnt/usr/local/share/fonts
-}
-
-tgt_netplan() {
-    in_target apt install -y netplan.io
-    in_target netplan generate
-}
-
-tgt_syscargo() {
-    in_target apt install -y rustup
-    zfs create rpool/home/cargo
-    in_target useradd -m -r -s /bin/bash cargo
-    in_target chown -R cargo:cargo /home/cargo
-    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
-    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
-[install]
-root = "/usr/local"
-EOF
-    in_target sudo -u cargo rustup default stable
-
-    write_file /mnt/usr/local/bin/syscargo 0755 <<'EOF'
-#!/bin/bash
-exec sudo -u cargo -H cargo "$@"
-EOF
-}
-
-tgt_uwsm() {
-    in_target apt install -y uwsm
-}
-
-tgt_filetools() {
-    in_target apt install -y yazi eza fzf
-}
-
-tgt_greetd() {
-    in_target apt install -y greetd
-    in_target systemctl enable greetd
-    write_file /mnt/etc/greetd/config.toml 0644 <<EOF
-[terminal]
-vt = 7
-
-[default_session]
-command = "uwsm start hyprland.desktop > /var/log/hyprland.log 2>&1"
-user = "${USERNAME}"
-EOF
-}
-
-tgt_hyprland() {
-    in_target apt install -y kitty desktop-base dbus-user-session hyprland hyprland-qtutils wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock
-}
-
-tgt_mako() {
-    in_target apt install -y libnotify-bin mako-notifier
-}
-
-# user
-
-user_filesystem() {
-    zfs create rpool/home/${USERNAME}
-}
-
-user_add() {
-    in_target STDOUTMSGLEVEL=fatal STDERRMSGLEVEL=fatal adduser ${USERNAME}
-}
-
-user_skel() {
-    in_target cp -a /etc/skel/. /home/${USERNAME}/
-}
-
-user_chown() {
-    in_target chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
-}
-
-user_groups() {
-    local groups
-    groups=$(IFS=,; echo "${USER_GROUPS[*]}")
-
-    in_target usermod -a -G "$groups" "${USERNAME}"
-}
-
-user_log() {
-    touch /mnt/var/log/hyprland.log
-    in_target chown ${USERNAME}:${USERNAME} /var/log/hyprland.log
-}
-
-user_dark() {
-    in_target apt install -y qt6ct qt5ct dconf-cli
-    in_target dconf update
-}
-
-# tgt
-
-tgt_pipewire() {
-    in_target apt install -y pipewire wireplumber pulseaudio-utils
-    mkdir -p /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants
-    ln -s /mnt/usr/lib/systemd/user/pipewire.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
-    ln -s /mnt/usr/lib/systemd/user/wireplumber.service /mnt/home/${USERNAME}/.config/systemd/user/default.target.wants/
-}
-
-tgt_audacity() {
-    in_target apt install -y audacity
-}
-
-tgt_audacious() {
-    in_target apt install -y audacious
-}
-
-tgt_mpv() {
-    in_target apt install -y mpv
-}
-
-tgt_imv() {
-    in_target apt install -y imv
-}
-
-tgt_browser() {
-    in_target apt install -y firefox
-    cp deploy/usr/share/firefox/distribution/distribution.ini /mnt/usr/share/firefox/distribution/
-}
-
-tgt_misc() {
-    in_target apt install -y nfs-common psmisc net-tools pciutils usbutils acpi
-}
-
-tgt_syscargo_permissions() {
-    mkdir -p /mnt/usr/local/bin
-    in_target chown -R root:cargo /usr/local
-    in_target chmod -R g+w /usr/local
-}
-
-tgt_wiremix() {
-    in_target apt install -y libpipewire-0.3-dev libclang-dev
-    in_target sudo -u cargo cargo install wiremix
-}
-
-tgt_sniptool() {
-    in_target apt install -y grim slurp swappy wl-clipboard
-    mkdir -p /mnt/home/${USERNAME}/Pictures/Screenshots
-    in_target chown ${USERNAME}:${USERNAME} /home/${USERNAME}/Pictures/Screenshots
-}
-
-tgt_cups() {
-    in_target apt install -y cups
-    add_user_group lpadmin
-}
-
-tgt_wifi() {
-    in_target apt install -y iwd firmware-iwlwifi
-    write_file /mnt/etc/iwd/main.conf 0644 <<EOF
-[General]
-EnableNetworkConfiguration=true
-EOF
-    in_target systemctl enable iwd
-}
-
-tgt_docker() {
-    in_target apt install -y docker.io docker-compose
-
-    mkdir -p /mnt/etc/docker
-    write_file /mnt/etc/docker/daemon.json 0644 <<EOF
-{
-  "bip": "192.168.253.1/24"
-}
-EOF
-
-    add_user_group docker
-}
-
-tgt_virt() {
-    in_target apt install -y qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients virt-manager bridge-utils ovmf
-
-    add_user_group libvirt
-    add_user_group kvm
-
-    in_target systemctl enable libvirtd
-}
-
-tgt_snapshots() {
-    in_target zfs snapshot bpool/hyprdebian@install
-    in_target zfs snapshot rpool/hyprdebian@install
-}
-
-# cleanup
-
-umount_all() {
-    umount /mnt/dev/log
-    mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
-    zpool export -a || true
-}
-
-# ---------------------------
-# CLI parsing
-# ---------------------------
-
-FROM=""
-ONLY=""
-SKIP_LIST=()
-ENABLE_LIST=()
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --from)
-            FROM="$2"
-            shift 2
-            ;;
-        --only)
-            ONLY="$2"
-            shift 2
-            ;;
-        --skip)
-            SKIP_LIST+=("$2")
-            shift 2
-            ;;
-        --enable)
-            ENABLE_LIST+=("$2")
-            shift 2
-            ;;
-        --list)
-            printf "%s\n" "${STEPS[@]}"
-            exit 0
-            ;;
-        *)
-            echo "Unknown argument: $1"
-            exit 1
-            ;;
-    esac
-done
-
-# Apply runtime skip overrides
-DISABLED_STEPS+=("${SKIP_LIST[@]}")
-
-# ---------------------------
-# Execution engine
-# ---------------------------
-
-start_running=false
-
-for step in "${STEPS[@]}"; do
-
-    # --only overrides everything
-    if [[ -n "$ONLY" ]]; then
-        if [[ "$step" == "$ONLY" ]]; then
-            run_step "$step"
-        fi
-        continue
-    fi
-
-    # --from logic
-    if [[ -n "$FROM" ]]; then
-        if [[ "$step" == "$FROM" ]]; then
-            start_running=true
-        fi
-
-        if [[ "$start_running" == false ]]; then
-            continue
-        fi
-    fi
-
-    run_step "$step"
-done
+# Load tasks for all the phases.
+source scripts/t_info.sh
+source scripts/t_prereq.sh
+source scripts/t_disk.sh
+source scripts/t_base.sh
+source scripts/t_optional.sh
+add_dependencies "t_install" "t_packages" "t_services"
+source scripts/t_user.sh
+source scripts/t_cleanup.sh
+
+# Start Installation.
+execute_task "t_install"
