@@ -42,7 +42,7 @@ tgt_hyprland() {
     add_packages uwsm kitty desktop-base dbus-user-session hyprland hyprland-qtutils \
         wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock \
         libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
-        pulseaudio-utils grim slurp swappy wl-clipboard
+        pulseaudio-utils grim slurp swappy wl-clipboard wiremix
 }
 
 user_log() {
