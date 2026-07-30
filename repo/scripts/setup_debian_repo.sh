@@ -13,16 +13,17 @@ RUN_GROUP=$(id -gn "${RUN_USER}")
 
 # Path Configuration
 SERVICE_NAME="local-deb-repo"
-# Use the invoking user's current directory as the base repo path
-TARGET_DIR="${SUDO_USER_HOME:-$(getent passwd "${RUN_USER}" | cut -d: -f6)}"
-REPO_DIR="${TARGET_DIR}/repo"
+# Target existing ./repo directory from where the script was called
+REPO_DIR="$(pwd)/repo"
 PORT="8080"
 SYSTEMD_SYS_DIR="/etc/systemd/system"
 UNIT_FILE="${SYSTEMD_SYS_DIR}/${SERVICE_NAME}.service"
 
-echo "==> Ensuring repository directory exists at ${REPO_DIR}..."
-mkdir -p "${REPO_DIR}"
-chown -R "${RUN_USER}:${RUN_GROUP}" "${REPO_DIR}"
+if [ ! -d "${REPO_DIR}" ]; then
+    echo "Error: Directory ${REPO_DIR} does not exist." >&2
+    echo "Please make sure your repository folder is created and populated before running this script." >&2
+    exit 1
+fi
 
 echo "==> Generating system-wide systemd unit file at ${UNIT_FILE}..."
 cat <<EOF > "${UNIT_FILE}"
