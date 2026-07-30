@@ -1,6 +1,7 @@
 #!/bin/bash
 
 DATASET="rpool/hyprdebian"
+BOOT_DATASET="bpool/hyprdebian"
 SNAP_NAME="pre-upgrade-$(date +%Y-%m-%d_%H%M)"
 
 echo "--- 1. Syncing Repositories ---"
@@ -22,8 +23,10 @@ read -r CONFIRM
 
 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
     echo -e "\n--- 3. Creating ZFS Snapshot ---"
-    if sudo zfs snapshot "$DATASET@$SNAP_NAME"; then
-        echo "Snapshot $SNAP_NAME created successfully."
+    if sudo zfs snapshot "$DATASET@$SNAP_NAME" "$BOOT_DATASET@$SNAP_NAME"; then
+        echo "Snapshots created successfully:"
+        echo "  - $DATASET@$SNAP_NAME"
+        echo "  - $BOOT_DATASET@$SNAP_NAME"
 
         echo -e "\n--- 4. Executing Upgrade ---"
         sudo apt upgrade -y
