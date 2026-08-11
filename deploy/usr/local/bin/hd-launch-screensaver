@@ -13,13 +13,8 @@ pgrep -f hyprdebian.screensaver && exit 0
 focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
 
 for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
-    hyprctl dispatch focusmonitor $m
-
-    hyprctl dispatch exec -- \
-        kitty --class=hyprdebian.screensaver \
-            --override font_size=18 \
-            --override window_padding_width=0 \
-            -e /usr/local/bin/hd-cmd-screensaver
+    hyprctl dispatch "hl.dsp.focus({ monitor = \"$m\" })"
+    hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class=hyprdebian.screensaver --override font_size=18 --override window_padding_width=0 -e /usr/local/bin/hd-cmd-screensaver")'
 done
 
-hyprctl dispatch focusmonitor $focused
+hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })"
