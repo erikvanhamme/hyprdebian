@@ -126,7 +126,7 @@ base_utilities() {
     # Note: command-not-found requires an update to the apt-file cache to work.
     in_target update-command-not-found
 
-    add_packages eza yazi fzf nfs-common psmisc net-tools pciutils usbutils acpi
+    add_packages eza yazi fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion
 }
 
 tgt_netplan() {
