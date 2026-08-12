@@ -18,6 +18,7 @@ EOF
 o_desktop() {
     add_dependencies "user_post" \
         "user_log" \
+        "user_icons" \
         "tgt_pipewire" \
         "tgt_sniptool"
 }
@@ -52,6 +53,11 @@ tgt_theme() {
 user_log() {
     touch ${TARGET_DIR}/var/log/hyprland.log
     in_target chown ${Q_USER}:${Q_USER} /var/log/hyprland.log
+}
+
+user_icons() {
+    mkdir ${TARGET_DIR}/home/${Q_USER}/.icons
+    in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/.icons
 }
 
 tgt_pipewire() {
