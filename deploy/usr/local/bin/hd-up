@@ -23,7 +23,7 @@ read -r CONFIRM
 
 if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
     echo -e "\n--- 3. Creating ZFS Snapshot ---"
-    if sudo zfs snapshot "$DATASET@$SNAP_NAME" "$BOOT_DATASET@$SNAP_NAME"; then
+    if sudo zfs snapshot "$DATASET@$SNAP_NAME" && sudo zfs snapshot "$BOOT_DATASET@$SNAP_NAME"; then
         echo "Snapshots created successfully:"
         echo "  - $DATASET@$SNAP_NAME"
         echo "  - $BOOT_DATASET@$SNAP_NAME"
