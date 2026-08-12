@@ -43,6 +43,7 @@ local browser     = "firefox"
 --
 hl.on("hyprland.start", function () 
     hl.exec_cmd("uwsm app -- mako")
+    hl.exec_cmd("nwg-look -a") -- Applies theme and font
 end)
 
 
@@ -54,7 +55,10 @@ end)
 
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
-hl.env("GTK_THEME", "Adwaita:dark")
+
+hl.env("QT_QPA_PLATFORM", "wayland;xcb")
+hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
+hl.env("QT_STYLE_OVERRIDE", "fusion")
 
 
 -----------------------

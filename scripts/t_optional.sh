@@ -45,6 +45,10 @@ tgt_hyprland() {
         pulseaudio-utils grim slurp swappy wl-clipboard wiremix playerctl brightnessctl
 }
 
+tgt_theme() {
+    add_packages nwg-look qt5-gtk-platformtheme qt6-gtk-platformtheme
+}
+
 user_log() {
     touch ${TARGET_DIR}/var/log/hyprland.log
     in_target chown ${Q_USER}:${Q_USER} /var/log/hyprland.log
@@ -120,7 +124,8 @@ tgt_syscargo_permissions() {
 add_dependencies "o_desktop" \
     "tgt_font" \
     "tgt_greetd" \
-    "tgt_hyprland"
+    "tgt_hyprland" \
+    "tgt_theme"
 
 add_dependencies "t_install" \
     "t_optional"
