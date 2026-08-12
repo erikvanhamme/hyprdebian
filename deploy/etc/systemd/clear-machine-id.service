@@ -1,0 +1,12 @@
+[Unit]
+Description=Neuter Machine ID on Shutdown
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target umount.target
+Requires=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'truncate -s 0 /etc/machine-id; if [ -f /var/lib/dbus/machine-id ]; then truncate -s 0 /var/lib/dbus/machine-id; fi'
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target

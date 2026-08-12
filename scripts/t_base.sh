@@ -102,6 +102,10 @@ tgt_grub2() {
 
 tgt_systemd() {
     in_target apt install -y systemd-timesyncd
+
+    add_services clear-machine-id
+    add_packages rsyslog
+    add_groups adm
 }
 
 tgt_console() {
