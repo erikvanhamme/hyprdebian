@@ -105,7 +105,7 @@ tgt_systemd() {
 
     add_services clear-machine-id
     add_packages rsyslog
-    add_groups adm
+    add_user_groups adm
 }
 
 tgt_console() {

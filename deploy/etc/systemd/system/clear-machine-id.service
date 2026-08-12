@@ -6,7 +6,9 @@ Requires=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'truncate -s 0 /etc/machine-id; if [ -f /var/lib/dbus/machine-id ]; then truncate -s 0 /var/lib/dbus/machine-id; fi'
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/bin/sh -c 'rm -f /etc/machine-id /var/lib/dbus/machine-id; touch /home/rsq/I-ran'
 
 [Install]
-WantedBy=shutdown.target reboot.target halt.target
+WantedBy=sysinit.target
