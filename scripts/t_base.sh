@@ -143,7 +143,10 @@ tgt_network() {
 
     # Render out the template for the wifi interface. Delete the wifi files if wifi is not enabled.
     if [[ "${Q_WIFI}" == "true" ]]; then
-        python3 render.py templates/etc/systemd/network/60-wlanx.network.j2 ${TARGET_DIR}/etc/systemd/network/60-${Q_WIFACE} -v Q_WIFACE=${Q_WIFACE} -m 0644
+        python3 render.py templates/etc/systemd/network/60-wlanx.network.j2 ${TARGET_DIR}/etc/systemd/network/60-${Q_WIFACE}.network -v Q_WIFACE=${Q_WIFACE} -m 0644
+
+	# If wifi is enabled, do not block the boot if no network comes online during boot.
+	in_target systemctl mask systemd-networkd-wait-online.service
     else
         rm -f ${TARGET_DIR}/etc/systemd/network/20-wifi.link
     fi
@@ -158,6 +161,9 @@ tgt_network() {
     if [[ "${Q_FIREWALL}" == "false" || "${Q_QEMU_KVM}" == "false" ]]; then
         rm -f ${TARGET_DIR}/etc/modules-load.d/br_netfilter.conf ${TARGET_DIR}/etc/sysctl.d/50-bridge-netfilter.conf
     fi
+
+    # Make sure systemd-networkd is enabled.
+    add_services systemd-networkd
 }
 
 tgt_enable_firewall() {

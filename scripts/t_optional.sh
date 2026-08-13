@@ -7,12 +7,6 @@ t_optional() {
 o_wifi() {
     add_packages iwd firmware-iwlwifi
     add_services iwd
-
-    mkdir -p ${TARGET_DIR}/etc/iwd
-    write_file ${TARGET_DIR}/etc/iwd/main.conf 0644 <<EOF
-[General]
-EnableNetworkConfiguration=true
-EOF
 }
 
 o_desktop() {

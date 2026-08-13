@@ -1,6 +1,6 @@
 #!/bin/sh
 
-sh -c "./10_linux" > /tmp/input
+sh -c "/etc/grub.d/10_linux" > /tmp/input
 
 awk '
 /submenu / {

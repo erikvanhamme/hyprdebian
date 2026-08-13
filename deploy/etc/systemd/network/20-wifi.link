@@ -2,5 +2,5 @@
 Type=wlan
 
 [Link]
-NamePolicy=kernel
+NamePolicy=keep kernel database onboard slot path
 MACAddressPolicy=persistent
