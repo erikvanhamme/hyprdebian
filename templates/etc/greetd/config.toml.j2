@@ -1,6 +1,13 @@
 [terminal]
 vt = 7
 
-[default_session]
+[general]
+runfile=/run/greetd.runfile
+
+[initial_session]
 command = "uwsm start hyprland.desktop > /var/log/hyprland.log 2>&1"
 user = "{{ Q_USER }}"
+
+[default_session]
+command = "sh -c 'rm /run/greetd.runfile; chvt 1; systemctl stop greetd.service'"
+user = "root"
