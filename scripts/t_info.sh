@@ -30,7 +30,7 @@ q_hostname() {
 }
 
 q_fqdn() {
-    ask Q_FQDN "Fully qualified domain name" "hyprdebian.rsq-online.ddns.net"
+    ask Q_FQDN "Fully qualified domain name" "${Q_HOSTNAME}.rsq-online.ddns.net"
 }
 
 q_kernel() {
@@ -67,6 +67,10 @@ q_wifi() {
     else
         return 0
     fi
+}
+
+q_firewall() {
+    ask_yes_no Q_FIREWALL "Install firewall"
 }
 
 q_desktop() {
@@ -107,6 +111,12 @@ q_rust() {
     fi
 }
 
+q_openssh() {
+    if ask_yes_no Q_OPENSSH "Enable OpenSSH server"; then
+        add_packages openssh-server
+    fi
+}
+
 add_dependencies "t_info" \
     "q_disk" \
     "q_swap" \
@@ -116,11 +126,13 @@ add_dependencies "t_info" \
     "q_kernel" \
     "q_iface" \
     "q_wifi" \
+    "q_firewall" \
     "q_desktop" \
     "q_docker" \
     "q_qemu_kvm" \
     "q_cups" \
-    "q_rust"
+    "q_rust" \
+    "q_openssh"
 
 add_dependencies "t_install" \
     "t_info"

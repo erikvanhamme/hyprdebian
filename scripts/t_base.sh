@@ -133,20 +133,39 @@ base_utilities() {
     add_packages eza yazi fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git-delta ack
 }
 
-tgt_netplan() {
-    in_target apt install -y netplan.io
+tgt_network() {
 
-    python3 render.py templates/etc/netplan/01-wired.yaml.j2 ${TARGET_DIR}/etc/netplan/01-wired.yaml -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0600
-
-    if [[ "${Q_WIFI}" == "true" ]]; then
-        python3 render.py templates/etc/netplan/02-wifi.yaml.j2 ${TARGET_DIR}/etc/netplan/02-wifi.yaml -v Q_WIFACE=${Q_WIFACE} -m 0600
-    fi
-
+    # Render out the template for the wired interface. Delete the bridge files if QEMU/KVM is not enabled.
+    python3 render.py templates/etc/systemd/network/50-ethx.network.j2 ${TARGET_DIR}/etc/systemd/network/50-${Q_IFACE}.network -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0644
     if [[ "${Q_QEMU_KVM}" == "false" ]]; then
-        rm -rf ${TARGET_DIR}/etc/systemd/network/10-netplan-br0.network.d
+        rm -f ${TARGET_DIR}/etc/systemd/network/30-br0.netdev ${TARGET_DIR}/etc/systemd/network/40-br0.network
     fi
 
-    in_target netplan generate
+    # Render out the template for the wifi interface. Delete the wifi files if wifi is not enabled.
+    if [[ "${Q_WIFI}" == "true" ]]; then
+        python3 render.py templates/etc/systemd/network/60-wlanx.network.j2 ${TARGET_DIR}/etc/systemd/network/60-${Q_WIFACE} -v Q_WIFACE=${Q_WIFACE} -m 0644
+    else
+        rm -f ${TARGET_DIR}/etc/systemd/network/20-wifi.link
+    fi
+
+    # Have the firewall installed and trigger the enablement.
+    if [[ "${Q_FIREWALL}" == "true" ]]; then
+        add_packages ufw
+        add_dependencies "t_services" "tgt_enable_firewall"
+    fi
+
+    # Remove the netfilter-bridge files if there is no reason to have them.
+    if [[ "${Q_FIREWALL}" == "false" || "${Q_QEMU_KVM}" == "false" ]]; then
+        rm -f ${TARGET_DIR}/etc/modules-load.d/br_netfilter.conf ${TARGET_DIR}/etc/sysctl.d/50-bridge-netfilter.conf
+    fi
+}
+
+tgt_enable_firewall() {
+    in_target ufw enable
+
+    if [[ "${Q_FIREWALL}" == "true" ]]; then
+        in_target ufw allow SSH
+    fi
 }
 
 add_dependencies "t_base" \
@@ -166,7 +185,7 @@ add_dependencies "t_base" \
     "tgt_systemd" \
     "tgt_console" \
     "base_utilities" \
-    "tgt_netplan"
+    "tgt_network"
 
 add_dependencies "t_install" \
     "t_base"

@@ -1,0 +1,13 @@
+[Match]
+Name={{ Q_IFACE }}
+{% if Q_QEMU_KVM %}
+[Network]
+Bridge=br0
+{% else %}
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+
+[DHCPv4]
+RouteMetric=100
+{% endif %}

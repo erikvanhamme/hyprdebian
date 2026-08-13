@@ -1,0 +1,6 @@
+[Match]
+Type=ether
+
+[Link]
+NamePolicy=kernel
+MACAddressPolicy=persistent
