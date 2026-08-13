@@ -1,0 +1,36 @@
+#!/bin/sh
+
+sh -c "./10_linux" > /tmp/input
+
+awk '
+/submenu / {
+    in_submenu = 1
+}
+
+in_submenu {
+    # If a line starts a menuentry containing "(recovery mode)"
+    if (/^[[:space:]]*menuentry.*\(recovery mode\)/) {
+        skip_entry = 1
+        next
+    }
+
+    # If we were skipping a recovery entry, look for its closing brace
+    if (skip_entry) {
+        if ($0 ~ /^[\t ]*\}/) {
+            skip_entry = 0
+        }
+        next
+    }
+}
+
+{ print }
+' /tmp/input > /tmp/filtered
+
+sed -i 's/quiet splash/quiet splash break=premount/' /tmp/filtered
+
+sed -i 's/Debian GNU\/Linux/ZFS recovery \(BusyBox shell\) for Debian GNU\/Linux/' /tmp/filtered
+
+cat /tmp/filtered
+
+rm /tmp/input
+rm /tmp/filtered
