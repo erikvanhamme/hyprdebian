@@ -3,7 +3,7 @@ set -eo pipefail
 exec 2>&1
 
 # Start banner.
-echo "=== Erik's nifty debian+hyprland installer v0.49 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.50 ==="
 
 # Set up idempotency and config paths.
 TARGET_DIR=/mnt
@@ -238,6 +238,45 @@ execute_task() {
         log_status "$COLOR_RED" "FAIL   " "$display_name"
         return 1
     fi
+}
+
+# Shows network interfaces.
+show_ifaces() {
+    printf '%-12s %-12s %-12s %s\n' "INTERFACE" "TYPE" "PATH NAME" "IP ADDRESS"
+    printf '%-12s %-12s %-12s %s\n' "---------" "----" "---------" "----------"
+
+    for iface in /sys/class/net/*; do
+        name=$(basename "$iface")
+
+        path_name=$(udevadm info --query=property --path="/sys/class/net/$name" 2>/dev/null | sed -n 's/^ID_NET_NAME_PATH=//p')
+
+        if [ -d "$iface/wireless" ]; then
+            type="wifi"
+        elif [ -e "$iface/device" ]; then
+            type="wired"
+        else
+            type="virtual"
+        fi
+
+        ip_addr=$(ip -4 -o addr show dev "$name" 2>/dev/null |
+            awk '{print $4}' |
+            cut -d/ -f1 |
+            paste -sd, -)
+
+        printf '%-12s %-12s %-12s %s\n' "$name" "$type" "${path_name:--}" "${ip_addr:--}"
+    done
+}
+
+# Generates a random mac address.
+random_mac() {
+    local bytes
+    bytes=$(od -An -N6 -tx1 /dev/urandom)
+
+    # Set locally-administered bit and clear multicast bit
+    set -- $bytes
+    printf '%02x:%02x:%02x:%02x:%02x:%02x\n' \
+        "$((0x$1 & 0xfe | 0x02))" \
+        "0x$2" "0x$3" "0x$4" "0x$5" "0x$6"
 }
 
 # Packages task.

@@ -51,17 +51,17 @@ q_kernel() {
 }
 
 q_iface() {
-    echo "Available wired interfaces:"
-    ip -o link show | awk -F': ' '{print $2}' | grep -E '^(en|eth)'
-    ask Q_IFACE "Select wired interface for DHCP (e.g. enp0s3)"
+    echo "Available interfaces:"
+    show_ifaces
+    ask Q_IFACE "Select wired interface for DHCP (use path name!)"
 }
 
 q_wifi() {
     if ask_yes_no Q_WIFI "Enable wifi"; then
 
-        echo "Available wifi interfaces:"
-        ip -o link show | awk -F': ' '{print $2}' | grep -E '^(wlan|w)'
-        ask Q_WIFACE "Select wifi interface for DHCP (e.g. wlan0)"
+        echo "Available interfaces:"
+        show_ifaces
+        ask Q_WIFACE "Select wifi interface for DHCP (use path name!)"
 
         add_dependencies "t_optional" "o_wifi"
     else

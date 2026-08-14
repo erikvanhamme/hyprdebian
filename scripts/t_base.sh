@@ -135,18 +135,21 @@ base_utilities() {
 
 tgt_network() {
 
-    # Render out the template for the wired interface. Delete the bridge files if QEMU/KVM is not enabled.
+    # Render out the template for the wired interface.
     python3 render.py templates/etc/systemd/network/50-ethx.network.j2 ${TARGET_DIR}/etc/systemd/network/50-${Q_IFACE}.network -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0644
-    if [[ "${Q_QEMU_KVM}" == "false" ]]; then
-        rm -f ${TARGET_DIR}/etc/systemd/network/30-br0.netdev ${TARGET_DIR}/etc/systemd/network/40-br0.network
+
+    # If QEMU/KVM is enabled, generate a random MAC address and render out the br0 netdev file.
+    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
+        mac=$(random_mac)
+        python3 render.py templates/etc/systemd/network/30-br0.netdev.j2 ${TARGET_DIR}/etc/systemd/network/30-br0.netdev -v MAC_ADDRESS=${mac} -m 0644
     fi
 
     # Render out the template for the wifi interface. Delete the wifi files if wifi is not enabled.
     if [[ "${Q_WIFI}" == "true" ]]; then
         python3 render.py templates/etc/systemd/network/60-wlanx.network.j2 ${TARGET_DIR}/etc/systemd/network/60-${Q_WIFACE}.network -v Q_WIFACE=${Q_WIFACE} -m 0644
 
-	# If wifi is enabled, do not block the boot if no network comes online during boot.
-	in_target systemctl mask systemd-networkd-wait-online.service
+	    # If wifi is enabled, do not block the boot if no network comes online during boot.
+	    in_target systemctl mask systemd-networkd-wait-online.service
     else
         rm -f ${TARGET_DIR}/etc/systemd/network/20-wifi.link
     fi
@@ -163,7 +166,7 @@ tgt_network() {
     fi
 
     # Make sure systemd-networkd is enabled.
-    add_services systemd-networkd
+    in_target systemctl enable systemd-networkd
 }
 
 tgt_enable_firewall() {
