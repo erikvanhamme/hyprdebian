@@ -1,0 +1,12 @@
+[Unit]
+Description=Battery percentage notifications
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/hd-battery-notify
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
