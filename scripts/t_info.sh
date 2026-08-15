@@ -117,6 +117,12 @@ q_openssh() {
     fi
 }
 
+q_laptop() {
+    if ask_yes_no Q_LAPTOP "Is this a laptop"; then
+        add_dependencies "t_optional" "o_laptop"
+    fi
+}
+
 add_dependencies "t_info" \
     "q_disk" \
     "q_swap" \
@@ -132,7 +138,8 @@ add_dependencies "t_info" \
     "q_qemu_kvm" \
     "q_cups" \
     "q_rust" \
-    "q_openssh"
+    "q_openssh" \
+    "q_laptop"
 
 add_dependencies "t_install" \
     "t_info"

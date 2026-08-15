@@ -59,6 +59,7 @@ tgt_pipewire() {
     mkdir -p ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants
     ln -s ${TARGET_DIR}/usr/lib/systemd/user/pipewire.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/
     ln -s ${TARGET_DIR}/usr/lib/systemd/user/wireplumber.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/
+    in_target chown -R ${Q_USER}:${Q_USER} /home/${Q_USER}/.config/systemd
 }
 
 tgt_sniptool() {
@@ -120,6 +121,10 @@ EOF
 tgt_syscargo_permissions() {
     in_target chown -R root:cargo /usr/local
     in_target chmod -R g+w /usr/local
+}
+
+o_laptop() {
+    # TODO: Add laptop specific things here, like battery monitoring.
 }
 
 add_dependencies "o_desktop" \
