@@ -28,4 +28,8 @@ p_install_packages() {
 }
 
 add_dependencies "t_prereq" "p_backup_sources" "p_remove_sources" "p_install_sources" "p_install_packages"
-add_dependencies "t_install" "t_prereq"
+
+# Only run the prereqs when not running on a hyprdebian live iso.
+if [ ! -f "~/hyprdebian.release ]; then
+    add_dependencies "t_install" "t_prereq"
+fi
