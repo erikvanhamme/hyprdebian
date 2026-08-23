@@ -125,6 +125,7 @@ tgt_syscargo_permissions() {
 
 o_laptop() {
     # TODO: Add laptop specific things here, like battery monitoring.
+    return 0
 }
 
 add_dependencies "o_desktop" \
