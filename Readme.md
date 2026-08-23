@@ -27,6 +27,12 @@ Feel free to experiment with it.
 
 ## Installation
 
+Please note:
+1. The installer will not do any handholding. If it asks questions, you better have the right answers.
+2. Near the end, it will complain that 'rpool' could not be exported. This is a known bug which is very hard to fix, see 'First boot' below for a workaround.
+
+### From Debian trixie live ISO
+
 To install you will need a Debian Trixie live ISO written to a USB stick to boot from.
 
 After boot, open a terminal and run:
@@ -35,12 +41,22 @@ After boot, open a terminal and run:
 sudo apt install -y git
 git clone https://github.com/erikvanhamme/hyprdebian.git
 ch hyprdebian
-script -c ./install.sh install.log
+sudo ./install.sh
 ```
 
-Please note:
-1. The installer will not do any handholding. If it asks questions, you better have the right answers.
-2. Near the end, it will complain that 'rpool' could not be exported. This is a known bug which is very hard to fix, see 'First boot' below for a workaround.
+### From hyprdebian live ISO
+
+To install you will need to create the live ISO by running the script in the livecd folder.
+
+When the ISO is built, write it to a USB stick and boot from it.
+
+After boot, open a terminal and run:
+
+```
+cd hyprdebian
+git pull
+sudo ./install.sh
+```
 
 ## First boot
 
@@ -64,5 +80,5 @@ Subsequent boots will be normal.
 SUPER + ENTER: terminal
 SUPER + B: firefox
 
-Other shortcuts are defined in ~/.config/hypr/hyprland.conf
+Other shortcuts are defined in ~/.config/hypr/hyprland.lua
 
