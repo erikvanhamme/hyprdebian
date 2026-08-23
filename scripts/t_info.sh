@@ -123,6 +123,10 @@ q_laptop() {
     fi
 }
 
+q_repo() {
+    ask Q_REPO "Local hyprdebian repository URL" "http://bitbucket5:8080/"
+}
+
 add_dependencies "t_info" \
     "q_disk" \
     "q_swap" \
@@ -139,7 +143,8 @@ add_dependencies "t_info" \
     "q_cups" \
     "q_rust" \
     "q_openssh" \
-    "q_laptop"
+    "q_laptop" \
+    "q_repo"
 
 add_dependencies "t_install" \
     "t_info"
