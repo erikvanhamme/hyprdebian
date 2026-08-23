@@ -3,7 +3,7 @@ set -eo pipefail
 exec 2>&1
 
 # Start banner.
-echo "=== Erik's nifty debian+hyprland installer v0.57 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.58 ==="
 
 # Set up idempotency and config paths.
 TARGET_DIR=/mnt

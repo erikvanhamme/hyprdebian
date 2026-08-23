@@ -30,6 +30,10 @@ p_install_packages() {
 add_dependencies "t_prereq" "p_backup_sources" "p_remove_sources" "p_install_sources" "p_install_packages"
 
 # Only run the prereqs when not running on a hyprdebian live iso.
-if [ ! -f "~/hyprdebian.release ]; then
+TARGET_USER="${SUDO_USER:-$USER}"
+USER_HOME=$(eval echo "~$TARGET_USER")
+RELEASE_FILE="$USER_HOME/hyprdebian.release"
+
+if [ ! -f "$RELEASE_FILE" ]; then
     add_dependencies "t_install" "t_prereq"
 fi
