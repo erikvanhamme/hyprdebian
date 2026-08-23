@@ -62,7 +62,7 @@ tgt_mount() {
 }
 
 tgt_apt_init() {
-    python3 render.py templates/etc/apt/sources.list.d/hyprdebian.local.list ${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.list -v Q_REPO=${Q_REPO}
+    python3 render.py templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources -v Q_REPO=${Q_REPO}
 
     in_target apt update
 }
