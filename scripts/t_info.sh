@@ -113,7 +113,7 @@ q_rust() {
 
 q_openssh() {
     if ask_yes_no Q_OPENSSH "Enable OpenSSH server"; then
-        add_packages openssh-server
+        add_packages openssh-server kitty-terminfo
     fi
 }
 
