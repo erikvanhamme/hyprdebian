@@ -94,6 +94,15 @@ write_file() {
     cat > "$path"
 }
 
+trim() {
+    local var="$*"
+    # Remove leading whitespace
+    var="${var#"${var%%[![:space:]]*}"}"
+    # Remove trailing whitespace
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+
 ask() {
     local var_name="$1"
     local prompt="$2"

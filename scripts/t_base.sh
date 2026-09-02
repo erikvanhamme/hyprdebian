@@ -14,28 +14,43 @@ bootstrap() {
 }
 
 configure_fstab() {
-    local efi_part efi_uuid
-    efi_part=${Q_DISK}-part1
-    efi_uuid=$(blkid -s UUID -o value ${efi_part})
+    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+        local efi_part efi2_part efi_uuid efi2_uuid
+        efi_part=${Q_DISK_A}-part1
+        efi2_part=${Q_DISK_B}-part2
+        efi_uuid=$(blkid -s UUID -o value ${efi_part})
+        efi2_uuid=$(blkid -s UUID -o value ${efi2_part})
 
-    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
-        if [[ -z "$efi_uud" ]] ; then
+        if [[ -z "$efi_uuid" || -z "$efi2_uuid" ]]; then
             echo "ERROR: Unable to determine UUIDs for fstab."
             return 1
         fi
 
-        python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid}
+        python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v efi2_uuid=${efi2_uuid}
     else
-        local swap_part swap_uuid
-        swap_part=${Q_DISK}-part2
-        swap_uuid=$(blkid -s UUID -o value ${swap_part})
+        local efi_part efi_uuid
+        efi_part=${Q_DISK}-part1
+        efi_uuid=$(blkid -s UUID -o value ${efi_part})
 
-        if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
-            echo "ERROR: Unable to determine UUIDs for fstab."
-            return 1
+        if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+            if [[ -z "$efi_uud" ]] ; then
+                echo "ERROR: Unable to determine UUIDs for fstab."
+                return 1
+            fi
+
+            python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid}
+        else
+            local swap_part swap_uuid
+            swap_part=${Q_DISK}-part2
+            swap_uuid=$(blkid -s UUID -o value ${swap_part})
+
+            if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
+                echo "ERROR: Unable to determine UUIDs for fstab."
+                return 1
+            fi
+
+            python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
         fi
-
-        python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
     fi
 }
 
@@ -106,11 +121,20 @@ tgt_zfs_support() {
 tgt_grub2() {
     in_target mkdir /boot/efi
     in_target mount /boot/efi
+    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+        in_target mkdir /boot/efi2
+        in_target mount /boot/efi2
+    fi
     in_target apt install -y grub-efi-amd64 shim-signed
     in_target update-initramfs -c -k all
     cp -v deploy/etc/default/grub ${TARGET_DIR}/etc/default
     in_target update-grub
-    in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=hyprdebian --recheck --no-floppy
+    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
+    else
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian" --recheck --no-floppy
+    fi
 }
 
 tgt_systemd() {

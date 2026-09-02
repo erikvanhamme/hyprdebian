@@ -4,20 +4,40 @@ t_info() {
     return 0
 }
 
+q_redundant() {
+    ask_yes_no Q_REDUNDANT "Install on redundant drives"
+    return 0
+}
+
 q_disk() {
     echo "Available block devices:"
     find /dev/disk/by-id
-    ask Q_DISK "Target disk (e.g. /dev/sda)"
 
-    if ask_yes_no Q_DESTROY "All data on $Q_DISK will be destroyed. Continue"; then
-        return 0
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
+        ask Q_DISK_A "Target disk A"
+        ask Q_DISK_B "Target disk B"
+        Q_DISKS="${Q_DISK_A} ${Q_DISK_B}"
     else
-        echo "Aborting."
-        return 1
+        ask Q_DISK "Target disk"
+        Q_DISKS="${Q_DISK}"
     fi
+
+    for DISK in ${Q_DISKS}; do
+        if ask_yes_no Q_DESTROY "All data on $DISK will be destroyed. Continue"; then
+            continue
+        else
+            echo "Aborting."
+            return 1
+        fi
+    done
 }
 
 q_swap() {
+    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+        Q_SWAP=0
+        return 0
+    fi
+
     ask Q_SWAP "Enter size of swap partition (in GiB, 0 = disable swap)" "2"
 }
 
@@ -129,6 +149,7 @@ q_repo() {
 }
 
 add_dependencies "t_info" \
+    "q_redundant" \
     "q_disk" \
     "q_swap" \
     "q_user" \

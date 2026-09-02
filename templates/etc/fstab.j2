@@ -3,6 +3,9 @@
 # <file system>  <mount point>  <type>  <options>         <dump> <pass>
 
 UUID={{ efi_uuid }}   /boot/efi   vfat   umask=0077        0      1
+{% if efi2_uuid %}
+UUID={{ efi2_uuid }}  /boot/efi2  vfat   umask=0077        0      1
+{% endif %}
 {% if swap_uuid %}
 UUID={{ swap_uuid }}  none        swap   sw                0      0
 {% endif %}
