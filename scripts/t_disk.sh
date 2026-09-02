@@ -26,15 +26,29 @@ p_efi() {
 }
 
 p_swap() {
-    sgdisk -n 2:0:+${Q_SWAP}G -t 2:8200 -c 2:"Swap" ${Q_DISK}
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        sgdisk -n 2:0:+${Q_SWAP}G -t 2:8200 -c 2:"Swap" ${Q_DISK}
+    fi
 }
 
 p_boot() {
-    sgdisk -n 3:0:+4G -t 3:BF01 -c 3:"Boot Pool" ${Q_DISK}
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        sgdisk -n 2:0:+4G -t 2:BF01 -c 2:"Boot Pool" ${Q_DISK}
+        boot_pool_part=${Q_DISK}-part2
+    else
+        sgdisk -n 3:0:+4G -t 3:BF01 -c 3:"Boot Pool" ${Q_DISK}
+        boot_pool_part=${Q_DISK}-part3
+    fi
 }
 
 p_root() {
-    sgdisk -n 4:0:0 -t 4:BF01 -c 4:"Root Pool" ${Q_DISK}
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        sgdisk -n 3:0:0 -t 3:BF01 -c 3:"Root Pool" ${Q_DISK}
+        root_pool_part=${Q_DISK}-part3
+    else
+        sgdisk -n 4:0:0 -t 4:BF01 -c 4:"Root Pool" ${Q_DISK}
+        root_pool_part=${Q_DISK}-part4
+    fi
 }
 
 p_probe() {
@@ -52,13 +66,16 @@ f_efi() {
 }
 
 f_swap() {
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        return 0
+    fi
+
     local swap_part=${Q_DISK}-part2
     mkswap ${swap_part}
     swapon ${swap_part}
 }
 
 f_boot_pool() {
-    local boot_pool_part=${Q_DISK}-part3
     zpool create -f \
         -o ashift=12 \
         -o autotrim=on \
@@ -74,7 +91,6 @@ f_boot_pool() {
 }
 
 f_root_pool() {
-    local root_pool_part=${Q_DISK}-part4
     zpool create -f \
         -o ashift=12 \
         -o autotrim=on \

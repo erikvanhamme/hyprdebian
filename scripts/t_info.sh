@@ -18,7 +18,7 @@ q_disk() {
 }
 
 q_swap() {
-    ask Q_SWAP "Enter size of swap partition (in GiB, must be > 0)" "2"
+    ask Q_SWAP "Enter size of swap partition (in GiB, 0 = disable swap)" "2"
 }
 
 q_user() {
@@ -71,6 +71,7 @@ q_wifi() {
 
 q_firewall() {
     ask_yes_no Q_FIREWALL "Install firewall"
+    return 0
 }
 
 q_desktop() {

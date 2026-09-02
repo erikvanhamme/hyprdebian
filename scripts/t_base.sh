@@ -14,20 +14,29 @@ bootstrap() {
 }
 
 configure_fstab() {
-    local efi_part swap_part
-    local efi_uuid swap_uuid
-
+    local efi_part efi_uuid
     efi_part=${Q_DISK}-part1
-    swap_part=${Q_DISK}-part2
     efi_uuid=$(blkid -s UUID -o value ${efi_part})
-    swap_uuid=$(blkid -s UUID -o value ${swap_part})
 
-    if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
-        echo "ERROR: Unable to determine UUIDs for fstab."
-        return 1
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        if [[ -z "$efi_uud" ]] ; then
+            echo "ERROR: Unable to determine UUIDs for fstab."
+            return 1
+        fi
+
+        python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid}
+    else
+        local swap_part swap_uuid
+        swap_part=${Q_DISK}-part2
+        swap_uuid=$(blkid -s UUID -o value ${swap_part})
+
+        if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
+            echo "ERROR: Unable to determine UUIDs for fstab."
+            return 1
+        fi
+
+        python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
     fi
-
-    python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
 }
 
 configure_hostname() {
