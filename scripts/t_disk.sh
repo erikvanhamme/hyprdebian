@@ -38,7 +38,7 @@ p_swap() {
         return 0
     fi
 
-    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+    if [[ "${Q_SWAP:-1}" -gt 0 ]]; then
         for DISK in ${Q_DISKS}; do
             sgdisk -n 2:0:+${Q_SWAP}G -t 2:8200 -c 2:"Swap" $DISK
         done

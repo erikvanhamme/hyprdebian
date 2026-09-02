@@ -33,7 +33,7 @@ q_disk() {
 }
 
 q_swap() {
-    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
         Q_SWAP=0
         return 0
     fi

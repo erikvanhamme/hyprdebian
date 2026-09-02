@@ -14,7 +14,7 @@ bootstrap() {
 }
 
 configure_fstab() {
-    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
         local efi_part efi2_part efi_uuid efi2_uuid
         efi_part=${Q_DISK_A}-part1
         efi2_part=${Q_DISK_B}-part1
@@ -33,7 +33,7 @@ configure_fstab() {
         efi_uuid=$(blkid -s UUID -o value ${efi_part})
 
         if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
-            if [[ -z "$efi_uud" ]] ; then
+            if [[ -z "$efi_uuid" ]] ; then
                 echo "ERROR: Unable to determine UUIDs for fstab."
                 return 1
             fi
@@ -126,7 +126,7 @@ tgt_zfs_support() {
 tgt_grub2() {
     in_target mkdir /boot/efi
     in_target mount /boot/efi
-    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
         in_target mkdir /boot/efi2
         in_target mount /boot/efi2
     fi
@@ -134,7 +134,7 @@ tgt_grub2() {
     in_target update-initramfs -c -k all
     cp -v deploy/etc/default/grub ${TARGET_DIR}/etc/default
     in_target update-grub
-    if [[ "${Q_REDUNDANT}"=="true" ]]; then
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
     else
