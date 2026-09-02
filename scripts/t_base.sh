@@ -17,7 +17,7 @@ configure_fstab() {
     if [[ "${Q_REDUNDANT}"=="true" ]]; then
         local efi_part efi2_part efi_uuid efi2_uuid
         efi_part=${Q_DISK_A}-part1
-        efi2_part=${Q_DISK_B}-part2
+        efi2_part=${Q_DISK_B}-part1
         efi_uuid=$(blkid -s UUID -o value ${efi_part})
         efi2_uuid=$(blkid -s UUID -o value ${efi2_part})
 

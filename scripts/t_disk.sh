@@ -23,7 +23,7 @@ d_discard() {
 
 p_prepare() {
     for DISK in ${Q_DISKS}; do
-        sgdisk --clear DISK
+        sgdisk --clear $DISK
     done
 }
 
@@ -47,7 +47,7 @@ p_swap() {
 
 p_boot() {
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        boot_pool_part = "mirror "
+        boot_pool_part="mirror "
     fi
 
     for DISK in ${Q_DISKS}; do
@@ -65,7 +65,7 @@ p_boot() {
 
 p_root() {
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        root_pool_part = "mirror "
+        root_pool_part="mirror "
     fi
 
     for DISK in ${Q_DISKS}; do
