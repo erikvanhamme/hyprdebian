@@ -73,6 +73,11 @@ deploy_files() {
 
     cp -rv deploy/etc/. ${TARGET_DIR}/etc/
     cp -rv deploy/usr/local/bin/. ${TARGET_DIR}/usr/local/bin/
+
+    if [[ "${Q_REDUNDANT}"=="false" ]]; then
+        rm ${TARGET_DIR}/usr/local/bin/hd-sync-efi
+        rm ${TARGET_DIR}/etc/apt/conf.d/99sync-efi
+    fi
 }
 
 tgt_mount() {
