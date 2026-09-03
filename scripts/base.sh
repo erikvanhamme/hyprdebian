@@ -228,6 +228,11 @@ b_network() {
         rm -f ${TARGET_DIR}/etc/systemd/network/20-wifi.link
     fi
 
+    # Remove the netfilter-bridge files if there is no reason to have them.
+    if [[ "${Q_FIREWALL}" == "false" || "${Q_QEMU_KVM}" == "false" ]]; then
+        rm -f ${TARGET_DIR}/etc/modules-load.d/br_netfilter.conf ${TARGET_DIR}/etc/sysctl.d/50-bridge-netfilter.conf
+    fi
+
     # Make sure systemd-networkd is enabled.
     in_target systemctl enable systemd-networkd
 }

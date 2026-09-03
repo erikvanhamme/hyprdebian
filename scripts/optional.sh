@@ -17,7 +17,16 @@ o_wifi() {
 }
 
 o_firewall() {
-    return 0
+    add_packages ufw
+    add_dependencies "pkg_post" "o_enable_firewall"
+}
+
+o_enable_firewall() {
+    in_target ufw enable
+    
+    if [[ "${Q_OPENSSH}" == "true" ]]; then
+        in_target ufw allow SSH
+    fi
 }
 
 o_font() {
@@ -29,7 +38,15 @@ o_desktop() {
 }
 
 o_docker() {
-    return 0
+    add_packages docker.io
+    add_user_groups docker
+
+    mkdir -p ${TARGET_DIR}/etc/docker
+    write_file ${TARGET_DIR}/etc/docker/daemon.json 0644 <<EOF
+{
+  "bip": "192.168.253.1/24"
+}
+EOF
 }
 
 o_qemu_kvm() {
@@ -48,7 +65,8 @@ o_qemu_kvm() {
 }
 
 o_cups() {
-    return 0
+    add_packages cups
+    add_user_groups lpadmin
 }
 
 o_rust() {
@@ -56,7 +74,7 @@ o_rust() {
 }
 
 o_openssh() {
-    return 0
+    add_packages openssh-server kitty-terminfo
 }
 
 add_dependencies "install" "o_pre" "o_main" "o_post"
