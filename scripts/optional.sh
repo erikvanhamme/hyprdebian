@@ -13,7 +13,8 @@ o_post() {
 }
 
 o_wifi() {
-    return 0
+    add_packages iwd firmware-iwlwifi
+    add_services iwd
 }
 
 o_firewall() {
@@ -49,8 +50,12 @@ o_hyprland() {
     add_packages uwsm kitty desktop-base dbus-user-session hyprland hyprland-qtutils \
         wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock \
         libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
-        pulseaudio-utils grim slurp swappy wl-clipboard wiremix playerctl brightnessctl \
+        pulseaudio-utils grim slurp swappy wl-clipboard playerctl brightnessctl \
         hyprshutdown
+
+    if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
+        add_packages wiremix
+    fi
 }
 
 o_theme() {
@@ -85,7 +90,7 @@ o_desktop() {
         "o_user_icons" \
         "o_pipewire" \
         "o_sniptool" \
-        
+
 }
 
 o_docker() {
@@ -121,7 +126,33 @@ o_cups() {
 }
 
 o_rust() {
-    return 0
+    add_packages rustup
+
+    add_dependencies "u_post" \
+        "o_syscargo" \
+        "o_syscargo_permissions"
+}
+
+o_syscargo() {
+    zfs create rpool/home/cargo
+    in_target useradd -m -r -s /bin/bash cargo
+    in_target chown -R cargo:cargo /home/cargo
+    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
+    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
+[install]
+root = "/usr/local"
+EOF
+    in_target sudo -u cargo rustup default stable
+
+    write_file ${TARGET_DIR}/usr/local/bin/syscargo 0755 <<'EOF'
+#!/bin/bash
+exec sudo -u cargo -H cargo "$@"
+EOF
+}
+
+o_syscargo_permissions() {
+    in_target chown -R root:cargo /usr/local
+    in_target chmod -R g+w /usr/local
 }
 
 o_openssh() {
