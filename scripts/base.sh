@@ -235,7 +235,7 @@ b_network() {
 add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
-    "b_hostame"  \
+    "b_hostname"  \
     "b_hosts"  \
     "b_zfs_cache"  \
     "b_deploy" \
