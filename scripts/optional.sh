@@ -50,7 +50,7 @@ EOF
 }
 
 o_qemu_kvm() {
-    add_packages qemu-system-x86 qemu-utils libvirt-daemon-system libvirt-clients bridge-utils ovmf
+    add_packages qemu-system-x86-headless qemu-utils libvirt-daemon-system libvirt-clients bridge-utils ovmf
 
     if [[ "${Q_DESKTOP}" == "true" ]]; then
         add_packages virt-manager
