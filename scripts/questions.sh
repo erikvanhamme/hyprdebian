@@ -100,7 +100,7 @@ q_firewall() {
 
 q_desktop() {
     if ask_yes_no Q_DESKTOP "Install desktop environment"; then
-        add_dependencies "o_main" "o_font" "o_desktop"
+        add_dependencies "o_main" "o_desktop"
     fi
 }
 
