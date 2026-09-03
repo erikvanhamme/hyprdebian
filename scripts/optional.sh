@@ -85,6 +85,7 @@ o_desktop() {
         "o_user_icons" \
         "o_pipewire" \
         "o_sniptool" \
+        
 }
 
 o_docker() {
