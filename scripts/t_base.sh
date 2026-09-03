@@ -78,6 +78,10 @@ deploy_files() {
         rm ${TARGET_DIR}/usr/local/bin/hd-sync-efi
         rm ${TARGET_DIR}/etc/apt/conf.d/99sync-efi
     fi
+
+    if [[ "${Q_QEMU_KVM}" == "false" ]]; then
+        rm -rf ${TARGET_DIR}/etc/libvirt
+    fi
 }
 
 tgt_mount() {

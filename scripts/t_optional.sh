@@ -86,6 +86,18 @@ o_qemu_kvm() {
     fi
     add_user_groups libvirt kvm
     add_services libvirtd
+
+    add_dependencies "user_post" "o_qemu_kvm_user_post"
+}
+
+o_qemu_kvm_user_post() {
+
+    # Ensure these are disabled to not force TCP or TLS listening
+    in_target systemctl stop libvirtd-tls.socket libvirtd-tcp.socket
+    in_target sudo systemctl mask libvirtd-tls.socket libvirtd-tcp.socket
+
+    # Make sure this file is gone to ensure that libvirtd can run without the systemd encryption BS.
+    rm ${TARGET_DIR}/usr/lib/systemd/system/libvirtd.service.d/10-secret.conf
 }
 
 o_cups() {
