@@ -9,7 +9,7 @@ source scripts/dependencies.sh
 source scripts/helpers.sh
 
 # Start banner.
-echo "=== Erik's nifty debian+hyprland installer v0.78 ==="
+echo "=== Erik's nifty debian+hyprland installer v0.79 ==="
 
 # Set up idempotency and config paths.
 mkdir -p "$STATE_DIR"

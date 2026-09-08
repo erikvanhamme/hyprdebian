@@ -15,6 +15,8 @@ q_post() {
 q_stable() {
     if ask_yes_no Q_STABLE "Install stable base debian system"; then
         Q_SUITE="stable"
+        add_dependencies "q_main" \
+            "q_de"            
     else
         Q_SUITE="unstable"
         add_dependencies "q_main" \
@@ -29,6 +31,39 @@ q_stable() {
             "q_repo"
     fi
     save_config Q_SUITE ${Q_SUITE}
+}
+
+q_de() {
+    ask Q_DE "Which desktop environment (none, cinnamon, gnome, kde, lxde, lxqt, mate, xfce)"
+    case "${Q_DE}" in
+        "none")
+            ;;
+        "cinnamon")
+            add_packages task-cinnamon-desktop
+            ;;sudo
+        "gnome")
+            add_packages task-gnome-desktop
+            ;;
+        "kde")
+            add_packages task-kde-desktop
+            ;;
+        "lxde")
+            add_packages task-lxde-desktop
+            ;;sudo
+        "lxqt")
+            add_packages task-lxqt-desktop
+            ;;sudo
+        "mate")
+            add_packages task-mate-desktop
+            ;;sudo
+        "xfce")
+            add_packages task-xfce-desktop
+            ;;sudo
+        *)
+            echo "Error: Invalid selection '${Q_DE}'."
+            exit 1
+            ;;
+    esac
 }
 
 q_redundant() {

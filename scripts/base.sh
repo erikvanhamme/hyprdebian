@@ -173,8 +173,14 @@ b_grub2() {
 b_systemd() {
     in_target apt install -y systemd-timesyncd
 
-    add_services clear-machine-id
-    add_packages rsyslog
+    if [[ "${Q_SUITE}" == "stable" ]]; then
+        rm ${TARGET_DIR}/etc/systemd/journald.conf
+        rm ${TARGET_DIR}/etc/systemd/system/clear-machine-id.service
+    else
+        add_services clear-machine-id
+        add_packages rsyslog
+    fi
+
     add_user_groups adm
 }
 
