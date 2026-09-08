@@ -13,7 +13,7 @@ q_post() {
 }
 
 q_stable() {
-    if ask_yes_no Q_STABLE "Install stable base debian system"; then
+    if ask_yes_no Q_STABLE "Install stable debian system"; then
         Q_SUITE="stable"
         add_dependencies "q_main" \
             "q_de"            
@@ -40,7 +40,7 @@ q_de() {
             ;;
         "cinnamon")
             add_packages task-cinnamon-desktop
-            ;;sudo
+            ;;
         "gnome")
             add_packages task-gnome-desktop
             ;;
@@ -49,16 +49,16 @@ q_de() {
             ;;
         "lxde")
             add_packages task-lxde-desktop
-            ;;sudo
+            ;;
         "lxqt")
             add_packages task-lxqt-desktop
-            ;;sudo
+            ;;
         "mate")
             add_packages task-mate-desktop
-            ;;sudo
+            ;;
         "xfce")
             add_packages task-xfce-desktop
-            ;;sudo
+            ;;
         *)
             echo "Error: Invalid selection '${Q_DE}'."
             exit 1
