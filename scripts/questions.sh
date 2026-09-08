@@ -29,6 +29,7 @@ q_disk() {
         ask Q_DISK "Target disk"
         Q_DISKS="${Q_DISK}"
     fi
+    save_config Q_DISKS ${Q_DISKS}
 
     for DISK in ${Q_DISKS}; do
         if ask_yes_no Q_DESTROY "All data on $DISK will be destroyed. Continue"; then
@@ -43,6 +44,7 @@ q_disk() {
 q_swap() {
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         Q_SWAP=0
+        save_config Q_SWAP ${Q_SWAP}
         return 0
     fi
 
