@@ -5,6 +5,12 @@ load_config() {
     # Load config and restore/default variables.
     if [[ -f "$CONFIG_FILE" ]]; then
         source "$CONFIG_FILE"
+
+        if [[ "${Q_REDUNDANT}" == "true" ]]; then
+            Q_DISKS="${Q_DISK_A} ${Q_DISK_B}"
+        else
+            Q_DISKS="${Q_DISK}"
+        fi
     fi
 
     if [[ -n "${USER_GROUPS:-}" ]]; then

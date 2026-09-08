@@ -163,10 +163,10 @@ b_grub2() {
     cp -v deploy/etc/default/grub ${TARGET_DIR}/etc/default
     in_target update-grub
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS} (primary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="${Q_OS} (secondary)" --recheck --no-floppy
     else
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS}" --recheck --no-floppy
     fi
 }
 

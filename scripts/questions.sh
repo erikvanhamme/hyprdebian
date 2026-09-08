@@ -12,29 +12,50 @@ q_post() {
     return 0
 }
 
-q_stable() {
-    if ask_yes_no Q_STABLE "Install stable debian system"; then
-        Q_SUITE="stable"
-        add_dependencies "q_main" \
-            "q_de"            
-    else
-        Q_SUITE="unstable"
-        add_dependencies "q_main" \
-            "q_wifi" \
-            "q_firewall" \
-            "q_desktop" \
-            "q_docker" \
-            "q_qemu_kvm" \
-            "q_cups" \
-            "q_rust" \
-            "q_openssh" \
-            "q_repo"
-    fi
+q_os() {
+    ask_options Q_OS "Which OS to install" "hyprdebian" "debian-stable" "debian-testing" "debian-unstable"
+    case "${Q_OS}" in
+        "hyprdebian")
+            Q_SUITE="unstable"
+            add_dependencies "q_os_questions" \
+                "q_kernel" \
+                "q_iface" \
+                "q_wifi" \
+                "q_firewall" \
+                "q_desktop" \
+                "q_docker" \
+                "q_qemu_kvm" \
+                "q_cups" \
+                "q_rust" \
+                "q_openssh" \
+                "q_repo"
+            ;;
+        "debian-stable")
+            Q_SUITE="stable"
+            add_dependencies "q_os_questions" \
+                "q_de"
+            ;;
+        "debian-testing")
+            Q_SUITE="testing"
+            add_dependencies "q_os_questions" \
+                "q_de"
+            ;;
+        "debian-unstable")
+            Q_SUITE="unstable"
+            add_dependencies "q_os_questions" \
+                "q_de"
+            ;;
+    esac
+
     save_config Q_SUITE ${Q_SUITE}
 }
 
+q_os_questions() {
+    return 0
+}
+
 q_de() {
-    ask Q_DE "Which desktop environment (none, cinnamon, gnome, kde, lxde, lxqt, mate, xfce)"
+    ask_options Q_DE "Which desktop environment" "none" "cinnamon" "gnome" "kde" "lxde" "lxqt" "mate" "xfce"
     case "${Q_DE}" in
         "none")
             ;;
@@ -59,10 +80,6 @@ q_de() {
         "xfce")
             add_packages task-xfce-desktop
             ;;
-        *)
-            echo "Error: Invalid selection '${Q_DE}'."
-            exit 1
-            ;;
     esac
 }
 
@@ -83,7 +100,6 @@ q_disk() {
         ask Q_DISK "Target disk"
         Q_DISKS="${Q_DISK}"
     fi
-    save_config Q_DISKS ${Q_DISKS}
 
     for DISK in ${Q_DISKS}; do
         if ask_yes_no Q_DESTROY "All data on $DISK will be destroyed. Continue"; then
@@ -199,14 +215,13 @@ q_repo() {
 # Add additional questions here.
 
 add_dependencies "q_main" \
-    "q_stable" \
+    "q_os" \
     "q_redundant" \
     "q_disk" \
     "q_swap" \
     "q_user" \
     "q_hostname" \
     "q_fqdn" \
-    "q_kernel" \
-    "q_iface" \
+    "q_os_questions" \
 
 add_dependencies "install" "q_pre" "q_main" "q_post"

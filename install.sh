@@ -9,7 +9,7 @@ source scripts/dependencies.sh
 source scripts/helpers.sh
 
 # Start banner.
-echo "=== Erik's nifty debian+hyprland installer v0.80 ==="
+echo "=== Erik's nifty hyprdebian/debian installer v0.81 ==="
 
 # Set up idempotency and config paths.
 mkdir -p "$STATE_DIR"
@@ -25,16 +25,16 @@ install() {
 
 # Load tasks/deps for all the phases, in order.
 source scripts/questions.sh
-source scripts/prereqs.sh
-source scripts/disk.sh
-source scripts/partition.sh
-source scripts/filesystem.sh
-source scripts/base.sh
-source scripts/optional.sh
-source scripts/packages.sh
-source scripts/services.sh
-source scripts/user.sh
-source scripts/cleanup.sh
+# source scripts/prereqs.sh
+# source scripts/disk.sh
+# source scripts/partition.sh
+# source scripts/filesystem.sh
+# source scripts/base.sh
+# source scripts/optional.sh
+# source scripts/packages.sh
+# source scripts/services.sh
+# source scripts/user.sh
+# source scripts/cleanup.sh
 
 # Start Installation.
 execute_task "install"

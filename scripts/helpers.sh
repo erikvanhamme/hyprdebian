@@ -55,6 +55,60 @@ ask() {
     save_config "$var_name" "$input"
 }
 
+ask_options() {
+    local var_name="$1"
+    local prompt="$2"
+    shift 2
+
+    # Collect remaining arguments as options array
+    local options=("$@")
+    local total_options=${#options[@]}
+
+    if (( total_options == 0 )); then
+        echo "Error: No options provided to ask_options" >&2
+        return 1
+    fi
+
+    local current="${!var_name:-}"
+    local default_idx=""
+    local i
+
+    # Display numbered options and check for default matching existing var or text
+    for (( i=0; i<total_options; i++ )); do
+        printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
+        if [[ -n "$current" && "${options[i]}" == "$current" ]]; then
+            default_idx=$((i + 1))
+        fi
+    done
+
+    # Fallback to option 1 as default if var_name is unset or doesn't match
+    default_idx="${default_idx:-1}"
+
+    local choice_prompt="$prompt [$default_idx]: "
+    local input choice_idx
+
+    while true; do
+        read -rp "$choice_prompt" input
+        input="${input:-$default_idx}"
+
+        # Validate numeric input within valid bounds
+        if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= total_options )); then
+            choice_idx=$((input - 1))
+            break
+        fi
+
+        echo "Invalid choice. Please enter a number between 1 and $total_options." >&2
+    done
+
+    local selected_option="${options[choice_idx]}"
+
+    # Assign result back to target variable name
+    printf -v "$var_name" "%s" "$selected_option"
+
+    # Save to configuration
+    save_config "$var_name" "$selected_option"
+}
+
 ask_yes_no() {
     local var_name=$1
     local prompt=$2
