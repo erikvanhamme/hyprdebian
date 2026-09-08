@@ -18,8 +18,9 @@ pkg_install() {
 
 pkg_qemu_kvm() {
 
-    # Make sure this file is gone to ensure that libvirtd can run without the systemd encryption BS.
-    rm ${TARGET_DIR}/usr/lib/systemd/system/libvirtd.service.d/10-secret.conf
+    # Add a mask for the secrets file that ships with debian systemd.
+    mkdir -p ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/
+    ln -sf /dev/null ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/10-secret.conf
 }
 
 add_dependencies "pkg_main" \
