@@ -32,19 +32,25 @@ q_os() {
             ;;
         "debian-stable")
             Q_SUITE="stable"
+            Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
                 "q_de"
             ;;
+            save_config Q_KERNEL ${Q_KERNEL}
         "debian-testing")
             Q_SUITE="testing"
+            Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
                 "q_de"
             ;;
+            save_config Q_KERNEL ${Q_KERNEL}
         "debian-unstable")
             Q_SUITE="unstable"
+            Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
                 "q_de"
             ;;
+            save_config Q_KERNEL ${Q_KERNEL}
     esac
 
     save_config Q_SUITE ${Q_SUITE}
