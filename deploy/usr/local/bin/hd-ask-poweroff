@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIRM=$(echo -e "No\nYes" | wofi --dmenu --prompt "Power off system?" --width 350 --height 150)
+
+if [[ "$CONFIRM" == "Yes" ]]; then
+    hd-poweroff
+fi
+

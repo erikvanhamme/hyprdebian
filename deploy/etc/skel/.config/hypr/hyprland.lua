@@ -60,6 +60,7 @@ hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
 hl.env("QT_STYLE_OVERRIDE", "fusion")
 
+hl.env("ELECTRON_OZONE_PLATFORM_HINT", "wayland")
 
 -----------------------
 ----- PERMISSIONS -----
@@ -116,6 +117,7 @@ hl.window_rule({
     name = "screensaver-fullscreen",
     match = { class = "hyprdebian.screensaver" },
     fullscreen = true,
+    opacity = 1.0,
 })
 
 hl.window_rule({
@@ -128,6 +130,18 @@ hl.window_rule({
     name = "imv-floating",
     match = { class = "imv" },
     float = true,
+})
+
+hl.window_rule({
+    name = "codium-transparancy",
+    match = { class = "codium" },
+    opacity = 0.8,
+})
+
+hl.window_rule({
+    name = "obsidian-transparancy",
+    match = { class = "md.obsidian.Obsidian" },
+    opacity = 0.8,
 })
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Dwindle-Layout/ for more
@@ -210,9 +224,12 @@ hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
 local closeWindowBind = hl.bind(mainMod .. " + W", hl.dsp.window.close())
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("codium"))
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("/usr/bin/wofi --show drun"))
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(terminal .. " -e wiremix"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd([[ notify-send "`date`" ]]))
+hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-reboot"))
+hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-poweroff"))
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
