@@ -115,8 +115,10 @@ b_mount() {
 }
 
 b_apt_init() {
+    python3 render.py template/etc/apt/sources.list.d/debian.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/debian.sources -v Q_SUITE=${Q_SUITE}
+
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        python3 render.py templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources -v Q_REPO=${Q_REPO}
+        python3 render.py templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources -v Q_REPO=${Q_REPO} -v Q_SUITE=${Q_SUITE}
     fi
 
     rm -f ${TARGET_DIR}/etc/apt/sources.list

@@ -12,6 +12,25 @@ q_post() {
     return 0
 }
 
+q_stable() {
+    if ask_yes_no Q_STABLE "Install stable base debian system"; then
+        Q_SUITE="stable"
+    else
+        Q_SUITE="unstable"
+        add_dependencies "q_main" \
+            "q_wifi" \
+            "q_firewall" \
+            "q_desktop" \
+            "q_docker" \
+            "q_qemu_kvm" \
+            "q_cups" \
+            "q_rust" \
+            "q_openssh" \
+            "q_repo"
+    fi
+    save_config Q_SUITE ${Q_SUITE}
+}
+
 q_redundant() {
     ask_yes_no Q_REDUNDANT "Install on redundant drives"
     return 0
@@ -145,6 +164,7 @@ q_repo() {
 # Add additional questions here.
 
 add_dependencies "q_main" \
+    "q_stable" \
     "q_redundant" \
     "q_disk" \
     "q_swap" \
@@ -153,14 +173,5 @@ add_dependencies "q_main" \
     "q_fqdn" \
     "q_kernel" \
     "q_iface" \
-    "q_wifi" \
-    "q_firewall" \
-    "q_desktop" \
-    "q_docker" \
-    "q_qemu_kvm" \
-    "q_cups" \
-    "q_rust" \
-    "q_openssh" \
-    "q_repo"
 
 add_dependencies "install" "q_pre" "q_main" "q_post"
