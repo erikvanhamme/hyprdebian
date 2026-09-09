@@ -1,5 +1,17 @@
 #!/bin/bash
 
+add_files() {
+    for file in "$@"; do
+        for check in "${FILES[@]}"; do
+            [[ "$check" == "$file" ]] && continue
+        done
+
+        FILES+=("$file")
+    done
+
+    save_config FILES "${FILES[*]}" # Persist as space-separated string.
+}
+
 add_packages() {
     for package in "$@"; do
         for check in "${PACKAGES[@]}"; do
@@ -146,6 +158,37 @@ ask_yes_no() {
                 ;;
         esac
     done
+}
+
+file_deploy() {
+    local src="$1"
+    local prefix="${2:-${TARGET_DIR}}"
+    local dst=$(file_dst "$src" "$prefix")
+
+    # Extract directory path
+    local dir=$(dirname "$dst")
+
+    # Create directory if it doesn't exist
+    mkdir -p "$dir"
+
+    cp $src $dst
+}
+
+file_deploy_queue() {
+    for file in ${FILES[@]}; do
+        file_deploy $file
+    done
+}
+
+file_dst() {
+    local src="$1"
+    local prefix="$2"
+
+    # Strip leading 'deploy/'
+    local dest="${src#deploy/}"
+
+    # Prepend prefix
+    echo "${prefix}/${dest}"
 }
 
 in_target() {

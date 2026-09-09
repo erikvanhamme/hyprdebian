@@ -33,6 +33,10 @@ load_config() {
         read -r -a TEMPLATE_MODES <<< "$TEMPLATE_MODES" # Convert string back to array.
     fi
 
+    if [[ -n "${FILES:-}" ]]; then
+        read -r -a FILES <<< "$FILES" # Convert string back to array.
+    fi
+
     if [[ -z "${USER_GROUPS:-}" ]]; then
         USER_GROUPS=(
             audio

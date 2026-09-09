@@ -90,8 +90,12 @@ q_de() {
 }
 
 q_redundant() {
-    ask_yes_no Q_REDUNDANT "Install on redundant drives"
-    return 0
+    if ask_yes_no Q_REDUNDANT "Install on redundant drives"; then
+        add_files \
+            "deploy/etc/apt/conf.d/99sync-efi" \
+            "deploy/usr/local/bin/hd-sync-efi" \
+
+    fi
 }
 
 q_disk() {

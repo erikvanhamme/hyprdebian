@@ -14,12 +14,28 @@ o_post() {
 
 o_wifi() {
     add_packages iwd firmware-iwlwifi
+
     add_services iwd
+
+    add_template templates/etc/systemd/network/60-wlanx.network.j2
+
+    add_files deploy/etc/systemd/network/20-wifi.link
+
+    # Do not block the boot if no network comes online during boot.
+    in_target systemctl mask systemd-networkd-wait-online.service
 }
 
 o_firewall() {
     add_packages ufw
+
     add_dependencies "pkg_post" "o_enable_firewall"
+
+    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
+        add_files \
+            "deploy/etc/modules-load.d/br_netfilter.conf" \
+            "deploy/etc/sysctl.d/50-bridge-netfilter.conf" \
+
+    fi
 }
 
 o_enable_firewall() {
@@ -39,7 +55,9 @@ o_font() {
 
 o_greetd() {
     add_packages greetd
+
     add_services greetd
+
     add_template templates/etc/greetd/config.toml.j2
 }
 
@@ -49,6 +67,35 @@ o_hyprland() {
         libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
         pulseaudio-utils grim slurp swappy wl-clipboard playerctl brightnessctl \
         hyprshutdown
+
+        add_files \
+            deploy/etc/dconf/db/local.d/00-dark-theme \
+            deploy/etc/skel/.config/alsa/asoundrc \
+            deploy/etc/skel/.config/hyprdebian/screensaver.txt \
+            deploy/etc/skel/.config/hypr/hypridle.conf \
+            deploy/etc/skel/.config/hypr/hyprland.lua \
+            deploy/etc/skel/.config/hypr/hyprlock.conf \
+            deploy/etc/skel/.config/hypr/hyprpaper.conf \
+            deploy/etc/skel/.config/kitty/kitty.conf \
+            deploy/etc/skel/.config/mako/config \
+            deploy/etc/skel/.config/mpv/input.conf \
+            deploy/etc/skel/.config/nwg-look/config \
+            deploy/etc/skel/.config/pam.d/hyprlock \
+            deploy/etc/skel/.config/pipewire/pipewire.conf.d/10-samplerate.conf \
+            deploy/etc/skel/.config/VSCodium/User/settings.json \
+            deploy/etc/skel/.config/wofi/style.css \
+            deploy/etc/skel/.local/share/nwg-look/gsettings \
+            deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
+            deploy/usr/local/bin/hd-ask-poweroff \
+            deploy/usr/local/bin/hd-ask-reboot \
+            deploy/usr/local/bin/hd-cmd-screensaver \
+            deploy/usr/local/bin/hd-kill-screensaver \
+            deploy/usr/local/bin/hd-launch-screensaver \
+            deploy/usr/local/bin/hd-poweroff \
+            deploy/usr/local/bin/hd-reboot \
+            deploy/usr/local/bin/hd-volume-down \
+            deploy/usr/local/bin/hd-volume-mute \
+            deploy/usr/local/bin/hd-volume-up \
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages wiremix
@@ -92,14 +139,10 @@ o_desktop() {
 
 o_docker() {
     add_packages docker.io
+
     add_user_groups docker
 
-    mkdir -p ${TARGET_DIR}/etc/docker
-    write_file ${TARGET_DIR}/etc/docker/daemon.json 0644 <<EOF
-{
-  "bip": "192.168.253.1/24"
-}
-EOF
+    add_files deploy/etc/docker/daemon.json
 }
 
 o_qemu_kvm() {
@@ -113,8 +156,18 @@ o_qemu_kvm() {
 
     add_services libvirtd
 
+    add_files \
+        deploy/etc/libvirt/libvirtd.conf \
+        deploy/etc/libvirt/secret.conf \
+        deploy/etc/systemd/network/40-br0.network \
+
     add_dependencies "pkg_post" "pkg_qemu_kvm"
     add_dependencies "svc_post" "svc_qemu_kvm"
+
+    BR0_MAC_ADDRESS=$(random_mac)
+    save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
+
+    add_template templates/etc/systemd/network/30-br0.netdev.j2
 }
 
 o_cups() {
@@ -141,10 +194,8 @@ root = "/usr/local"
 EOF
     in_target sudo -u cargo rustup default stable
 
-    write_file ${TARGET_DIR}/usr/local/bin/syscargo 0755 <<'EOF'
-#!/bin/bash
-exec sudo -u cargo -H cargo "$@"
-EOF
+    file_deploy deploy/usr/local/bin/syscargo
+    chmod 0755 ${TARGET_DIR}/usr/local/bin/syscargo 0755
 }
 
 o_syscargo_permissions() {

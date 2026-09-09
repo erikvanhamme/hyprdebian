@@ -12,6 +12,19 @@ b_post() {
     return 0
 }
 
+b_files() {
+
+    # These files need to be deployed for sure.
+    add_files \
+        deploy/etc/apt/preferences.d/00-block-unwanted \
+        deploy/etc/profile.d/local-bin-path.sh \
+        deploy/etc/skel/.config/nano/nanorc \
+        deploy/etc/skel/.bash_aliases \
+        deploy/etc/skel/.gitconfig \
+        deploy/usr/local/bin/hd-up \
+
+}
+
 b_templates() {
 
     # These templates need to be rendered for sure.
@@ -90,19 +103,6 @@ b_zfs_cache() {
     cp /etc/zfs/zpool.cache ${TARGET_DIR}/etc/zfs
 }
 
-b_deploy() {
-    mkdir -p ${TARGET_DIR}/etc
-    mkdir -p ${TARGET_DIR}/usr/local/bin
-
-    cp -rv deploy/etc/. ${TARGET_DIR}/etc/
-    cp -rv deploy/usr/local/bin/. ${TARGET_DIR}/usr/local/bin/
-
-    if [[ "${Q_REDUNDANT}" == "false" ]]; then
-        rm ${TARGET_DIR}/usr/local/bin/hd-sync-efi
-        rm ${TARGET_DIR}/etc/apt/conf.d/99sync-efi
-    fi
-}
-
 b_mount() {
     mount --make-private --rbind /dev  ${TARGET_DIR}/dev
     mount --make-private --rbind /proc ${TARGET_DIR}/proc
@@ -153,14 +153,21 @@ b_zfs_support() {
 b_grub2() {
     in_target mkdir /boot/efi
     in_target mount /boot/efi
+
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         in_target mkdir /boot/efi2
         in_target mount /boot/efi2
     fi
+
     in_target apt install -y grub-efi-amd64 shim-signed
+    
     in_target update-initramfs -c -k all
-    cp -v deploy/etc/default/grub ${TARGET_DIR}/etc/default
+    
+    file_deploy deploy/etc/default/grub
+    file_deploy deploy/etc/grub.d/11_zfs_recovery
+    
     in_target update-grub
+    
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS} (primary)" --recheck --no-floppy
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="${Q_OS} (secondary)" --recheck --no-floppy
@@ -172,12 +179,15 @@ b_grub2() {
 b_systemd() {
     in_target apt install -y systemd-timesyncd
 
-    if [[ "${Q_SUITE}" == "stable" ]]; then
-        rm ${TARGET_DIR}/etc/systemd/journald.conf
-        rm ${TARGET_DIR}/etc/systemd/system/clear-machine-id.service
-    else
+    if [[ "${Q_OS}" == "hyprdebian" ]]; then
         add_services clear-machine-id
+
         add_packages rsyslog
+
+        add_files \
+            deploy/etc/systemd/journald.conf \
+            deploy/etc/systemd/system/clear-machine-id.service \
+            
     fi
 
     add_user_groups adm
@@ -211,48 +221,27 @@ b_utilities() {
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages yazi
+
+        add_files deploy/etc/skel/.config/yazi/yazi.toml 
     fi
 }
 
 b_network() {
+    add_files deploy/etc/systemd/network/10-ethernet.link
 
-    # Render out the template for the wired interface.
     add_template templates/etc/systemd/network/50-ethx.network.j2
 
-    # If QEMU/KVM is enabled, generate a random MAC address and render out the br0 netdev file.
-    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
-        BR0_MAC_ADDRESS=$(random_mac)
-        save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
-        add_template templates/etc/systemd/network/30-br0.netdev.j2
-    fi
-
-    # Render out the template for the wifi interface. Delete the wifi files if wifi is not enabled.
-    if [[ "${Q_WIFI}" == "true" ]]; then
-        add_template templates/etc/systemd/network/60-wlanx.network.j2
-
-	    # If wifi is enabled, do not block the boot if no network comes online during boot.
-	    in_target systemctl mask systemd-networkd-wait-online.service
-    else
-        rm -f ${TARGET_DIR}/etc/systemd/network/20-wifi.link
-    fi
-
-    # Remove the netfilter-bridge files if there is no reason to have them.
-    if [[ "${Q_FIREWALL}" == "false" || "${Q_QEMU_KVM}" == "false" ]]; then
-        rm -f ${TARGET_DIR}/etc/modules-load.d/br_netfilter.conf ${TARGET_DIR}/etc/sysctl.d/50-bridge-netfilter.conf
-    fi
-
-    # Make sure systemd-networkd is enabled.
     in_target systemctl enable systemd-networkd
 }
 
 add_dependencies "b_pre" \
+    "b_files" \
     "b_templates" \
 
 add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
     "b_zfs_cache"  \
-    "b_deploy" \
     "b_mount" \
     "b_apt_init" \
     "b_locales" \
