@@ -24,6 +24,20 @@ add_services() {
     save_config SERVICES "${SERVICES[*]}" # Persist as space-separated string.
 }
 
+add_template() {
+    for check in "${TEMPLATE_SRCS[@]}"; do
+        if [[ "$check" == "$1" ]]; then
+            return 0
+        fi
+    done
+
+    TEMPLATE_SRCS+=("$1")
+    TEMPLATE_MODES+=("${2:-0644}")
+
+    save_config TEMPLATE_SRCS "${TEMPLATE_SRCS[*]}" # Persist as space-separated string.
+    save_config TEMPLATE_MODES "${TEMPLATE_MODES[*]}" # Persist as space-separated string.
+}
+
 add_user_groups() {
     for group in "$@"; do
         for check in "${USER_GROUPS[@]}"; do
@@ -191,6 +205,42 @@ show_ifaces() {
             paste -sd, -)
 
         printf '%-12s %-12s %-12s %s\n' "$name" "$type" "${path_name:--}" "${ip_addr:--}"
+    done
+}
+
+template_dst() {
+    local src="$1"
+    local prefix="$2"
+
+    # Strip leading 'templates/'
+    local rel_path="${src#templates/}"
+
+    # Strip trailing '.j2'
+    local dest="${rel_path%.j2}"
+
+    # Prepend prefix
+    echo "${prefix}/${dest}"
+}
+
+template_render() {
+    local src="$1"
+    local mode="$2"
+    local prefix="${3:-${TARGET_DIR}}"
+    local dst=$(template_dst "$src" "$prefix")
+
+    # Note: render.py will make the needed directories!
+
+    python3 render.py $src $dst -m $mode
+}
+
+template_render_queue() {
+
+    # Process entries by index
+    for i in "${!TEMPLATE_SRCS[@]}"; do
+        src="${TEMPLATE_SRCS[$i]}"
+        mode="${TEMPLATE_MODES[$i]}"
+
+        template_render $src $mode
     done
 }
 

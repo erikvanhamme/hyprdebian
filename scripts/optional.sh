@@ -40,10 +40,7 @@ o_font() {
 o_greetd() {
     add_packages greetd
     add_services greetd
-
-    mkdir -p ${TARGET_DIR}/etc/greetd
-
-    python3 render.py templates/etc/greetd/config.toml.j2 ${TARGET_DIR}/etc/greetd/config.toml -v Q_USER=${Q_USER}
+    add_template templates/etc/greetd/config.toml.j2
 }
 
 o_hyprland() {

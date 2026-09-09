@@ -22,7 +22,15 @@ load_config() {
     fi
 
     if [[ -n "${SERVICES:-}" ]]; then
-        read -r -a SERVICESS <<< "$SERVICES" # Convert string back to array.
+        read -r -a SERVICES <<< "$SERVICES" # Convert string back to array.
+    fi
+
+    if [[ -n "${TEMPLATE_SRCS:-}" ]]; then
+        read -r -a TEMPLATE_SRCS <<< "$TEMPLATE_SRCS" # Convert string back to array.
+    fi
+
+    if [[ -n "${TEMPLATE_MODES:-}" ]]; then
+        read -r -a TEMPLATE_MODES <<< "$TEMPLATE_MODES" # Convert string back to array.
     fi
 
     if [[ -z "${USER_GROUPS:-}" ]]; then

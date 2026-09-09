@@ -12,6 +12,13 @@ b_post() {
     return 0
 }
 
+b_templates() {
+
+    # These templates need to be rendered for sure.
+    add_template templates/etc/hostname.j2
+    add_template templates/etc/hosts.j2
+}
+
 b_bootstrap() {
     mkdir ${TARGET_DIR}/run
     mount -t tmpfs tmpfs ${TARGET_DIR}/run
@@ -33,7 +40,7 @@ b_fstab_redundant() {
         return 1
     fi
 
-    python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v efi2_uuid=${efi2_uuid}
+    template_render templates/etc/fstab.j2
 }
 
 b_fstab_noswap() {
@@ -46,7 +53,7 @@ b_fstab_noswap() {
         return 1
     fi
 
-    python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid}
+    template_render templates/etc/fstab.j2
 }
 
 b_fstab_swap() {
@@ -63,7 +70,7 @@ b_fstab_swap() {
         return 1
     fi
 
-    python3 render.py templates/etc/fstab.j2 ${TARGET_DIR}/etc/fstab -v efi_uuid=${efi_uuid} -v swap_uuid=${swap_uuid}
+    template_render templates/etc/fstab.j2
 }
 
 b_fstab() {
@@ -76,14 +83,6 @@ b_fstab() {
             b_fstab_swap
         fi
     fi
-}
-
-b_hostname() {
-    python3 render.py templates/etc/hostname.j2 ${TARGET_DIR}/etc/hostname -v Q_HOSTNAME=${Q_HOSTNAME}
-}
-
-b_hosts() {
-    python3 render.py templates/etc/hosts.j2 ${TARGET_DIR}/etc/hosts -v Q_FQDN=${Q_FQDN} -v Q_HOSTNAME=${Q_HOSTNAME}
 }
 
 b_zfs_cache() {
@@ -115,10 +114,10 @@ b_mount() {
 }
 
 b_apt_init() {
-    python3 render.py templates/etc/apt/sources.list.d/debian.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/debian.sources -v Q_SUITE=${Q_SUITE}
+    template_render templates/etc/apt/sources.list.d/debian.sources.j2
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        python3 render.py templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 ${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources -v Q_REPO=${Q_REPO} -v Q_SUITE=${Q_SUITE}
+        template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2
     fi
 
     rm -f ${TARGET_DIR}/etc/apt/sources.list
@@ -218,17 +217,18 @@ b_utilities() {
 b_network() {
 
     # Render out the template for the wired interface.
-    python3 render.py templates/etc/systemd/network/50-ethx.network.j2 ${TARGET_DIR}/etc/systemd/network/50-${Q_IFACE}.network -v Q_IFACE=${Q_IFACE} -v Q_QEMU_KVM=${Q_QEMU_KVM} -m 0644
+    add_template templates/etc/systemd/network/50-ethx.network.j2
 
     # If QEMU/KVM is enabled, generate a random MAC address and render out the br0 netdev file.
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
-        mac=$(random_mac)
-        python3 render.py templates/etc/systemd/network/30-br0.netdev.j2 ${TARGET_DIR}/etc/systemd/network/30-br0.netdev -v MAC_ADDRESS=${mac} -m 0644
+        BR0_MAC_ADDRESS=$(random_mac)
+        save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
+        add_template templates/etc/systemd/network/30-br0.netdev.j2
     fi
 
     # Render out the template for the wifi interface. Delete the wifi files if wifi is not enabled.
     if [[ "${Q_WIFI}" == "true" ]]; then
-        python3 render.py templates/etc/systemd/network/60-wlanx.network.j2 ${TARGET_DIR}/etc/systemd/network/60-${Q_WIFACE}.network -v Q_WIFACE=${Q_WIFACE} -m 0644
+        add_template templates/etc/systemd/network/60-wlanx.network.j2
 
 	    # If wifi is enabled, do not block the boot if no network comes online during boot.
 	    in_target systemctl mask systemd-networkd-wait-online.service
@@ -245,11 +245,12 @@ b_network() {
     in_target systemctl enable systemd-networkd
 }
 
+add_dependencies "b_pre" \
+    "b_templates" \
+
 add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
-    "b_hostname"  \
-    "b_hosts"  \
     "b_zfs_cache"  \
     "b_deploy" \
     "b_mount" \
