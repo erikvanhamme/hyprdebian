@@ -181,7 +181,7 @@ q_firewall() {
 }
 
 q_desktop() {
-    if ask_yes_no Q_DESKTOP "Install desktop environment"; then
+    if ask_yes_no Q_DESKTOP "Install hyprland desktop environment"; then
         add_dependencies "o_main" "o_desktop"
     fi
 }

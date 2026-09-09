@@ -171,6 +171,7 @@ file_deploy() {
     # Create directory if it doesn't exist
     mkdir -p "$dir"
 
+    echo "cp $src $dst"
     cp $src $dst
 }
 
@@ -267,7 +268,7 @@ template_dst() {
 
 template_render() {
     local src="$1"
-    local mode="$2"
+    local mode="${2:-0644}"
     local prefix="${3:-${TARGET_DIR}}"
     local dst=$(template_dst "$src" "$prefix")
 
