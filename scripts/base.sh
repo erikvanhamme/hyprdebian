@@ -217,7 +217,7 @@ b_utilities() {
     # Note: command-not-found requires an update to the apt-file cache to work.
     in_target update-command-not-found
 
-    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git-delta ack
+    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git-delta ack qemu-guest-agent
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages yazi

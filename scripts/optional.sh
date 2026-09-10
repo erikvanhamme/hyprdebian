@@ -160,6 +160,7 @@ o_qemu_kvm() {
         deploy/etc/libvirt/libvirtd.conf \
         deploy/etc/libvirt/secret.conf \
         deploy/etc/systemd/network/40-br0.network \
+        deploy/usr/local/bin/hd-backup-vm \
 
     add_dependencies "pkg_post" "pkg_qemu_kvm"
     add_dependencies "svc_post" "svc_qemu_kvm"

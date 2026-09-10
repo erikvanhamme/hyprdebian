@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VM_NAME="$1"
+BACKUP_DIR="$2/${VM_NAME}"
+BACKUP_OWNER="$3"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+SNAP_NAME="backup-${TIMESTAMP}"
+
+mkdir -p "${BACKUP_DIR}"
+
+# 1. Dump XML configuration
+XML_PATH="${BACKUP_DIR}/${VM_NAME}.xml"
+virsh dumpxml --migratable "${VM_NAME}" > "${XML_PATH}"
+
+# 2. Extract NVRAM path if UEFI VM
+NVRAM_PATH=$(virsh dumpxml "${VM_NAME}" | xmllint --xpath "string(//os/nvram/text())" - 2>/dev/null || true)
+if [[ -n "${NVRAM_PATH}" && -f "${NVRAM_PATH}" ]]; then
+    cp "${NVRAM_PATH}" "${BACKUP_DIR}/${VM_NAME}_VARS.fd"
+fi
+
+# 3. Parse all block-type disk paths from XML
+mapfile -t ZVOL_PATHS < <(xmllint --xpath "//devices/disk[@type='block']/source/@dev" "${XML_PATH}" 2>/dev/null | grep -oP 'dev="\K[^"]+')
+
+if [[ ${#ZVOL_PATHS[@]} -eq 0 ]]; then
+    echo "No block devices found for ${VM_NAME}."
+    exit 1
+fi
+
+# Convert /dev/zvol/pool/dataset paths into ZFS dataset names (pool/dataset)
+ZFS_DATASETS=()
+for dev in "${ZVOL_PATHS[@]}"; do
+    # Resolves /dev/zvol/pool/zvols/vm1-disk0 -> pool/zvols/vm1-disk0
+    ds="${dev#/dev/zvol/}"
+    ZFS_DATASETS+=("${ds}")
+done
+
+# 4. Quiesce filesystem (Guest Agent)
+echo "Freezing guest filesystem..."
+virsh qemu-agent-command "${VM_NAME}" '{"execute":"guest-fsfreeze-freeze"}' --timeout 5 || echo "Warning: fsfreeze failed, taking crash-consistent snapshot."
+
+# 5. Atomic snapshot creation for all discovered ZVOLs
+echo "Creating ZFS snapshots..."
+for ds in "${ZFS_DATASETS[@]}"; do
+    zfs snapshot "${ds}@${SNAP_NAME}"
+done
+
+# 6. Thaw guest immediately
+echo "Thawing guest filesystem..."
+virsh qemu-agent-command "${VM_NAME}" '{"execute":"guest-fsfreeze-thaw"}' || true
+
+# 7. Stream each ZVOL snapshot to compressed file
+for ds in "${ZFS_DATASETS[@]}"; do
+    clean_ds_name=$(echo "${ds}" | tr '/' '_')
+    OUT_FILE="${BACKUP_DIR}/${clean_ds_name}.zst"
+
+    echo "Streaming ${ds}@${SNAP_NAME} -> ${OUT_FILE}"
+    zfs send "${ds}@${SNAP_NAME}" | zstd -T0 > "${OUT_FILE}"
+
+    # Destroy snapshot after file stream completes
+    zfs destroy "${ds}@${SNAP_NAME}"
+done
+
+# 8. Change ownership of the backed up files.
+chown -R $BACKUP_OWNER $BACKUP_DIR
+
+echo "Backup complete for ${VM_NAME}."
