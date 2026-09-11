@@ -80,6 +80,13 @@ def get_first_row(db, query):
     return db.execute(query).fetchone()
 
 
+def is_excluded(path, excludes):
+    for exclude in excludes:
+        if path.startswith(exclude):
+            return True
+    return False
+
+
 def create_db(db, version):
     db.execute('''
         CREATE TABLE files(
@@ -427,7 +434,7 @@ def update_fileset_preload(db, path, fileset_number):
     return files, file_links, symlinks, symlink_links
 
 
-def update_fileset_scan(db, path, fileset_number, fileset_name):
+def update_fileset_scan(db, path, fileset_number, fileset_name, relevant_excludes):
     printc(f'    Scanning file system path {path}.', Fore.MAGENTA)
 
     files, file_links, symlinks, symlink_links = update_fileset_preload(db, path, fileset_number)
@@ -436,6 +443,9 @@ def update_fileset_scan(db, path, fileset_number, fileset_name):
     for root, dirs, filesys in os.walk(path):
         for filename in filesys + dirs:
             full_path = os.path.join(root, filename)
+            if is_excluded(full_path, relevant_excludes):
+                printc(f"      File {full_path} is excluded.", Fore.CYAN)
+                continue
 
             # Get the defining attributes for the path.
             is_symlink, target, filesize, mtime, is_possible_hardlink, is_fifo = update_fileset_get_attributes(full_path)
@@ -568,7 +578,7 @@ def update_fileset_handle_removed_items(db, is_symlink, fileset_number, fileset_
     printc('    Database updated.', Fore.GREEN)
 
 
-def update_fileset_path(db, fileset_number, path):
+def update_fileset_path(db, fileset_number, path, exclude):
     fileset_name = get_first_value(db, f'''
         SELECT name 
         FROM filesets 
@@ -577,13 +587,19 @@ def update_fileset_path(db, fileset_number, path):
 
     printc(f'  Updating path {path} in file set {fileset_name}.', Fore.MAGENTA)
 
-    # Step 1: Scan filesystem.
-    update_fileset_scan(db, path, fileset_number, fileset_name)
+    # Step 1: Compute the relevant exclusions
+    relevant_excludes = []
+    for exclude_path in exclude:
+        if exclude_path.startswith(path):
+            relevant_excludes.append(exclude_path)
 
-    # Step 2: Remove files in database that are no longer on disk and are not in a (relevant) tarball.
+    # Step 2: Scan filesystem.
+    update_fileset_scan(db, path, fileset_number, fileset_name, relevant_excludes)
+
+    # Step 3: Remove files in database that are no longer on disk and are not in a (relevant) tarball.
     update_fileset_handle_removed_items(db, False, fileset_number, fileset_name)
 
-    # Step 3: Remove symlinks in database that are no longer on disk and are not in a (relevant) tarball.
+    # Step 4: Remove symlinks in database that are no longer on disk and are not in a (relevant) tarball.
     update_fileset_handle_removed_items(db, True, fileset_number, fileset_name)
 
     printc(f'  Fileset path {path} updated for file set {fileset_name}.', Fore.GREEN)
@@ -1002,7 +1018,7 @@ def add_backup(db, backup_name, fileset_name):
 
 def add_fileset(db, fileset_name, paths):
     for path in paths:
-        if not os.path.isdir(path):
+        if not os.path.isdir(path.removeprefix('^')):
             printc(f"Given path {path} is not an existing directory.", Fore.RED)
             return
 
@@ -1026,28 +1042,9 @@ def add_fileset(db, fileset_name, paths):
 
     db.commit()
 
-    fileset_number = get_first_value(db, f'''
-        SELECT number
-        FROM filesets 
-        WHERE name="{fileset_name}"
-    ''')
-
-    for path in paths:
-        absolute_path = os.path.abspath(path)
-
-        db.execute(f'''
-            INSERT INTO paths(
-                fileset_number, 
-                path
-            ) VALUES(
-                {fileset_number}, 
-                "{absolute_path}"
-            )
-        ''')
-
-        db.commit()
-
     printc(f'Fileset with name {fileset_name} added.', Fore.GREEN)
+
+    add_paths(db, fileset_name, paths)
 
 
 def add_paths(db, fileset_name, paths):
@@ -1064,13 +1061,15 @@ def add_paths(db, fileset_name, paths):
 
     # Collect paths from the arguments.
     for path in paths:
-        if not os.path.isdir(path):  # Check if the path is a directory.
+        if not os.path.isdir(path.removeprefix('^')):  # Check if the path is a directory.
             printc(f'Given path {path} is not an existing directory.', Fore.RED)
             return
 
     # Add paths to the database.
     for path in paths:
-        absolute_path = os.path.abspath(path)
+        absolute_path = os.path.abspath(path.removeprefix('^'))
+        if path.startswith('^'):
+            absolute_path = '^' + absolute_path
         db.execute(f'''
             INSERT INTO paths(
                 fileset_number, 
@@ -1082,9 +1081,11 @@ def add_paths(db, fileset_name, paths):
         ''')
 
         db.commit()
-        
-        update_fileset_path(db, fileset_number, path)
 
+        printc(f'Path {path} ({absolute_path}) added to fileset {fileset_name}.', Fore.GREEN)
+
+    # Update the fileset
+    update_filesets(db, [fileset_name])
 
 def add_carrier(db, backup_name, carrier_labels):
     backup_number = get_first_value(db, f'''
@@ -1545,8 +1546,17 @@ def update_filesets(db, fileset_names):
         ''')
 
         if paths is not None:
+            scan = []
+            exclude = []
+
             for path in paths:
-                update_fileset_path(db, fileset_number, path[0])
+                if path[0].startswith('^'):
+                    exclude.append(path[0].removeprefix('^'))
+                else:
+                    scan.append(path[0])
+
+            for path in scan:
+                update_fileset_path(db, fileset_number, path, exclude)
         
         printc(f"Fileset {fileset_name} updated.", Fore.GREEN)
 
