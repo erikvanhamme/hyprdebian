@@ -218,13 +218,19 @@ b_utilities() {
     in_target update-command-not-found
 
     add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git-delta ack qemu-guest-agent \ 
-        python-is-python3 python3-colorama python3-tabulate
+        python-is-python3 python3-colorama python3-tabulate mbuffer mt-st
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages yazi
 
         add_files deploy/etc/skel/.config/yazi/yazi.toml 
     fi
+
+    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian
+
+    # Compile block write utility for backups on tape.
+    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian
+    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c
 }
 
 b_network() {
