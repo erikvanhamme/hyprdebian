@@ -126,7 +126,7 @@ b_apt_init() {
 }
 
 b_console() {
-    in_target apt install -y locales keyboard-configuration console-setup tzdata
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration console-setup
 
     in_target dpkg-reconfigure locales
 
@@ -143,14 +143,15 @@ b_buildtools() {
 
 b_kernel() {
     if [[ "${Q_KERNEL}" == "latest" ]]; then
-        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux firmware-qlogic
+        in_target apt install -y linux-image-amd64 linux-headers-amd64
     else
         mkdir -p ${TARGET_DIR}/tmp/deb
         cp kernels/*${Q_KERNEL}* ${TARGET_DIR}/tmp/deb/
         in_target dpkg -R -i /tmp/deb/
         in_target apt install -y -f
-        in_target apt install -y firmware-linux
     fi
+
+    add_packages firmware-linux firmware-qlogic
 }
 
 b_zfs_support() {
@@ -166,7 +167,7 @@ b_grub2() {
         in_target mount /boot/efi2
     fi
 
-    in_target apt install -y grub-efi-amd64 shim-signed desktop-base
+    in_target apt install -y grub-efi-amd64 shim-signed
     
     in_target update-initramfs -c -k all
     
