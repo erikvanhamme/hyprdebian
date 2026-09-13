@@ -12,6 +12,11 @@ pkg_post() {
     return 0
 }
 
+pkg_utilities() {
+    in_target apt-file update
+    in_target update-command-not-found
+}
+
 pkg_install() {
     in_target apt install -y ${PACKAGES[*]}
 }

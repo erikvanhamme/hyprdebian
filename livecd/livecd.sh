@@ -18,6 +18,7 @@ lb config \
 cat <<'EOF' > config/package-lists/zfs.list.chroot
 task-gnome-desktop
 build-essential
+kitty-terminfo
 linux-headers-amd64
 zfs-dkms
 zfsutils-linux

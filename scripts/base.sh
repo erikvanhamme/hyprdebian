@@ -131,7 +131,7 @@ b_locales() {
 }
 
 b_buildtools() {
-    in_target apt install -y build-essential cmake meson ninja-build pkg-config initramfs-tools
+    in_target apt install -y build-essential dracut-
 }
 
 b_kernel() {
@@ -177,7 +177,7 @@ b_grub2() {
 }
 
 b_systemd() {
-    in_target apt install -y systemd-timesyncd
+    add_packages systemd-timesyncd
 
     if [[ "${Q_OS}" == "hyprdebian" ]]; then
         add_services clear-machine-id
@@ -211,13 +211,10 @@ b_console() {
 }
 
 b_utilities() {
-    in_target apt install -y command-not-found man-db apt-file
-    in_target apt-file update
+    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack \
+        qemu-guest-agent command-not-found man-db apt-file
 
-    # Note: command-not-found requires an update to the apt-file cache to work.
-    in_target update-command-not-found
-
-    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack qemu-guest-agent 
+    add_dependencies "pkg_post" "pkg_utilities"
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages yazi
