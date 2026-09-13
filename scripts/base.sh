@@ -125,13 +125,20 @@ b_apt_init() {
     in_target apt update
 }
 
-b_locales() {
-    in_target apt install -y locales
+b_console() {
+    in_target apt install -y locales keyboard-configuration console-setup tzdata
+
     in_target dpkg-reconfigure locales
+
+    in_target dpkg-reconfigure tzdata
+
+    in_target dpkg-reconfigure keyboard-configuration
+
+    in_target dpkg-reconfigure console-setup
 }
 
 b_buildtools() {
-    in_target apt install -y build-essential dracut-
+    in_target apt install -y build-essential initramfs-tools
 }
 
 b_kernel() {
@@ -193,23 +200,6 @@ b_systemd() {
     add_user_groups adm
 }
 
-b_console() {
-
-    # 1. Install packages first
-    in_target apt install -y keyboard-configuration console-setup tzdata
-
-    # 2. Configure timezone
-    in_target dpkg-reconfigure tzdata
-
-    # 3. Configure the keyboard layout FIRST.
-    # This satisfies the dependency so console-setup won't ask again.
-    in_target dpkg-reconfigure keyboard-configuration
-
-    # 4. Configure the console font/size.
-    # It will pull the layout just picked in step 3 automatically.
-    in_target dpkg-reconfigure console-setup
-}
-
 b_utilities() {
     add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack \
         qemu-guest-agent command-not-found man-db apt-file
@@ -228,7 +218,7 @@ b_network() {
 
     add_template templates/etc/systemd/network/50-ethx.network.j2
 
-    in_target systemctl enable systemd-networkd
+    add_services systemd-networkd
 }
 
 add_dependencies "b_pre" \
@@ -241,13 +231,12 @@ add_dependencies "b_main" \
     "b_zfs_cache"  \
     "b_mount" \
     "b_apt_init" \
-    "b_locales" \
+    "b_console" \
     "b_buildtools" \
     "b_kernel" \
     "b_zfs_support" \
     "b_grub2" \
     "b_systemd" \
-    "b_console" \
     "b_utilities" \
     "b_network" \
 
