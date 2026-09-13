@@ -155,7 +155,7 @@ b_kernel() {
 }
 
 b_zfs_support() {
-    in_target apt install -y zfs-dkms zfsutils-linux zfs-initramfs
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y zfs-dkms zfsutils-linux zfs-initramfs
 }
 
 b_grub2() {

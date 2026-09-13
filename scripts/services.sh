@@ -13,7 +13,7 @@ svc_post() {
 }
 
 svc_enable() {
-    for svc in ${SERVICES}; do
+    for svc in ${SERVICES[*]}; do
         in_target systemctl enable $svc
     done
 }
