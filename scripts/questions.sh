@@ -19,13 +19,15 @@ q_os() {
             Q_SUITE="unstable"
             add_dependencies "q_os_questions" \
                 "q_kernel" \
+                "q_desktop" \
+                "q_encrypt" \
                 "q_iface" \
                 "q_wifi" \
                 "q_firewall" \
-                "q_desktop" \
                 "q_docker" \
                 "q_qemu_kvm" \
                 "q_cups" \
+                "q_backuptools" \
                 "q_rust" \
                 "q_openssh" \
                 "q_repo"
@@ -34,21 +36,24 @@ q_os() {
             Q_SUITE="stable"
             Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
-                "q_de"
+                "q_de" \
+                "q_encrypt"
             save_config Q_KERNEL ${Q_KERNEL}
             ;;
         "debian-testing")
             Q_SUITE="testing"
             Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
-                "q_de"
+                "q_de" \
+                "q_encrypt"
             save_config Q_KERNEL ${Q_KERNEL}
             ;;
         "debian-unstable")
             Q_SUITE="unstable"
             Q_KERNEL="latest"
             add_dependencies "q_os_questions" \
-                "q_de"
+                "q_de" \
+                "q_encrypt"
             save_config Q_KERNEL ${Q_KERNEL}
             ;;
     esac
@@ -186,6 +191,18 @@ q_desktop() {
     fi
 }
 
+q_encrypt() {
+    if [[ "Q_DESKTOP" == "true" ]]; then
+        Q_ENCRYPT="true"
+        save_config Q_ENCRYPT ${Q_ENCRYPT}
+        return 0
+    fi
+
+    if ! ask_yes_no Q_ENCRYPT "Encrypt root filesystem"; then
+        return 0
+    fi
+}
+
 q_docker() {
     if ask_yes_no Q_DOCKER "Enable docker"; then
         add_dependencies "o_main" "o_docker"
@@ -201,6 +218,12 @@ q_qemu_kvm() {
 q_cups() {
     if ask_yes_no Q_CUPS "Enable CUPS"; then
         add_dependencies "o_main" "o_cups"
+    fi
+}
+
+q_backuptools() {
+    if ask_yes_no Q_BACKUPTOOLS "Install backup tools"; then
+        add_dependencies "o_main" "o_backuptools"
     fi
 }
 

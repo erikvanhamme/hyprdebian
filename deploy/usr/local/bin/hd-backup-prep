@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ensure correct usage
+if [[ $# -ne 2 ]]; then
+    echo "Usage: $0 <block_device> <pool_name>" >&2
+    echo "Example: $0 /dev/sdb mypool" >&2
+    exit 1
+fi
+
+DEVICE="$1"
+POOL_NAME="$2"
+
+# Determine the actual invoking user
+CALLING_USER="${SUDO_USER:-$USER}"
+
+# Validate block device existence using sudo
+if ! sudo blockdev --getsize64 "$DEVICE" &>/dev/null; then
+    echo "Error: Device '$DEVICE' is not a valid block device or cannot be accessed." >&2
+    exit 1
+fi
+
+# Get total size of the block device in bytes
+DEVICE_SIZE_BYTES=$(sudo blockdev --getsize64 "$DEVICE")
+
+if [[ -z "$DEVICE_SIZE_BYTES" || "$DEVICE_SIZE_BYTES" -eq 0 ]]; then
+    echo "Error: Unable to retrieve size for '$DEVICE'." >&2
+    exit 1
+fi
+
+# Calculate 90% quota in bytes
+QUOTA_BYTES=$(( DEVICE_SIZE_BYTES * 90 / 100 ))
+
+echo "=== Target Device: $DEVICE"
+echo "=== Pool Name:     $POOL_NAME"
+echo "=== Mountpoint:    /mnt/$POOL_NAME"
+echo "=== Executing User:$CALLING_USER"
+echo "=== Device Size:   $DEVICE_SIZE_BYTES bytes"
+echo "=== 90% Quota:     $QUOTA_BYTES bytes"
+echo
+
+# Step A: Clear ZFS labels explicitly
+echo "--> Clearing existing ZFS labels from $DEVICE..."
+sudo zpool labelclear -f "$DEVICE" 2>/dev/null || true
+
+# Step B: Wipe partition and filesystem signatures
+echo "--> Wiping signatures from $DEVICE..."
+sudo wipefs -a -f "$DEVICE" 2>/dev/null || true
+
+# Step C: Zero out partition table and magic headers (destroys 'unknown filesystem' residue)
+echo "--> Zeroing device header..."
+sudo dd if=/dev/zero of="$DEVICE" bs=1M count=100 conv=fdatasync status=none 2>/dev/null || true
+
+# Step D: Force kernel to reread geometry and notify udev to release handles
+echo "--> Refreshing kernel block device table..."
+sudo blockdev --rereadpt "$DEVICE" 2>/dev/null || sudo partprobe "$DEVICE" 2>/dev/null || true
+sudo udevadm trigger --action=change "$DEVICE" 2>/dev/null || true
+sudo udevadm settle
+
+# Step E: Create zpool with native encryption and requested properties
+echo "--> Creating natively encrypted zpool '$POOL_NAME'..."
+sudo zpool create -f \
+    -o ashift=12 \
+    -O encryption=aes-256-gcm \
+    -O keyformat=passphrase \
+    -O keylocation=prompt \
+    -O compression=zstd \
+    -O recordsize=4M \
+    -O xattr=sa \
+    -O dnodesize=auto \
+    -O mountpoint="/mnt/${POOL_NAME}" \
+    "$POOL_NAME" "$DEVICE"
+
+# Step F: Apply 90% quota constraint
+echo "--> Applying 90% quota constraint ($QUOTA_BYTES bytes)..."
+sudo zfs set quota="$QUOTA_BYTES" "$POOL_NAME"
+
+# Step G: Set ownership of mountpoint to invoking user
+echo "--> Changing ownership of /mnt/$POOL_NAME to user '$CALLING_USER'..."
+sudo chown -R "$CALLING_USER" "/mnt/${POOL_NAME}"
+
+echo
+echo "Successfully created encrypted zpool '$POOL_NAME' mounted at /mnt/$POOL_NAME."

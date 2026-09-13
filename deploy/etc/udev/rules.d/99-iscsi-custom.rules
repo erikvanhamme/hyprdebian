@@ -1,0 +1,2 @@
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd[a-z]|sd[a-z][a-z]", ATTRS{model}=="hba-btm-slot*", SYMLINK+="disk/by-model/$attr{model}"
+ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="sd[a-z]|sd[a-z][a-z]", ATTRS{model}=="hba-top-slot*", SYMLINK+="disk/by-model/$attr{model}"

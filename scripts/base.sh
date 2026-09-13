@@ -131,12 +131,12 @@ b_locales() {
 }
 
 b_buildtools() {
-    in_target apt install -y build-essential cmake meson ninja-build git pkg-config initramfs-tools
+    in_target apt install -y build-essential cmake meson ninja-build pkg-config initramfs-tools
 }
 
 b_kernel() {
     if [[ "${Q_KERNEL}" == "latest" ]]; then
-        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux
+        in_target apt install -y linux-image-amd64 linux-headers-amd64 firmware-linux firmware-qlogic
     else
         mkdir -p ${TARGET_DIR}/tmp/deb
         cp kernels/*${Q_KERNEL}* ${TARGET_DIR}/tmp/deb/
@@ -159,7 +159,7 @@ b_grub2() {
         in_target mount /boot/efi2
     fi
 
-    in_target apt install -y grub-efi-amd64 shim-signed
+    in_target apt install -y grub-efi-amd64 shim-signed desktop-base
     
     in_target update-initramfs -c -k all
     
@@ -217,20 +217,13 @@ b_utilities() {
     # Note: command-not-found requires an update to the apt-file cache to work.
     in_target update-command-not-found
 
-    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git-delta ack qemu-guest-agent \ 
-        python-is-python3 python3-colorama python3-tabulate mbuffer mt-st
+    add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack qemu-guest-agent 
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages yazi
 
         add_files deploy/etc/skel/.config/yazi/yazi.toml 
     fi
-
-    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian
-
-    # Compile block write utility for backups on tape.
-    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian
-    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c
 }
 
 b_network() {

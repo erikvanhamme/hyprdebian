@@ -36,24 +36,37 @@ f_boot_pool() {
         -o compatibility=grub2 \
         -o cachefile=/etc/zfs/zpool.cache \
         -O devices=off \
-        -O acltype=posixacl -O xattr=sa \
+        -O acltype=posixacl \
+        -O xattr=sa \
         -O compression=lz4 \
         -O normalization=formD \
         -O relatime=on \
-        -O canmount=off -O mountpoint=/boot -R /mnt \
+        -O canmount=off \
+        -O mountpoint=/boot \
+        -R /mnt \
         bpool ${boot_pool_part}
 }
 
 f_root_pool() {
+    local encrypt=""
+    
+    if [[ "${Q_ENCRYPT}" == "true" ]]; then
+        encrypt="-O encryption=on -O keylocation=prompt -O keyformat=passphrase"
+    fi
+
     zpool create -f \
         -o ashift=12 \
         -o autotrim=on \
-        -O encryption=on -O keylocation=prompt -O keyformat=passphrase \
-        -O acltype=posixacl -O xattr=sa -O dnodesize=auto \
+        -O acltype=posixacl \
+        -O xattr=sa \
+        -O dnodesize=auto \
         -O compression=lz4 \
         -O normalization=formD \
         -O relatime=on \
-        -O canmount=off -O mountpoint=/ -R /mnt \
+        -O canmount=off \
+        -O mountpoint=/ \
+        -R /mnt \
+        ${encrypt} \
         rpool ${root_pool_part}
 }
 

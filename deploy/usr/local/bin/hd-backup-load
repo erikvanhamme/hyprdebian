@@ -1,0 +1,5 @@
+#!/bin/bash
+
+sudo zpool import -f $1
+sudo zfs load-key $1
+sudo zfs mount $1

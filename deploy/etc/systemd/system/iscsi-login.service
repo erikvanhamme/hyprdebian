@@ -1,0 +1,22 @@
+[Unit]
+Description=On-Demand iSCSI Target Login
+# Ensure network is up and iscsid daemon is running before starting
+Requires=network-online.target iscsid.service
+After=network-online.target iscsid.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Variables for quick adjustments
+Environment="TARGET_IQN=iqn.2003-01.org.linux-iscsi.iscsi1.x8664:sn.97cfe76068d1"
+Environment="TARGET_IP=iscsi1.rsq-online.ddns.net"
+
+# Startup sequence
+ExecStart=/usr/bin/iscsiadm -m node -T ${TARGET_IQN} -p ${TARGET_IP} --login
+
+# Teardown sequence
+ExecStop=/usr/bin/iscsiadm -m node -T ${TARGET_IQN} -p ${TARGET_IP} --logout
+
+[Install]
+WantedBy=multi-user.target

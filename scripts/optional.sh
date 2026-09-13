@@ -62,7 +62,7 @@ o_greetd() {
 }
 
 o_hyprland() {
-    add_packages uwsm kitty desktop-base dbus-user-session hyprland hyprland-qtutils \
+    add_packages uwsm kitty dbus-user-session hyprland hyprland-qtutils \
         wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock \
         libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
         pulseaudio-utils grim slurp swappy wl-clipboard playerctl brightnessctl \
@@ -160,7 +160,6 @@ o_qemu_kvm() {
         deploy/etc/libvirt/libvirtd.conf \
         deploy/etc/libvirt/secret.conf \
         deploy/etc/systemd/network/40-br0.network \
-        deploy/usr/local/bin/hd-backup-vm \
 
     add_dependencies "pkg_post" "pkg_qemu_kvm"
     add_dependencies "svc_post" "svc_qemu_kvm"
@@ -174,6 +173,32 @@ o_qemu_kvm() {
 o_cups() {
     add_packages cups
     add_user_groups lpadmin
+}
+
+o_backuptools() {
+    add_dependencies "svc_post" "svc_backuptools"
+
+    add_packages python-is-python3 python3-colorama python3-tabulate mbuffer mt-st open-iscsi
+
+    add_files \
+        deploy/etc/systemd/sytem/iscsi-login.service \
+        deploy/etc/udev/rules.d/99-iscsi-custom.rules \
+        deploy/usr/local/bin/hd-backup \
+        deploy/usr/local/bin/hd-backup-load \
+        deploy/usr/local/bin/hd-backup-prep \
+        deploy/usr/local/bin/hd-backup-unload \
+
+    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
+        add_files \
+            deploy/usr/local/bin/hd-backup-vm \
+
+    fi
+
+    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian
+
+    # Compile block write utility for backups on tape.
+    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian
+    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c
 }
 
 o_rust() {
