@@ -28,15 +28,15 @@ if [[ -z "$DEVICE_SIZE_BYTES" || "$DEVICE_SIZE_BYTES" -eq 0 ]]; then
     exit 1
 fi
 
-# Calculate 90% quota in bytes
-QUOTA_BYTES=$(( DEVICE_SIZE_BYTES * 90 / 100 ))
+# Calculate 10% reservation in bytes
+RESERVATION_BYTES=$(( DEVICE_SIZE_BYTES * 90 / 100 ))
 
-echo "=== Target Device: $DEVICE"
-echo "=== Pool Name:     $POOL_NAME"
-echo "=== Mountpoint:    /mnt/$POOL_NAME"
-echo "=== Executing User:$CALLING_USER"
-echo "=== Device Size:   $DEVICE_SIZE_BYTES bytes"
-echo "=== 90% Quota:     $QUOTA_BYTES bytes"
+echo "=== Target Device:   $DEVICE"
+echo "=== Pool Name:       $POOL_NAME"
+echo "=== Mountpoint:      /mnt/$POOL_NAME"
+echo "=== Executing User:  $CALLING_USER"
+echo "=== Device Size:     $DEVICE_SIZE_BYTES bytes"
+echo "=== 10% Reservation: $QUOTA_BYTES bytes"
 echo
 
 # Step A: Clear ZFS labels explicitly
@@ -71,9 +71,10 @@ sudo zpool create -f \
     -O mountpoint="/mnt/${POOL_NAME}" \
     "$POOL_NAME" "$DEVICE"
 
-# Step F: Apply 90% quota constraint
-echo "--> Applying 90% quota constraint ($QUOTA_BYTES bytes)..."
-sudo zfs set quota="$QUOTA_BYTES" "$POOL_NAME"
+# Step F: Apply 10% reservation constraint
+echo "--> Applying 10% reservation ($RESERVATION_BYTES bytes)..."
+sudo zfs create "$POOL_NAME/reserved"
+sudo zfs set reservation="$RESERVATION_BYTES" "$POOL_NAME/reserved"
 
 # Step G: Set ownership of mountpoint to invoking user
 echo "--> Changing ownership of /mnt/$POOL_NAME to user '$CALLING_USER'..."
