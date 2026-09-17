@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CURRENT_USER="$USER"
+STATE_FILE="/tmp/hd-mount_state_${CURRENT_USER}"
+
+if [[ ! -f "$STATE_FILE" || ! -s "$STATE_FILE" ]]; then
+    notify-send -a "Unmount Menu" -u low "Unmount Menu" "No active script-managed mounts found."
+    exit 0
+fi
+
+# Build wofi selection menu from active state tracking file
+MENU_ITEMS=""
+while IFS='|' read -r dev mp is_fstab; do
+    if [[ -n "$dev" ]]; then
+        if [[ "$is_fstab" -eq 1 ]]; then
+            MENU_ITEMS+="${dev}\t[fstab] -> ${mp}\n"
+        else
+            MENU_ITEMS+="${dev}\tmounted on ${mp}\n"
+        fi
+    fi
+done < "$STATE_FILE"
+
+MENU_ITEMS=$(echo -e "$MENU_ITEMS" | sed '/^$/d')
+
+if [[ -z "$MENU_ITEMS" ]]; then
+    notify-send -a "Unmount Menu" -u low "Unmount Menu" "No active mounts recorded."
+    exit 0
+fi
+
+SELECTED_LINE=$(echo "$MENU_ITEMS" | wofi --dmenu --prompt "Select device to unmount:" --width 1024 --lines 10)
+
+if [[ -z "$SELECTED_LINE" ]]; then
+    exit 0
+fi
+
+TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
+
+RESULT=$(sudo /usr/local/bin/hd-mount-helper unmount "$TARGET_DEV" "$CURRENT_USER" 2>&1)
+EXIT_CODE=$?
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+    notify-send -a "Unmount Menu" -u normal -i drive-harddisk "Unmount Successful" "$RESULT"
+else
+    notify-send -a "Unmount Menu" -u critical -i dialog-error "Unmount Failed" "$RESULT"
+fi

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CURRENT_USER="$USER"
+
+# Fetch unmounted physical block devices (excluding swap, optical drives, active mounts)
+UNMOUNTED_DEVS=$(sudo lsblk -J -b -o NAME,PATH,FSTYPE,LABEL,UUID,MOUNTPOINTS,TYPE | jq -r '
+    .blockdevices[]? | 
+    recurse(.children[]?) | 
+    select(.type == "part" or .type == "disk") | 
+    select(.fstype != null and .fstype != "" and .fstype != "swap") | 
+    select((.mountpoints | map(select(. != null)) | length) == 0) | 
+    "\(.path)\t[\(.fstype)] \(.label // "No-Label") (\(.uuid // "No-UUID"))"
+' 2>/dev/null || true)
+
+# Fetch unmounted targets defined in /etc/fstab
+UNMOUNTED_FSTAB=$(findmnt --fstab --real --noheadings -o SOURCE,TARGET | while read -r src tgt; do
+    if ! findmnt --mountpoint "$tgt" >/dev/null 2>&1; then
+        echo -e "${src}\t[fstab] -> ${tgt}"
+    fi
+done || true)
+
+# Combine and deduplicate menu choices
+COMBINED_LIST=$(echo -e "${UNMOUNTED_DEVS}\n${UNMOUNTED_FSTAB}" | sed '/^$/d' | sort -u)
+
+if [[ -z "$COMBINED_LIST" ]]; then
+    notify-send -a "Mount Menu" -u low "Mount Menu" "No unmounted block devices or fstab targets found."
+    exit 0
+fi
+
+# Present options in wofi
+SELECTED_LINE=$(echo "$COMBINED_LIST" | wofi --dmenu --prompt "Select device to mount:" --width 1024 --lines 10)
+
+if [[ -z "$SELECTED_LINE" ]]; then
+    exit 0
+fi
+
+# Extract device path/source string (first column before tab)
+TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
+
+# Execute mount helper with elevated privileges
+RESULT=$(sudo /usr/local/bin/hd-mount-helper mount "$TARGET_DEV" "$CURRENT_USER" 2>&1)
+EXIT_CODE=$?
+
+# Verify outcome and dispatch notification via mako
+if [[ $EXIT_CODE -eq 0 ]]; then
+    notify-send -a "Mount Menu" -u normal -i drive-harddisk "Mount Successful" "$RESULT"
+else
+    notify-send -a "Mount Menu" -u critical -i dialog-error "Mount Failed" "$RESULT"
+fi

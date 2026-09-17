@@ -230,6 +230,8 @@ hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(terminal .. " -e wiremix"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd([[ notify-send "`date`" ]]))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-reboot"))
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-poweroff"))
+hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("/usr/local/bin/hd-mount"))
+hl.bind(mainMod .. " + SHIFT + U", hl.dsp.exec_cmd("/usr/local/bin/hd-unmount"))
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))

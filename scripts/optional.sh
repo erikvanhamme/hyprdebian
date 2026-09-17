@@ -83,6 +83,7 @@ o_hyprland() {
             deploy/etc/skel/.config/pam.d/hyprlock \
             deploy/etc/skel/.config/pipewire/pipewire.conf.d/10-samplerate.conf \
             deploy/etc/skel/.config/VSCodium/User/settings.json \
+            deploy/etc/skel/.config/wofi/config \
             deploy/etc/skel/.config/wofi/style.css \
             deploy/etc/skel/.local/share/nwg-look/gsettings \
             deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
@@ -91,8 +92,11 @@ o_hyprland() {
             deploy/usr/local/bin/hd-cmd-screensaver \
             deploy/usr/local/bin/hd-kill-screensaver \
             deploy/usr/local/bin/hd-launch-screensaver \
+            deploy/usr/local/bin/hd-mount \
+            deploy/usr/local/bin/hd-mount-helper \
             deploy/usr/local/bin/hd-poweroff \
             deploy/usr/local/bin/hd-reboot \
+            deploy/usr/local/bin/hd-unmount \
             deploy/usr/local/bin/hd-volume-down \
             deploy/usr/local/bin/hd-volume-mute \
             deploy/usr/local/bin/hd-volume-up \

@@ -32,7 +32,7 @@ EOF
 
 pr_install_packages() {
     local INSTALL_KVER="$(uname -r)"
-    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip python3-jinja2
+    apt install -y gdisk dosfstools linux-headers-${INSTALL_KVER} zfsutils-linux debootstrap unzip python3-jinja2 parted
 }
 
 add_dependencies "pr_main" \

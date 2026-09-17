@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-}"
+TARGET_ENTRY="${2:-}"
+CALLING_USER="${3:-${SUDO_USER:-$USER}}"
+
+STATE_FILE="/tmp/hd-mount_state_${CALLING_USER}"
+COUNTER_FILE="/tmp/hd-mount_counter_${CALLING_USER}"
+
+if [[ -z "$ACTION" || -z "$TARGET_ENTRY" ]]; then
+    echo "Usage: $0 <mount|unmount> <target> [username]" >&2
+    exit 1
+fi
+
+if [[ "$ACTION" == "mount" ]]; then
+    IS_FSTAB=0
+    MOUNT_POINT=""
+
+    if findmnt --fstab --source "$TARGET_ENTRY" >/dev/null 2>&1 || \
+       findmnt --fstab --verify --tab-file /etc/fstab | grep -q "$TARGET_ENTRY"; then
+        IS_FSTAB=1
+        MOUNT_POINT=$(findmnt --fstab --source "$TARGET_ENTRY" -no TARGET 2>/dev/null || true)
+    fi
+
+    if [[ $IS_FSTAB -eq 1 ]]; then
+        if mount "$TARGET_ENTRY"; then
+            echo "${TARGET_ENTRY}|${MOUNT_POINT}|1" >> "$STATE_FILE"
+            echo "Successfully mounted fstab entry $TARGET_ENTRY"
+            exit 0
+        else
+            echo "Failed to mount fstab entry $TARGET_ENTRY" >&2
+            exit 1
+        fi
+    else
+        COUNTER=1
+        if [[ -f "$COUNTER_FILE" ]]; then
+            COUNTER=$(cat "$COUNTER_FILE")
+        fi
+
+        MOUNT_POINT="/mnt/${CALLING_USER}/${COUNTER}"
+
+        mkdir -p "$MOUNT_POINT"
+        chown "${CALLING_USER}:" "/mnt/${CALLING_USER}" "$MOUNT_POINT"
+
+        if mount "$TARGET_ENTRY" "$MOUNT_POINT"; then
+            echo $((COUNTER + 1)) > "$COUNTER_FILE"
+            echo "${TARGET_ENTRY}|${MOUNT_POINT}|0" >> "$STATE_FILE"
+            echo "Successfully mounted $TARGET_ENTRY on $MOUNT_POINT"
+            exit 0
+        else
+            echo "Failed to mount $TARGET_ENTRY on $MOUNT_POINT" >&2
+            exit 1
+        fi
+    fi
+
+elif [[ "$ACTION" == "unmount" ]]; then
+    if [[ ! -f "$STATE_FILE" ]]; then
+        echo "No state file found." >&2
+        exit 1
+    fi
+
+    # Retrieve match from state file (exact string match on first column)
+    MATCH=$(awk -F'|' -v target="$TARGET_ENTRY" '$1 == target {print $0; exit}' "$STATE_FILE")
+
+    if [[ -z "$MATCH" ]]; then
+        MOUNT_POINT="$TARGET_ENTRY"
+        IS_FSTAB=1
+    else
+        IFS='|' read -r DEV MP IS_FSTAB <<< "$MATCH"
+        MOUNT_POINT="$MP"
+    fi
+
+    if umount "$TARGET_ENTRY" || umount "$MOUNT_POINT"; then
+        if [[ "$IS_FSTAB" -eq 0 && -d "$MOUNT_POINT" ]]; then
+            rmdir "$MOUNT_POINT" 2>/dev/null || true
+        fi
+
+        # Safely rewrite state file omitting the unmounted entry (fixed string comparison)
+        TMP_STATE=$(mktemp)
+        awk -F'|' -v target="$TARGET_ENTRY" '$1 != target' "$STATE_FILE" > "$TMP_STATE"
+        mv "$TMP_STATE" "$STATE_FILE"
+        chmod 644 $STATE_FILE
+
+        echo "Successfully unmounted $TARGET_ENTRY"
+        exit 0
+    else
+        echo "Failed to unmount $TARGET_ENTRY" >&2
+        exit 1
+    fi
+fi
