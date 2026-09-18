@@ -29,3 +29,18 @@ rules = [
   { mime = "audio/*", use = ["audacious_open", "audacious_enqueue"] },
   { mime = "image/*", use = "imv_open" },
 ]
+
+# Disable terminal preview rendering for network paths
+[[plugin.prepend_previewers]]
+url = "/stor/**"
+run = "noop"
+
+# Disable background preloading (fetching thumbnails, archive contents, etc.)
+[[plugin.prepend_preloaders]]
+url = "/stor/**"
+run = "noop"
+
+# Disable folder/file fetchers on the network mount
+#[[plugin.prepend_fetchers]]
+#url = "/stor/**"
+#run = "noop"
