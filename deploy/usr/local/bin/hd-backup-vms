@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# File containing the backup configurations
+BACKUP_FILE="/etc/hyprdebian/vm-backups"
+
+# Check if the backup file exists
+if [[ ! -f $BACKUP_FILE ]]; then
+    echo "Backup configuration file not found!"
+    exit 1
+fi
+
+# Read each line from the backup configuration file
+while IFS= read -r line; do
+    # Skip lines that start with a '#' (comments)
+    if [[ $line =~ ^# ]]; then
+        continue
+    fi
+
+    # Extract the arguments from the line
+    VM_NAME=$(echo $line | awk '{print $1}')
+    BACKUP_DIR=$(echo $line | awk '{print $2}')
+    USERNAME=$(echo $line | awk '{print $3}')
+
+    # Check if all required arguments are provided
+    if [[ -z $VM_NAME || -z $BACKUP_DIR || -z $USERNAME ]]; then
+        echo "Invalid entry found in backup configuration file: $line"
+        continue
+    fi
+
+    # Execute the hd-backup-vm script with the arguments
+    echo "Running backup for VM: $VM_NAME"
+    /usr/local/bin/hd-backup-vm "$VM_NAME" "$BACKUP_DIR" "$USERNAME"
+done < "$BACKUP_FILE"

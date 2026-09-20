@@ -1,0 +1,5 @@
+# Lists all the virtual machines to backup, the target folders, and the user managing the backup files.
+#
+# VM_NAME TARGET_FOLDER USER
+# e.g. :
+# git /dpool/backups/vm/git rsq

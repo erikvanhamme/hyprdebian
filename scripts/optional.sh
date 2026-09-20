@@ -194,8 +194,16 @@ o_backuptools() {
 
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
         add_files \
+            deploy/etc/hyprdebian/vm-backups \
+            deploy/etc/systemd/system/backup-vms.service \
+            deploy/etc/systemd/system/backup-vms.timer \
             deploy/usr/local/bin/hd-backup-vm \
+            deploy/usr/local/bin/hd-backup-vms \
+            deploy/usr/local/bin/hd-restore-vm \
 
+        add_services \
+            backup-vms.timer \
+            
     fi
 
     mkdir -p ${TARGET_DIR}/usr/src/hyprdebian
