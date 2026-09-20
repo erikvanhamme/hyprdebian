@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+    echo "Usage: $0 <backup_dir> [target_vm_name]"
+    echo "Example: $0 /backups/my-vm my-vm-restored"
+    exit 1
+fi
+
+BACKUP_DIR="$1"
+OLD_VM_NAME=$(basename "${BACKUP_DIR}")
+NEW_VM_NAME="${2:-${OLD_VM_NAME}}"
+
+XML_SRC="${BACKUP_DIR}/${OLD_VM_NAME}.xml"
+VARS_SRC="${BACKUP_DIR}/${OLD_VM_NAME}_VARS.fd"
+
+if [[ ! -f "${XML_SRC}" ]]; then
+    echo "Error: XML config file not found at ${XML_SRC}"
+    exit 1
+fi
+
+echo "=========================================="
+echo " Starting Restore for: ${OLD_VM_NAME}"
+echo " Target VM Name:      ${NEW_VM_NAME}"
+echo "=========================================="
+
+# 1. Discover distinct dataset prefixes in the backup directory
+mapfile -t CLEAN_DS_LIST < <(find "${BACKUP_DIR}" -maxdepth 1 -name "*.zst" | sed -E 's/.*\/([^\/]+)\.[0-9]{4}\.zst$/\1/' | sort -u)
+
+if [[ ${#CLEAN_DS_LIST[@]} -eq 0 ]]; then
+    echo "Error: No .zst stream files found in ${BACKUP_DIR}"
+    exit 1
+fi
+
+declare -A DATASET_MAP
+
+echo ""
+echo "--- ZVOL Path Remapping ---"
+echo "Configure destination ZFS dataset paths for each ZVOL."
+
+# 2. Interactive mapping prompt for target pool/dataset paths
+for clean_ds in "${CLEAN_DS_LIST[@]}"; do
+    orig_ds=$(echo "${clean_ds}" | tr '_' '/')
+    default_target="${orig_ds}"
+    
+    read -rp "Target dataset for [${orig_ds}] (Default: ${default_target}): " target_ds
+    target_ds="${target_ds:-${default_target}}"
+    
+    DATASET_MAP["${clean_ds}"]="${target_ds}"
+done
+
+echo ""
+echo "--- Replaying Snapshot Streams ---"
+
+# 3. Stream restore per dataset
+for clean_ds in "${CLEAN_DS_LIST[@]}"; do
+    target_ds="${DATASET_MAP[${clean_ds}]}"
+    
+    mapfile -t SEQ_FILES < <(find "${BACKUP_DIR}" -maxdepth 1 -name "${clean_ds}.[0-9][0-9][0-9][0-9].zst" | sort)
+    
+    if [[ ${#SEQ_FILES[@]} -eq 0 ]]; then
+        echo "Warning: No sequence files found for dataset ${clean_ds}, skipping."
+        continue
+    fi
+
+    echo "Restoring to target dataset: ${target_ds}"
+    
+    for seq_file in "${SEQ_FILES[@]}"; do
+        seq_num=$(echo "${seq_file}" | grep -oP '\.\K[0-9]{4}(?=\.zst)')
+        echo "  -> Applying stream chunk #${seq_num} (${seq_file})..."
+        zstd -dc "${seq_file}" | zfs receive -F "${target_ds}"
+    done
+    echo "Successfully restored ${target_ds}"
+done
+
+# 4. Process & Sanitize XML configuration file
+TEMP_XML=$(mktemp /tmp/vm_restore_XXXXXX.xml)
+cp "${XML_SRC}" "${TEMP_XML}"
+
+# 4a. Update VM name and remove UUID for new domain generation
+if [[ "${OLD_VM_NAME}" != "${NEW_VM_NAME}" ]]; then
+    sed -i "s|<name>${OLD_VM_NAME}</name>|<name>${NEW_VM_NAME}</name>|g" "${TEMP_XML}"
+    sed -i '/<uuid>/d' "${TEMP_XML}"
+fi
+
+# 4b. Remap block device paths in XML from old ZVOL paths to new target paths
+for clean_ds in "${CLEAN_DS_LIST[@]}"; do
+    orig_ds=$(echo "${clean_ds}" | tr '_' '/')
+    target_ds="${DATASET_MAP[${clean_ds}]}"
+    
+    old_dev="/dev/zvol/${orig_ds}"
+    new_dev="/dev/zvol/${target_ds}"
+    
+    if [[ "${old_dev}" != "${new_dev}" ]]; then
+        echo "Remapping XML device path: ${old_dev} -> ${new_dev}"
+        sed -i "s|'${old_dev}'|'${new_dev}'|g" "${TEMP_XML}"
+        sed -i "s|\"${old_dev}\"|\"${new_dev}\"|g" "${TEMP_XML}"
+    fi
+done
+
+# 5. Restore NVRAM state if UEFI file exists
+NVRAM_TARGET=$(xmllint --xpath "string(//os/nvram/text())" "${TEMP_XML}" 2>/dev/null || true)
+if [[ -f "${VARS_SRC}" && -n "${NVRAM_TARGET}" ]]; then
+    echo "Restoring UEFI NVRAM VARS file to ${NVRAM_TARGET}..."
+    mkdir -p "$(dirname "${NVRAM_TARGET}")"
+    cp "${VARS_SRC}" "${NVRAM_TARGET}"
+fi
+
+# 6. Define restored domain in libvirt
+echo "Registering VM definition with libvirt..."
+virsh define "${TEMP_XML}"
+rm -f "${TEMP_XML}"
+
+echo "=========================================="
+echo " Restore completed successfully for ${NEW_VM_NAME}"
+echo "=========================================="

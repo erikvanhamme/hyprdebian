@@ -1,19 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $0 <vm_name> <backup_dir> <backup_owner>"
+    echo "Example: $0 myvm /path/to/backup myuser"
+    exit 1
+fi
+
 VM_NAME="$1"
 BACKUP_DIR="$2/${VM_NAME}"
 BACKUP_OWNER="$3"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SNAP_NAME="backup-${TIMESTAMP}"
+SEQ_FILE="${BACKUP_DIR}/${VM_NAME}.sequence"
 
 mkdir -p "${BACKUP_DIR}"
 
-# 1. Dump XML configuration
+# 1. Dump XML configuration (Always replaced)
 XML_PATH="${BACKUP_DIR}/${VM_NAME}.xml"
 virsh dumpxml --migratable "${VM_NAME}" > "${XML_PATH}"
 
-# 2. Extract NVRAM path if UEFI VM
+# 2. Extract NVRAM path if UEFI VM (Always replaced)
 NVRAM_PATH=$(virsh dumpxml "${VM_NAME}" | xmllint --xpath "string(//os/nvram/text())" - 2>/dev/null || true)
 if [[ -n "${NVRAM_PATH}" && -f "${NVRAM_PATH}" ]]; then
     cp "${NVRAM_PATH}" "${BACKUP_DIR}/${VM_NAME}_VARS.fd"
@@ -27,20 +34,30 @@ if [[ ${#ZVOL_PATHS[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Convert /dev/zvol/pool/dataset paths into ZFS dataset names (pool/dataset)
+# Convert /dev/zvol/pool/dataset paths into ZFS dataset names
 ZFS_DATASETS=()
 for dev in "${ZVOL_PATHS[@]}"; do
-    # Resolves /dev/zvol/pool/zvols/vm1-disk0 -> pool/zvols/vm1-disk0
     ds="${dev#/dev/zvol/}"
     ZFS_DATASETS+=("${ds}")
 done
+
+# Read current sequence index from file or default to 0
+if [[ -f "${SEQ_FILE}" ]]; then
+    NEXT_IDX=$(<"${SEQ_FILE}")
+else
+    NEXT_IDX=0
+fi
+
+SEQ_NUM=$(printf "%04d" "${NEXT_IDX}")
+
+echo "Starting backup sequence #${SEQ_NUM} for ${VM_NAME}..."
 
 # 4. Quiesce filesystem (Guest Agent)
 echo "Freezing guest filesystem..."
 virsh qemu-agent-command "${VM_NAME}" '{"execute":"guest-fsfreeze-freeze"}' --timeout 5 || echo "Warning: fsfreeze failed, taking crash-consistent snapshot."
 
 # 5. Atomic snapshot creation for all discovered ZVOLs
-echo "Creating ZFS snapshots..."
+echo "Creating ZFS snapshot: ${SNAP_NAME}..."
 for ds in "${ZFS_DATASETS[@]}"; do
     zfs snapshot "${ds}@${SNAP_NAME}"
 done
@@ -49,19 +66,31 @@ done
 echo "Thawing guest filesystem..."
 virsh qemu-agent-command "${VM_NAME}" '{"execute":"guest-fsfreeze-thaw"}' || true
 
-# 7. Stream each ZVOL snapshot to compressed file
+# 7. Stream each ZVOL snapshot (Full vs Incremental)
 for ds in "${ZFS_DATASETS[@]}"; do
     clean_ds_name=$(echo "${ds}" | tr '/' '_')
-    OUT_FILE="${BACKUP_DIR}/${clean_ds_name}.zst"
+    OUT_FILE="${BACKUP_DIR}/${clean_ds_name}.${SEQ_NUM}.zst"
 
-    echo "Streaming ${ds}@${SNAP_NAME} -> ${OUT_FILE}"
-    zfs send "${ds}@${SNAP_NAME}" | zstd -T0 > "${OUT_FILE}"
+    # Search for an existing base snapshot on the dataset from previous runs
+    PREV_SNAP=$(zfs list -H -t snapshot -o name -s creation "${ds}" | grep "@backup-" | grep -v "@${SNAP_NAME}" | tail -n 1 | cut -d'@' -f2 || true)
 
-    # Destroy snapshot after file stream completes
-    zfs destroy "${ds}@${SNAP_NAME}"
+    if [[ "${SEQ_NUM}" == "0000" || -z "${PREV_SNAP}" ]]; then
+        echo "Performing FULL backup (${SEQ_NUM}) for ${ds}@${SNAP_NAME} -> ${OUT_FILE}"
+        zfs send "${ds}@${SNAP_NAME}" | zstd -T0 > "${OUT_FILE}"
+    else
+        echo "Performing INCREMENTAL backup (${SEQ_NUM}) from @${PREV_SNAP} to @${SNAP_NAME} -> ${OUT_FILE}"
+        zfs send -i "@${PREV_SNAP}" "${ds}@${SNAP_NAME}" | zstd -T0 > "${OUT_FILE}"
+        
+        # Destroy previous base snapshot; current snapshot becomes new base
+        zfs destroy "${ds}@${PREV_SNAP}" || true
+    fi
 done
 
-# 8. Change ownership of the backed up files.
-chown -R $BACKUP_OWNER $BACKUP_DIR
+# 8. Increment sequence counter and update tracker file
+NEXT_IDX=$((NEXT_IDX + 1))
+echo "${NEXT_IDX}" > "${SEQ_FILE}"
 
-echo "Backup complete for ${VM_NAME}."
+# 9. Change ownership of all backed up files including state file
+chown -R "${BACKUP_OWNER}" "${BACKUP_DIR}"
+
+echo "Backup #${SEQ_NUM} complete for ${VM_NAME}."
