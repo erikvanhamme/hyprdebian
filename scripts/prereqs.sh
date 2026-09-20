@@ -38,6 +38,7 @@ pr_install_packages() {
 add_dependencies "pr_main" \
     "pr_backup_sources" \
     "pr_remove_sources" \
+    "pr_install_sources" \
     "pr_install_packages" \
 
 # Only run the prereqs when not running on a hyprdebian live iso.
