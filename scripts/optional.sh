@@ -156,6 +156,12 @@ o_qemu_kvm() {
         add_packages virt-manager
     fi
 
+    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
+        add_files \
+            deploy/etc/skel/.config/libvirt/libvirt.conf \
+
+    fi
+
     add_user_groups libvirt kvm
 
     add_services libvirtd
