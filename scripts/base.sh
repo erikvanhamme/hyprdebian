@@ -17,6 +17,7 @@ b_files() {
     # These files need to be deployed for sure.
     add_files \
         deploy/etc/apt/preferences.d/00-block-unwanted \
+        deploy/etc/default/zramswap \
         deploy/etc/profile.d/local-bin-path.sh \
         deploy/etc/skel/.config/nano/nanorc \
         deploy/etc/skel/.bash_aliases \
@@ -203,7 +204,7 @@ b_systemd() {
 
 b_utilities() {
     add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack \
-        qemu-guest-agent command-not-found man-db apt-file
+        qemu-guest-agent command-not-found man-db apt-file zram-tools
 
     add_dependencies "pkg_post" "pkg_utilities"
 
