@@ -213,6 +213,10 @@ b_utilities() {
         add_packages yazi
 
         add_files deploy/etc/skel/.config/yazi/yazi.toml 
+
+        if [[ "${Q_DESKTOP}" == "false" ]]; then
+            add_packages ffplay-
+        fi
     fi
 }
 
