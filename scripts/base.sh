@@ -195,11 +195,11 @@ b_systemd() {
 
         add_files \
             deploy/etc/systemd/journald.conf \
-            deploy/etc/systemd/resolved.conf.d \
+            deploy/etc/systemd/resolved.conf.d/00-direct-uplink.conf \
             deploy/etc/systemd/system/clear-machine-id.service \
             
         add_dependencies "pkg_post" \
-            "pkd_systemd" \
+            "pkg_systemd" \
             
     fi
 
