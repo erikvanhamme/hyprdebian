@@ -28,10 +28,6 @@ pkg_qemu_kvm() {
     ln -sf /dev/null ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/10-secret.conf
 }
 
-pkg_systemd() {
-    ln -sf /run/systemd/resolve/resolv.conf ${TARGET_DIR}/etc/resolv.conf
-}
-
 add_dependencies "pkg_main" \
     "pkg_install" \
 

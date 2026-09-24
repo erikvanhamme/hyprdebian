@@ -198,9 +198,6 @@ b_systemd() {
             deploy/etc/systemd/resolved.conf.d/00-direct-uplink.conf \
             deploy/etc/systemd/system/clear-machine-id.service \
             
-        add_dependencies "pkg_post" \
-            "pkg_systemd" \
-            
     fi
 
     add_user_groups adm
