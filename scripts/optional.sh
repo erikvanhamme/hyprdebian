@@ -102,7 +102,9 @@ o_hyprland() {
             deploy/usr/local/bin/hd-volume-up \
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        add_packages wiremix
+        add_packages wiremix yazi
+
+        add_files deploy/etc/skel/.config/yazi/yazi.toml 
     fi
 }
 

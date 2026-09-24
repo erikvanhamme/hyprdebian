@@ -208,16 +208,6 @@ b_utilities() {
         qemu-guest-agent command-not-found man-db apt-file zram-tools
 
     add_dependencies "pkg_post" "pkg_utilities"
-
-    if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        add_packages yazi
-
-        add_files deploy/etc/skel/.config/yazi/yazi.toml 
-
-        if [[ "${Q_DESKTOP}" == "false" ]]; then
-            add_packages ffplay-
-        fi
-    fi
 }
 
 b_network() {
