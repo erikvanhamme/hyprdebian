@@ -40,7 +40,5 @@ run = "noop"
 url = "/stor/**"
 run = "noop"
 
-# Disable folder/file fetchers on the network mount
-#[[plugin.prepend_fetchers]]
-#url = "/stor/**"
-#run = "noop"
+[manager]
+show_hidden = true

@@ -168,7 +168,7 @@ b_grub2() {
         in_target mount /boot/efi2
     fi
 
-    in_target apt install -y grub-efi-amd64 shim-signed
+    in_target apt install -y grub-efi-amd64 shim-signed os-prober-
     
     in_target update-initramfs -c -k all
     
