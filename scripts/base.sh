@@ -191,11 +191,15 @@ b_systemd() {
     if [[ "${Q_OS}" == "hyprdebian" ]]; then
         add_services clear-machine-id
 
-        add_packages rsyslog
+        add_packages systemd-resolved rsyslog
 
         add_files \
             deploy/etc/systemd/journald.conf \
+            deploy/etc/systemd/resolved.conf.d \
             deploy/etc/systemd/system/clear-machine-id.service \
+            
+        add_dependencies "pkg_post" \
+            "pkd_systemd" \
             
     fi
 
