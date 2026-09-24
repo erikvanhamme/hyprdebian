@@ -181,7 +181,7 @@ o_qemu_kvm() {
 }
 
 o_cups() {
-    add_packages cups
+    add_packages cups avahi-daemon-
     add_user_groups lpadmin
 }
 
