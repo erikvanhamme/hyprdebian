@@ -21,7 +21,7 @@ svc_enable() {
 svc_systemd() {
     ln -sf /run/systemd/resolve/resolv.conf ${TARGET_DIR}/etc/resolv.conf
 
-    in_target systemctl mask rpcbind.socket rpcbind.service
+    in_target systemctl mask systemd-firstboot.service systemd-preset-all.service systemd-machine-id-commit.service rpcbind.socket rpcbind.service 
 }
 
 svc_qemu_kvm() {

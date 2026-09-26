@@ -189,14 +189,15 @@ b_systemd() {
     add_packages systemd-timesyncd
 
     if [[ "${Q_OS}" == "hyprdebian" ]]; then
-        add_services clear-machine-id
+        add_services rotate-machine-id
 
         add_packages systemd-resolved rsyslog
 
         add_files \
             deploy/etc/systemd/journald.conf \
             deploy/etc/systemd/resolved.conf.d/00-direct-uplink.conf \
-            deploy/etc/systemd/system/clear-machine-id.service \
+            deploy/etc/systemd/system/rotate-machine-id.service \
+            deploy/etc/systemd/system-preset/00-ignore-all.preset \
             
     fi
 

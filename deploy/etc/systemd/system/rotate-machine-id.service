@@ -1,0 +1,13 @@
+[Unit]
+Description=Rotate Machine ID on Shutdown
+DefaultDependencies=no
+After=final.target
+Before=shutdown.target reboot.target halt.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/dbus-uuidgen > /etc/machine-id
+TimeoutStartSec=10s
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target
