@@ -42,23 +42,8 @@ b_bootstrap() {
     debootstrap --arch=amd64 --exclude=ifupdown --include=ca-certificates ${Q_SUITE} ${TARGET_DIR} http://deb.debian.org/debian
 }
 
-b_fstab_redundant() {
-    local efi_part efi2_part efi_uuid efi2_uuid
-    efi_part=${Q_DISK_A}-part1
-    efi2_part=${Q_DISK_B}-part1
-    efi_uuid=$(blkid -s UUID -o value ${efi_part})
-    efi2_uuid=$(blkid -s UUID -o value ${efi2_part})
-
-    if [[ -z "$efi_uuid" || -z "$efi2_uuid" ]]; then
-        echo "ERROR: Unable to determine UUIDs for fstab."
-        return 1
-    fi
-
-    template_render templates/etc/fstab.j2
-}
-
 b_fstab() {
-    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+    if [[ "${Q_SWAP:-1}" -gt 0 ]]; then
         local swap_part swap_uuid
         swap_part=${Q_DISK}-part2
         swap_uuid=$(blkid -s UUID -o value ${swap_part})
@@ -86,8 +71,8 @@ b_mount_unit_redundant() {
         return 1
     fi
 
-    template_render templates/etc/systemd/system/boot-efi.mount
-    template_render templates/etc/systemd/system/boot-efi2.mount
+    template_render templates/etc/systemd/system/boot-efi.mount.j2
+    template_render templates/etc/systemd/system/boot-efi2.mount.j2
 
     add_files \
         deploy/etc/systemd/system/boot-efi.automount \
@@ -114,9 +99,9 @@ b_mount_unit_single() {
 
 b_mount_unit() {
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        b_mount_redundant
+        b_mount_unit_redundant
     else
-        b_mount_single
+        b_mount_unit_single
     fi
 }
 
