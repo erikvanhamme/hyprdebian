@@ -36,6 +36,12 @@ o_firewall() {
             "deploy/etc/sysctl.d/50-bridge-netfilter.conf" \
 
     fi
+
+    if [[ "${Q_DOCKER}" == "true" ]]; then
+        add_files \
+            deploy/etc/ufw/after.rules \
+            
+    fi
 }
 
 o_enable_firewall() {

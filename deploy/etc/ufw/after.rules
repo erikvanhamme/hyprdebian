@@ -1,0 +1,49 @@
+#
+# rules.input-after
+#
+# Rules that should be run after the ufw command line added rules. Custom
+# rules should be added to one of these chains:
+#   ufw-after-input
+#   ufw-after-output
+#   ufw-after-forward
+#
+
+# Don't delete these required lines, otherwise there will be errors
+*filter
+:ufw-after-input - [0:0]
+:ufw-after-output - [0:0]
+:ufw-after-forward - [0:0]
+# End required lines
+
+# don't log noisy services by default
+-A ufw-after-input -p udp --dport 137 -j ufw-skip-to-policy-input
+-A ufw-after-input -p udp --dport 138 -j ufw-skip-to-policy-input
+-A ufw-after-input -p tcp --dport 139 -j ufw-skip-to-policy-input
+-A ufw-after-input -p tcp --dport 445 -j ufw-skip-to-policy-input
+-A ufw-after-input -p udp --dport 67 -j ufw-skip-to-policy-input
+-A ufw-after-input -p udp --dport 68 -j ufw-skip-to-policy-input
+
+# don't log noisy broadcast
+-A ufw-after-input -m addrtype --dst-type BROADCAST -j ufw-skip-to-policy-input
+
+# don't delete the 'COMMIT' line or these rules won't be processed
+COMMIT
+
+# BEGIN DOCKER UFW FIX
+*filter
+:ufw-user-forward - [0:0]
+:DOCKER-USER - [0:0]
+
+# 1. Allow return traffic for ESTABLISHED and RELATED container connections
+-A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 2. Evaluate standard UFW forward rules (e.g., 'ufw route allow ...')
+-A DOCKER-USER -j ufw-user-forward
+
+# 3. Allow local Docker bridge communication
+-A DOCKER-USER -j RETURN -s 192.168.240.0/20
+
+# 4. Drop all other external/unmatched traffic to Docker
+-A DOCKER-USER -j DROP
+COMMIT
+# END DOCKER UFW FIX
