@@ -78,6 +78,10 @@ b_mount_unit_redundant() {
         deploy/etc/systemd/system/boot-efi.automount \
         deploy/etc/systemd/system/boot-efi2.automount \
 
+    add_services \
+        boot-efi.automount \
+        boot-efi2.automount \
+
 }
 
 b_mount_unit_single() {
@@ -94,7 +98,10 @@ b_mount_unit_single() {
 
     add_files \
         deploy/etc/systemd/system/boot-efi.automount \
-        
+
+    add_services \
+        boot-efi.automount \
+
 }
 
 b_mount_unit() {
