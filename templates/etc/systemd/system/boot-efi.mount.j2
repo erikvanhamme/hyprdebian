@@ -1,0 +1,14 @@
+[Unit]
+Description=EFI System Partition Mount
+Documentation=man:systemd.mount(5)
+DefaultDependencies=no
+After=zfs-mount.service
+Requires=zfs-mount.service
+Before=local-fs.target
+
+[Mount]
+What=UUID={{ efi_uuid }}
+Where=/boot/efi
+Type=vfat
+Options=umask=0077,noexec,nodev,nosuid
+TimeoutSec=10

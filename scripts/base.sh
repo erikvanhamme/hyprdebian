@@ -57,7 +57,45 @@ b_fstab_redundant() {
     template_render templates/etc/fstab.j2
 }
 
-b_fstab_noswap() {
+b_fstab() {
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
+        local swap_part swap_uuid
+        swap_part=${Q_DISK}-part2
+        swap_uuid=$(blkid -s UUID -o value ${swap_part})
+
+        if [[ -z "$swap_uuid" ]]; then
+            echo "ERROR: Unable to determine UUIDs for fstab."
+            return 1
+        fi
+
+        template_render templates/etc/fstab.j2
+    else
+        template_render templates/etc/fstab.j2
+    fi
+}
+
+b_mount_unit_redundant() {
+    local efi_part efi2_part efi_uuid efi2_uuid
+    efi_part=${Q_DISK_A}-part1
+    efi2_part=${Q_DISK_B}-part1
+    efi_uuid=$(blkid -s UUID -o value ${efi_part})
+    efi2_uuid=$(blkid -s UUID -o value ${efi2_part})
+
+    if [[ -z "$efi_uuid" || -z "$efi2_uuid" ]]; then
+        echo "ERROR: Unable to determine UUIDs for fstab."
+        return 1
+    fi
+
+    template_render templates/etc/systemd/system/boot-efi.mount
+    template_render templates/etc/systemd/system/boot-efi2.mount
+
+    add_files \
+        deploy/etc/systemd/system/boot-efi.automount \
+        deploy/etc/systemd/system/boot-efi2.automount \
+
+}
+
+b_mount_unit_single() {
     local efi_part efi_uuid
     efi_part=${Q_DISK}-part1
     efi_uuid=$(blkid -s UUID -o value ${efi_part})
@@ -67,35 +105,18 @@ b_fstab_noswap() {
         return 1
     fi
 
-    template_render templates/etc/fstab.j2
+    template_render templates/etc/systemd/system/boot-efi.mount
+
+    add_files \
+        deploy/etc/systemd/system/boot-efi.automount \
+        
 }
 
-b_fstab_swap() {
-    local efi_part efi_uuid
-    efi_part=${Q_DISK}-part1
-    efi_uuid=$(blkid -s UUID -o value ${efi_part})
-
-    local swap_part swap_uuid
-    swap_part=${Q_DISK}-part2
-    swap_uuid=$(blkid -s UUID -o value ${swap_part})
-
-    if [[ -z "$efi_uuid" || -z "$swap_uuid" ]]; then
-        echo "ERROR: Unable to determine UUIDs for fstab."
-        return 1
-    fi
-
-    template_render templates/etc/fstab.j2
-}
-
-b_fstab() {
+b_mount_unit() {
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        b_fstab_redundant
+        b_mount_redundant
     else
-        if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
-            b_fstab_noswap
-        else
-            b_fstab_swap
-        fi
+        b_mount_single
     fi
 }
 
@@ -226,6 +247,7 @@ add_dependencies "b_pre" \
 add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
+    "b_mount_unit" \
     "b_zfs_cache"  \
     "b_mount" \
     "b_apt_init" \
