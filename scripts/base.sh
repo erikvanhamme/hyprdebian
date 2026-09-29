@@ -167,11 +167,14 @@ b_zfs_support() {
 
 b_grub2() {
     in_target mkdir /boot/efi
-    in_target mount /boot/efi
 
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         in_target mkdir /boot/efi2
-        in_target mount /boot/efi2
+
+        in_target mount ${Q_DISK_A}-part1 /boot/efi
+        in_target mount ${Q_DISK_B}-part1 /boot/efi2
+    else
+        in_target mount ${Q_DISK}-part1 /boot/efi
     fi
 
     in_target apt install -y grub-efi-amd64 shim-signed os-prober-
