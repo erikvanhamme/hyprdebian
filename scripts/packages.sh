@@ -28,6 +28,15 @@ pkg_qemu_kvm() {
     ln -sf /dev/null ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/10-secret.conf
 }
 
+pkg_enable_firewall() {
+    in_target ufw enable
+    in_target ufw logging off
+    
+    if [[ "${Q_OPENSSH}" == "true" ]]; then
+        in_target ufw allow SSH
+    fi
+}
+
 add_dependencies "pkg_main" \
     "pkg_install" \
 

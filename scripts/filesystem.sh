@@ -43,6 +43,7 @@ f_boot_pool() {
         -O relatime=on \
         -O canmount=off \
         -O mountpoint=/boot \
+        -O atime=off \
         -R /mnt \
         bpool ${boot_pool_part}
 }
@@ -65,6 +66,7 @@ f_root_pool() {
         -O relatime=on \
         -O canmount=off \
         -O mountpoint=/ \
+        -O atime=off \
         -R /mnt \
         ${encrypt} \
         rpool ${root_pool_part}

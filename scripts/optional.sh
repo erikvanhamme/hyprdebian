@@ -28,7 +28,7 @@ o_wifi() {
 o_firewall() {
     add_packages ufw
 
-    add_dependencies "pkg_post" "o_enable_firewall"
+    add_dependencies "pkg_post" "pkg_enable_firewall"
 
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
         add_files \
@@ -41,14 +41,6 @@ o_firewall() {
         add_files \
             deploy/etc/ufw/after.rules \
             
-    fi
-}
-
-o_enable_firewall() {
-    in_target ufw enable
-    
-    if [[ "${Q_OPENSSH}" == "true" ]]; then
-        in_target ufw allow SSH
     fi
 }
 
