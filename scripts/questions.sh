@@ -18,7 +18,6 @@ q_os() {
         "hyprdebian")
             Q_SUITE="unstable"
             add_dependencies "q_os_questions" \
-                "q_type" \
                 "q_kernel" \
                 "q_desktop" \
                 "q_encrypt" \
@@ -248,6 +247,7 @@ q_repo() {
 
 add_dependencies "q_main" \
     "q_os" \
+    "q_type" \
     "q_redundant" \
     "q_disk" \
     "q_swap" \
