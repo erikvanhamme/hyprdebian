@@ -192,12 +192,6 @@ q_desktop() {
 }
 
 q_encrypt() {
-    if [[ "Q_DESKTOP" == "true" ]]; then
-        Q_ENCRYPT="true"
-        save_config Q_ENCRYPT ${Q_ENCRYPT}
-        return 0
-    fi
-
     if ! ask_yes_no Q_ENCRYPT "Encrypt root filesystem"; then
         return 0
     fi
