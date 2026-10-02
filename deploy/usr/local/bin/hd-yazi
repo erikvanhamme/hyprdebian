@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/yazi/last-cwd"
+mkdir -p "$(dirname "$STATE_FILE")"
+
+# Determine starting directory
+START_DIR="$HOME"
+if [[ -f "$STATE_FILE" ]]; then
+    LAST_DIR="$(cat "$STATE_FILE")"
+    if [[ -d "$LAST_DIR" ]]; then
+        START_DIR="$LAST_DIR"
+    fi
+fi
+
+# Launch Yazi and capture the working directory on exit
+# --cwd-file writes the last active directory when Yazi quits
+yazi "$START_DIR" --cwd-file="$STATE_FILE"

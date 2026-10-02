@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# 1. Fetch JSON info about active monitors
+MONITORS_JSON=$(hyprctl monitors -j)
+
+# Select target monitor
+MONITOR_COUNT=$(echo "$MONITORS_JSON" | jq '. | length')
+
+if [ "$MONITOR_COUNT" -eq 0 ]; then
+    notify-send "Hyprland Monitor Selector" "No active monitors found."
+    exit 1
+elif [ "$MONITOR_COUNT" -eq 1 ]; then
+    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[0].name')
+else
+    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[].name' | wofi --dmenu --prompt "Select Monitor")
+fi
+
+[ -z "$TARGET_MONITOR" ] && exit 0
+
+# 2. Extract available modes for the selected monitor
+AVAILABLE_MODES=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '
+    .[] | select(.name == $mon) | .availableModes[]
+' | sort -rV | uniq)
+
+if [ -z "$AVAILABLE_MODES" ]; then
+    notify-send "Hyprland Monitor Selector" "Could not read modes for $TARGET_MONITOR"
+    exit 1
+fi
+
+# 3. Present available modes via wofi
+SELECTED_MODE=$(echo "$AVAILABLE_MODES" | wofi --dmenu --prompt "Resolution/FPS for $TARGET_MONITOR")
+
+[ -z "$SELECTED_MODE" ] && exit 0
+
+# Clean mode string (e.g., "2560x1440@165.00Hz" -> "2560x1440@165")
+CLEAN_MODE=$(echo "$SELECTED_MODE" | sed -E 's/Hz//; s/\.[0-9]+@/@/')
+
+# 4. Read current position and scale
+POS_X=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .x')
+POS_Y=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .y')
+CURRENT_SCALE=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .scale')
+
+# 5. Apply mode change using the Lua hl.monitor API via hyprctl eval
+EVAL_CMD=$(printf 'hl.monitor({ output = "%s", mode = "%s", position = "%dx%d", scale = "%s" })' \
+    "$TARGET_MONITOR" "$CLEAN_MODE" "$POS_X" "$POS_Y" "$CURRENT_SCALE")
+
+hyprctl eval "$EVAL_CMD"
+
+notify-send "Display Updated" "${TARGET_MONITOR} set to ${CLEAN_MODE}"

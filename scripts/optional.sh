@@ -90,6 +90,7 @@ o_hyprland() {
             deploy/usr/local/bin/hd-cmd-screensaver \
             deploy/usr/local/bin/hd-kill-screensaver \
             deploy/usr/local/bin/hd-launch-screensaver \
+            deploy/usr/local/bin/hd-mode-select \
             deploy/usr/local/bin/hd-mount \
             deploy/usr/local/bin/hd-mount-helper \
             deploy/usr/local/bin/hd-poweroff \
@@ -98,6 +99,7 @@ o_hyprland() {
             deploy/usr/local/bin/hd-volume-down \
             deploy/usr/local/bin/hd-volume-mute \
             deploy/usr/local/bin/hd-volume-up \
+            deploy/usr/local/bin/hd-yazi \
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages wiremix yazi
