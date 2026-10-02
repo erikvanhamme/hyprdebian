@@ -35,11 +35,20 @@ u_groups() {
     in_target usermod -a -G "$groups" "${Q_USER}"
 }
 
+u_root_skel() {
+    mkdir -p ${TARGET_DIR}/root/.config
+    cp -r deploy/etc/skel/.config/nano ${TARGET_DIR}/root/.config
+    cp deploy/etc/skel/.bash_aliases ${TARGET_DIR}/root
+    cp ${TARGET_DIR}/etc/skel/.bashrc ${TARGET_DIR}/root
+    cp ${TARGET_DIR}/etc/skel/.bash_logout ${TARGET_DIR}/root
+}
+
 add_dependencies "u_main" \
     "u_filesystem" \
     "u_add" \
     "u_skel" \
     "u_chown" \
     "u_groups" \
+    "u_root_skel" \
 
 add_dependencies "install" "u_pre" "u_main" "u_post"
