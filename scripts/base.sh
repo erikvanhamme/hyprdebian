@@ -94,7 +94,7 @@ b_mount_unit_single() {
         return 1
     fi
 
-    template_render templates/etc/systemd/system/boot-efi.mount
+    template_render templates/etc/systemd/system/boot-efi.mount.j2
 
     add_files \
         deploy/etc/systemd/system/boot-efi.automount \
