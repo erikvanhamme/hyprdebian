@@ -202,7 +202,9 @@ b_grub2() {
 }
 
 b_systemd() {
-    add_packages systemd-timesyncd
+    if [[ "${Q_TYPE}" != "vm" ]]; then
+        add_packages systemd-timesyncd
+    fi
 
     if [[ "${Q_OS}" == "hyprdebian" ]]; then
         add_services rotate-machine-id
@@ -222,7 +224,11 @@ b_systemd() {
 
 b_utilities() {
     add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack \
-        qemu-guest-agent command-not-found man-db apt-file zram-tools
+        command-not-found man-db apt-file zram-tools
+
+    if [[ "${Q_TYPE}" == "vm" ]]; then
+        add_packages qemu-guest-agent
+    fi
 
     add_dependencies "pkg_post" "pkg_utilities"
 }

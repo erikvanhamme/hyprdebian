@@ -18,6 +18,7 @@ q_os() {
         "hyprdebian")
             Q_SUITE="unstable"
             add_dependencies "q_os_questions" \
+                "q_type" \
                 "q_kernel" \
                 "q_desktop" \
                 "q_encrypt" \
@@ -63,6 +64,10 @@ q_os() {
 
 q_os_questions() {
     return 0
+}
+
+q_type() {
+    ask_options Q_TYPE "What type of computer are you installing" "desktop" "laptop" "server" "vm"
 }
 
 q_de() {
