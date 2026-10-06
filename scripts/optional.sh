@@ -85,6 +85,7 @@ o_hyprland() {
             deploy/etc/skel/.config/wofi/style.css \
             deploy/etc/skel/.local/share/nwg-look/gsettings \
             deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
+            deploy/etc/sudoers.d/99-mount-menu \
             deploy/usr/local/bin/hd-ask-poweroff \
             deploy/usr/local/bin/hd-ask-reboot \
             deploy/usr/local/bin/hd-cmd-screensaver \
@@ -144,7 +145,7 @@ o_desktop() {
 }
 
 o_docker() {
-    add_packages docker.io
+    add_packages docker.io docker-compose
 
     add_user_groups docker
 
