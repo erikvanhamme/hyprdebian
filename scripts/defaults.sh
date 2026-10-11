@@ -21,6 +21,7 @@ MACHINE_TYPES=(desktop laptop server vm)
 declare -gA DEFAULTS_common=(
     [Q_OS]="hyprdebian"
     [Q_TYPE]="desktop"
+    [Q_DEFAULTS]="y"
     [Q_DE]="kde"
     [Q_SWAP]="2"
     [Q_USER]="rsq"

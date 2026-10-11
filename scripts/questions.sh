@@ -71,6 +71,11 @@ q_type() {
     ask_options Q_TYPE "What type of computer are you installing" "${default}" "${MACHINE_TYPES[@]}"
 }
 
+q_defaults() {
+    local default="$(get_default Q_DEFAULTS "${Q_TYPE:-}")"
+    ask_yes_no Q_DEFAULTS "Use machine type defaults" "${default}" || true
+}
+
 q_de() {
     local default="$(get_default Q_DE "${Q_TYPE:-}")"
     ask_options Q_DE "Which desktop environment" "${default}" "none" "cinnamon" "gnome" "kde" "lxde" "lxqt" "mate" "xfce"
@@ -291,6 +296,7 @@ q_repo() {
 add_dependencies "q_main" \
     "q_os" \
     "q_type" \
+    "q_defaults" \
     "q_redundant" \
     "q_disk" \
     "q_swap" \
