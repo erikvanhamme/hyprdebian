@@ -48,6 +48,16 @@ sudo ./install.sh
 
 To install you will need to create the live ISO by running the script in the livecd folder.
 
+To build it in a docker container instead, so the live-build dependencies stay off your system:
+
+```
+docker build -t hyprdebian-livecd livecd/
+mkdir -p livecd/out
+docker run --rm --privileged -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -v "$PWD/livecd/out:/out" hyprdebian-livecd
+```
+
+The ISO is written to livecd/out/hyprdebian-live-amd64.iso.
+
 When the ISO is built, write it to a USB stick and boot from it.
 
 After boot, open a terminal and run:
