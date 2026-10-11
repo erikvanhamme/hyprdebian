@@ -59,7 +59,8 @@ save_config() {
     grep -Ev "^(declare [-a-zA-Z]+ )?${key}=" "$CONFIG_FILE" 2>/dev/null > "$CONFIG_FILE.tmp" || true
 
     if [[ "$key" == "TASK_DEPS" ]]; then
-        declare -p TASK_DEPS >> "$CONFIG_FILE.tmp"
+        # Save with 'declare -gA' so sourcing it from load_config sets the global.
+        declare -p TASK_DEPS | sed 's/^declare -A /declare -gA /' >> "$CONFIG_FILE.tmp"
     else
         printf '%s="%s"\n' "$key" "$value" >> "$CONFIG_FILE.tmp"
     fi
