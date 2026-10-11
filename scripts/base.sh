@@ -19,6 +19,7 @@ b_files() {
         deploy/etc/apt/preferences.d/00-block-unwanted \
         deploy/etc/default/zramswap \
         deploy/etc/profile.d/local-bin-path.sh \
+        deploy/etc/sysctl.d/50-zram.conf \
         deploy/etc/skel/.config/nano/nanorc \
         deploy/etc/skel/.bash_aliases \
         deploy/etc/skel/.gitconfig \
