@@ -27,10 +27,6 @@ f_swap() {
     local swap_part=${Q_DISK}-part2
 
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        if ! command -v mdadm > /dev/null; then
-            apt install -y mdadm
-        fi
-
         # The wipe leaves the md superblock of a previous install inside partition 2, and the
         # new partition 2 starts at the same offset, so udev may reassemble the old array after
         # repartitioning. A rerun of this task also finds the array it created before. Stop the

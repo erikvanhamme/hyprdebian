@@ -16,9 +16,7 @@ d_unmount_swap() {
     swapoff -a
 
     # Stop raid arrays (swap of a previous redundant install) so the disks can be wiped.
-    if command -v mdadm > /dev/null; then
-        mdadm --stop --scan || true
-    fi
+    mdadm --stop --scan || true
 }
 
 d_wipe() {
