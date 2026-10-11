@@ -173,8 +173,11 @@ o_qemu_kvm() {
     add_dependencies "pkg_post" "pkg_qemu_kvm"
     add_dependencies "svc_post" "svc_qemu_kvm"
 
-    BR0_MAC_ADDRESS=$(random_mac)
-    save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
+    # Keep an existing address, so a rerun or an upgrade does not change the MAC of the bridge.
+    if [[ -z "${BR0_MAC_ADDRESS:-}" ]]; then
+        BR0_MAC_ADDRESS=$(random_mac)
+        save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
+    fi
 
     add_template templates/etc/systemd/network/30-br0.netdev.j2
 }
@@ -221,6 +224,8 @@ o_backuptools() {
 o_rust() {
     add_packages rustup
 
+    add_files deploy/usr/local/bin/syscargo
+
     add_dependencies "u_post" \
         "o_syscargo" \
         "o_syscargo_permissions"
@@ -236,10 +241,7 @@ o_syscargo() {
 [install]
 root = "/usr/local"
 EOF
-    in_target sudo -u cargo rustup default stable || return 1
-
-    file_deploy deploy/usr/local/bin/syscargo || return 1
-    chmod 0755 ${TARGET_DIR}/usr/local/bin/syscargo
+    in_target sudo -u cargo rustup default stable
 }
 
 o_syscargo_permissions() {
