@@ -5,6 +5,7 @@ TARGET_DIR=/mnt
 STATE_DIR="/tmp/hyprdebian"
 CONFIG_FILE="$STATE_DIR/config"
 INSTALLED_CONFIG_FILE="/etc/hyprdebian/installer.config" # Copy of the config on the installed system.
+MIGRATIONS_FILE="/etc/hyprdebian/migrations" # The migrations applied on the installed system.
 
 # Color constants.
 if [[ -t 1 ]]; then

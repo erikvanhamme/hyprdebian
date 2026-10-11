@@ -17,6 +17,34 @@ upg_session() {
     find_session
 }
 
+# Runs the migrations that did not run on this system yet, in order. Each one is recorded right
+# after it succeeded, so it never runs twice, even when a later part of the upgrade fails.
+upg_migrations() {
+    local file name
+
+    for file in migrations/*.sh; do
+        [[ -e "$file" ]] || continue
+        name=$(basename "$file" .sh)
+
+        if grep -qxF "$name" "${TARGET_DIR}${MIGRATIONS_FILE}" 2>/dev/null; then
+            continue
+        fi
+
+        log_status "$COLOR_YELLOW" "START  " "migration ${name}"
+
+        unset -f migrate
+        source "$file" || return 1
+
+        if ! migrate; then
+            log_status "$COLOR_RED" "FAIL   " "migration ${name}"
+            return 1
+        fi
+
+        echo "$name" >> "${TARGET_DIR}${MIGRATIONS_FILE}" || return 1
+        log_status "$COLOR_GREEN" "DONE   " "migration ${name}"
+    done
+}
+
 # Installs the packages the new version adds. Packages that were removed after an earlier
 # installation or upgrade are not installed again.
 upg_packages() {
@@ -133,6 +161,7 @@ add_dependencies "upg_pre" \
     "upg_session" \
 
 add_dependencies "upg_main" \
+    "upg_migrations" \
     "upg_packages" \
     "upg_files" \
     "upg_etc" \
