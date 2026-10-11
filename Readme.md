@@ -24,6 +24,18 @@ Feel free to experiment with it.
 11. Some laptop friendly optimization.
 12. Optional docker support.
 13. Optional QEMU/KVM support.
+14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md).
+
+## System overview
+
+- **Base:** Debian unstable (sid), with extra packages from the local hyprdebian repository.
+- **Storage:** ZFS on root with native encryption, on a single drive or mirrored over two drives. The installer takes an `@install` snapshot of the boot and root datasets.
+- **Session:** systemd, with uwsm managing the Hyprland session and greetd for the login.
+- **Desktop:** Hyprland, with kitty as terminal, wofi as launcher and mako for notifications.
+- **Audio:** PipeWire, with wiremix as mixer.
+- **Network:** systemd-networkd, with iwd for wifi.
+
+See [About](docs/HyprDebian/About.md) for more.
 
 ## Installation
 
@@ -46,6 +58,8 @@ sudo ./install.sh
 
 ### From hyprdebian live ISO
 
+The hyprdebian live ISO is a Debian trixie live system with a GNOME desktop, ZFS support, the tools the installer needs and a checkout of this repo. The installer skips its prerequisites phase when it runs on it.
+
 To install you will need to create the live ISO by running the script in the livecd folder.
 
 To build it in a docker container instead, so the live-build dependencies stay off your system:
@@ -58,7 +72,13 @@ docker run --rm --privileged -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -v "$
 
 The ISO is written to livecd/out/hyprdebian-live-amd64.iso.
 
-When the ISO is built, write it to a USB stick and boot from it.
+When the ISO is built, write it to a USB stick, for example with:
+
+```
+sudo dd if=livecd/out/hyprdebian-live-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+```
+
+Replace /dev/sdX with the USB stick. Everything on it will be lost. The live cd boots on both UEFI and BIOS machines.
 
 After boot, open a terminal and run:
 
@@ -67,6 +87,32 @@ cd hyprdebian
 git pull
 sudo ./install.sh
 ```
+
+The repo on the live cd is the version from the moment the ISO was built. The `git pull` brings it up to date.
+
+The admin tools such as mdadm, gdisk and zpool are not in the PATH of the live user. Run them with sudo.
+
+See [Live cd](docs/Livecd/Overview.md) for building without docker, following the build and the warnings you can ignore.
+
+### Questions and defaults
+
+The installer first asks all its questions. Nothing is changed on the disks until all questions are answered.
+
+One of the first questions is the machine type: `desktop`, `laptop`, `server` or `vm`. Each machine type has its own default answers, for example wifi on a laptop and redundant drives on a server. When you choose to use the machine type defaults, every question that has a default is answered with it without asking. The disks, the disk destruction confirmation and the password are always asked.
+
+See [Defaults](docs/Installer/Defaults.md) for all the default answers.
+
+### When the installer fails
+
+The installer can be started again after a failure. Tasks that completed before are skipped, and the installation continues with the task that failed. Fix the cause and run `sudo ./install.sh` again.
+
+The answers and progress are kept in `/tmp/hyprdebian`. To start a completely fresh installation, remove it:
+
+```
+sudo rm -rf /tmp/hyprdebian
+```
+
+Because it is in `/tmp`, it is also gone after a reboot of the live system.
 
 ## First boot
 
@@ -87,8 +133,12 @@ Subsequent boots will be normal.
 
 ## Keyboard shortcuts
 
-SUPER + ENTER: terminal
-SUPER + B: firefox
+`SUPER + RETURN` opens a terminal and `SUPER + SPACE` opens the application launcher. See [Key Bindings](docs/HyprDebian/Key%20Bindings.md) for all the shortcuts.
 
-Other shortcuts are defined in ~/.config/hypr/hyprland.lua
+## Documentation
 
+The `docs` folder has more documentation:
+- [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
+- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it.
+- [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
+- [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
