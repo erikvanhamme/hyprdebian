@@ -14,28 +14,57 @@ if [ "$MONITOR_COUNT" -eq 0 ]; then
 elif [ "$MONITOR_COUNT" -eq 1 ]; then
     TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[0].name')
 else
-    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[].name' | wofi --dmenu --prompt "Select Monitor")
+    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[].name' | wofi --dmenu --prompt "Select Monitor" --width 30% --height 24% --cache-file /dev/null)
 fi
 
 [ -z "$TARGET_MONITOR" ] && exit 0
 
-# 2. Extract available modes for the selected monitor
+# 2. Extract available modes and the current mode for the selected monitor
 AVAILABLE_MODES=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '
     .[] | select(.name == $mon) | .availableModes[]
-' | sort -rV | uniq)
+' | sed -E 's/Hz$//' | sort -u)
 
 if [ -z "$AVAILABLE_MODES" ]; then
     notify-send "Hyprland Monitor Selector" "Could not read modes for $TARGET_MONITOR"
     exit 1
 fi
 
-# 3. Present available modes via wofi
-SELECTED_MODE=$(echo "$AVAILABLE_MODES" | wofi --dmenu --prompt "Resolution/FPS for $TARGET_MONITOR")
+CURRENT_RES=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | "\(.width)x\(.height)"')
+CURRENT_RATE=$(LC_NUMERIC=C printf '%.2f' "$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .refreshRate')")
 
-[ -z "$SELECTED_MODE" ] && exit 0
+# Puts the current value at the top of a list, so wofi pre-selects it.
+current_first() {
+    local current="$1" list="$2"
+    if echo "$list" | grep -Fxq "$current"; then
+        echo "$current"
+        echo "$list" | grep -Fxv "$current" || true
+    else
+        echo "$list"
+    fi
+}
 
-# Clean mode string (e.g., "2560x1440@165.00Hz" -> "2560x1440@165")
-CLEAN_MODE=$(echo "$SELECTED_MODE" | sed -E 's/Hz//; s/\.[0-9]+@/@/')
+# 3a. Select the resolution (e.g. "2560x1440")
+RESOLUTIONS=$(echo "$AVAILABLE_MODES" | cut -d@ -f1 | sort -urV)
+SELECTED_RES=$(current_first "$CURRENT_RES" "$RESOLUTIONS" | wofi --dmenu --prompt "Resolution for $TARGET_MONITOR" --width 30% --height 24% --cache-file /dev/null)
+
+[ -z "$SELECTED_RES" ] && exit 0
+echo "$RESOLUTIONS" | grep -Fxq "$SELECTED_RES" || exit 0
+
+# 3b. Select the refresh rate supported at that resolution (e.g. "165.00Hz")
+RATES=$(echo "$AVAILABLE_MODES" | awk -F@ -v res="$SELECTED_RES" '$1 == res { print $2 "Hz" }' | sort -urn)
+SELECTED_RATE=$(current_first "${CURRENT_RATE}Hz" "$RATES" | wofi --dmenu --prompt "Refresh rate for $TARGET_MONITOR at $SELECTED_RES" --width 30% --height 24% --cache-file /dev/null)
+
+[ -z "$SELECTED_RATE" ] && exit 0
+echo "$RATES" | grep -Fxq "$SELECTED_RATE" || exit 0
+SELECTED_RATE=${SELECTED_RATE%Hz}
+
+# Nothing to do when the mode did not change
+if [ "$SELECTED_RES" = "$CURRENT_RES" ] && [ "$SELECTED_RATE" = "$CURRENT_RATE" ]; then
+    exit 0
+fi
+
+# Assemble the mode string (e.g. "2560x1440@165.00")
+CLEAN_MODE="${SELECTED_RES}@${SELECTED_RATE}"
 
 # 4. Read current position and scale
 POS_X=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .x')
