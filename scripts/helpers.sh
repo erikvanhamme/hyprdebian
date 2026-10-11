@@ -3,7 +3,7 @@
 add_files() {
     for file in "$@"; do
         for check in "${FILES[@]}"; do
-            [[ "$check" == "$file" ]] && continue
+            [[ "$check" == "$file" ]] && continue 2
         done
 
         FILES+=("$file")
@@ -15,7 +15,7 @@ add_files() {
 add_packages() {
     for package in "$@"; do
         for check in "${PACKAGES[@]}"; do
-            [[ "$check" == "$package" ]] && continue
+            [[ "$check" == "$package" ]] && continue 2
         done
 
         PACKAGES+=("$package")
@@ -27,7 +27,7 @@ add_packages() {
 add_services() {
     for service in "$@"; do
         for check in "${SERVICES[@]}"; do
-            [[ "$check" == "$service" ]] && continue
+            [[ "$check" == "$service" ]] && continue 2
         done
 
         SERVICES+=("$service")
@@ -53,7 +53,7 @@ add_template() {
 add_user_groups() {
     for group in "$@"; do
         for check in "${USER_GROUPS[@]}"; do
-            [[ "$check" == "$group" ]] && continue
+            [[ "$check" == "$group" ]] && continue 2
         done
 
         USER_GROUPS+=("$group")

@@ -20,5 +20,5 @@ The project owner (Erik Van Hamme) has final say on all changes. Agents are help
 The installer version is in the start banner in `install.sh` (`echo "=== Erik's nifty hyprdebian/debian installer v0.NNN ==="`).
 
 - **Bump it when a change affects the installer or the systems it installs.** That covers `install.sh`, `scripts/`, `templates/`, `deploy/`, `render.py`, `kernels.py` and anything else the installer runs or copies into the target system.
-- **Bump it once per set of working changes, not once per edit.** If the working tree already holds a bump that hasn't been committed, don't bump again.
+- **Bump it once per set of working changes, not once per edit.** Before finishing a task, run `git diff HEAD -- install.sh`. If it already shows an uncommitted bump, leave it; otherwise bump. Never assume from earlier in the session: the owner may have committed in the meantime.
 - **Only increment the minor number** (e.g. `v0.129` → `v0.130`). Never change the major number; the decision to go to `v1.0` belongs to the owner.
