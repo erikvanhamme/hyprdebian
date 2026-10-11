@@ -14,12 +14,12 @@ svc_post() {
 
 svc_enable() {
     for svc in ${SERVICES[*]}; do
-        in_target systemctl enable $svc
+        in_target systemctl enable $svc || return 1
     done
 }
 
 svc_systemd() {
-    ln -sf /run/systemd/resolve/resolv.conf ${TARGET_DIR}/etc/resolv.conf
+    ln -sf /run/systemd/resolve/resolv.conf ${TARGET_DIR}/etc/resolv.conf || return 1
 
     in_target systemctl mask systemd-firstboot.service systemd-preset-all.service systemd-machine-id-commit.service rpcbind.socket rpcbind.service 
 }

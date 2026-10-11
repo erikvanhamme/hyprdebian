@@ -45,9 +45,9 @@ o_firewall() {
 }
 
 o_font() {
-    in_target apt install -y fontconfig wget unzip
-    mkdir ${TARGET_DIR}/usr/local/share/fonts
-    wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip
+    in_target apt install -y fontconfig wget unzip || return 1
+    mkdir -p ${TARGET_DIR}/usr/local/share/fonts || return 1
+    wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip || return 1
     unzip JetBrainsMono.zip -d ${TARGET_DIR}/usr/local/share/fonts
 }
 
@@ -114,24 +114,24 @@ o_theme() {
 }
 
 o_user_log() {
-    touch ${TARGET_DIR}/var/log/hyprland.log
+    touch ${TARGET_DIR}/var/log/hyprland.log || return 1
     in_target chown ${Q_USER}:${Q_USER} /var/log/hyprland.log
 }
 
 o_user_icons() {
-    mkdir ${TARGET_DIR}/home/${Q_USER}/.icons
+    mkdir -p ${TARGET_DIR}/home/${Q_USER}/.icons || return 1
     in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/.icons
 }
 
 o_pipewire() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants
-    ln -s ${TARGET_DIR}/usr/lib/systemd/user/pipewire.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/
-    ln -s ${TARGET_DIR}/usr/lib/systemd/user/wireplumber.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/
+    mkdir -p ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants || return 1
+    ln -sf ${TARGET_DIR}/usr/lib/systemd/user/pipewire.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/ || return 1
+    ln -sf ${TARGET_DIR}/usr/lib/systemd/user/wireplumber.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/ || return 1
     in_target chown -R ${Q_USER}:${Q_USER} /home/${Q_USER}/.config/systemd
 }
 
 o_sniptool() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USER}/Pictures/Screenshots
+    mkdir -p ${TARGET_DIR}/home/${Q_USER}/Pictures/Screenshots || return 1
     in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/Pictures/Screenshots
 }
 
@@ -194,7 +194,7 @@ o_backuptools() {
     add_packages python-is-python3 python3-colorama python3-tabulate mbuffer mt-st open-iscsi
 
     add_files \
-        deploy/etc/systemd/sytem/iscsi-login.service \
+        deploy/etc/systemd/system/iscsi-login.service \
         deploy/etc/udev/rules.d/99-iscsi-custom.rules \
         deploy/usr/local/bin/hd-backup \
         deploy/usr/local/bin/hd-backup-load \
@@ -215,10 +215,10 @@ o_backuptools() {
             
     fi
 
-    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian
+    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian || return 1
 
     # Compile block write utility for backups on tape.
-    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian
+    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian || return 1
     in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c
 }
 
@@ -231,22 +231,23 @@ o_rust() {
 }
 
 o_syscargo() {
-    zfs create rpool/home/cargo
-    in_target useradd -m -r -s /bin/bash cargo
-    in_target chown -R cargo:cargo /home/cargo
-    in_target sudo -u cargo mkdir -p /home/cargo/.cargo
-    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF'
+    # The checks for an existing dataset and user let a rerun of this task get past them.
+    zfs list rpool/home/cargo > /dev/null 2>&1 || zfs create rpool/home/cargo || return 1
+    in_target id -u cargo > /dev/null 2>&1 || in_target useradd -m -r -s /bin/bash cargo || return 1
+    in_target chown -R cargo:cargo /home/cargo || return 1
+    in_target sudo -u cargo mkdir -p /home/cargo/.cargo || return 1
+    in_target sudo -u cargo tee /home/cargo/.cargo/config.toml > /dev/null <<'EOF' || return 1
 [install]
 root = "/usr/local"
 EOF
-    in_target sudo -u cargo rustup default stable
+    in_target sudo -u cargo rustup default stable || return 1
 
-    file_deploy deploy/usr/local/bin/syscargo
-    chmod 0755 ${TARGET_DIR}/usr/local/bin/syscargo 0755
+    file_deploy deploy/usr/local/bin/syscargo || return 1
+    chmod 0755 ${TARGET_DIR}/usr/local/bin/syscargo
 }
 
 o_syscargo_permissions() {
-    in_target chown -R root:cargo /usr/local
+    in_target chown -R root:cargo /usr/local || return 1
     in_target chmod -R g+w /usr/local
 }
 

@@ -13,18 +13,18 @@ pr_post() {
 }
 
 pr_backup_sources() {
-    mkdir -p /etc/apt/backup
+    mkdir -p /etc/apt/backup || return 1
     cp -a /etc/apt/sources.list /etc/apt/backup/sources.list.$(date +%s) 2>/dev/null || true
     cp -a /etc/apt/sources.list.d /etc/apt/backup/sources.list.d.$(date +%s) 2>/dev/null || true
 }
 
 pr_remove_sources() {
-    rm -f /etc/apt/sources.list
+    rm -f /etc/apt/sources.list || return 1
     rm -f /etc/apt/sources.list.d/*.list
 }
 
 pr_install_sources() {
-    cat > /etc/apt/sources.list <<'EOF'
+    cat > /etc/apt/sources.list <<'EOF' || return 1
 deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware
 EOF
     apt update

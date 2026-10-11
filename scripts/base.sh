@@ -35,10 +35,10 @@ b_templates() {
 }
 
 b_bootstrap() {
-    mkdir ${TARGET_DIR}/run
-    mount -t tmpfs tmpfs ${TARGET_DIR}/run
-    mkdir ${TARGET_DIR}/run/lock
-    mkdir -p ${TARGET_DIR}/var/lib
+    mkdir -p ${TARGET_DIR}/run || return 1
+    mount -t tmpfs tmpfs ${TARGET_DIR}/run || return 1
+    mkdir -p ${TARGET_DIR}/run/lock || return 1
+    mkdir -p ${TARGET_DIR}/var/lib || return 1
 
     debootstrap --arch=amd64 --exclude=ifupdown --include=ca-certificates ${Q_SUITE} ${TARGET_DIR} http://deb.debian.org/debian
 }
@@ -81,7 +81,7 @@ b_mdadm() {
     fi
 
     # Written before mdadm is installed, so its postinst keeps this file.
-    template_render templates/etc/mdadm/mdadm.conf.j2
+    template_render templates/etc/mdadm/mdadm.conf.j2 || return 1
 
     add_packages mdadm
 }
@@ -107,7 +107,7 @@ b_crypttab() {
         return 1
     fi
 
-    template_render templates/etc/crypttab.j2
+    template_render templates/etc/crypttab.j2 || return 1
 
     add_packages systemd-cryptsetup
 }
@@ -124,8 +124,8 @@ b_mount_unit_redundant() {
         return 1
     fi
 
-    template_render templates/etc/systemd/system/boot-efi.mount.j2
-    template_render templates/etc/systemd/system/boot-efi2.mount.j2
+    template_render templates/etc/systemd/system/boot-efi.mount.j2 || return 1
+    template_render templates/etc/systemd/system/boot-efi2.mount.j2 || return 1
 
     add_files \
         deploy/etc/systemd/system/boot-efi.automount \
@@ -147,7 +147,7 @@ b_mount_unit_single() {
         return 1
     fi
 
-    template_render templates/etc/systemd/system/boot-efi.mount.j2
+    template_render templates/etc/systemd/system/boot-efi.mount.j2 || return 1
 
     add_files \
         deploy/etc/systemd/system/boot-efi.automount \
@@ -166,42 +166,42 @@ b_mount_unit() {
 }
 
 b_zfs_cache() {
-    mkdir ${TARGET_DIR}/etc/zfs
+    mkdir -p ${TARGET_DIR}/etc/zfs || return 1
     cp /etc/zfs/zpool.cache ${TARGET_DIR}/etc/zfs
 }
 
 b_mount() {
-    mount --make-private --rbind /dev  ${TARGET_DIR}/dev
-    mount --make-private --rbind /proc ${TARGET_DIR}/proc
-    mount --make-private --rbind /sys  ${TARGET_DIR}/sys
+    mount --make-private --rbind /dev  ${TARGET_DIR}/dev || return 1
+    mount --make-private --rbind /proc ${TARGET_DIR}/proc || return 1
+    mount --make-private --rbind /sys  ${TARGET_DIR}/sys || return 1
 
     # /dev is shared with the live system, so leave its /dev/log alone. Its symlink
     # points at /run/systemd/journal/dev-log, so expose the journal socket there.
-    mkdir -p ${TARGET_DIR}/run/systemd/journal
-    touch ${TARGET_DIR}/run/systemd/journal/dev-log
+    mkdir -p ${TARGET_DIR}/run/systemd/journal || return 1
+    touch ${TARGET_DIR}/run/systemd/journal/dev-log || return 1
     mount --bind /run/systemd/journal/dev-log ${TARGET_DIR}/run/systemd/journal/dev-log
 }
 
 b_apt_init() {
-    template_render templates/etc/apt/sources.list.d/debian.sources.j2
+    template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2
+        template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 || return 1
     fi
 
-    rm -f ${TARGET_DIR}/etc/apt/sources.list
+    rm -f ${TARGET_DIR}/etc/apt/sources.list || return 1
 
     in_target apt update
 }
 
 b_console() {
-    in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration console-setup
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration console-setup || return 1
 
-    in_target dpkg-reconfigure locales
+    in_target dpkg-reconfigure locales || return 1
 
-    in_target dpkg-reconfigure tzdata
+    in_target dpkg-reconfigure tzdata || return 1
 
-    in_target dpkg-reconfigure keyboard-configuration
+    in_target dpkg-reconfigure keyboard-configuration || return 1
 
     in_target dpkg-reconfigure console-setup
 }
@@ -212,12 +212,14 @@ b_buildtools() {
 
 b_kernel() {
     if [[ "${Q_KERNEL}" == "latest" ]]; then
-        in_target apt install -y linux-image-amd64 linux-headers-amd64
+        in_target apt install -y linux-image-amd64 linux-headers-amd64 || return 1
     else
-        mkdir -p ${TARGET_DIR}/tmp/deb
-        cp kernels/*${Q_KERNEL}* ${TARGET_DIR}/tmp/deb/
+        mkdir -p ${TARGET_DIR}/tmp/deb || return 1
+        cp kernels/*${Q_KERNEL}* ${TARGET_DIR}/tmp/deb/ || return 1
+
+        # dpkg fails when the packages have missing dependencies, apt install -f then installs them.
         in_target dpkg -R -i /tmp/deb/
-        in_target apt install -y -f
+        in_target apt install -y -f || return 1
     fi
 
     add_packages firmware-linux firmware-qlogic
@@ -228,28 +230,29 @@ b_zfs_support() {
 }
 
 b_grub2() {
-    in_target mkdir /boot/efi
+    # The checks for an existing mount let a rerun of this task get past the mounts.
+    in_target mkdir -p /boot/efi || return 1
 
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target mkdir /boot/efi2
+        in_target mkdir -p /boot/efi2 || return 1
 
-        in_target mount ${Q_DISK_A}-part1 /boot/efi
-        in_target mount ${Q_DISK_B}-part1 /boot/efi2
+        in_target mountpoint -q /boot/efi || in_target mount ${Q_DISK_A}-part1 /boot/efi || return 1
+        in_target mountpoint -q /boot/efi2 || in_target mount ${Q_DISK_B}-part1 /boot/efi2 || return 1
     else
-        in_target mount ${Q_DISK}-part1 /boot/efi
+        in_target mountpoint -q /boot/efi || in_target mount ${Q_DISK}-part1 /boot/efi || return 1
     fi
 
-    in_target apt install -y grub-efi-amd64 shim-signed os-prober-
+    in_target apt install -y grub-efi-amd64 shim-signed os-prober- || return 1
     
-    in_target update-initramfs -c -k all
+    in_target update-initramfs -c -k all || return 1
     
-    file_deploy deploy/etc/default/grub
-    file_deploy deploy/etc/grub.d/11_zfs_recovery
+    file_deploy deploy/etc/default/grub || return 1
+    file_deploy deploy/etc/grub.d/11_zfs_recovery || return 1
     
-    in_target update-grub
+    in_target update-grub || return 1
     
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS} (primary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS} (primary)" --recheck --no-floppy || return 1
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="${Q_OS} (secondary)" --recheck --no-floppy
     else
         in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS}" --recheck --no-floppy

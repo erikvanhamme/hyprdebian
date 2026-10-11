@@ -250,7 +250,7 @@ file_deploy() {
     local dir=$(dirname "$dst")
 
     # Create directory if it doesn't exist
-    mkdir -p "$dir"
+    mkdir -p "$dir" || return 1
 
     echo "cp $src $dst"
     cp $src $dst
@@ -258,7 +258,7 @@ file_deploy() {
 
 file_deploy_queue() {
     for file in ${FILES[@]}; do
-        file_deploy $file
+        file_deploy $file || return 1
     done
 }
 
@@ -365,7 +365,7 @@ template_render_queue() {
         src="${TEMPLATE_SRCS[$i]}"
         mode="${TEMPLATE_MODES[$i]}"
 
-        template_render $src $mode
+        template_render $src $mode || return 1
     done
 }
 

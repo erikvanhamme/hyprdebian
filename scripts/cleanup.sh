@@ -13,7 +13,7 @@ c_post() {
 }
 
 c_snapshots() {
-    in_target zfs snapshot bpool/hyprdebian@install
+    in_target zfs snapshot bpool/hyprdebian@install || return 1
     in_target zfs snapshot rpool/hyprdebian@install
 }
 

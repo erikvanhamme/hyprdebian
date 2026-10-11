@@ -15,7 +15,7 @@ f_post() {
 f_efi() {
     for DISK in ${Q_DISKS}; do
         local efi_part=$DISK-part1
-        mkfs.fat -F32 ${efi_part}
+        mkfs.fat -F32 ${efi_part} || return 1
     done
 }
 
@@ -37,7 +37,7 @@ f_swap() {
         done
 
         mdadm --create /dev/md/swap --run --level=1 --raid-devices=2 --metadata=1.2 \
-            --homehost=${Q_HOSTNAME} --name=swap ${Q_DISK_A}-part2 ${Q_DISK_B}-part2
+            --homehost=${Q_HOSTNAME} --name=swap ${Q_DISK_A}-part2 ${Q_DISK_B}-part2 || return 1
         swap_part=/dev/md/swap
     fi
 
@@ -47,7 +47,7 @@ f_swap() {
         return 0
     fi
 
-    mkswap ${swap_part}
+    mkswap ${swap_part} || return 1
     swapon ${swap_part}
 }
 
@@ -100,10 +100,10 @@ f_root_pool() {
 }
 
 f_datasets() {
-    zfs create -o canmount=noauto -o mountpoint=/ rpool/hyprdebian
-    zfs mount rpool/hyprdebian
+    zfs create -o canmount=noauto -o mountpoint=/ rpool/hyprdebian || return 1
+    zfs mount rpool/hyprdebian || return 1
 
-    zfs create -o mountpoint=/boot bpool/hyprdebian
+    zfs create -o mountpoint=/boot bpool/hyprdebian || return 1
 
     zfs create rpool/home
 }

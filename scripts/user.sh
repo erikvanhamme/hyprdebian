@@ -24,7 +24,7 @@ u_add() {
         --user-group \
         --shell /bin/bash \
         --comment "${Q_FULLNAME}" \
-        ${Q_USER}
+        ${Q_USER} || return 1
 
     printf '%s:%s\n' "${Q_USER}" "${Q_PASSWORD}" | in_target chpasswd
 }
@@ -45,10 +45,10 @@ u_groups() {
 }
 
 u_root_skel() {
-    mkdir -p ${TARGET_DIR}/root/.config
-    cp -r deploy/etc/skel/.config/nano ${TARGET_DIR}/root/.config
-    cp deploy/etc/skel/.bash_aliases ${TARGET_DIR}/root
-    cp ${TARGET_DIR}/etc/skel/.bashrc ${TARGET_DIR}/root
+    mkdir -p ${TARGET_DIR}/root/.config || return 1
+    cp -r deploy/etc/skel/.config/nano ${TARGET_DIR}/root/.config || return 1
+    cp deploy/etc/skel/.bash_aliases ${TARGET_DIR}/root || return 1
+    cp ${TARGET_DIR}/etc/skel/.bashrc ${TARGET_DIR}/root || return 1
     cp ${TARGET_DIR}/etc/skel/.bash_logout ${TARGET_DIR}/root
 }
 

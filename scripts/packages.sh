@@ -13,7 +13,7 @@ pkg_post() {
 }
 
 pkg_utilities() {
-    in_target apt-file update
+    in_target apt-file update || return 1
     in_target update-command-not-found
 }
 
@@ -24,13 +24,13 @@ pkg_install() {
 pkg_qemu_kvm() {
 
     # Add a mask for the secrets file that ships with debian systemd.
-    mkdir -p ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/
+    mkdir -p ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/ || return 1
     ln -sf /dev/null ${TARGET_DIR}/etc/systemd/system/libvirtd.service.d/10-secret.conf
 }
 
 pkg_enable_firewall() {
-    in_target ufw enable
-    in_target ufw logging off
+    in_target ufw enable || return 1
+    in_target ufw logging off || return 1
     
     if [[ "${Q_OPENSSH}" == "true" ]]; then
         in_target ufw allow SSH

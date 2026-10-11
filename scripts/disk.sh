@@ -13,7 +13,7 @@ d_post() {
 }
 
 d_unmount_swap() {
-    swapoff -a
+    swapoff -a || return 1
 
     # Stop raid arrays (swap of a previous redundant install) so the disks can be wiped.
     mdadm --stop --scan || true
@@ -21,14 +21,14 @@ d_unmount_swap() {
 
 d_wipe() {
     for DISK in ${Q_DISKS}; do
-        wipefs -af $DISK
-        sgdisk --zap-all $DISK
+        wipefs -af $DISK || return 1
+        sgdisk --zap-all $DISK || return 1
     done
 }
 
 d_discard() {
     for DISK in ${Q_DISKS}; do
-        blkdiscard -f $DISK
+        blkdiscard -f $DISK || return 1
     done
 }
 
