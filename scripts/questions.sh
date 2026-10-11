@@ -140,12 +140,6 @@ q_disk() {
 }
 
 q_swap() {
-    if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        Q_SWAP=0
-        save_config Q_SWAP ${Q_SWAP}
-        return 0
-    fi
-
     local default="$(get_default Q_SWAP "${Q_TYPE:-}")"
     ask Q_SWAP "Enter size of swap partition (in GiB, 0 = disable swap)" "${default}"
 }

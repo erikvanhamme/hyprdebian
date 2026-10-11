@@ -25,6 +25,26 @@ f_swap() {
     fi
 
     local swap_part=${Q_DISK}-part2
+
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
+        if ! command -v mdadm > /dev/null; then
+            apt install -y mdadm
+        fi
+
+        # The wipe leaves the md superblock of a previous install inside partition 2, and the
+        # new partition 2 starts at the same offset, so udev may reassemble the old array after
+        # repartitioning. A rerun of this task also finds the array it created before. Stop the
+        # arrays and clear the superblocks so the partitions are free for a fresh array.
+        mdadm --stop --scan || true
+        for DISK in ${Q_DISKS}; do
+            mdadm --zero-superblock ${DISK}-part2 || true
+        done
+
+        mdadm --create /dev/md/swap --run --level=1 --raid-devices=2 --metadata=1.2 \
+            --homehost=${Q_HOSTNAME} --name=swap ${Q_DISK_A}-part2 ${Q_DISK_B}-part2
+        swap_part=/dev/md/swap
+    fi
+
     mkswap ${swap_part}
     swapon ${swap_part}
 }

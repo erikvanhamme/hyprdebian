@@ -31,6 +31,7 @@ debootstrap
 gparted
 gdisk
 git
+mdadm
 python3-jinja2
 EOF
 

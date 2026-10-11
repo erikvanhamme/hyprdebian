@@ -46,6 +46,9 @@ b_fstab() {
     if [[ "${Q_SWAP:-1}" -gt 0 ]]; then
         local swap_part swap_uuid
         swap_part=${Q_DISK}-part2
+        if [[ "${Q_REDUNDANT}" == "true" ]]; then
+            swap_part=/dev/md/swap
+        fi
         swap_uuid=$(blkid -s UUID -o value ${swap_part})
 
         if [[ -z "$swap_uuid" ]]; then
@@ -57,6 +60,25 @@ b_fstab() {
     else
         template_render templates/etc/fstab.j2
     fi
+}
+
+b_mdadm() {
+    if [[ "${Q_REDUNDANT}" != "true" || "${Q_SWAP:-1}" -eq 0 ]]; then
+        return 0
+    fi
+
+    local mdadm_array
+    mdadm_array=$(mdadm --detail --brief /dev/md/swap)
+
+    if [[ -z "$mdadm_array" ]]; then
+        echo "ERROR: Unable to determine the swap array for mdadm.conf."
+        return 1
+    fi
+
+    # Written before mdadm is installed, so its postinst keeps this file.
+    template_render templates/etc/mdadm/mdadm.conf.j2
+
+    add_packages mdadm
 }
 
 b_mount_unit_redundant() {
@@ -250,6 +272,7 @@ add_dependencies "b_pre" \
 add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
+    "b_mdadm" \
     "b_mount_unit" \
     "b_zfs_cache"  \
     "b_mount" \

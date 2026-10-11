@@ -25,15 +25,19 @@ p_efi() {
 }
 
 p_swap() {
-    if [[ "${Q_REDUNDANT}" == "true" ]]; then
+    if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
         return 0
     fi
 
-    if [[ "${Q_SWAP:-1}" -gt 0 ]]; then
-        for DISK in ${Q_DISKS}; do
-            sgdisk -n 2:0:+${Q_SWAP}G -t 2:8200 -c 2:"Swap" $DISK
-        done
+    # On redundant drives, the swap partitions become a raid1 (mdadm) array.
+    local swap_type=8200
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
+        swap_type=FD00
     fi
+
+    for DISK in ${Q_DISKS}; do
+        sgdisk -n 2:0:+${Q_SWAP}G -t 2:${swap_type} -c 2:"Swap" $DISK
+    done
 }
 
 p_boot() {
