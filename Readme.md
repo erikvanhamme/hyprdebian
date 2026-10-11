@@ -40,7 +40,7 @@ After boot, open a terminal and run:
 ```
 sudo apt install -y git
 git clone https://github.com/erikvanhamme/hyprdebian.git
-ch hyprdebian
+cd hyprdebian
 sudo ./install.sh
 ```
 
