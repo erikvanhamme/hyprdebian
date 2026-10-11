@@ -41,6 +41,8 @@ p_swap() {
 }
 
 p_boot() {
+    # Start empty, the value saved by an earlier run must not be appended to.
+    boot_pool_part=""
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         boot_pool_part="mirror "
     fi
@@ -56,9 +58,14 @@ p_boot() {
     done
 
     boot_pool_part=$(trim "${boot_pool_part}")
+
+    # Saved, so f_boot_pool still has it when the installer is started again after this task.
+    save_config boot_pool_part "${boot_pool_part}"
 }
 
 p_root() {
+    # Start empty, the value saved by an earlier run must not be appended to.
+    root_pool_part=""
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
         root_pool_part="mirror "
     fi
@@ -74,6 +81,9 @@ p_root() {
     done
 
     root_pool_part=$(trim "${root_pool_part}")
+
+    # Saved, so f_root_pool still has it when the installer is started again after this task.
+    save_config root_pool_part "${root_pool_part}"
 }
 
 p_probe() {
