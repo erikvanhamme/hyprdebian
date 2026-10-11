@@ -97,7 +97,11 @@ DEFAULTS_ALWAYS_ASK=(
 The check whether a question is answered without asking is done by `accept_default`.
 
 ### Values that are already set
-When the variable of a question already has a value, for example because it was loaded from the [configuration file](Idempotency.md#state), `ask` and `ask_options` use that value instead of the default, both as the suggested answer and as the automatic answer. `ask_yes_no` always uses the default.
+When the variable of a question already has a value, for example because it was loaded from the [configuration file](Idempotency.md#state), the ask functions use that value instead of the default, both as the suggested answer and as the automatic answer. For `ask_yes_no`, a saved `true` counts as `y` and a saved `false` as `n`.
+
+Whether a question is answered without asking still depends on the default only: a question without a default is always asked, even when its variable already has a value. The value is then only the suggested answer.
+
+The exception is `Q_DESTROY`. It is cleared before each disk is confirmed, so the destruction of a disk is never suggested and must always be typed.
 
 ### Checks
 The defaults are checked so that mistakes in the tables are found early:

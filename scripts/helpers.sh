@@ -185,30 +185,42 @@ ask_options() {
 }
 
 # Asks a yes/no question. The optional default ("y" or "n") is used when the answer is empty.
+# A value already set for the variable ("true" or "false") wins over the default.
 # With a default, the question is not asked when accept_default says so.
 ask_yes_no() {
     local var_name=$1
     local prompt=$2
     local default="${3:-}"
-    local input choices
+    local input choices current
 
     case "$default" in
-        "y") choices="Y/n" ;;
-        "n") choices="y/N" ;;
-        "") choices="y/n" ;;
+        "y"|"n"|"") ;;
         *)
             echo "Error: Invalid default '$default' for ask_yes_no, must be y or n" >&2
             return 2
             ;;
     esac
 
+    # Prefer the current value, then the default.
+    case "${!var_name:-}" in
+        "true") current="y" ;;
+        "false") current="n" ;;
+        *) current="$default" ;;
+    esac
+
+    case "$current" in
+        "y") choices="Y/n" ;;
+        "n") choices="y/N" ;;
+        "") choices="y/n" ;;
+    esac
+
     while true; do
         if accept_default "$var_name" "$default"; then
-            echo "$prompt: $default"
-            input="$default"
+            echo "$prompt: $current"
+            input="$current"
         else
             read -rp "$prompt ($choices): " input
-            input="${input:-$default}"
+            input="${input:-$current}"
         fi
 
         case "$input" in

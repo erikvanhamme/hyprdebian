@@ -130,6 +130,8 @@ q_disk() {
     fi
 
     for DISK in ${Q_DISKS}; do
+        # Never suggest an earlier answer: destroying a disk must always be typed explicitly.
+        Q_DESTROY=""
         if ask_yes_no Q_DESTROY "All data on $DISK will be destroyed. Continue"; then
             continue
         else
