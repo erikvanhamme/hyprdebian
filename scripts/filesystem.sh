@@ -41,6 +41,12 @@ f_swap() {
         swap_part=/dev/md/swap
     fi
 
+    # Encrypted swap gets a fresh random key and mkswap on every boot (see /etc/crypttab).
+    # Never swap to the device unencrypted, not even during the install.
+    if [[ "${Q_ENCRYPT}" == "true" ]]; then
+        return 0
+    fi
+
     mkswap ${swap_part}
     swapon ${swap_part}
 }

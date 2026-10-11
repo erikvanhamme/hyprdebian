@@ -44,7 +44,11 @@ b_bootstrap() {
 }
 
 b_fstab() {
-    if [[ "${Q_SWAP:-1}" -gt 0 ]]; then
+    if [[ "${Q_SWAP:-1}" -gt 0 && "${Q_ENCRYPT}" == "true" ]]; then
+        local swap_crypt=true
+
+        template_render templates/etc/fstab.j2
+    elif [[ "${Q_SWAP:-1}" -gt 0 ]]; then
         local swap_part swap_uuid
         swap_part=${Q_DISK}-part2
         if [[ "${Q_REDUNDANT}" == "true" ]]; then
@@ -80,6 +84,32 @@ b_mdadm() {
     template_render templates/etc/mdadm/mdadm.conf.j2
 
     add_packages mdadm
+}
+
+b_crypttab() {
+    if [[ "${Q_ENCRYPT}" != "true" || "${Q_SWAP:-1}" -eq 0 ]]; then
+        return 0
+    fi
+
+    # The swap device is overwritten on every boot, so refer to it by a name that can
+    # never point at another device.
+    local swap_device swap_id
+    if [[ "${Q_REDUNDANT}" == "true" ]]; then
+        swap_id=$(mdadm --detail --export /dev/md/swap | sed -n 's/^MD_UUID=//p')
+        swap_device=/dev/disk/by-id/md-uuid-${swap_id}
+    else
+        swap_id=$(blkid -s PARTUUID -o value ${Q_DISK}-part2)
+        swap_device=/dev/disk/by-partuuid/${swap_id}
+    fi
+
+    if [[ -z "$swap_id" ]]; then
+        echo "ERROR: Unable to determine the swap device for crypttab."
+        return 1
+    fi
+
+    template_render templates/etc/crypttab.j2
+
+    add_packages systemd-cryptsetup
 }
 
 b_mount_unit_redundant() {
@@ -274,6 +304,7 @@ add_dependencies "b_main" \
     "b_bootstrap" \
     "b_fstab" \
     "b_mdadm" \
+    "b_crypttab" \
     "b_mount_unit" \
     "b_zfs_cache"  \
     "b_mount" \
