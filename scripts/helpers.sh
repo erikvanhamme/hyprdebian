@@ -81,6 +81,32 @@ ask() {
     save_config "$var_name" "$input"
 }
 
+# Asks for a password twice without echoing it. The password is never saved to the config.
+ask_password() {
+    local var_name="$1"
+    local prompt="$2"
+    local pw1 pw2
+
+    while true; do
+        read -rsp "$prompt: " pw1
+        echo
+        read -rsp "Repeat ${prompt,}: " pw2
+        echo
+
+        # ZFS requires passphrases of at least 8 characters.
+        if [[ "$pw1" != "$pw2" ]]; then
+            echo "Passwords do not match." >&2
+        elif (( ${#pw1} < 8 )); then
+            echo "Password must be at least 8 characters." >&2
+        else
+            break
+        fi
+    done
+
+    printf -v "$var_name" "%s" "$pw1"
+    export -n "$var_name" # Keep it out of the environment of child processes.
+}
+
 ask_options() {
     local var_name="$1"
     local prompt="$2"

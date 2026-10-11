@@ -144,6 +144,24 @@ q_user() {
     ask Q_USER "Username" "rsq"
 }
 
+q_password() {
+    ask_password Q_PASSWORD "Password for user account and disk encryption"
+}
+
+q_fullname() {
+    while true; do
+        ask Q_FULLNAME "Full name" "Erik Van Hamme"
+
+        # The full name ends up in the GECOS field of /etc/passwd.
+        if [[ "${Q_FULLNAME}" != *[:,]* ]]; then
+            break
+        fi
+
+        echo "Full name cannot contain ':' or ','." >&2
+        Q_FULLNAME=""
+    done
+}
+
 q_hostname() {
     ask Q_HOSTNAME "Hostname" "hyprdebian"
 }
@@ -252,8 +270,13 @@ add_dependencies "q_main" \
     "q_disk" \
     "q_swap" \
     "q_user" \
+    "q_password" \
+    "q_fullname" \
     "q_hostname" \
     "q_fqdn" \
     "q_os_questions" \
+
+# The password is never saved, so it must be asked again on every run.
+always_run "q_password"
 
 add_dependencies "install" "q_pre" "q_main" "q_post"

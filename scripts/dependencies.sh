@@ -8,6 +8,11 @@ mark_done() {
     touch "$STATE_DIR/$1.done"
 }
 
+# Forces a task to run again on every installer run.
+always_run() {
+    rm -f "$STATE_DIR/$1.done"
+}
+
 # Task and dependency handling.
 add_dependencies() {
     local task_id=$1

@@ -17,7 +17,16 @@ u_filesystem() {
 }
 
 u_add() {
-    in_target STDOUTMSGLEVEL=fatal STDERRMSGLEVEL=fatal adduser ${Q_USER}
+    # The home directory is a ZFS dataset created by u_filesystem, and is filled by u_skel.
+    in_target useradd \
+        --no-create-home \
+        --home-dir /home/${Q_USER} \
+        --user-group \
+        --shell /bin/bash \
+        --comment "${Q_FULLNAME}" \
+        ${Q_USER}
+
+    printf '%s:%s\n' "${Q_USER}" "${Q_PASSWORD}" | in_target chpasswd
 }
 
 u_skel() {

@@ -49,27 +49,32 @@ f_boot_pool() {
 }
 
 f_root_pool() {
-    local encrypt=""
-    
-    if [[ "${Q_ENCRYPT}" == "true" ]]; then
-        encrypt="-O encryption=on -O keylocation=prompt -O keyformat=passphrase"
-    fi
+    local options=(
+        -f
+        -o ashift=12
+        -o autotrim=on
+        -O acltype=posixacl
+        -O xattr=sa
+        -O dnodesize=auto
+        -O compression=lz4
+        -O normalization=formD
+        -O relatime=on
+        -O canmount=off
+        -O mountpoint=/
+        -O atime=off
+        -R /mnt
+    )
 
-    zpool create -f \
-        -o ashift=12 \
-        -o autotrim=on \
-        -O acltype=posixacl \
-        -O xattr=sa \
-        -O dnodesize=auto \
-        -O compression=lz4 \
-        -O normalization=formD \
-        -O relatime=on \
-        -O canmount=off \
-        -O mountpoint=/ \
-        -O atime=off \
-        -R /mnt \
-        ${encrypt} \
-        rpool ${root_pool_part}
+    if [[ "${Q_ENCRYPT}" == "true" ]]; then
+        # With keylocation=prompt, zpool reads the passphrase from stdin when it is not a terminal.
+        printf '%s' "${Q_PASSWORD}" | zpool create "${options[@]}" \
+            -O encryption=on \
+            -O keylocation=prompt \
+            -O keyformat=passphrase \
+            rpool ${root_pool_part}
+    else
+        zpool create "${options[@]}" rpool ${root_pool_part}
+    fi
 }
 
 f_datasets() {
