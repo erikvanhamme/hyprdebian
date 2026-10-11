@@ -14,13 +14,13 @@ p_post() {
 
 p_prepare() {
     for DISK in ${Q_DISKS}; do
-        sgdisk --clear $DISK
+        sgdisk --clear $DISK || return 1
     done
 }
 
 p_efi() {
     for DISK in ${Q_DISKS}; do
-        sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" $DISK
+        sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" $DISK || return 1
     done
 }
 
@@ -36,7 +36,7 @@ p_swap() {
     fi
 
     for DISK in ${Q_DISKS}; do
-        sgdisk -n 2:0:+${Q_SWAP}G -t 2:${swap_type} -c 2:"Swap" $DISK
+        sgdisk -n 2:0:+${Q_SWAP}G -t 2:${swap_type} -c 2:"Swap" $DISK || return 1
     done
 }
 
@@ -49,10 +49,10 @@ p_boot() {
 
     for DISK in ${Q_DISKS}; do
         if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
-            sgdisk -n 2:0:+4G -t 2:BF01 -c 2:"Boot Pool" $DISK
+            sgdisk -n 2:0:+4G -t 2:BF01 -c 2:"Boot Pool" $DISK || return 1
             boot_pool_part+="$DISK-part2 "
         else
-            sgdisk -n 3:0:+4G -t 3:BF01 -c 3:"Boot Pool" $DISK
+            sgdisk -n 3:0:+4G -t 3:BF01 -c 3:"Boot Pool" $DISK || return 1
             boot_pool_part+="$DISK-part3 "
         fi
     done
@@ -72,10 +72,10 @@ p_root() {
 
     for DISK in ${Q_DISKS}; do
         if [[ "${Q_SWAP:-1}" -eq 0 ]]; then
-            sgdisk -n 3:0:0 -t 3:BF01 -c 3:"Root Pool" $DISK
+            sgdisk -n 3:0:0 -t 3:BF01 -c 3:"Root Pool" $DISK || return 1
             root_pool_part+="$DISK-part3 "
         else
-            sgdisk -n 4:0:0 -t 4:BF01 -c 4:"Root Pool" $DISK
+            sgdisk -n 4:0:0 -t 4:BF01 -c 4:"Root Pool" $DISK || return 1
             root_pool_part+="$DISK-part4 "
         fi
     done
