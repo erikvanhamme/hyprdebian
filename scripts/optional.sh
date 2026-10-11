@@ -123,13 +123,6 @@ o_user_icons() {
     in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/.icons
 }
 
-o_pipewire() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants || return 1
-    ln -sf ${TARGET_DIR}/usr/lib/systemd/user/pipewire.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/ || return 1
-    ln -sf ${TARGET_DIR}/usr/lib/systemd/user/wireplumber.service ${TARGET_DIR}/home/${Q_USER}/.config/systemd/user/default.target.wants/ || return 1
-    in_target chown -R ${Q_USER}:${Q_USER} /home/${Q_USER}/.config/systemd
-}
-
 o_sniptool() {
     mkdir -p ${TARGET_DIR}/home/${Q_USER}/Pictures/Screenshots || return 1
     in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/Pictures/Screenshots
@@ -139,7 +132,6 @@ o_desktop() {
     add_dependencies "u_post" \
         "o_user_log" \
         "o_user_icons" \
-        "o_pipewire" \
         "o_sniptool" \
 
 }
