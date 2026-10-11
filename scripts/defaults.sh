@@ -13,9 +13,22 @@
 # the machine type is selected, lookups only use DEFAULTS_common.
 #
 # To add a machine type, add it to MACHINE_TYPES and declare its table below.
+#
+# When the user chooses to use the machine type defaults (Q_DEFAULTS), the
+# questions that have a default are answered with it without asking, except
+# the ones in DEFAULTS_ALWAYS_ASK. Questions without a default are always asked.
 
 # Known machine types. The order is the order in which they are offered.
 MACHINE_TYPES=(desktop laptop server vm)
+
+# Questions that are always asked, even when the machine type defaults are used.
+DEFAULTS_ALWAYS_ASK=(
+    Q_OS
+    Q_TYPE
+    Q_DEFAULTS
+    Q_REDUNDANT
+    Q_HOSTNAME
+)
 
 # Defaults shared by all machine types.
 declare -gA DEFAULTS_common=(
@@ -108,6 +121,22 @@ get_default() {
     else
         return 1
     fi
+}
+
+# Succeeds when a question should be answered with its default without asking.
+# Usage: accept_default <var> <default>
+accept_default() {
+    local var_name="$1"
+    local default="$2"
+    local check
+
+    [[ "${Q_DEFAULTS:-}" == "true" && -n "$default" ]] || return 1
+
+    for check in "${DEFAULTS_ALWAYS_ASK[@]}"; do
+        [[ "$check" == "$var_name" ]] && return 1
+    done
+
+    return 0
 }
 
 # Succeeds when the argument is a known machine type.

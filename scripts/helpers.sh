@@ -62,6 +62,8 @@ add_user_groups() {
     save_config USER_GROUPS "${USER_GROUPS[*]}" # Persist as space-separated string.
 }
 
+# Asks for a value. The optional default is used when the answer is empty.
+# With a default, the question is not asked when accept_default says so.
 ask() {
     local var_name="$1"
     local prompt="$2"
@@ -69,7 +71,10 @@ ask() {
 
     local current="${!var_name:-$default}"
 
-    if [[ -n "${current:-}" ]]; then
+    if accept_default "$var_name" "$default"; then
+        echo "$prompt: $current"
+        input="$current"
+    elif [[ -n "${current:-}" ]]; then
         read -rp "$prompt [$current]: " input
         input="${input:-$current}"
     else
@@ -109,6 +114,7 @@ ask_password() {
 
 # Asks to pick one of the options. The optional default is the text of one of the options,
 # pass "" for none. A value already set for the variable wins over the default.
+# With a default, the question is not asked when accept_default says so.
 # Usage: ask_options <var> <prompt> <default> <option>...
 ask_options() {
     local var_name="$1"
@@ -140,29 +146,34 @@ ask_options() {
         return 2
     fi
 
-    # Display numbered options.
-    for (( i=0; i<total_options; i++ )); do
-        printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
-    done
-
     # Prefer the current value, then the default, then option 1.
     default_idx="${current_idx:-${default_idx:-1}}"
 
     local choice_prompt="$prompt [$default_idx]: "
     local input choice_idx
 
-    while true; do
-        read -rp "$choice_prompt" input
-        input="${input:-$default_idx}"
+    if accept_default "$var_name" "$default"; then
+        choice_idx=$((default_idx - 1))
+        echo "$prompt: ${options[choice_idx]}"
+    else
+        # Display numbered options.
+        for (( i=0; i<total_options; i++ )); do
+            printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
+        done
 
-        # Validate numeric input within valid bounds
-        if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= total_options )); then
-            choice_idx=$((input - 1))
-            break
-        fi
+        while true; do
+            read -rp "$choice_prompt" input
+            input="${input:-$default_idx}"
 
-        echo "Invalid choice. Please enter a number between 1 and $total_options." >&2
-    done
+            # Validate numeric input within valid bounds
+            if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= total_options )); then
+                choice_idx=$((input - 1))
+                break
+            fi
+
+            echo "Invalid choice. Please enter a number between 1 and $total_options." >&2
+        done
+    fi
 
     local selected_option="${options[choice_idx]}"
 
@@ -174,6 +185,7 @@ ask_options() {
 }
 
 # Asks a yes/no question. The optional default ("y" or "n") is used when the answer is empty.
+# With a default, the question is not asked when accept_default says so.
 ask_yes_no() {
     local var_name=$1
     local prompt=$2
@@ -191,8 +203,14 @@ ask_yes_no() {
     esac
 
     while true; do
-        read -rp "$prompt ($choices): " input
-        input="${input:-$default}"
+        if accept_default "$var_name" "$default"; then
+            echo "$prompt: $default"
+            input="$default"
+        else
+            read -rp "$prompt ($choices): " input
+            input="${input:-$default}"
+        fi
+
         case "$input" in
             [Yy]*)
                 printf -v "$var_name" "true"
