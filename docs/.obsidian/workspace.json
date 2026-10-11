@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Installer/Installer structure.md",
+                "file": "Installer/Defaults.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Installer structure"
+              "title": "Defaults"
             }
           }
         ],
@@ -205,15 +205,29 @@
   },
   "active": "b665cb09c3898fee",
   "lastOpenFiles": [
-    "Livecd/Livecd overview.md",
+    "Livecd/Overview.md",
+    "Installer/Extending.md.tmp.355275.e1a3704dbb50",
+    "Installer/Structure.md.tmp.355275.2088396a1738",
+    "Installer/Questions.md.tmp.355275.c6e2aa9f47fb",
+    "Installer/Questions.md.tmp.355275.2dfdabe910cd",
+    "Installer/Defaults.md",
+    "Installer/Defaults.md.tmp.355275.6d18c608829c",
+    "Installer/Extending.md",
+    "Installer/Files and templates.md",
+    "Installer/Queues.md",
+    "Installer/Questions.md",
+    "Installer/Phases.md",
+    "Installer/Idempotency.md",
+    "Installer/Dependencies.md",
+    "Installer/Structure.md",
+    "Installer/Installer structure.md",
+    "Installer/Extending.md.tmp.355275.5b368600fd06",
+    "Installer/Idempotency.md.tmp.355275.fe98c81d9119",
+    "Installer/Files and templates.md.tmp.355275.5ae6b3e38321",
+    "Installer/Queues.md.tmp.355275.d61ed09d4e92",
+    "Installer/Questions.md.tmp.355275.b89738342977",
     "Backup tool/Backup tool overview.md",
     "About hyprdebian.md",
-    "Backup tool",
-    "Livecd",
-    "Local repository",
-    "Installer/Installer structure.md",
-    "Installer",
-    "About hyprdebian",
     "Welcome.md"
   ]
 }
