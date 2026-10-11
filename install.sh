@@ -6,6 +6,7 @@ exec 2>&1
 set -a
 
 # Source functions and constants.
+source version.sh
 source scripts/config.sh
 source scripts/constants.sh
 source scripts/defaults.sh
@@ -13,7 +14,7 @@ source scripts/dependencies.sh
 source scripts/helpers.sh
 
 # Start banner.
-echo "=== Erik's nifty hyprdebian/debian installer v0.141 ==="
+echo "=== Erik's nifty hyprdebian/debian installer $INSTALLER_VERSION ==="
 
 # Prepare idempotency and config paths.
 mkdir -p "$STATE_DIR"
