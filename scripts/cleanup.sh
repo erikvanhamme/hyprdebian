@@ -18,7 +18,7 @@ c_snapshots() {
 }
 
 c_unmount() {
-    umount /mnt/dev/log
+    umount /mnt/run/systemd/journal/dev-log
     mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
     zpool export -a || true
 }

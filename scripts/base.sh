@@ -122,9 +122,11 @@ b_mount() {
     mount --make-private --rbind /proc ${TARGET_DIR}/proc
     mount --make-private --rbind /sys  ${TARGET_DIR}/sys
 
-    in_target rm /dev/log
-    in_target touch /dev/log
-    mount --bind /run/systemd/journal/dev-log ${TARGET_DIR}/dev/log
+    # /dev is shared with the live system, so leave its /dev/log alone. Its symlink
+    # points at /run/systemd/journal/dev-log, so expose the journal socket there.
+    mkdir -p ${TARGET_DIR}/run/systemd/journal
+    touch ${TARGET_DIR}/run/systemd/journal/dev-log
+    mount --bind /run/systemd/journal/dev-log ${TARGET_DIR}/run/systemd/journal/dev-log
 }
 
 b_apt_init() {
