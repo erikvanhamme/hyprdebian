@@ -107,10 +107,14 @@ ask_password() {
     export -n "$var_name" # Keep it out of the environment of child processes.
 }
 
+# Asks to pick one of the options. The optional default is the text of one of the options,
+# pass "" for none. A value already set for the variable wins over the default.
+# Usage: ask_options <var> <prompt> <default> <option>...
 ask_options() {
     local var_name="$1"
     local prompt="$2"
-    shift 2
+    local default="$3"
+    shift 3
 
     # Collect remaining arguments as options array
     local options=("$@")
@@ -122,19 +126,27 @@ ask_options() {
     fi
 
     local current="${!var_name:-}"
-    local default_idx=""
+    local current_idx="" default_idx=""
     local i
 
-    # Display numbered options and check for default matching existing var or text
+    # Look up the indexes of the current value and the default.
     for (( i=0; i<total_options; i++ )); do
-        printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
-        if [[ -n "$current" && "${options[i]}" == "$current" ]]; then
-            default_idx=$((i + 1))
-        fi
+        [[ -n "$current" && "${options[i]}" == "$current" ]] && current_idx=$((i + 1))
+        [[ -n "$default" && "${options[i]}" == "$default" ]] && default_idx=$((i + 1))
     done
 
-    # Fallback to option 1 as default if var_name is unset or doesn't match
-    default_idx="${default_idx:-1}"
+    if [[ -n "$default" && -z "$default_idx" ]]; then
+        echo "Error: Default '$default' is not one of the options of ask_options" >&2
+        return 2
+    fi
+
+    # Display numbered options.
+    for (( i=0; i<total_options; i++ )); do
+        printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
+    done
+
+    # Prefer the current value, then the default, then option 1.
+    default_idx="${current_idx:-${default_idx:-1}}"
 
     local choice_prompt="$prompt [$default_idx]: "
     local input choice_idx
@@ -161,13 +173,26 @@ ask_options() {
     save_config "$var_name" "$selected_option"
 }
 
+# Asks a yes/no question. The optional default ("y" or "n") is used when the answer is empty.
 ask_yes_no() {
     local var_name=$1
     local prompt=$2
-    local input
+    local default="${3:-}"
+    local input choices
+
+    case "$default" in
+        "y") choices="Y/n" ;;
+        "n") choices="y/N" ;;
+        "") choices="y/n" ;;
+        *)
+            echo "Error: Invalid default '$default' for ask_yes_no, must be y or n" >&2
+            return 2
+            ;;
+    esac
 
     while true; do
-        read -rp "$prompt (y/n): " input
+        read -rp "$prompt ($choices): " input
+        input="${input:-$default}"
         case "$input" in
             [Yy]*)
                 printf -v "$var_name" "true"

@@ -13,7 +13,8 @@ q_post() {
 }
 
 q_os() {
-    ask_options Q_OS "Which OS to install" "hyprdebian" "debian-stable" "debian-testing" "debian-unstable"
+    local default="$(get_default Q_OS "${Q_TYPE:-}")"
+    ask_options Q_OS "Which OS to install" "${default}" "hyprdebian" "debian-stable" "debian-testing" "debian-unstable"
     case "${Q_OS}" in
         "hyprdebian")
             Q_SUITE="unstable"
@@ -66,11 +67,13 @@ q_os_questions() {
 }
 
 q_type() {
-    ask_options Q_TYPE "What type of computer are you installing" "desktop" "laptop" "server" "vm"
+    local default="$(get_default Q_TYPE)"
+    ask_options Q_TYPE "What type of computer are you installing" "${default}" "${MACHINE_TYPES[@]}"
 }
 
 q_de() {
-    ask_options Q_DE "Which desktop environment" "none" "cinnamon" "gnome" "kde" "lxde" "lxqt" "mate" "xfce"
+    local default="$(get_default Q_DE "${Q_TYPE:-}")"
+    ask_options Q_DE "Which desktop environment" "${default}" "none" "cinnamon" "gnome" "kde" "lxde" "lxqt" "mate" "xfce"
     case "${Q_DE}" in
         "none")
             ;;
@@ -99,7 +102,8 @@ q_de() {
 }
 
 q_redundant() {
-    if ask_yes_no Q_REDUNDANT "Install on redundant drives"; then
+    local default="$(get_default Q_REDUNDANT "${Q_TYPE:-}")"
+    if ask_yes_no Q_REDUNDANT "Install on redundant drives" "${default}"; then
         add_files \
             "deploy/etc/apt/conf.d/99sync-efi" \
             "deploy/usr/local/bin/hd-sync-efi" \
@@ -112,11 +116,14 @@ q_disk() {
     find /dev/disk/by-id
 
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        ask Q_DISK_A "Target disk A"
-        ask Q_DISK_B "Target disk B"
+        local default="$(get_default Q_DISK_A "${Q_TYPE:-}")"
+        ask Q_DISK_A "Target disk A" "${default}"
+        local default="$(get_default Q_DISK_B "${Q_TYPE:-}")"
+        ask Q_DISK_B "Target disk B" "${default}"
         Q_DISKS="${Q_DISK_A} ${Q_DISK_B}"
     else
-        ask Q_DISK "Target disk"
+        local default="$(get_default Q_DISK "${Q_TYPE:-}")"
+        ask Q_DISK "Target disk" "${default}"
         Q_DISKS="${Q_DISK}"
     fi
 
@@ -137,11 +144,13 @@ q_swap() {
         return 0
     fi
 
-    ask Q_SWAP "Enter size of swap partition (in GiB, 0 = disable swap)" "2"
+    local default="$(get_default Q_SWAP "${Q_TYPE:-}")"
+    ask Q_SWAP "Enter size of swap partition (in GiB, 0 = disable swap)" "${default}"
 }
 
 q_user() {
-    ask Q_USER "Username" "rsq"
+    local default="$(get_default Q_USER "${Q_TYPE:-}")"
+    ask Q_USER "Username" "${default}"
 }
 
 q_password() {
@@ -149,8 +158,10 @@ q_password() {
 }
 
 q_fullname() {
+    local default="$(get_default Q_FULLNAME "${Q_TYPE:-}")"
+
     while true; do
-        ask Q_FULLNAME "Full name" "Erik Van Hamme"
+        ask Q_FULLNAME "Full name" "${default}"
 
         # The full name ends up in the GECOS field of /etc/passwd.
         if [[ "${Q_FULLNAME}" != *[:,]* ]]; then
@@ -163,101 +174,120 @@ q_fullname() {
 }
 
 q_hostname() {
-    ask Q_HOSTNAME "Hostname" "hyprdebian"
+    local default="$(get_default Q_HOSTNAME "${Q_TYPE:-}")"
+    ask Q_HOSTNAME "Hostname" "${default}"
 }
 
 q_fqdn() {
-    ask Q_FQDN "Fully qualified domain name" "${Q_HOSTNAME}.rsq-online.ddns.net"
+    local default="$(get_default Q_FQDN "${Q_TYPE:-}")"
+    ask Q_FQDN "Fully qualified domain name" "${default:-${Q_HOSTNAME}.rsq-online.ddns.net}"
 }
 
 q_kernel() {
-    if ! ask_yes_no Q_SPECIFIC_KERNEL "Do you wish to download a specific kernel"; then
+    local default="$(get_default Q_SPECIFIC_KERNEL "${Q_TYPE:-}")"
+    if ! ask_yes_no Q_SPECIFIC_KERNEL "Do you wish to download a specific kernel" "${default}"; then
         Q_KERNEL="latest"
         save_config Q_KERNEL ${Q_KERNEL}
         return 0
     fi
 
-    ask Q_KERNEL_REPO "Which repository would you like to download a kernel from" "stable"
+    local default="$(get_default Q_KERNEL_REPO "${Q_TYPE:-}")"
+    ask Q_KERNEL_REPO "Which repository would you like to download a kernel from" "${default}"
     python3 kernels.py ${Q_KERNEL_REPO}
 
     echo "Downloaded kernel versions:"
     if [[ -d kernels ]]; then
         find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
     fi
-    ask Q_KERNEL "Select kernel version to install"
+    local default="$(get_default Q_KERNEL "${Q_TYPE:-}")"
+    ask Q_KERNEL "Select kernel version to install" "${default}"
 }
 
 q_iface() {
     show_ifaces
-    ask Q_IFACE "Select wired interface for DHCP (use path name!)"
+    local default="$(get_default Q_IFACE "${Q_TYPE:-}")"
+    ask Q_IFACE "Select wired interface for DHCP (use path name!)" "${default}"
 }
 
 q_wifi() {
-    if ask_yes_no Q_WIFI "Enable wifi"; then
+    local default="$(get_default Q_WIFI "${Q_TYPE:-}")"
+    if ask_yes_no Q_WIFI "Enable wifi" "${default}"; then
         show_ifaces
-        ask Q_WIFACE "Select wifi interface for DHCP (use path name!)"
+        local default="$(get_default Q_WIFACE "${Q_TYPE:-}")"
+        ask Q_WIFACE "Select wifi interface for DHCP (use path name!)" "${default}"
 
         add_dependencies "o_main" "o_wifi"
     fi
 }
 
 q_firewall() {
-    if ask_yes_no Q_FIREWALL "Install firewall"; then
+    local default="$(get_default Q_FIREWALL "${Q_TYPE:-}")"
+    if ask_yes_no Q_FIREWALL "Install firewall" "${default}"; then
         add_dependencies "o_main" "o_firewall"
     fi
 }
 
 q_desktop() {
-    if ask_yes_no Q_DESKTOP "Install hyprland desktop environment"; then
+    local default="$(get_default Q_DESKTOP "${Q_TYPE:-}")"
+    if ask_yes_no Q_DESKTOP "Install hyprland desktop environment" "${default}"; then
         add_dependencies "o_main" "o_desktop"
     fi
 }
 
 q_encrypt() {
-    if ! ask_yes_no Q_ENCRYPT "Encrypt root filesystem"; then
+    local default="$(get_default Q_ENCRYPT "${Q_TYPE:-}")"
+    if ! ask_yes_no Q_ENCRYPT "Encrypt root filesystem" "${default}"; then
         return 0
     fi
 }
 
 q_docker() {
-    if ask_yes_no Q_DOCKER "Enable docker"; then
+    local default="$(get_default Q_DOCKER "${Q_TYPE:-}")"
+    if ask_yes_no Q_DOCKER "Enable docker" "${default}"; then
         add_dependencies "o_main" "o_docker"
     fi
 }
 
 q_qemu_kvm() {
-    if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM"; then
+    local default="$(get_default Q_QEMU_KVM "${Q_TYPE:-}")"
+    if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM" "${default}"; then
         add_dependencies "o_main" "o_qemu_kvm"
     fi
 }
 
 q_cups() {
-    if ask_yes_no Q_CUPS "Enable CUPS"; then
+    local default="$(get_default Q_CUPS "${Q_TYPE:-}")"
+    if ask_yes_no Q_CUPS "Enable CUPS" "${default}"; then
         add_dependencies "o_main" "o_cups"
     fi
 }
 
 q_backuptools() {
-    if ask_yes_no Q_BACKUPTOOLS "Install backup tools"; then
+    local default="$(get_default Q_BACKUPTOOLS "${Q_TYPE:-}")"
+    if ask_yes_no Q_BACKUPTOOLS "Install backup tools" "${default}"; then
         add_dependencies "o_main" "o_backuptools"
     fi
 }
 
 q_rust() {
-    if ask_yes_no Q_RUST "Enable rust and syscargo support"; then
+    local default="$(get_default Q_RUST "${Q_TYPE:-}")"
+    if ask_yes_no Q_RUST "Enable rust and syscargo support" "${default}"; then
         add_dependencies "o_main" "o_rust"
     fi
 }
 
 q_openssh() {
-    if ask_yes_no Q_OPENSSH "Enable OpenSSH server"; then
+    local default="$(get_default Q_OPENSSH "${Q_TYPE:-}")"
+    if ask_yes_no Q_OPENSSH "Enable OpenSSH server" "${default}"; then
         add_dependencies "o_main" "o_openssh"
     fi
 }
 
 q_repo() {
-    if ask_yes_no Q_REPO_ENABLED "Enable hyprdebian repo"; then
-        ask Q_REPO "Local hyprdebian repository URL" "http://repo.rsq-online.ddns.net:8080/"
+    local default="$(get_default Q_REPO_ENABLED "${Q_TYPE:-}")"
+    if ask_yes_no Q_REPO_ENABLED "Enable hyprdebian repo" "${default}"; then
+        local default="$(get_default Q_REPO "${Q_TYPE:-}")"
+        ask Q_REPO "Local hyprdebian repository URL" "${default}"
     fi
 }
 
