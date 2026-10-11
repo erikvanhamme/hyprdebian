@@ -131,6 +131,24 @@ You will then be prompted for the unlock passphrase as entered during installati
 
 Subsequent boots will be normal.
 
+## Upgrading
+
+An installed system can be upgraded to a newer version of hyprdebian. On the installed system, get the latest version of this repo and run the upgrade:
+
+```
+git clone https://github.com/erikvanhamme/hyprdebian.git
+cd hyprdebian
+sudo ./upgrade.sh
+```
+
+In a repo that was cloned before, run `git pull` instead of the clone.
+
+The upgrade uses the answers given during the installation, and only asks the questions that were added since. It installs new packages, enables new services and updates the hyprdebian scripts and config files, including the ones in your home directory. When a config file was changed on your system, it asks whether to keep yours, take the new version or merge the two, in meld from the desktop or in sdiff from a console.
+
+Packages that are already installed are not upgraded. Use `apt` for that, as usual.
+
+Systems installed before version v0.152 have no saved answers, so the upgrade asks all the questions once. See [Upgrade](docs/Installer/Upgrade.md) for how the upgrade works.
+
 ## Keyboard shortcuts
 
 `SUPER + RETURN` opens a terminal and `SUPER + SPACE` opens the application launcher. See [Key Bindings](docs/HyprDebian/Key%20Bindings.md) for all the shortcuts.
@@ -139,6 +157,6 @@ Subsequent boots will be normal.
 
 The `docs` folder has more documentation:
 - [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
-- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it.
+- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it, and how the [upgrade](docs/Installer/Upgrade.md) works.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.

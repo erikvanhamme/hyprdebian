@@ -11,6 +11,7 @@ The installer documentation is split into these documents:
 - [Files and templates](Files%20and%20templates.md): how files end up on the target system.
 - [Idempotency](Idempotency.md): how answers and progress are remembered, so the installer can be started again after a failure.
 - [Extending](Extending.md): where common changes to the installer go.
+- [Upgrade](Upgrade.md): how an installed system is upgraded to a newer version with `upgrade.sh`.
 
 ## Overview
 The installer is a set of bash scripts, started with:
@@ -25,13 +26,16 @@ The layout of the repo, as far as the installer is concerned:
 | Path | Purpose |
 | --- | --- |
 | `install.sh` | Entry point. Loads the helper scripts and the phases, then starts the installation. |
+| `upgrade.sh` | Entry point of the upgrade of an installed system. See [Upgrade](Upgrade.md). |
 | `version.sh` | The installer version, shown in the start banner. |
 | `scripts/dependencies.sh` | The task and dependency system. |
 | `scripts/helpers.sh` | Helper functions: questions, queues, file deployment, template rendering, running commands in the target. |
 | `scripts/config.sh` | Loading and saving the installer configuration. |
 | `scripts/constants.sh` | Constants such as the target and state directories. |
 | `scripts/defaults.sh` | Default answers per machine type. |
-| `scripts/<phase>.sh` | One script per phase, with the tasks of that phase. |
+| `scripts/<phase>.sh` | One script per phase, with the tasks of that phase. `scripts/upgrade.sh` is the phase of the upgrade. |
+| `scripts/upgrade_helpers.sh` | Helper functions of the upgrade, and the installer settings and functions it replaces. |
+| `migrations/` | One-off changes for the upgrade of installed systems. See [Upgrade](Upgrade.md#migrations). |
 | `deploy/` | Files that are copied as-is to the target system. |
 | `templates/` | Jinja2 templates that are rendered to files on the target system. |
 | `render.py` | Renders one Jinja2 template. |

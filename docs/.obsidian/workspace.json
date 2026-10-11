@@ -27,24 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-<<<<<<< Updated upstream
-                "file": "HyprDebian/About.md",
-||||||| Stash base
-                "file": "Installer/Upgrade.md",
-=======
                 "file": "HyprDebian/Backup tool.md",
->>>>>>> Stashed changes
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-<<<<<<< Updated upstream
-              "title": "About"
-||||||| Stash base
-              "title": "Upgrade"
-=======
               "title": "Backup tool"
->>>>>>> Stashed changes
             }
           }
         ],
@@ -217,17 +205,6 @@
   },
   "active": "5654be25486d6877",
   "lastOpenFiles": [
-<<<<<<< Updated upstream
-||||||| Stash base
-    "HyprDebian/About.md",
-    "Installer/Extending.md.tmp.410160.1a9b4ddf7869",
-    "Installer/Structure.md.tmp.410160.f8814e9c693f",
-    "Installer/Structure.md.tmp.410160.4477873d73d6",
-    "Installer/Structure.md.tmp.410160.242ff49018e9",
-    "Installer/Upgrade.md.tmp.410160.f3af43f5929e",
-    "Installer/Upgrade.md",
-    "Installer/Upgrade.md.tmp.410160.a8624e11a8af",
-=======
     "Installer/Upgrade.md.tmp.36501.5328fc8df1ed",
     "Installer/Upgrade.md.tmp.36501.ad8914291e5f",
     "Installer/Upgrade.md.tmp.36501.924d75a3eb78",
@@ -241,20 +218,9 @@
     "HyprDebian/About.md",
     "Installer/Extending.md.tmp.410160.1a9b4ddf7869",
     "Installer/Structure.md.tmp.410160.f8814e9c693f",
->>>>>>> Stashed changes
     "HyprDebian/Key Bindings.md",
     "Installer/Defaults.md",
     "Livecd/Overview.md",
-<<<<<<< Updated upstream
-    "Installer/Extending.md.tmp.355275.e1a3704dbb50",
-    "Installer/Structure.md.tmp.355275.2088396a1738",
-    "Installer/Questions.md.tmp.355275.c6e2aa9f47fb",
-    "Installer/Questions.md.tmp.355275.2dfdabe910cd",
-    "Installer/Defaults.md.tmp.355275.6d18c608829c",
-||||||| Stash base
-    "Installer/Extending.md.tmp.355275.e1a3704dbb50",
-=======
->>>>>>> Stashed changes
     "Installer/Extending.md",
     "Installer/Files and templates.md",
     "Installer/Queues.md",
