@@ -68,7 +68,7 @@ o_hyprland() {
         wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock \
         libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
         pulseaudio-utils grim slurp swappy wl-clipboard playerctl brightnessctl \
-        hyprshutdown
+        hyprshutdown meld
 
         add_files \
             deploy/etc/dconf/db/local.d/00-dark-theme \
