@@ -1,13 +1,14 @@
 [Unit]
 Description=Rotate Machine ID on Shutdown
-DefaultDependencies=no
-After=final.target
-Before=shutdown.target reboot.target halt.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/dbus-uuidgen > /etc/machine-id
-TimeoutStartSec=10s
+RemainAfterExit=yes
+# Nothing to do at boot; the unit stays "active" so ExecStop runs on shutdown,
+# while the root filesystem is still mounted read-write.
+ExecStart=/bin/true
+ExecStop=/bin/sh -c '/usr/bin/dbus-uuidgen > /etc/machine-id'
+TimeoutStopSec=10s
 
 [Install]
-WantedBy=shutdown.target reboot.target halt.target
+WantedBy=multi-user.target
