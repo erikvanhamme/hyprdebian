@@ -116,14 +116,11 @@ q_disk() {
     find /dev/disk/by-id
 
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        local default="$(get_default Q_DISK_A "${Q_TYPE:-}")"
-        ask Q_DISK_A "Target disk A" "${default}"
-        local default="$(get_default Q_DISK_B "${Q_TYPE:-}")"
-        ask Q_DISK_B "Target disk B" "${default}"
+        ask Q_DISK_A "Target disk A"
+        ask Q_DISK_B "Target disk B"
         Q_DISKS="${Q_DISK_A} ${Q_DISK_B}"
     else
-        local default="$(get_default Q_DISK "${Q_TYPE:-}")"
-        ask Q_DISK "Target disk" "${default}"
+        ask Q_DISK "Target disk"
         Q_DISKS="${Q_DISK}"
     fi
 
@@ -199,8 +196,7 @@ q_kernel() {
     if [[ -d kernels ]]; then
         find kernels | grep -E "^kernels/linux-image-[0-9]+\.[0-9]+\.[0-9]+\+deb[0-9]+-amd64" | awk -F'[-+]' '{print $3}' | sort -V
     fi
-    local default="$(get_default Q_KERNEL "${Q_TYPE:-}")"
-    ask Q_KERNEL "Select kernel version to install" "${default}"
+    ask Q_KERNEL "Select kernel version to install"
 }
 
 q_iface() {
@@ -213,8 +209,7 @@ q_wifi() {
     local default="$(get_default Q_WIFI "${Q_TYPE:-}")"
     if ask_yes_no Q_WIFI "Enable wifi" "${default}"; then
         show_ifaces
-        local default="$(get_default Q_WIFACE "${Q_TYPE:-}")"
-        ask Q_WIFACE "Select wifi interface for DHCP (use path name!)" "${default}"
+        ask Q_WIFACE "Select wifi interface for DHCP (use path name!)"
 
         add_dependencies "o_main" "o_wifi"
     fi

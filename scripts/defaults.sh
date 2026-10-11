@@ -70,6 +70,7 @@ declare -gA DEFAULTS_server=(
 
 declare -gA DEFAULTS_vm=(
     [Q_REDUNDANT]="n"
+    [Q_IFACE]="enp1s0"
     [Q_WIFI]="n"
     [Q_DESKTOP]="n"
     [Q_ENCRYPT]="n"
