@@ -52,6 +52,9 @@ mark_done "o_font"
 add_dependencies "upgrade" \
     "q_main" \
     "b_files" \
+    "b_systemd" \
+    "b_utilities" \
+    "b_network" \
     "o_main" \
 
 # Load the upgrade phase.

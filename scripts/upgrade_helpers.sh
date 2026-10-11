@@ -37,6 +37,28 @@ load_installed_config() {
         echo "ERROR: Unable to read ${INSTALLED_CONFIG_FILE}." >&2
         exit 1
     fi
+
+    # The queues of the installed version, to find out what the new version adds.
+    INSTALLED_PACKAGES=$(source "$INSTALLED_CONFIG_FILE" && echo "${PACKAGES:-}")
+    INSTALLED_SERVICES=$(source "$INSTALLED_CONFIG_FILE" && echo "${SERVICES:-}")
+    INSTALLED_USER_GROUPS=$(source "$INSTALLED_CONFIG_FILE" && echo "${USER_GROUPS:-}")
+}
+
+# Prints the words of the first list that are not in the second list.
+# Usage: new_items <list> <list>
+new_items() {
+    local item check
+    local result=()
+
+    for item in $1; do
+        for check in $2; do
+            [[ "$check" == "$item" ]] && continue 2
+        done
+
+        result+=("$item")
+    done
+
+    echo "${result[*]}"
 }
 
 # Finds the Wayland session upgrade.sh was started from, by looking for WAYLAND_DISPLAY in the
@@ -61,10 +83,10 @@ find_session() {
     done
 }
 
-# Lets the user merge the new version of a file into the one in a home directory, with meld when
-# upgrade.sh was started from a Wayland session, and with sdiff otherwise. The file is left as it
-# was when the merge is not finished.
-# Usage: merge_file <new file> <file in home>
+# Lets the user merge the new version of a file into the installed one, with meld when upgrade.sh
+# was started from a Wayland session, and with sdiff otherwise. The file is left as it was when
+# the merge is not finished.
+# Usage: merge_file <new file> <installed file>
 merge_file() {
     local src="$1"
     local dst="$2"
@@ -101,10 +123,11 @@ merge_file() {
     rm -rf "$tmp"
 }
 
-# Updates one file in a home directory. A missing file is added, a file that differs from the new
-# version is kept, replaced or merged, as the user chooses.
-# Usage: home_file <new file> <user> <file in home>
-home_file() {
+# Updates one installed file that the user may have changed. A missing file is added, owned by
+# the user, a file that differs from the new version is kept, replaced or merged, as the user
+# chooses.
+# Usage: update_file <new file> <user> <installed file>
+update_file() {
     local src="$1"
     local user="$2"
     local dst="$3"
