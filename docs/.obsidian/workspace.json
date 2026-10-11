@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Backup tool/Backup tool overview.md",
+                "file": "Installer/Installer structure.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Backup tool overview"
+              "title": "Installer structure"
             }
           }
         ],
@@ -205,8 +205,9 @@
   },
   "active": "b665cb09c3898fee",
   "lastOpenFiles": [
-    "About hyprdebian.md",
+    "Livecd/Livecd overview.md",
     "Backup tool/Backup tool overview.md",
+    "About hyprdebian.md",
     "Backup tool",
     "Livecd",
     "Local repository",
