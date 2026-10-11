@@ -282,7 +282,7 @@ b_systemd() {
 
 b_utilities() {
     add_packages eza fzf nfs-common psmisc net-tools pciutils usbutils acpi bash-completion git git-delta ack \
-        command-not-found man-db apt-file zram-tools
+        command-not-found man-db apt-file zram-tools python3-jinja2
 
     if [[ "${Q_TYPE}" == "vm" ]]; then
         add_packages qemu-guest-agent

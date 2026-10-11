@@ -96,6 +96,22 @@ upg_etc() {
     done
 }
 
+# Updates the files rendered from the queued templates. Each template is rendered into the state
+# directory first, then handled like the other files in /etc. The templates for the disks and the
+# boot loader are not queued, so they are never changed by an upgrade.
+upg_templates() {
+    local i src new
+    local prefix="${STATE_DIR}/templates"
+
+    for i in "${!TEMPLATE_SRCS[@]}"; do
+        src="${TEMPLATE_SRCS[$i]}"
+        new=$(template_dst "$src" "$prefix")
+
+        template_render "$src" "${TEMPLATE_MODES[$i]}" "$prefix" > /dev/null || return 1
+        update_file "$new" root "$(template_dst "$src" "${TARGET_DIR}")" || return 1
+    done
+}
+
 # Adds the user to the groups the new version adds. Groups the user was removed from after an
 # earlier installation or upgrade are not added again.
 upg_groups() {
@@ -115,7 +131,7 @@ upg_groups() {
 upg_services() {
     local services svc
 
-    # Unit files may have changed in upg_etc.
+    # Unit files may have changed in upg_etc and upg_templates.
     in_target systemctl daemon-reload || return 1
 
     services=$(new_items "${SERVICES[*]}" "${INSTALLED_SERVICES:-}")
@@ -165,6 +181,7 @@ add_dependencies "upg_main" \
     "upg_packages" \
     "upg_files" \
     "upg_etc" \
+    "upg_templates" \
     "upg_groups" \
     "upg_services" \
     "upg_home" \
