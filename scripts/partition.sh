@@ -88,7 +88,7 @@ p_root() {
 
 p_probe() {
     for DISK in ${Q_DISKS}; do
-        partprobe $DISK
+        partprobe $DISK || return 1
     done
 }
 
