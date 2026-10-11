@@ -47,8 +47,12 @@ o_firewall() {
 o_font() {
     in_target apt install -y fontconfig wget unzip || return 1
     mkdir -p ${TARGET_DIR}/usr/local/share/fonts || return 1
-    wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip || return 1
-    unzip JetBrainsMono.zip -d ${TARGET_DIR}/usr/local/share/fonts
+
+    # A rerun overwrites a partial download and the fonts unzipped before, without asking.
+    local zip=${STATE_DIR}/JetBrainsMono.zip
+    wget -O ${zip} https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip || return 1
+    unzip -o ${zip} -d ${TARGET_DIR}/usr/local/share/fonts || return 1
+    rm -f ${zip}
 }
 
 o_greetd() {
