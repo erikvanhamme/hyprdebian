@@ -13,6 +13,7 @@ source scripts/defaults.sh
 source scripts/dependencies.sh
 source scripts/helpers.sh
 source scripts/upgrade_helpers.sh
+source scripts/upgrade_detect.sh
 
 # Start banner.
 echo "=== Erik's nifty hyprdebian/debian upgrader $INSTALLER_VERSION ==="
@@ -26,6 +27,10 @@ fi
 rm -rf "$STATE_DIR"
 mkdir -p "$STATE_DIR"
 declare -A TASK_DEPS
+
+# Check that the system is up to date, then install what the upgrade itself needs.
+check_up_to_date
+install_prerequisites
 
 # Load the answers of the installation.
 load_installed_config

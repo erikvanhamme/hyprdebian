@@ -13,6 +13,11 @@ The upgrade must run as root, and from a terminal, because it can ask questions.
 
 The upgrade can be started again at any time. It starts fresh on every run, and every part of it only changes what is not up to date yet.
 
+## Before the upgrade
+Before it works out anything, the upgrade:
+1. **Checks that the system is up to date.** It runs `apt update`, and counts the packages `apt full-upgrade` would upgrade. When there are any, it recommends to upgrade the system first, and asks whether to continue anyway. The default is to stop. The upgrade installs new packages with their latest versions, and on a system that is behind, these can pull in upgrades of the packages they depend on, like `systemd`, while the rest of the system stays behind.
+2. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates, and `mdadm`.
+
 ## State on the installed system
 The installer leaves two files on the installed system for the upgrade:
 
@@ -27,14 +32,15 @@ The state of the upgrade itself is kept in `/tmp/hyprdebian-upgrade`, and is rem
 
 ## Startup
 `upgrade.sh` does the following, in order:
-1. Sources `version.sh` and the installer helper scripts, then `scripts/upgrade_helpers.sh`. The upgrade helpers replace a few installer settings and functions, see [Upgrade helpers](#upgrade-helpers).
+1. Sources `version.sh` and the installer helper scripts, then `scripts/upgrade_helpers.sh` and `scripts/upgrade_detect.sh`. The upgrade helpers replace a few installer settings and functions, see [Upgrade helpers](#upgrade-helpers).
 2. Prints the start banner and checks that it runs as root.
 3. Creates a fresh state directory `/tmp/hyprdebian-upgrade`.
-4. Loads the answers of the installation (`load_installed_config`, then `load_config`). The queues and dependencies in the saved config were worked out by the version that wrote it, so they are left out. The old queues are kept apart, to find out what the new version adds.
-5. Defines the root task `upgrade`.
-6. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and marks the tasks that only make sense during an installation as done, so they are skipped.
-7. Adds the tasks that work out the queues to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
-8. Runs `execute_task "upgrade"`.
+4. Checks that the system is up to date (`check_up_to_date`), and installs the packages the upgrade needs (`install_prerequisites`). See [Before the upgrade](#before-the-upgrade).
+5. Loads the answers of the installation (`load_installed_config`, then `load_config`). The queues and dependencies in the saved config were worked out by the version that wrote it, so they are left out. The old queues are kept apart, to find out what the new version adds. Without a saved config, the answers are worked out from the system, see [Systems installed before the upgrade existed](#systems-installed-before-the-upgrade-existed).
+6. Defines the root task `upgrade`.
+7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and marks the tasks that only make sense during an installation as done, so they are skipped.
+8. Adds the tasks that work out the queues to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
+9. Runs `execute_task "upgrade"`.
 
 ## Working out the queues
 The upgrade runs the tasks of the installer that decide what is installed, with the code of the new version:
@@ -137,7 +143,7 @@ See [migrations/README.md](../../migrations/README.md) for how to write a migrat
 | `in_target` | Runs a command in a `chroot` of `/mnt`. | Runs the command directly. |
 | `accept_default` | Answers a question with its default when the machine type defaults are used. | Answers a question with its saved answer, when there is one. |
 
-It also has the functions the upgrade tasks use: `load_installed_config`, `new_items`, `find_session`, `merge_file` and `update_file`.
+It also has the functions the upgrade uses: `is_installed`, `check_up_to_date`, `install_prerequisites`, `load_installed_config`, `new_items`, `find_session`, `merge_file` and `update_file`. The detection of the answers is in `scripts/upgrade_detect.sh`.
 
 ## Changing the installer with the upgrade in mind
 Because the upgrade runs the installer tasks that work out the queues, a few rules keep them working for both:
@@ -148,8 +154,36 @@ Because the upgrade runs the installer tasks that work out the queues, a few rul
 - **Removing something needs a migration.** The upgrade only adds packages, services, groups and files. When the new version stops using one of them, add a migration that removes it.
 
 ## Systems installed before the upgrade existed
-A system installed before version v0.152 has no `/etc/hyprdebian/installer.config` and no `/etc/hyprdebian/migrations`. The upgrade then:
-- asks all the questions, except the disks, the password and the kernel,
+A system installed before version v0.152 has no `/etc/hyprdebian/installer.config` and no `/etc/hyprdebian/migrations`.
+
+### Detected answers
+The upgrade works out the answers from the state of the system (`detect_config` in `scripts/upgrade_detect.sh`), and then asks **every** question with the detected answer filled in. Press enter to confirm an answer, or correct it. The disks, the password and the kernel are not asked.
+
+| Answer | Worked out from |
+| --- | --- |
+| `Q_OS` | The suite in `debian.sources`. On unstable, a `task-*-desktop` package means `debian-unstable`, otherwise `hyprdebian`. |
+| `Q_DE` | The installed `task-*-desktop` package, for the Debian OSes. |
+| `Q_TYPE` | `hostnamectl chassis`. |
+| `Q_REDUNDANT`, `Q_ENCRYPT` | A mirror in `rpool`, and the encryption of `rpool`. |
+| `Q_SWAP` | The size of the swap partition in `/proc/swaps`, in GiB. zram swap is not counted. |
+| `Q_USER`, `Q_FULLNAME` | The first regular user with a home directory in `/home`. |
+| `Q_HOSTNAME`, `Q_FQDN` | `/etc/hostname`, and the `127.0.1.1` line in `/etc/hosts`. |
+| `Q_SPECIFIC_KERNEL`, `Q_KERNEL` | Whether `linux-image-amd64` is installed, otherwise the running kernel. |
+| `Q_IFACE`, `Q_WIFACE` | The `Name=` in the `50-` and `60-` network files. |
+| `Q_QEMU_KVM`, `BR0_MAC_ADDRESS` | `30-br0.netdev` and its MAC address, or the user in the `libvirt` group. The packages alone are not enough: virt-manager is also used to manage other machines. |
+| `Q_BACKUPTOOLS` | `hd-backup` in `/usr/local/bin`, or `mbuffer` and `mt-st` installed. |
+| `Q_REPO_ENABLED`, `Q_REPO` | `hyprdebian.local.sources` and its URI. |
+| Other components | Their main package: `hyprland`, `iwd`, `ufw`, `docker.io`, `cups`, `rustup`, `openssh-server`. |
+
+The answers are saved at the end of the upgrade, so the next upgrade uses them without asking.
+
+### Other differences
+The upgrade also:
 - treats every package, service and group as new, once. Packages that are already installed are left alone, but services that were disabled are enabled again,
-- runs all migrations, which is why migrations must also work on a system where their change is already done,
-- generates a new `BR0_MAC_ADDRESS`. `30-br0.netdev` then differs from the new version: answer `k` to keep the MAC of the bridge, and copy it into `BR0_MAC_ADDRESS` in `/etc/hyprdebian/installer.config`, or the question comes back on every upgrade.
+- runs all migrations. Each migration first checks whether its change is needed, and is recorded as done without changing anything when it is not.
+
+## Migrations so far
+| Migration | What it does |
+| --- | --- |
+| `0001-resolv-conf-uplink` | On hyprdebian, when `/etc/resolv.conf` does not point to `/run/systemd/resolve/resolv.conf` yet: installs `systemd-resolved` when it is missing, and points `/etc/resolv.conf` to `/run/systemd/resolve/resolv.conf`, like `svc_systemd` does on a new installation. Installing `systemd-resolved` points it to the stub resolver, which `00-direct-uplink.conf` turns off. |
+| `0002-network-file-names` | Older versions named the network files after the interface (`50-<interface>.network`, `60-<wifi interface>.network`). Moves them to `50-ethx.network` and `60-wlanx.network`, so the upgrade compares them with the templates, or removes the old file when the new one is already there. |

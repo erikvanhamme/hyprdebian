@@ -147,7 +147,9 @@ The upgrade uses the answers given during the installation, and only asks the qu
 
 Packages that are already installed are not upgraded. Use `apt` for that, as usual.
 
-Systems installed before version v0.152 have no saved answers, so the upgrade asks all the questions once. See [Upgrade](docs/Installer/Upgrade.md) for how the upgrade works.
+Before it starts, the upgrade checks that the system is up to date, and recommends running `sudo apt full-upgrade` first when it is not.
+
+Systems installed before version v0.152 have no saved answers. The upgrade then works out the answers from the system, and asks every question once with the detected answer filled in. See [Upgrade](docs/Installer/Upgrade.md) for how the upgrade works.
 
 ## Keyboard shortcuts
 

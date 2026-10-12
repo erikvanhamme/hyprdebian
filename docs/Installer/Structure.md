@@ -35,6 +35,7 @@ The layout of the repo, as far as the installer is concerned:
 | `scripts/defaults.sh` | Default answers per machine type. |
 | `scripts/<phase>.sh` | One script per phase, with the tasks of that phase. `scripts/upgrade.sh` is the phase of the upgrade. |
 | `scripts/upgrade_helpers.sh` | Helper functions of the upgrade, and the installer settings and functions it replaces. |
+| `scripts/upgrade_detect.sh` | Works out the answers from the system, for systems installed before the installer saved its config. |
 | `migrations/` | One-off changes for the upgrade of installed systems. See [Upgrade](Upgrade.md#migrations). |
 | `deploy/` | Files that are copied as-is to the target system. |
 | `templates/` | Jinja2 templates that are rendered to files on the target system. |

@@ -22,6 +22,9 @@ upg_session() {
 upg_migrations() {
     local file name
 
+    # Systems installed before the config was saved do not have /etc/hyprdebian yet.
+    mkdir -p "$(dirname "${TARGET_DIR}${MIGRATIONS_FILE}")" || return 1
+
     for file in migrations/*.sh; do
         [[ -e "$file" ]] || continue
         name=$(basename "$file" .sh)

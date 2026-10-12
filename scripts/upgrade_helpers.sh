@@ -12,21 +12,82 @@ in_target() {
 }
 
 # Answer the questions with the saved answers. Only questions without a saved answer, like
-# questions added after the installation, are asked.
+# questions added after the installation, are asked. Answers that were worked out from the
+# system are all asked, with the detected answer filled in, so the user can confirm them.
 accept_default() {
     local var_name="$1"
 
-    [[ -n "${!var_name:-}" ]]
+    [[ "${CONFIRM_ANSWERS:-false}" != "true" && -n "${!var_name:-}" ]]
+}
+
+# Succeeds when a package is installed.
+is_installed() {
+    [[ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null)" == "installed" ]]
+}
+
+# Checks that the packages of the system are up to date. The upgrade installs the new packages
+# with their latest versions, which can pull in upgrades of the packages they depend on. The user
+# chooses to stop and upgrade the system first, or to continue.
+check_up_to_date() {
+    local count answer
+
+    in_target apt update || return 1
+    count=$(in_target apt-get -s full-upgrade 2>/dev/null | grep -c '^Inst ') || true
+
+    if (( count == 0 )); then
+        return 0
+    fi
+
+    echo "The system is not up to date, ${count} packages can be upgraded."
+    echo "Upgrading it first is recommended: sudo apt full-upgrade"
+
+    while true; do
+        read -rp "Continue the upgrade anyway (y/N): " answer || return 1
+
+        case "$answer" in
+            [Yy]*)
+                return 0
+                ;;
+            [Nn]*|"")
+                echo "Upgrade stopped."
+                exit 0
+                ;;
+            *)
+                echo "Please answer y or n."
+                ;;
+        esac
+    done
+}
+
+# Installs the packages the upgrade needs on the system, like python3-jinja2 to render the
+# templates.
+install_prerequisites() {
+    local package
+    local packages=()
+
+    for package in python3-jinja2 mdadm; do
+        is_installed "$package" || packages+=("$package")
+    done
+
+    if (( ${#packages[@]} == 0 )); then
+        return 0
+    fi
+
+    echo "Installing the packages the upgrade needs: ${packages[*]}"
+    in_target apt install --no-upgrade "${packages[@]}"
 }
 
 # Copies the answers of the installation to the upgrade config. The queues and dependencies in
 # the saved config were worked out by the installer version that wrote it, so they are left out
-# and worked out again.
+# and worked out again. Without a saved config, the answers are worked out from the system.
 load_installed_config() {
     local status=0
 
     if [[ ! -f "$INSTALLED_CONFIG_FILE" ]]; then
-        echo "WARNING: ${INSTALLED_CONFIG_FILE} not found, all questions will be asked."
+        echo "WARNING: ${INSTALLED_CONFIG_FILE} not found, the answers are worked out from the system."
+        echo "Every question is asked with the detected answer filled in. Check them carefully."
+        detect_config
+        CONFIRM_ANSWERS="true"
         return 0
     fi
 

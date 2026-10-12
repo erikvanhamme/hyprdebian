@@ -10,6 +10,9 @@ Add a file `NNNN-short-description.sh`, with the next free number, that defines 
 
 # Stops using the foo service, it is replaced by bar.
 migrate() {
+    # Not needed when the service is already gone.
+    [[ -e ${TARGET_DIR}/etc/systemd/system/foo.service ]] || return 0
+
     in_target systemctl disable --now foo.service || return 1
     rm -f ${TARGET_DIR}/etc/systemd/system/foo.service
 }
@@ -19,7 +22,7 @@ migrate() {
 - The answers (`Q_*`) are available, so a migration can check whether a feature is enabled.
 - Use `in_target` and `${TARGET_DIR}`, like the installer tasks.
 - A migration that needs a package the same version adds, installs it itself: migrations run before the new packages are installed.
-- Write it so it also works on a system where the change is already done, for example on a system that was installed before the record of migrations existed.
+- Start `migrate` with a check whether the change is needed, and return 0 when it is not. A migration also runs on systems that already have the change, like systems installed after the change went into the installer but before the migration was added. Returning 0 records it as done, just like a migration that made the change.
 - Never change or renumber a migration after it was committed. Systems that already ran it will not run it again.
 
 ## How they run
