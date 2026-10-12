@@ -59,11 +59,17 @@ has_backuptools() {
 detect_config() {
     local net="${TARGET_DIR}/etc/systemd/network"
     local repo_file="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources"
+    local repo_list="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.list"
     local suite de os user swap type
 
     # Both hyprdebian and debian-unstable use unstable. Only the plain Debian installations have
     # a desktop task.
     suite=$(sed -n 's/^Suites: *//p' "${TARGET_DIR}/etc/apt/sources.list.d/debian.sources" 2>/dev/null | head -n 1) || true
+
+    # Older versions used /etc/apt/sources.list: "deb <url> <suite> <components>".
+    if [[ -z "$suite" ]]; then
+        suite=$(awk '$1 == "deb" && $2 !~ /^\[/ {print $3; exit}' "${TARGET_DIR}/etc/apt/sources.list" 2>/dev/null) || true
+    fi
     de=$(dpkg-query -W -f='${db:Status-Status} ${Package}\n' 'task-*-desktop' 2>/dev/null | sed -n 's/^installed task-\(.*\)-desktop$/\1/p' | head -n 1) || true
 
     case "$suite" in
@@ -140,6 +146,14 @@ detect_config() {
     save_detected Q_RUST "$(detected_bool is_installed rustup)"
     save_detected Q_OPENSSH "$(detected_bool is_installed openssh-server)"
 
-    save_detected Q_REPO_ENABLED "$(detected_bool test -e "$repo_file")"
-    save_detected Q_REPO "$(sed -n 's/^URIs: *//p' "$repo_file" 2>/dev/null | head -n 1)"
+    # Older versions used the one-line format: "deb [trusted=yes] <url> sid main".
+    if [[ -e "$repo_file" ]]; then
+        save_detected Q_REPO_ENABLED "true"
+        save_detected Q_REPO "$(sed -n 's/^URIs: *//p' "$repo_file" | head -n 1)"
+    elif [[ -e "$repo_list" ]]; then
+        save_detected Q_REPO_ENABLED "true"
+        save_detected Q_REPO "$(grep -o 'https\?://[^ ]*' "$repo_list" | head -n 1)"
+    else
+        save_detected Q_REPO_ENABLED "false"
+    fi
 }

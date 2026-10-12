@@ -161,7 +161,7 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 
 | Answer | Worked out from |
 | --- | --- |
-| `Q_OS` | The suite in `debian.sources`. On unstable, a `task-*-desktop` package means `debian-unstable`, otherwise `hyprdebian`. |
+| `Q_OS` | The suite in `debian.sources`, or in `/etc/apt/sources.list` on older systems. On unstable, a `task-*-desktop` package means `debian-unstable`, otherwise `hyprdebian`. |
 | `Q_DE` | The installed `task-*-desktop` package, for the Debian OSes. |
 | `Q_TYPE` | `hostnamectl chassis`. |
 | `Q_REDUNDANT`, `Q_ENCRYPT` | A mirror in `rpool`, and the encryption of `rpool`. |
@@ -172,7 +172,7 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 | `Q_IFACE`, `Q_WIFACE` | The `Name=` in the `50-` and `60-` network files. |
 | `Q_QEMU_KVM`, `BR0_MAC_ADDRESS` | `30-br0.netdev` and its MAC address, or the user in the `libvirt` group. The packages alone are not enough: virt-manager is also used to manage other machines. |
 | `Q_BACKUPTOOLS` | `hd-backup` in `/usr/local/bin`, or `mbuffer` and `mt-st` installed. |
-| `Q_REPO_ENABLED`, `Q_REPO` | `hyprdebian.local.sources` and its URI. |
+| `Q_REPO_ENABLED`, `Q_REPO` | `hyprdebian.local.sources` and its URI, or the older `hyprdebian.local.list` and the URL in it. |
 | Other components | Their main package: `hyprland`, `iwd`, `ufw`, `docker.io`, `cups`, `rustup`, `openssh-server`. |
 
 The answers are saved at the end of the upgrade, so the next upgrade uses them without asking.
@@ -189,3 +189,4 @@ The upgrade also:
 | `0002-network-file-names` | Older versions named the network files after the interface (`50-<interface>.network`, `60-<wifi interface>.network`). Moves them to `50-ethx.network` and `60-wlanx.network`, so the upgrade compares them with the templates, or removes the old file when the new one is already there. |
 | `0003-machine-id-rotation` | Older versions deleted `/etc/machine-id` on shutdown with `clear-machine-id.service`, so systemd saw every boot as a first boot and applied the presets. Disables and removes that service, which `rotate-machine-id.service` replaced, and masks `systemd-firstboot`, `systemd-preset-all` and `systemd-machine-id-commit`, like `svc_systemd` does on a new installation. |
 | `0004-libvirt-masks` | When libvirt is installed, masks `libvirtd-tcp.socket`, `libvirtd-tls.socket` and the `10-secret.conf` drop-in of `libvirtd.service`, like `svc_qemu_kvm` and `pkg_qemu_kvm` do on a new installation. Without them, libvirtd fails on a missing systemd credential key. Restarts libvirtd when it is enabled. Unlike the installer, it does this whenever libvirt is installed, also when it is only there for virt-manager. |
+| `0005-apt-sources` | Older versions defined the apt sources in the one-line format, in `/etc/apt/sources.list` and `sources.list.d/hyprdebian.local.list`. Renders `debian.sources` and, when the local repo is enabled, `hyprdebian.local.sources` from the templates when they are missing, like `b_apt_init`. Moves `sources.list` to `sources.list.bak`, which apt does not read, removes `hyprdebian.local.list` once `hyprdebian.local.sources` is there, and runs `apt update`. When the local repo is not enabled in the answers, `hyprdebian.local.list` is kept, so the repo is not lost. |
