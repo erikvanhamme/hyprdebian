@@ -1,5 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
-sudo zpool import -f $1
-sudo zfs load-key $1
-sudo zfs mount $1
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <pool_name>" >&2
+    exit 1
+fi
+
+sudo zpool import -f "$1"
+sudo zfs load-key "$1"
+sudo zfs mount "$1"

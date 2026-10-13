@@ -1,3 +1,9 @@
 #!/bin/bash
+set -euo pipefail
 
-sudo zpool export $1
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <pool_name>" >&2
+    exit 1
+fi
+
+sudo zpool export "$1"

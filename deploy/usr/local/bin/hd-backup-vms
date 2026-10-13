@@ -10,25 +10,35 @@ if [[ ! -f $BACKUP_FILE ]]; then
     exit 1
 fi
 
-# Read each line from the backup configuration file
-while IFS= read -r line; do
-    # Skip lines that start with a '#' (comments)
-    if [[ $line =~ ^# ]]; then
+# VMs whose backup failed, reported at the end.
+FAILED=()
+
+# Read each line from the backup configuration file. The last line may lack a newline.
+while IFS= read -r line || [[ -n "$line" ]]; do
+    # Extract the arguments from the line
+    read -r VM_NAME BACKUP_DIR USERNAME _ <<< "$line"
+
+    # Skip blank lines and comments
+    if [[ -z $VM_NAME || $VM_NAME == \#* ]]; then
         continue
     fi
 
-    # Extract the arguments from the line
-    VM_NAME=$(echo $line | awk '{print $1}')
-    BACKUP_DIR=$(echo $line | awk '{print $2}')
-    USERNAME=$(echo $line | awk '{print $3}')
-
     # Check if all required arguments are provided
-    if [[ -z $VM_NAME || -z $BACKUP_DIR || -z $USERNAME ]]; then
+    if [[ -z $BACKUP_DIR || -z $USERNAME ]]; then
         echo "Invalid entry found in backup configuration file: $line"
         continue
     fi
 
-    # Execute the hd-backup-vm script with the arguments
+    # Execute the hd-backup-vm script with the arguments. A failing VM must not stop the backups
+    # of the others, and the script must not read the configuration file from stdin.
     echo "Running backup for VM: $VM_NAME"
-    /usr/local/bin/hd-backup-vm "$VM_NAME" "$BACKUP_DIR" "$USERNAME"
+    if ! /usr/local/bin/hd-backup-vm "$VM_NAME" "$BACKUP_DIR" "$USERNAME" < /dev/null; then
+        echo "Backup failed for VM: $VM_NAME" >&2
+        FAILED+=("$VM_NAME")
+    fi
 done < "$BACKUP_FILE"
+
+if [[ ${#FAILED[@]} -gt 0 ]]; then
+    echo "Backups failed for: ${FAILED[*]}" >&2
+    exit 1
+fi

@@ -32,6 +32,24 @@ if [[ ${#CLEAN_DS_LIST[@]} -eq 0 ]]; then
     exit 1
 fi
 
+# The stream files have the slashes of the dataset names replaced by underscores. The original
+# names are looked up in the XML, so underscores in them survive. Swapping back is the fallback.
+mapfile -t XML_DATASETS < <(xmllint --xpath "//devices/disk[@type='block']/source/@dev" "${XML_SRC}" 2>/dev/null | grep -oP 'dev="/dev/zvol/\K[^"]+' || true)
+
+original_dataset() {
+    local clean_ds="$1"
+    local ds
+
+    for ds in "${XML_DATASETS[@]}"; do
+        if [[ "${ds//\//_}" == "${clean_ds}" ]]; then
+            echo "${ds}"
+            return 0
+        fi
+    done
+
+    echo "${clean_ds}" | tr '_' '/'
+}
+
 declare -A DATASET_MAP
 
 echo ""
@@ -40,7 +58,7 @@ echo "Configure destination ZFS dataset paths for each ZVOL."
 
 # 2. Interactive mapping prompt for target pool/dataset paths
 for clean_ds in "${CLEAN_DS_LIST[@]}"; do
-    orig_ds=$(echo "${clean_ds}" | tr '_' '/')
+    orig_ds=$(original_dataset "${clean_ds}")
     default_target="${orig_ds}"
     
     read -rp "Target dataset for [${orig_ds}] (Default: ${default_target}): " target_ds
@@ -75,6 +93,7 @@ done
 
 # 4. Process & Sanitize XML configuration file
 TEMP_XML=$(mktemp /tmp/vm_restore_XXXXXX.xml)
+trap 'rm -f "${TEMP_XML}"' EXIT
 cp "${XML_SRC}" "${TEMP_XML}"
 
 # 4a. Update VM name and remove UUID for new domain generation
@@ -85,7 +104,7 @@ fi
 
 # 4b. Remap block device paths in XML from old ZVOL paths to new target paths
 for clean_ds in "${CLEAN_DS_LIST[@]}"; do
-    orig_ds=$(echo "${clean_ds}" | tr '_' '/')
+    orig_ds=$(original_dataset "${clean_ds}")
     target_ds="${DATASET_MAP[${clean_ds}]}"
     
     old_dev="/dev/zvol/${orig_ds}"
