@@ -109,8 +109,10 @@ q_de() {
 q_redundant() {
     local default="$(get_default Q_REDUNDANT "${Q_TYPE:-}")"
     if ask_yes_no Q_REDUNDANT "Install on redundant drives" "${default}"; then
+        add_packages rsync
+
         add_files \
-            "deploy/etc/apt/conf.d/99sync-efi" \
+            "deploy/etc/apt/apt.conf.d/99sync-efi" \
             "deploy/usr/local/bin/hd-sync-efi" \
 
     fi
