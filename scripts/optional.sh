@@ -219,7 +219,7 @@ o_backuptools() {
 
     # Compile block write utility for backups on tape.
     cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian || return 1
-    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c
+    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c || return 1
 }
 
 o_rust() {
