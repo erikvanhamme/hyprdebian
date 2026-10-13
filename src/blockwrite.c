@@ -1,12 +1,38 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 
 #define BLOCK_SIZE (4 * 1024 * 1024) // 4 MiB = 4,194,304 bytes
 #define ALIGNMENT  4096              // 4 KiB alignment for O_DIRECT
+
+// Write one full block in a single write() call.
+// On tape every write() becomes one record, and with O_DIRECT the rest of a
+// partial write would start on an unaligned address, so a short write is an
+// error and is never continued.
+static int write_block(int out_fd, const char *buffer, const char *what) {
+    while (1) {
+        ssize_t bytes_written = write(out_fd, buffer, BLOCK_SIZE);
+
+        if (bytes_written == BLOCK_SIZE) {
+            return 0;
+        }
+
+        if (bytes_written < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            fprintf(stderr, "Error writing %s to device: %s\n", what, strerror(errno));
+            return -1;
+        }
+
+        fprintf(stderr, "Error writing %s to device: short write of %zd of %d bytes\n",
+                what, bytes_written, BLOCK_SIZE);
+        return -1;
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -26,8 +52,9 @@ int main(int argc, char *argv[]) {
 
     // Allocate 4 MiB buffer aligned on a 4 KiB boundary
     char *buffer = NULL;
-    if (posix_memalign((void **)&buffer, ALIGNMENT, BLOCK_SIZE) != 0) {
-        perror("Failed to allocate memory");
+    int alloc_error = posix_memalign((void **)&buffer, ALIGNMENT, BLOCK_SIZE);
+    if (alloc_error != 0) {
+        fprintf(stderr, "Failed to allocate memory: %s\n", strerror(alloc_error));
         close(out_fd);
         return EXIT_FAILURE;
     }
@@ -42,21 +69,10 @@ int main(int argc, char *argv[]) {
 
             // Full 4 MiB block ready to write
             if (total_read == BLOCK_SIZE) {
-                ssize_t total_written = 0;
-                while (total_written < BLOCK_SIZE) {
-                    ssize_t bytes_written = write(out_fd, 
-                                                  buffer + total_written, 
-                                                  BLOCK_SIZE - total_written);
-                    if (bytes_written <= 0) {
-                        if (bytes_written < 0 && errno == EINTR) {
-                            continue;
-                        }
-                        perror("Error writing to device");
-                        free(buffer);
-                        close(out_fd);
-                        return EXIT_FAILURE;
-                    }
-                    total_written += bytes_written;
+                if (write_block(out_fd, buffer, "block") != 0) {
+                    free(buffer);
+                    close(out_fd);
+                    return EXIT_FAILURE;
                 }
                 total_read = 0; // Reset buffer counter
             }
@@ -64,25 +80,12 @@ int main(int argc, char *argv[]) {
             // EOF reached on stdin
             if (total_read > 0) {
                 // Zero-fill remaining space to ensure the final block is exactly 4 MiB
-                for (size_t i = total_read; i < BLOCK_SIZE; i++) {
-                    buffer[i] = 0;
-                }
+                memset(buffer + total_read, 0, BLOCK_SIZE - total_read);
 
-                ssize_t total_written = 0;
-                while (total_written < BLOCK_SIZE) {
-                    ssize_t bytes_written = write(out_fd, 
-                                                  buffer + total_written, 
-                                                  BLOCK_SIZE - total_written);
-                    if (bytes_written <= 0) {
-                        if (bytes_written < 0 && errno == EINTR) {
-                            continue;
-                        }
-                        perror("Error writing final block to device");
-                        free(buffer);
-                        close(out_fd);
-                        return EXIT_FAILURE;
-                    }
-                    total_written += bytes_written;
+                if (write_block(out_fd, buffer, "final block") != 0) {
+                    free(buffer);
+                    close(out_fd);
+                    return EXIT_FAILURE;
                 }
             }
             break;
@@ -98,6 +101,13 @@ int main(int argc, char *argv[]) {
     }
 
     free(buffer);
-    close(out_fd);
+
+    // Closing a tape device writes the filemark, so a failure here means the
+    // archive on the carrier is incomplete.
+    if (close(out_fd) != 0) {
+        perror("Error closing device");
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
