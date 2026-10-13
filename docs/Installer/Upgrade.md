@@ -77,7 +77,7 @@ The upgrade phase is in `scripts/upgrade.sh`, and is built like the [phases](Pha
 | | `upg_services` | Reloads systemd, and enables the services the new version adds. |
 | | `upg_home` | Updates the files from `/etc/skel` in the home directories of the user and root. |
 | | `upg_hooks` | Runs the tasks the new version attaches to the hooks of the installer phases, when they did not run on the system yet. See [Hook tasks](#hook-tasks). |
-| `upg_post` | `upg_save_config` | Writes the config back to `/etc/hyprdebian/installer.config`. |
+| `upg_post` | `upg_save_config` | Writes the config back to `/etc/hyprdebian/installer.config`, and writes `/etc/issue` with the new version (`write_issue`). |
 
 The upgrade stops at the first task that fails. The config is only written back at the end, so a failed upgrade does the same comparisons again on the next run.
 

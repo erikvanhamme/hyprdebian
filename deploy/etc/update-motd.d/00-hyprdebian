@@ -1,0 +1,151 @@
+#!/bin/bash
+
+# Shows the HyprDebian banner and the state of the system after a login on the console or over
+# ssh. pam_motd runs this as root, so it can read the installer config, which has mode 0600.
+
+CONFIG=/etc/hyprdebian/installer.config
+
+# The colors of the window borders: orange for the logo, blue for its shadow.
+ACCENT=$'\e[38;5;202m'
+SHADOW=$'\e[38;5;26m'
+LABEL=$'\e[2m'
+GOOD=$'\e[32m'
+BAD=$'\e[1;31m'
+RESET=$'\e[0m'
+
+# Prints the value of a key in the installer config, or "unknown" when it is not there.
+config_value() {
+    local value
+
+    value=$(sed -n "s/^$1=//p" "$CONFIG" 2>/dev/null | tail -n 1)
+
+    if [[ -z "$value" ]]; then
+        value="unknown"
+    fi
+
+    echo "$value"
+}
+
+# Prints a line with a label in front of it.
+# Usage: line <label> <text>
+line() {
+    printf '  %s%-8s%s %s\n' "$LABEL" "$1" "$RESET" "$2"
+}
+
+show_logo() {
+    local logo
+
+    logo=$(cat <<'EOF'
+░██ ░██                         ░████           ░██     ░██
+░██ ░██                         ░██ ░██         ░██
+░██ ░██ ░██ ░██ ░██████ ░██████ ░██ ░██ ░██████ ░██████ ░██ ░██████ ░██████
+░██████ ░██ ░██ ░██ ░██ ░██     ░██ ░██ ░██ ░██ ░██ ░██ ░██     ░██ ░██ ░██
+░██ ░██ ░██ ░██ ░██ ░██ ░██     ░██ ░██ ░██████ ░██ ░██ ░██ ░██████ ░██ ░██
+░██ ░██ ░██ ░██ ░██ ░██ ░██     ░██ ░██ ░██     ░██ ░██ ░██ ░██ ░██ ░██ ░██
+░██ ░██ ░██████ ░██████ ░██     ░████   ░██████ ░██████ ░██ ░██████ ░██ ░██
+            ░██ ░██
+        ░██████ ░██
+EOF
+)
+
+    echo
+    while IFS= read -r row; do
+        printf '  %s%s\n' "${ACCENT}${row//░/${SHADOW}░${ACCENT}}" "$RESET"
+    done <<< "$logo"
+    echo
+}
+
+show_version() {
+    local debian
+
+    debian=$(cat /etc/debian_version 2>/dev/null)
+
+    printf '  %sHyprDebian%s %s · %s · %s · Debian %s\n' "$ACCENT" "$RESET" \
+        "$(config_value INSTALLED_VERSION)" "$(config_value Q_TYPE)" "$(config_value Q_SUITE)" \
+        "${debian:-unknown}"
+    printf '  %sMaintained by Erik Van Hamme <erik.vanhamme@gmail.com>%s\n\n' "$LABEL" "$RESET"
+}
+
+show_system() {
+    local load1 load5 load15 rest
+
+    read -r load1 load5 load15 rest < /proc/loadavg
+
+    line "Kernel" "$(uname -r)"
+    line "Uptime" "$(uptime -p | sed 's/^up //')"
+    line "Load" "${load1} ${load5} ${load15}"
+    line "Memory" "$(free -h | awk '/^Mem:/ { print $3 " / " $2 }')"
+}
+
+# One line per ZFS pool, with its health and how full it is.
+show_pools() {
+    local name health capacity size color
+    local label="Pools"
+
+    if ! command -v zpool >/dev/null; then
+        return 0
+    fi
+
+    while IFS=$'\t' read -r name health capacity size; do
+        if [[ "$health" == "ONLINE" ]]; then
+            color="$GOOD"
+        else
+            color="$BAD"
+        fi
+
+        line "$label" "${name} ${color}${health}${RESET} ${capacity} of ${size}"
+        label=""
+    done < <(zpool list -H -o name,health,capacity,size 2>/dev/null)
+}
+
+# One line per mdadm array, like the swap array on systems with redundant drives.
+show_arrays() {
+    local md name link degraded state
+    local label="RAID"
+
+    for md in /sys/block/md*; do
+        if [[ ! -d "$md/md" ]]; then
+            continue
+        fi
+
+        # Prefer the name of the array, like swap, over md127.
+        name=$(basename "$md")
+        for link in /dev/md/*; do
+            if [[ "$(readlink -f "$link")" == "/dev/${name}" ]]; then
+                name=$(basename "$link")
+            fi
+        done
+
+        # The number of missing drives.
+        degraded=$(cat "$md/md/degraded" 2>/dev/null)
+
+        if [[ "${degraded:-0}" == "0" ]]; then
+            state="${GOOD}$(cat "$md/md/array_state" 2>/dev/null)${RESET}"
+        else
+            state="${BAD}degraded${RESET}"
+        fi
+
+        line "$label" "${name} ${state}"
+        label=""
+    done
+}
+
+show_units() {
+    local failed=()
+
+    mapfile -t failed < <(systemctl list-units --failed --no-legend --plain 2>/dev/null | awk '{ print $1 }')
+
+    if (( ${#failed[@]} == 0 )); then
+        line "Units" "${GOOD}all running${RESET}"
+    else
+        line "Units" "${BAD}${#failed[@]} failed:${RESET} $(IFS=,; echo "${failed[*]}" | sed 's/,/, /g')"
+    fi
+}
+
+show_logo
+show_version
+show_system
+show_pools
+show_arrays
+show_units
+echo

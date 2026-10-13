@@ -15,7 +15,10 @@ c_post() {
 c_save_config() {
     # upgrade.sh reads the answers back from this copy.
     save_config INSTALLED_VERSION "${INSTALLER_VERSION}"
-    install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}"
+    install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}" || return 1
+
+    # The console shows the installed version above the login prompt.
+    write_issue
 }
 
 c_save_migrations() {

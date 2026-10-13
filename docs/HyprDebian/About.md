@@ -11,6 +11,7 @@ Hyprdebian is intended to have only 1 user.
 - **Storage & Encryption:** Deployed on **ZFS on root** featuring native dataset encryption, mirrored/striped pool topologies, and automated snapshotting for system rollbacks.
 - **Session & Process Management:** Uses **`systemd`** as the init system and process supervisor, paired with **`uwsm`** (Universal Wayland Session Manager) to handle session lifecycle management, environment variable scoping, and clean service teardown.
 - **Display & Login:** Uses **`greetd`** for minimal console/graphical login into the graphical session.
+- **Login Banner:** Console and SSH logins show the HyprDebian logo with the installed version, machine type and suite, the maintainer, and the state of the system: kernel, uptime, load, memory, ZFS pools, RAID arrays and failed units (`/etc/update-motd.d/00-hyprdebian`). The console shows the version and suite above the login prompt (`/etc/issue`).
 
 ## Desktop & UI Stack
 

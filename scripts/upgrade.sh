@@ -209,7 +209,10 @@ upg_hooks() {
 
 upg_save_config() {
     save_config INSTALLED_VERSION "${INSTALLER_VERSION}"
-    install -D -m 0600 "$CONFIG_FILE" "${INSTALLED_CONFIG_FILE}"
+    install -D -m 0600 "$CONFIG_FILE" "${INSTALLED_CONFIG_FILE}" || return 1
+
+    # The console shows the installed version above the login prompt.
+    write_issue
 }
 
 add_dependencies "upg_pre" \

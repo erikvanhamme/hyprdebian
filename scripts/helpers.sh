@@ -281,6 +281,13 @@ in_target() {
         "$@"
 }
 
+# Writes /etc/issue, the line the console shows above the login prompt, with the installed
+# version and suite. agetty replaces \e{...} with a color and \l with the name of the tty.
+write_issue() {
+    printf '%s\n\n' "\\e{brown}HyprDebian\\e{reset} ${INSTALLER_VERSION} · ${Q_SUITE} · \\l" \
+        > "${TARGET_DIR}/etc/issue"
+}
+
 log_status() {
     local color="$1"
     local label="$2"

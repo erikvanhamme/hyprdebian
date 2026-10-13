@@ -20,6 +20,7 @@ b_files() {
         deploy/etc/default/zramswap \
         deploy/etc/profile.d/local-bin-path.sh \
         deploy/etc/sysctl.d/50-zram.conf \
+        deploy/etc/update-motd.d/00-hyprdebian \
         deploy/etc/skel/.config/nano/nanorc \
         deploy/etc/skel/.bash_aliases \
         deploy/etc/skel/.gitconfig \
@@ -292,6 +293,17 @@ b_utilities() {
     add_dependencies "pkg_post" "pkg_utilities"
 }
 
+b_motd() {
+    # 00-hyprdebian replaces the motd and the uname line of Debian. base-files only writes
+    # /etc/motd when it is missing, and dpkg does not put back a conffile that was removed.
+    : > ${TARGET_DIR}/etc/motd || return 1
+    rm -f ${TARGET_DIR}/etc/update-motd.d/10-uname || return 1
+
+    # base-files writes its /etc/issue to /etc/issue.debian from now on, so write_issue can
+    # write ours without conffile questions on upgrades of base-files.
+    in_target dpkg-divert --local --rename --divert /etc/issue.debian --add /etc/issue
+}
+
 b_network() {
     add_files deploy/etc/systemd/network/10-ethernet.link
 
@@ -320,6 +332,7 @@ add_dependencies "b_main" \
     "b_grub2" \
     "b_systemd" \
     "b_utilities" \
+    "b_motd" \
     "b_network" \
 
 add_dependencies "install" "b_pre" "b_main" "b_post"
