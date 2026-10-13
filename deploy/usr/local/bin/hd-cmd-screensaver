@@ -2,12 +2,14 @@
 
 # Run the screensaver using random effects from TTE.
 
+# No focused window counts as in focus: hd-launch-screensaver moves focus to each empty
+# monitor before its screensaver window maps, which must not end the other instances.
 screensaver_in_focus() {
-  hyprctl activewindow -j | jq -e '.class == "hyprdebian.screensaver"' >/dev/null 2>&1
+  hyprctl activewindow -j | jq -e '(.class // "hyprdebian.screensaver") == "hyprdebian.screensaver"' >/dev/null 2>&1
 }
 
 exit_screensaver() {
-    hyprctl eval 'hl.config({ cursor = { invisible = false} })' &> /tmp/cmdc || true
+    hyprctl eval 'hl.config({ cursor = { invisible = false } })' &> /dev/null || true
     pkill -x tte 2> /dev/null
     pkill -f '^kitty --class=hyprdebian\.screensaver( |$)' 2> /dev/null
     exit 0
