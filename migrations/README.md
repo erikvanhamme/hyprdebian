@@ -24,6 +24,7 @@ migrate() {
 - A migration that needs a package the same version adds, installs it itself: migrations run before the new packages are installed.
 - Start `migrate` with a check whether the change is needed, and return 0 when it is not. A migration also runs on systems that already have the change, like systems installed after the change went into the installer but before the migration was added. Returning 0 records it as done, just like a migration that made the change.
 - Never change or renumber a migration after it was committed. Systems that already ran it will not run it again.
+- Add a row for the migration to [docs/Installer/Migrations.md](../docs/Installer/Migrations.md).
 
 ## How they run
 The upgrade runs the migrations that did not run on the system yet, in the order of their numbers, before it installs the new packages and updates the files. Each migration that succeeds is added to `/etc/hyprdebian/migrations`. When a migration fails, the upgrade stops, and the migration runs again on the next upgrade.

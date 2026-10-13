@@ -12,6 +12,7 @@ The installer documentation is split into these documents:
 - [Idempotency](Idempotency.md): how answers and progress are remembered, so the installer can be started again after a failure.
 - [Extending](Extending.md): where common changes to the installer go.
 - [Upgrade](Upgrade.md): how an installed system is upgraded to a newer version with `upgrade.sh`.
+- [Migrations](Migrations.md): the one-off changes the upgrade makes to installed systems, and what each one does.
 
 ## Overview
 The installer is a set of bash scripts, started with:
