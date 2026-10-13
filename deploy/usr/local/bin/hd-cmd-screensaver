@@ -9,7 +9,7 @@ screensaver_in_focus() {
 exit_screensaver() {
     hyprctl eval 'hl.config({ cursor = { invisible = false} })' &> /tmp/cmdc || true
     pkill -x tte 2> /dev/null
-    pkill -f hyprdebian.screensaver 2> /dev/null
+    pkill -f '^kitty --class=hyprdebian\.screensaver( |$)' 2> /dev/null
     exit 0
 }
 

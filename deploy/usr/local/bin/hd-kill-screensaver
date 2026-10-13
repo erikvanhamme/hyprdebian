@@ -2,4 +2,4 @@
 
 hyprctl eval 'hl.config({ cursor = { invisible = false } })' &> /dev/null
 pkill -x tte 2> /dev/null
-pkill -f hyprdebian.screensaver 2> /dev/null
+pkill -f '^kitty --class=hyprdebian\.screensaver( |$)' 2> /dev/null

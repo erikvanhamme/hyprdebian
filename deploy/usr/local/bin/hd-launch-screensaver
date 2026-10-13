@@ -7,14 +7,34 @@ if ! command -v tte &>/dev/null; then
     exit 1
 fi
 
+# Matches only the screensaver kitty windows, not other processes that mention the class.
+screensaver_pattern='^kitty --class=hyprdebian\.screensaver( |$)'
+
 # Exit early if screensaver is already running
-pgrep -f hyprdebian.screensaver && exit 0
+if pgrep -f "$screensaver_pattern" >/dev/null; then
+    exit 0
+fi
+
+# Wait until a screensaver window is mapped on the given monitor. Windows open on the monitor
+# that has focus when they map, so focus must not move on before that.
+wait_for_screensaver_on() {
+    local monitor_id=$1
+    for _ in $(seq 50); do
+        if hyprctl clients -j | jq -e --argjson id "$monitor_id" \
+            'any(.[]; .class == "hyprdebian.screensaver" and .monitor == $id)' >/dev/null; then
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
 
 focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
 
-for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+hyprctl monitors -j | jq -r '.[] | "\(.id) \(.name)"' | while read -r id m; do
     hyprctl dispatch "hl.dsp.focus({ monitor = \"$m\" })"
     hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class=hyprdebian.screensaver --override font_size=18 --override window_padding_width=0 -e /usr/local/bin/hd-cmd-screensaver")'
+    wait_for_screensaver_on "$id"
 done
 
 hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })"
