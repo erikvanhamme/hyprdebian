@@ -1,6 +1,14 @@
 # Modernized from /etc/apt/sources.list
 Types: deb
 URIs: http://deb.debian.org/debian/
-Suites: {{ Q_SUITE }}
+Suites: {{ Q_SUITE }}{% if Q_SUITE != "unstable" %} {{ Q_SUITE }}-updates{% endif %}
 Components: main  contrib non-free non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+{%- if Q_SUITE != "unstable" %}
+
+Types: deb
+URIs: http://security.debian.org/debian-security/
+Suites: {{ Q_SUITE }}-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+{%- endif %}

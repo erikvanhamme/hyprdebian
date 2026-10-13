@@ -13,9 +13,16 @@ q_post() {
 }
 
 q_suite() {
-    # Not asked: hyprdebian is based on unstable. A saved suite is kept.
-    Q_SUITE="${Q_SUITE:-unstable}"
-    save_config Q_SUITE ${Q_SUITE}
+    if [[ "${Q_TYPE}" == "laptop" || "${Q_TYPE}" == "desktop" ]]; then
+
+        # Not asked: laptop and desktop are based on unstable. A saved suite is kept.
+        Q_SUITE="${Q_SUITE:-unstable}"
+        save_config Q_SUITE ${Q_SUITE}
+        return 0
+    fi
+
+    local default="$(get_default Q_SUITE "${Q_TYPE:-}")"
+    ask_options Q_SUITE "Which suite are you installing" "${default}" "${SUITES[@]}"
 }
 
 q_type() {
@@ -106,6 +113,16 @@ q_fqdn() {
 }
 
 q_kernel() {
+    # The specific kernels are only offered on unstable, the ZFS module of the other suites may
+    # not build for them.
+    if [[ "${Q_SUITE}" != "unstable" ]]; then
+        Q_SPECIFIC_KERNEL="false"
+        save_config Q_SPECIFIC_KERNEL ${Q_SPECIFIC_KERNEL}
+        Q_KERNEL="latest"
+        save_config Q_KERNEL ${Q_KERNEL}
+        return 0
+    fi
+
     local default="$(get_default Q_SPECIFIC_KERNEL "${Q_TYPE:-}")"
     if ! ask_yes_no Q_SPECIFIC_KERNEL "Do you wish to download a specific kernel" "${default}"; then
         Q_KERNEL="latest"
@@ -148,6 +165,13 @@ q_firewall() {
 }
 
 q_desktop() {
+    # The desktop needs packages that are only in unstable.
+    if [[ "${Q_SUITE}" != "unstable" ]]; then
+        Q_DESKTOP="false"
+        save_config Q_DESKTOP ${Q_DESKTOP}
+        return 0
+    fi
+
     local default="$(get_default Q_DESKTOP "${Q_TYPE:-}")"
     if ask_yes_no Q_DESKTOP "Install hyprland desktop environment" "${default}"; then
         add_dependencies "o_main" "o_desktop"
@@ -204,6 +228,13 @@ q_openssh() {
 }
 
 q_repo() {
+    # The packages in the hyprdebian repo are built for unstable.
+    if [[ "${Q_SUITE}" != "unstable" ]]; then
+        Q_REPO_ENABLED="false"
+        save_config Q_REPO_ENABLED ${Q_REPO_ENABLED}
+        return 0
+    fi
+
     local default="$(get_default Q_REPO_ENABLED "${Q_TYPE:-}")"
     if ask_yes_no Q_REPO_ENABLED "Enable hyprdebian repo" "${default}"; then
         local default="$(get_default Q_REPO "${Q_TYPE:-}")"
@@ -214,8 +245,8 @@ q_repo() {
 # Add additional questions here.
 
 add_dependencies "q_main" \
-    "q_suite" \
     "q_type" \
+    "q_suite" \
     "q_defaults" \
     "q_redundant" \
     "q_disk" \

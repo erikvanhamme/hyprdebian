@@ -60,7 +60,21 @@ detect_config() {
     local net="${TARGET_DIR}/etc/systemd/network"
     local repo_file="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources"
     local repo_list="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.list"
-    local user swap type
+    local user swap type suite
+
+    # Older versions used /etc/apt/sources.list: "deb <url> <suite> <components>".
+    suite=$(sed -n 's/^Suites: *\([^ ]*\).*/\1/p' "${TARGET_DIR}/etc/apt/sources.list.d/debian.sources" 2>/dev/null | head -n 1) || true
+    if [[ -z "$suite" ]]; then
+        suite=$(awk '$1 == "deb" && $2 !~ /^\[/ {print $3; exit}' "${TARGET_DIR}/etc/apt/sources.list" 2>/dev/null) || true
+    fi
+
+    # The questions check for unstable, not for its codename. q_suite is not run by the upgrade,
+    # so the suite must always be saved.
+    if [[ -z "$suite" || "$suite" == "sid" ]]; then
+        suite="unstable"
+    fi
+
+    save_detected Q_SUITE "$suite"
 
     case "$(hostnamectl chassis 2>/dev/null)" in
         laptop|convertible|tablet) type="laptop" ;;

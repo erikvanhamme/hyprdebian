@@ -54,7 +54,7 @@ The upgrade runs the tasks of the installer that decide what is installed, with 
 | `b_systemd`, `b_utilities`, `b_network` | The base packages, files, templates, services and groups. |
 | `o_main` | The selected optional components. |
 
-These tasks are skipped: `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (it downloads the fonts).
+These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (it downloads the fonts).
 
 Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`. Both are safe to repeat.
 
@@ -166,10 +166,11 @@ Because the upgrade runs the installer tasks that work out the queues, a few rul
 A system installed before version v0.152 has no `/etc/hyprdebian/installer.config` and no `/etc/hyprdebian/migrations`.
 
 ### Detected answers
-The upgrade works out the answers from the state of the system (`detect_config` in `scripts/upgrade_detect.sh`), and then asks **every** question with the detected answer filled in. Press enter to confirm an answer, or correct it. The disks, the password and the kernel are not asked.
+The upgrade works out the answers from the state of the system (`detect_config` in `scripts/upgrade_detect.sh`), and then asks **every** question with the detected answer filled in. Press enter to confirm an answer, or correct it. The suite, the disks, the password and the kernel are not asked.
 
 | Answer | Worked out from |
 | --- | --- |
+| `Q_SUITE` | The suite in `debian.sources`, or in the older `sources.list`. `sid`, or no suite found, is saved as `unstable`. |
 | `Q_TYPE` | `hostnamectl chassis`. |
 | `Q_REDUNDANT`, `Q_ENCRYPT` | A mirror in `rpool`, and the encryption of `rpool`. |
 | `Q_SWAP` | The size of the swap partition in `/proc/swaps`, in GiB. zram swap is not counted. |

@@ -21,9 +21,15 @@
 # Known machine types. The order is the order in which they are offered.
 MACHINE_TYPES=(desktop laptop server vm)
 
+# Debian suites a server or vm can be installed with. Desktops and laptops always use unstable.
+# Testing and stable are named by their codenames (forky and trixie), so an installed system stays
+# on its release when Debian releases the next one. Update them after every Debian release.
+SUITES=(unstable forky trixie)
+
 # Questions that are always asked, even when the machine type defaults are used.
 DEFAULTS_ALWAYS_ASK=(
     Q_TYPE
+    Q_SUITE
     Q_DEFAULTS
     Q_REDUNDANT
     Q_HOSTNAME
@@ -32,6 +38,7 @@ DEFAULTS_ALWAYS_ASK=(
 # Defaults shared by all machine types.
 declare -gA DEFAULTS_common=(
     [Q_TYPE]="desktop"
+    [Q_SUITE]="unstable"
     [Q_DEFAULTS]="y"
     [Q_SWAP]="2"
     [Q_USER]="rsq"

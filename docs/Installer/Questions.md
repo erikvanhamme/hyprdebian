@@ -20,7 +20,14 @@ Each answer (except the password) is saved in the configuration file immediately
 
 Which questions are asked depends on earlier answers. For example, `q_wifi` only asks for the wifi interface when wifi is enabled.
 
-`Q_SUITE`, the Debian suite that is installed, is not asked. `q_suite` sets it to `unstable`, the suite hyprdebian is based on, unless a saved value exists.
+`Q_SUITE` is the Debian suite that is installed. It is only asked for a server or a vm, which can be installed with `unstable`, `forky` (testing) or `trixie` (stable), the `SUITES` in `scripts/defaults.sh`. A desktop or laptop always gets `unstable`, the suite hyprdebian is based on, unless a saved value exists.
+
+On a suite other than `unstable`, these questions are not asked, and are answered with no:
+- `Q_SPECIFIC_KERNEL`: the kernel is `latest`, the kernel of the suite. The ZFS module of the suite may not build for a kernel from elsewhere.
+- `Q_DESKTOP`: the desktop needs packages that are only in `unstable`.
+- `Q_REPO_ENABLED`: the packages in the hyprdebian repo are built for `unstable`.
+
+On a suite other than `unstable`, `debian.sources` also has the `-updates` and `-security` suites.
 
 ## Machine type defaults
 The defaults for the questions depend on the machine type (`desktop`, `laptop`, `server` or `vm`). They are defined in:

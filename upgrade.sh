@@ -54,7 +54,8 @@ source scripts/packages.sh
 source scripts/services.sh
 source scripts/user.sh
 
-# Tasks that only make sense during an installation.
+# Tasks that only make sense during an installation. The suite of an installed system is kept.
+mark_done "q_suite"
 mark_done "q_disk"
 mark_done "q_password"
 mark_done "q_kernel"

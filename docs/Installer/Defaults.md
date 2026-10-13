@@ -13,12 +13,20 @@ The machine types are listed in `MACHINE_TYPES`, in the order in which they are 
 MACHINE_TYPES=(desktop laptop server vm)
 ```
 
+The suites a server or vm can be installed with are listed in `SUITES`, in the order in which they are offered:
+```
+SUITES=(unstable forky trixie)
+```
+
+Testing and stable are named by their codenames, `forky` and `trixie`, so an installed system stays on its release when Debian releases the next one: a `forky` server becomes a stable server, instead of following testing to the next release. The list must be updated after every Debian release.
+
 ## Common defaults
 These defaults are the same for every machine type (`DEFAULTS_common`):
 
 | Key | Question | Default |
 | --- | --- | --- |
 | `Q_TYPE` | What type of computer are you installing | `desktop` |
+| `Q_SUITE` | Which suite are you installing (server and vm only) | `unstable` |
 | `Q_DEFAULTS` | Use machine type defaults | `y` |
 | `Q_SWAP` | Size of swap partition in GiB | `2` |
 | `Q_USER` | Username | `rsq` |
@@ -85,6 +93,7 @@ Some questions are asked even when `Q_DEFAULTS` is yes, because the machine type
 ```
 DEFAULTS_ALWAYS_ASK=(
     Q_TYPE
+    Q_SUITE
     Q_DEFAULTS
     Q_REDUNDANT
     Q_HOSTNAME
