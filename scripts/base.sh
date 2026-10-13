@@ -255,10 +255,10 @@ b_grub2() {
     in_target update-grub || return 1
     
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS} (primary)" --recheck --no-floppy || return 1
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="${Q_OS} (secondary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy || return 1
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
     else
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="${Q_OS}" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian" --recheck --no-floppy
     fi
 }
 
@@ -267,18 +267,16 @@ b_systemd() {
         add_packages systemd-timesyncd
     fi
 
-    if [[ "${Q_OS}" == "hyprdebian" ]]; then
-        add_services rotate-machine-id
+    add_services rotate-machine-id
 
-        add_packages systemd-resolved rsyslog
+    add_packages systemd-resolved rsyslog
 
-        add_files \
-            deploy/etc/systemd/journald.conf \
-            deploy/etc/systemd/resolved.conf.d/00-direct-uplink.conf \
-            deploy/etc/systemd/system/rotate-machine-id.service \
-            deploy/etc/systemd/system-preset/00-ignore-all.preset \
-            
-    fi
+    add_files \
+        deploy/etc/systemd/journald.conf \
+        deploy/etc/systemd/resolved.conf.d/00-direct-uplink.conf \
+        deploy/etc/systemd/system/rotate-machine-id.service \
+        deploy/etc/systemd/system-preset/00-ignore-all.preset \
+
 
     add_user_groups adm
 }

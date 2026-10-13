@@ -23,7 +23,6 @@ MACHINE_TYPES=(desktop laptop server vm)
 
 # Questions that are always asked, even when the machine type defaults are used.
 DEFAULTS_ALWAYS_ASK=(
-    Q_OS
     Q_TYPE
     Q_DEFAULTS
     Q_REDUNDANT
@@ -32,10 +31,8 @@ DEFAULTS_ALWAYS_ASK=(
 
 # Defaults shared by all machine types.
 declare -gA DEFAULTS_common=(
-    [Q_OS]="hyprdebian"
     [Q_TYPE]="desktop"
     [Q_DEFAULTS]="y"
-    [Q_DE]="kde"
     [Q_SWAP]="2"
     [Q_USER]="rsq"
     [Q_FULLNAME]="Erik Van Hamme"

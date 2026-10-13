@@ -60,39 +60,7 @@ detect_config() {
     local net="${TARGET_DIR}/etc/systemd/network"
     local repo_file="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.sources"
     local repo_list="${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian.local.list"
-    local suite de os user swap type
-
-    # Both hyprdebian and debian-unstable use unstable. Only the plain Debian installations have
-    # a desktop task.
-    suite=$(sed -n 's/^Suites: *//p' "${TARGET_DIR}/etc/apt/sources.list.d/debian.sources" 2>/dev/null | head -n 1) || true
-
-    # Older versions used /etc/apt/sources.list: "deb <url> <suite> <components>".
-    if [[ -z "$suite" ]]; then
-        suite=$(awk '$1 == "deb" && $2 !~ /^\[/ {print $3; exit}' "${TARGET_DIR}/etc/apt/sources.list" 2>/dev/null) || true
-    fi
-    de=$(dpkg-query -W -f='${db:Status-Status} ${Package}\n' 'task-*-desktop' 2>/dev/null | sed -n 's/^installed task-\(.*\)-desktop$/\1/p' | head -n 1) || true
-
-    case "$suite" in
-        unstable|sid)
-            if [[ -n "$de" ]]; then
-                os="debian-unstable"
-            else
-                os="hyprdebian"
-            fi
-            ;;
-        testing)
-            os="debian-testing"
-            ;;
-        *)
-            os="debian-stable"
-            ;;
-    esac
-
-    save_detected Q_OS "$os"
-
-    if [[ "$os" != "hyprdebian" ]]; then
-        save_detected Q_DE "${de:-none}"
-    fi
+    local user swap type
 
     case "$(hostnamectl chassis 2>/dev/null)" in
         laptop|convertible|tablet) type="laptop" ;;
@@ -128,13 +96,6 @@ detect_config() {
     else
         save_detected Q_SPECIFIC_KERNEL "true"
         save_detected Q_KERNEL "$(uname -r | cut -d+ -f1)"
-    fi
-
-    # The other questions are only asked on hyprdebian. On the Debian OSes, an answer to them,
-    # like Q_QEMU_KVM for a user in the libvirt group, would change the rendered templates, and
-    # it could not be corrected, because the question is not asked.
-    if [[ "$os" != "hyprdebian" ]]; then
-        return 0
     fi
 
     # The network. Older versions named the network files after the interface.

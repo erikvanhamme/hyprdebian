@@ -170,8 +170,6 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 
 | Answer | Worked out from |
 | --- | --- |
-| `Q_OS` | The suite in `debian.sources`, or in `/etc/apt/sources.list` on older systems. On unstable, a `task-*-desktop` package means `debian-unstable`, otherwise `hyprdebian`. |
-| `Q_DE` | The installed `task-*-desktop` package, for the Debian OSes. |
 | `Q_TYPE` | `hostnamectl chassis`. |
 | `Q_REDUNDANT`, `Q_ENCRYPT` | A mirror in `rpool`, and the encryption of `rpool`. |
 | `Q_SWAP` | The size of the swap partition in `/proc/swaps`, in GiB. zram swap is not counted. |
@@ -183,8 +181,6 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 | `Q_BACKUPTOOLS` | `hd-backup` in `/usr/local/bin`, or `mbuffer` and `mt-st` installed. |
 | `Q_REPO_ENABLED`, `Q_REPO` | `hyprdebian.local.sources` and its URI, or the older `hyprdebian.local.list` and the URL in it. |
 | Other components | Their main package: `hyprland`, `iwd`, `ufw`, `docker.io`, `cups`, `rustup`, `openssh-server`. |
-
-The answers from `Q_IFACE` down are only worked out on hyprdebian. The Debian OSes do not ask these questions, so a detected answer could not be corrected, and would still change the rendered templates.
 
 The answers are saved at the end of the upgrade, so the next upgrade uses them without asking.
 

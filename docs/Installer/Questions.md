@@ -7,7 +7,7 @@ scripts/questions.sh
 ```
 
 ## Asking questions
-Every answer is stored in a variable with the `Q_` prefix (`Q_OS`, `Q_HOSTNAME`, `Q_ENCRYPT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
+Every answer is stored in a variable with the `Q_` prefix (`Q_TYPE`, `Q_HOSTNAME`, `Q_ENCRYPT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
 
 | Function | Purpose |
 | --- | --- |
@@ -18,7 +18,9 @@ Every answer is stored in a variable with the `Q_` prefix (`Q_OS`, `Q_HOSTNAME`,
 
 Each answer (except the password) is saved in the configuration file immediately. See [Idempotency](Idempotency.md).
 
-Which questions are asked depends on earlier answers. For example, `q_os` adds the hyprdebian specific questions to `q_os_questions` only when hyprdebian is selected as the OS.
+Which questions are asked depends on earlier answers. For example, `q_wifi` only asks for the wifi interface when wifi is enabled.
+
+`Q_SUITE`, the Debian suite that is installed, is not asked. `q_suite` sets it to `unstable`, the suite hyprdebian is based on, unless a saved value exists.
 
 ## Machine type defaults
 The defaults for the questions depend on the machine type (`desktop`, `laptop`, `server` or `vm`). They are defined in:

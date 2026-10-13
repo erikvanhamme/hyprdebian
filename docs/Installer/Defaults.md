@@ -18,10 +18,8 @@ These defaults are the same for every machine type (`DEFAULTS_common`):
 
 | Key | Question | Default |
 | --- | --- | --- |
-| `Q_OS` | Which OS to install | `hyprdebian` |
 | `Q_TYPE` | What type of computer are you installing | `desktop` |
 | `Q_DEFAULTS` | Use machine type defaults | `y` |
-| `Q_DE` | Which desktop environment (Debian only) | `kde` |
 | `Q_SWAP` | Size of swap partition in GiB | `2` |
 | `Q_USER` | Username | `rsq` |
 | `Q_FULLNAME` | Full name | `Erik Van Hamme` |
@@ -74,7 +72,7 @@ local default="$(get_default Q_SWAP "${Q_TYPE:-}")"
 
 So a machine type table only needs the keys where that type differs from the common defaults, and a value in a machine type table overrides the value in `DEFAULTS_common`. At the moment the two sets of keys do not overlap.
 
-The machine type is not known yet for the first questions: `Q_OS` and `Q_TYPE` are asked before it is selected, so on a fresh run they only use `DEFAULTS_common`.
+The machine type is not known yet for the first question: `Q_TYPE` is asked before it is selected, so on a fresh run it only uses `DEFAULTS_common`.
 
 A question can also have its own fallback when there is no default in the tables. `Q_FQDN` has no entry in the tables and falls back to the hostname followed by `.rsq-online.ddns.net`.
 
@@ -86,7 +84,6 @@ The default is then passed to one of the ask functions. With the answer to "Use 
 Some questions are asked even when `Q_DEFAULTS` is yes, because the machine type defaults cannot know the right answer. They are listed in `DEFAULTS_ALWAYS_ASK`:
 ```
 DEFAULTS_ALWAYS_ASK=(
-    Q_OS
     Q_TYPE
     Q_DEFAULTS
     Q_REDUNDANT

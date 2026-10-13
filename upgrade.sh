@@ -16,7 +16,7 @@ source scripts/upgrade_helpers.sh
 source scripts/upgrade_detect.sh
 
 # Start banner.
-echo "=== Erik's nifty hyprdebian/debian upgrader $INSTALLER_VERSION ==="
+echo "=== Erik's nifty hyprdebian upgrader $INSTALLER_VERSION ==="
 
 if [[ $EUID -ne 0 ]]; then
     echo "ERROR: The upgrade must be run as root." >&2

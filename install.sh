@@ -14,7 +14,7 @@ source scripts/dependencies.sh
 source scripts/helpers.sh
 
 # Start banner.
-echo "=== Erik's nifty hyprdebian/debian installer $INSTALLER_VERSION ==="
+echo "=== Erik's nifty hyprdebian installer $INSTALLER_VERSION ==="
 
 # Prepare idempotency and config paths.
 mkdir -p "$STATE_DIR"

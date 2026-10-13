@@ -12,58 +12,10 @@ q_post() {
     return 0
 }
 
-q_os() {
-    local default="$(get_default Q_OS "${Q_TYPE:-}")"
-    ask_options Q_OS "Which OS to install" "${default}" "hyprdebian" "debian-stable" "debian-testing" "debian-unstable"
-    case "${Q_OS}" in
-        "hyprdebian")
-            Q_SUITE="unstable"
-            add_dependencies "q_os_questions" \
-                "q_kernel" \
-                "q_desktop" \
-                "q_encrypt" \
-                "q_iface" \
-                "q_wifi" \
-                "q_firewall" \
-                "q_docker" \
-                "q_qemu_kvm" \
-                "q_cups" \
-                "q_backuptools" \
-                "q_rust" \
-                "q_openssh" \
-                "q_repo"
-            ;;
-        "debian-stable")
-            Q_SUITE="stable"
-            Q_KERNEL="latest"
-            add_dependencies "q_os_questions" \
-                "q_de" \
-                "q_encrypt"
-            save_config Q_KERNEL ${Q_KERNEL}
-            ;;
-        "debian-testing")
-            Q_SUITE="testing"
-            Q_KERNEL="latest"
-            add_dependencies "q_os_questions" \
-                "q_de" \
-                "q_encrypt"
-            save_config Q_KERNEL ${Q_KERNEL}
-            ;;
-        "debian-unstable")
-            Q_SUITE="unstable"
-            Q_KERNEL="latest"
-            add_dependencies "q_os_questions" \
-                "q_de" \
-                "q_encrypt"
-            save_config Q_KERNEL ${Q_KERNEL}
-            ;;
-    esac
-
+q_suite() {
+    # Not asked: hyprdebian is based on unstable. A saved suite is kept.
+    Q_SUITE="${Q_SUITE:-unstable}"
     save_config Q_SUITE ${Q_SUITE}
-}
-
-q_os_questions() {
-    return 0
 }
 
 q_type() {
@@ -74,36 +26,6 @@ q_type() {
 q_defaults() {
     local default="$(get_default Q_DEFAULTS "${Q_TYPE:-}")"
     ask_yes_no Q_DEFAULTS "Use machine type defaults" "${default}" || true
-}
-
-q_de() {
-    local default="$(get_default Q_DE "${Q_TYPE:-}")"
-    ask_options Q_DE "Which desktop environment" "${default}" "none" "cinnamon" "gnome" "kde" "lxde" "lxqt" "mate" "xfce"
-    case "${Q_DE}" in
-        "none")
-            ;;
-        "cinnamon")
-            add_packages task-cinnamon-desktop
-            ;;
-        "gnome")
-            add_packages task-gnome-desktop
-            ;;
-        "kde")
-            add_packages task-kde-desktop
-            ;;
-        "lxde")
-            add_packages task-lxde-desktop
-            ;;
-        "lxqt")
-            add_packages task-lxqt-desktop
-            ;;
-        "mate")
-            add_packages task-mate-desktop
-            ;;
-        "xfce")
-            add_packages task-xfce-desktop
-            ;;
-    esac
 }
 
 q_redundant() {
@@ -292,7 +214,7 @@ q_repo() {
 # Add additional questions here.
 
 add_dependencies "q_main" \
-    "q_os" \
+    "q_suite" \
     "q_type" \
     "q_defaults" \
     "q_redundant" \
@@ -303,7 +225,19 @@ add_dependencies "q_main" \
     "q_fullname" \
     "q_hostname" \
     "q_fqdn" \
-    "q_os_questions" \
+    "q_kernel" \
+    "q_desktop" \
+    "q_encrypt" \
+    "q_iface" \
+    "q_wifi" \
+    "q_firewall" \
+    "q_docker" \
+    "q_qemu_kvm" \
+    "q_cups" \
+    "q_backuptools" \
+    "q_rust" \
+    "q_openssh" \
+    "q_repo" \
 
 # The password is never saved, so it must be asked again on every run.
 always_run "q_password"
