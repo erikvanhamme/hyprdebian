@@ -29,14 +29,14 @@ if [[ -z "$DEVICE_SIZE_BYTES" || "$DEVICE_SIZE_BYTES" -eq 0 ]]; then
 fi
 
 # Calculate 10% reservation in bytes
-RESERVATION_BYTES=$(( DEVICE_SIZE_BYTES * 90 / 100 ))
+RESERVATION_BYTES=$(( DEVICE_SIZE_BYTES * 10 / 100 ))
 
 echo "=== Target Device:   $DEVICE"
 echo "=== Pool Name:       $POOL_NAME"
 echo "=== Mountpoint:      /mnt/$POOL_NAME"
 echo "=== Executing User:  $CALLING_USER"
 echo "=== Device Size:     $DEVICE_SIZE_BYTES bytes"
-echo "=== 10% Reservation: $QUOTA_BYTES bytes"
+echo "=== 10% Reservation: $RESERVATION_BYTES bytes"
 echo
 
 # Step A: Clear ZFS labels explicitly
