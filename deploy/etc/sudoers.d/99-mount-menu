@@ -1,1 +1,0 @@
-rsq ALL=(ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /usr/bin/lsblk -J -b -o NAME\,PATH\,FSTYPE\,LABEL\,UUID\,MOUNTPOINTS\,TYPE, /usr/local/bin/hd-mount-helper

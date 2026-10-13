@@ -36,10 +36,8 @@ fi
 
 TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
 
-RESULT=$(sudo /usr/local/bin/hd-mount-helper unmount "$TARGET_DEV" "$CURRENT_USER" 2>&1)
-EXIT_CODE=$?
-
-if [[ $EXIT_CODE -eq 0 ]]; then
+# The result is tested in the if, so set -e does not end the script before a failure is shown.
+if RESULT=$(sudo /usr/local/bin/hd-mount-helper unmount "$TARGET_DEV" "$CURRENT_USER" 2>&1); then
     notify-send -a "Unmount Menu" -u normal -i drive-harddisk "Unmount Successful" "$RESULT"
 else
     notify-send -a "Unmount Menu" -u critical -i dialog-error "Unmount Failed" "$RESULT"

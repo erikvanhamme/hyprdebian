@@ -38,12 +38,9 @@ fi
 # Extract device path/source string (first column before tab)
 TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
 
-# Execute mount helper with elevated privileges
-RESULT=$(sudo /usr/local/bin/hd-mount-helper mount "$TARGET_DEV" "$CURRENT_USER" 2>&1)
-EXIT_CODE=$?
-
-# Verify outcome and dispatch notification via mako
-if [[ $EXIT_CODE -eq 0 ]]; then
+# Execute mount helper with elevated privileges, and dispatch the outcome via mako.
+# The result is tested in the if, so set -e does not end the script before a failure is shown.
+if RESULT=$(sudo /usr/local/bin/hd-mount-helper mount "$TARGET_DEV" "$CURRENT_USER" 2>&1); then
     notify-send -a "Mount Menu" -u normal -i drive-harddisk "Mount Successful" "$RESULT"
 else
     notify-send -a "Mount Menu" -u critical -i dialog-error "Mount Failed" "$RESULT"

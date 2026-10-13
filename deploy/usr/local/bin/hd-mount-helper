@@ -13,6 +13,15 @@ if [[ -z "$ACTION" || -z "$TARGET_ENTRY" ]]; then
     exit 1
 fi
 
+# Drops the entry of the given target from the state file.
+remove_state_entry() {
+    local tmp_state
+    tmp_state=$(mktemp)
+    awk -F'|' -v target="$1" '$1 != target' "$STATE_FILE" > "$tmp_state"
+    mv "$tmp_state" "$STATE_FILE"
+    chmod 644 "$STATE_FILE"
+}
+
 if [[ "$ACTION" == "mount" ]]; then
     IS_FSTAB=0
     MOUNT_POINT=""
@@ -43,7 +52,17 @@ if [[ "$ACTION" == "mount" ]]; then
         mkdir -p "$MOUNT_POINT"
         chown "${CALLING_USER}:" "/mnt/${CALLING_USER}" "$MOUNT_POINT"
 
-        if mount "$TARGET_ENTRY" "$MOUNT_POINT"; then
+        # Filesystems without Unix owners are owned by whoever mounts them, which is root here.
+        # Hand them to the calling user, so the user can write to them.
+        MOUNT_OPTS=()
+        FSTYPE=$(blkid -o value -s TYPE "$TARGET_ENTRY" 2>/dev/null || true)
+        case "$FSTYPE" in
+            vfat|exfat|ntfs|ntfs3)
+                MOUNT_OPTS=(-o "uid=$(id -u "$CALLING_USER"),gid=$(id -g "$CALLING_USER")")
+                ;;
+        esac
+
+        if mount "${MOUNT_OPTS[@]}" "$TARGET_ENTRY" "$MOUNT_POINT"; then
             echo $((COUNTER + 1)) > "$COUNTER_FILE"
             echo "${TARGET_ENTRY}|${MOUNT_POINT}|0" >> "$STATE_FILE"
             echo "Successfully mounted $TARGET_ENTRY on $MOUNT_POINT"
@@ -71,16 +90,24 @@ elif [[ "$ACTION" == "unmount" ]]; then
         MOUNT_POINT="$MP"
     fi
 
+    # The entry was unmounted elsewhere, e.g. by pulling the drive. Drop it, or it stays forever.
+    if [[ -n "$MATCH" && -n "$MOUNT_POINT" ]] && ! findmnt --mountpoint "$MOUNT_POINT" >/dev/null 2>&1; then
+        if [[ "$IS_FSTAB" -eq 0 && -d "$MOUNT_POINT" ]]; then
+            rmdir "$MOUNT_POINT" 2>/dev/null || true
+        fi
+
+        remove_state_entry "$TARGET_ENTRY"
+
+        echo "$TARGET_ENTRY was no longer mounted, removed it from the list"
+        exit 0
+    fi
+
     if umount "$TARGET_ENTRY" || umount "$MOUNT_POINT"; then
         if [[ "$IS_FSTAB" -eq 0 && -d "$MOUNT_POINT" ]]; then
             rmdir "$MOUNT_POINT" 2>/dev/null || true
         fi
 
-        # Safely rewrite state file omitting the unmounted entry (fixed string comparison)
-        TMP_STATE=$(mktemp)
-        awk -F'|' -v target="$TARGET_ENTRY" '$1 != target' "$STATE_FILE" > "$TMP_STATE"
-        mv "$TMP_STATE" "$STATE_FILE"
-        chmod 644 $STATE_FILE
+        remove_state_entry "$TARGET_ENTRY"
 
         echo "Successfully unmounted $TARGET_ENTRY"
         exit 0
