@@ -7,7 +7,7 @@ migrate() {
     local conf="${TARGET_DIR}/etc/ufw/ufw.conf"
 
     # Not needed without the firewall, or when the logging is already off.
-    if [[ "${Q_FIREWALL}" == "false" ]]; then
+    if [[ "${Q_FIREWALL}" != "true" ]]; then
         return 0
     fi
 

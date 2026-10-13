@@ -18,7 +18,7 @@ Reboot the system after the upgrade. New services only start on the next boot, a
 ## Before the upgrade
 Before it works out anything, the upgrade:
 1. **Checks that the system is up to date.** It runs `apt update`, and counts the packages `apt full-upgrade` would upgrade. When there are any, it recommends to upgrade the system first, and asks whether to continue anyway. The default is to stop. The upgrade installs new packages with their latest versions, and on a system that is behind, these can pull in upgrades of the packages they depend on, like `systemd`, while the rest of the system stays behind.
-2. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates, and `mdadm`.
+2. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates.
 
 ## State on the installed system
 The installer leaves two files on the installed system for the upgrade:
@@ -121,7 +121,7 @@ The templates for the disks, the boot loader and the apt sources (`fstab`, `cryp
 ## Packages, services and groups
 For packages, services and groups, the upgrade only acts on what the new version **adds**: what is in the new queue, but not in the queue saved by the installation or the last upgrade. A package that was removed, a service that was disabled or a group the user was taken out of after the installation is not brought back.
 
-- **Packages** are installed with `apt update` and `apt install --no-upgrade`. Packages that are already installed are not upgraded. Upgrading the system is left to the user. apt asks before it installs extra dependencies. Answering no stops the upgrade.
+- **Packages** are installed with `apt update` and `apt install --no-upgrade`. Packages that are already installed are not upgraded. Upgrading the system is left to the user. apt asks before it installs extra dependencies. Answering no stops the upgrade. Queue entries that keep a package out, like `avahi-daemon-`, are passed along only for packages that are not installed, so a new package cannot pull them in. An installed package is never removed this way.
 - **Services** are only enabled, not started, so they start on the next boot. Starting a service on a running system can disturb it. `rotate-machine-id`, for example, would change the machine id right away. `systemctl daemon-reload` runs on every upgrade, because unit files may have changed.
 - **Groups** take effect after the user logs in again.
 
@@ -183,6 +183,8 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 | `Q_BACKUPTOOLS` | `hd-backup` in `/usr/local/bin`, or `mbuffer` and `mt-st` installed. |
 | `Q_REPO_ENABLED`, `Q_REPO` | `hyprdebian.local.sources` and its URI, or the older `hyprdebian.local.list` and the URL in it. |
 | Other components | Their main package: `hyprland`, `iwd`, `ufw`, `docker.io`, `cups`, `rustup`, `openssh-server`. |
+
+The answers from `Q_IFACE` down are only worked out on hyprdebian. The Debian OSes do not ask these questions, so a detected answer could not be corrected, and would still change the rendered templates.
 
 The answers are saved at the end of the upgrade, so the next upgrade uses them without asking.
 

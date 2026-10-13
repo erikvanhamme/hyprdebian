@@ -26,7 +26,10 @@ upg_migrations() {
     mkdir -p "$(dirname "${TARGET_DIR}${MIGRATIONS_FILE}")" || return 1
 
     for file in migrations/*.sh; do
-        [[ -e "$file" ]] || continue
+        if [[ ! -e "$file" ]]; then
+            continue
+        fi
+
         name=$(basename "$file" .sh)
 
         if grep -qxF "$name" "${TARGET_DIR}${MIGRATIONS_FILE}" 2>/dev/null; then
@@ -51,18 +54,35 @@ upg_migrations() {
 # Installs the packages the new version adds. Packages that were removed after an earlier
 # installation or upgrade are not installed again.
 upg_packages() {
-    local packages
-    packages=$(new_items "${PACKAGES[*]}" "${INSTALLED_PACKAGES:-}")
+    local package
+    local install=()
+    local keep_out=()
 
-    if [[ -z "$packages" ]]; then
+    for package in $(new_items "${PACKAGES[*]}" "${INSTALLED_PACKAGES:-}"); do
+        if [[ "$package" != *- ]]; then
+            install+=("$package")
+        fi
+    done
+
+    if (( ${#install[@]} == 0 )); then
         return 0
     fi
 
-    echo "New packages: ${packages}"
+    # Entries like avahi-daemon- keep a package out, also when a new package recommends it. For a
+    # package that is installed, apt would remove it, together with the packages that depend on it.
+    # That is left to a migration, so these entries are only passed for packages that are not
+    # installed.
+    for package in "${PACKAGES[@]}"; do
+        if [[ "$package" == *- ]] && ! is_installed "${package%-}"; then
+            keep_out+=("$package")
+        fi
+    done
+
+    echo "New packages: ${install[*]}"
     in_target apt update || return 1
 
     # Upgrading the packages that are already installed is left to the user.
-    in_target apt install --no-upgrade ${packages}
+    in_target apt install --no-upgrade "${install[@]}" "${keep_out[@]}"
 }
 
 # Deploys the files in /etc/skel and /usr/local/bin that differ from the ones on the system.
@@ -157,7 +177,10 @@ upg_home() {
     local src rel
 
     for src in "${FILES[@]}"; do
-        [[ "$src" == deploy/etc/skel/* ]] || continue
+        if [[ "$src" != deploy/etc/skel/* ]]; then
+            continue
+        fi
+
         rel="${src#deploy/etc/skel/}"
 
         update_file "$src" "${Q_USER}" "${TARGET_DIR}/home/${Q_USER}/${rel}" || return 1

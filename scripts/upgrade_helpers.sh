@@ -69,8 +69,10 @@ install_prerequisites() {
     local package
     local packages=()
 
-    for package in python3-jinja2 mdadm; do
-        is_installed "$package" || packages+=("$package")
+    for package in python3-jinja2; do
+        if ! is_installed "$package"; then
+            packages+=("$package")
+        fi
     done
 
     if (( ${#packages[@]} == 0 )); then
@@ -122,7 +124,9 @@ new_items() {
 
     for item in $1; do
         for check in $2; do
-            [[ "$check" == "$item" ]] && continue 2
+            if [[ "$check" == "$item" ]]; then
+                continue 2
+            fi
         done
 
         result+=("$item")
@@ -144,7 +148,9 @@ find_session() {
         environ=$(tr '\0' '\n' 2>/dev/null < "/proc/$pid/environ") || environ=""
 
         if grep -q '^WAYLAND_DISPLAY=' <<< "$environ"; then
-            SESSION_USER=$(stat -c %U "/proc/$pid")
+            # /proc/<pid> is owned by the effective user, which is root for sudo. The real user
+            # is the user of the session.
+            SESSION_USER=$(id -nu "$(awk '/^Uid:/ { print $2 }' "/proc/$pid/status")")
             mapfile -t SESSION_ENV < <(grep -E '^(WAYLAND_DISPLAY|XDG_RUNTIME_DIR|DBUS_SESSION_BUS_ADDRESS)=' <<< "$environ")
             return 0
         fi

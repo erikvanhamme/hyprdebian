@@ -31,7 +31,7 @@ network_name() {
 # Succeeds when the user is a member of the group.
 # Usage: in_group <user> <group>
 in_group() {
-    id -nG "$1" 2>/dev/null | grep -qw "$2"
+    id -nG "$1" 2>/dev/null | tr ' ' '\n' | grep -qxF "$2"
 }
 
 # Succeeds when the root pool is mirrored over two disks.
@@ -128,6 +128,13 @@ detect_config() {
     else
         save_detected Q_SPECIFIC_KERNEL "true"
         save_detected Q_KERNEL "$(uname -r | cut -d+ -f1)"
+    fi
+
+    # The other questions are only asked on hyprdebian. On the Debian OSes, an answer to them,
+    # like Q_QEMU_KVM for a user in the libvirt group, would change the rendered templates, and
+    # it could not be corrected, because the question is not asked.
+    if [[ "$os" != "hyprdebian" ]]; then
+        return 0
     fi
 
     # The network. Older versions named the network files after the interface.

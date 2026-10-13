@@ -8,7 +8,7 @@ migrate() {
     local package removed
 
     # Not needed without cups, or when the packages are not installed.
-    if [[ "${Q_CUPS}" == "false" ]]; then
+    if [[ "${Q_CUPS}" != "true" ]]; then
         return 0
     fi
 
