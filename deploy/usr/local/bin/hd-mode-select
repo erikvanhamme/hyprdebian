@@ -66,14 +66,15 @@ fi
 # Assemble the mode string (e.g. "2560x1440@165.00")
 CLEAN_MODE="${SELECTED_RES}@${SELECTED_RATE}"
 
-# 4. Read current position and scale
+# 4. Read current position, scale and transform, so the mode change keeps them
 POS_X=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .x')
 POS_Y=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .y')
 CURRENT_SCALE=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .scale')
+CURRENT_TRANSFORM=$(echo "$MONITORS_JSON" | jq -r --arg mon "$TARGET_MONITOR" '.[] | select(.name == $mon) | .transform')
 
 # 5. Apply mode change using the Lua hl.monitor API via hyprctl eval
-EVAL_CMD=$(printf 'hl.monitor({ output = "%s", mode = "%s", position = "%dx%d", scale = "%s" })' \
-    "$TARGET_MONITOR" "$CLEAN_MODE" "$POS_X" "$POS_Y" "$CURRENT_SCALE")
+EVAL_CMD=$(printf 'hl.monitor({ output = "%s", mode = "%s", position = "%dx%d", scale = "%s", transform = %d })' \
+    "$TARGET_MONITOR" "$CLEAN_MODE" "$POS_X" "$POS_Y" "$CURRENT_SCALE" "$CURRENT_TRANSFORM")
 
 hyprctl eval "$EVAL_CMD"
 
