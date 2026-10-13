@@ -11,7 +11,9 @@ migrate() {
 
     # Not needed without encryption, or when fstab has no swap partition by UUID, like on systems
     # without swap or with the encrypted swap already.
-    [[ "${Q_ENCRYPT}" == "true" ]] || return 0
+    if [[ "${Q_ENCRYPT}" == "false" ]]; then
+        return 0
+    fi
 
     entries=$(awk '$1 !~ /^#/ && $3 == "swap" && $1 ~ /^UUID=/ { print substr($1, 6) }' "$fstab")
 

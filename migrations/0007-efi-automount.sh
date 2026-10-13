@@ -94,7 +94,9 @@ migrate() {
     local remove=()
     for unit in "${units[@]}"; do
         where="/${unit//-//}"
-        in_fstab "$where" && remove+=("$where")
+        if in_fstab "$where"; then
+            remove+=("$where")
+        fi
     done
 
     if (( ${#remove[@]} > 0 )); then

@@ -8,7 +8,9 @@ migrate() {
     local old="${TARGET_DIR}/etc/apt/conf.d/99sync-efi"
 
     # Not needed when the old hook is gone.
-    [[ -e "$old" ]] || return 0
+    if [[ ! -e "$old" ]]; then
+        return 0
+    fi
 
     echo "Removing ${old}, it is replaced by /etc/apt/apt.conf.d/99sync-efi"
     rm -f "$old" || return 1

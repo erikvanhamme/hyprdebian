@@ -12,7 +12,9 @@ migrate() {
     local needed=false
 
     # Not needed without libvirt, or when the masks are already there.
-    is_installed libvirt-daemon-system || return 0
+    if ! is_installed libvirt-daemon-system; then
+        return 0
+    fi
 
     if [[ "$(readlink "$dropin")" != "/dev/null" ]]; then
         needed=true
