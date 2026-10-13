@@ -48,6 +48,12 @@ source scripts/questions.sh
 source scripts/base.sh
 source scripts/optional.sh
 
+# Load the phases with the tasks that the queuing tasks attach to their hooks. Only these tasks
+# run, see upg_hooks.
+source scripts/packages.sh
+source scripts/services.sh
+source scripts/user.sh
+
 # Tasks that only make sense during an installation.
 mark_done "q_disk"
 mark_done "q_password"

@@ -29,12 +29,13 @@ pkg_qemu_kvm() {
 }
 
 pkg_enable_firewall() {
-    in_target ufw enable || return 1
-    in_target ufw logging off || return 1
-    
+    # Allow SSH before enabling the firewall, so an upgrade over ssh keeps accepting connections.
     if [[ "${Q_OPENSSH}" == "true" ]]; then
-        in_target ufw allow SSH
+        in_target ufw allow SSH || return 1
     fi
+
+    in_target ufw enable || return 1
+    in_target ufw logging off
 }
 
 add_dependencies "pkg_main" \

@@ -171,6 +171,19 @@ upg_home() {
     done
 }
 
+# Runs the tasks that the new version attaches to the hooks of the installer phases, like enabling
+# the firewall, when they did not run on this system yet. They run once, like they do during an
+# installation, in the order of the hooks.
+upg_hooks() {
+    local hook task
+
+    for hook in "${UPGRADE_HOOKS[@]}"; do
+        for task in $(new_items "${TASK_DEPS[$hook]//,/ }" "${INSTALLED_HOOK_TASKS:-}"); do
+            execute_task "$task" || return 1
+        done
+    done
+}
+
 upg_save_config() {
     save_config INSTALLED_VERSION "${INSTALLER_VERSION}"
     install -D -m 0600 "$CONFIG_FILE" "${INSTALLED_CONFIG_FILE}"
@@ -188,6 +201,7 @@ add_dependencies "upg_main" \
     "upg_groups" \
     "upg_services" \
     "upg_home" \
+    "upg_hooks" \
 
 add_dependencies "upg_post" \
     "upg_save_config" \

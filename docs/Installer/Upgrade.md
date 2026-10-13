@@ -40,7 +40,7 @@ The state of the upgrade itself is kept in `/tmp/hyprdebian-upgrade`, and is rem
 4. Checks that the system is up to date (`check_up_to_date`), and installs the packages the upgrade needs (`install_prerequisites`). See [Before the upgrade](#before-the-upgrade).
 5. Loads the answers of the installation (`load_installed_config`, then `load_config`). The queues and dependencies in the saved config were worked out by the version that wrote it, so they are left out. The old queues are kept apart, to find out what the new version adds. Without a saved config, the answers are worked out from the system, see [Systems installed before the upgrade existed](#systems-installed-before-the-upgrade-existed).
 6. Defines the root task `upgrade`.
-7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and marks the tasks that only make sense during an installation as done, so they are skipped.
+7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and `scripts/packages.sh`, `scripts/services.sh` and `scripts/user.sh` for the tasks on their hooks (see [Hook tasks](#hook-tasks)), and marks the tasks that only make sense during an installation as done, so they are skipped.
 8. Adds the tasks that work out the queues to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
 9. Runs `execute_task "upgrade"`, and when it succeeds, recommends a reboot.
 
@@ -76,6 +76,7 @@ The upgrade phase is in `scripts/upgrade.sh`, and is built like the [phases](Pha
 | | `upg_groups` | Adds the user to the groups the new version adds. |
 | | `upg_services` | Reloads systemd, and enables the services the new version adds. |
 | | `upg_home` | Updates the files from `/etc/skel` in the home directories of the user and root. |
+| | `upg_hooks` | Runs the tasks the new version attaches to the hooks of the installer phases, when they did not run on the system yet. See [Hook tasks](#hook-tasks). |
 | `upg_post` | `upg_save_config` | Writes the config back to `/etc/hyprdebian/installer.config`. |
 
 The upgrade stops at the first task that fails. The config is only written back at the end, so a failed upgrade does the same comparisons again on the next run.
@@ -126,6 +127,11 @@ For packages, services and groups, the upgrade only acts on what the new version
 
 Packages, services and groups that the new version no longer uses are not removed. That needs a migration.
 
+## Hook tasks
+Some queuing tasks attach a task to a hook of a later installer phase, for a step that does more than queuing. `o_firewall` attaches `pkg_enable_firewall` to `pkg_post`, `o_qemu_kvm` attaches `pkg_qemu_kvm` and `svc_qemu_kvm`, `o_desktop` attaches the tasks that create the log file and the directories in the home directory, and so on. The upgrade does not run these phases, so it runs these tasks itself in `upg_hooks`.
+
+The hooks are listed in `UPGRADE_HOOKS` in `scripts/upgrade_helpers.sh`: `pkg_post`, `svc_post` and `u_post`. Like packages, services and groups, a task only runs when the new version **adds** it: when it is attached to one of these hooks now, but was not in the dependencies saved by the installation or the last upgrade. So a task runs once, when its component is enabled for the first time during an upgrade, or when a new version adds the task. The tasks run at the end of `upg_main`, after the packages, files, services and groups, in the order of the hooks.
+
 ## Migrations
 A migration is a one-off change for systems that were installed or upgraded before the change, like masking a service, removing a file or a package that is no longer used, or moving a config file. Migrations are the files `migrations/NNNN-description.sh`. Each one defines a `migrate` function, written like a task.
 
@@ -150,7 +156,8 @@ It also has the functions the upgrade uses: `is_installed`, `check_up_to_date`, 
 ## Changing the installer with the upgrade in mind
 Because the upgrade runs the installer tasks that work out the queues, a few rules keep them working for both:
 
-- **Tasks that queue things must be safe to run on an installed system.** The `o_` tasks and the base tasks in [Working out the queues](#working-out-the-queues) also run during every upgrade, on the running system. Keep them to queuing. A step that does something, like masking a service, belongs in a task attached to a hook (see [Extending](Extending.md)), and needs a migration for systems that are already installed.
+- **Tasks that queue things must be safe to run on an installed system.** The `o_` tasks and the base tasks in [Working out the queues](#working-out-the-queues) also run during every upgrade, on the running system. Keep them to queuing. A step that does something, like masking a service, belongs in a task attached to a hook (see [Extending](Extending.md)).
+- **Tasks attached to `pkg_post`, `svc_post` and `u_post` must be safe to run on the running system.** The upgrade runs a new one once, see [Hook tasks](#hook-tasks). A task that already ran does not run again when it changes, so a change for systems that already have it needs a migration. Renaming a task makes it run again on every system that has its component.
 - **Generated values must be saved and reused.** A value that is generated during the installation, like `BR0_MAC_ADDRESS`, is saved with `save_config`, and only generated when there is no saved value yet. Otherwise every upgrade would generate a new one.
 - **Files go through a queue.** A file that a task deploys directly, with `file_deploy` or `template_render`, is not seen by the upgrade. Queue it with `add_files` or `add_template`, unless it must never be changed by an upgrade.
 - **Removing something needs a migration.** The upgrade only adds packages, services, groups and files. When the new version stops using one of them, add a migration that removes it.
@@ -181,5 +188,5 @@ The answers are saved at the end of the upgrade, so the next upgrade uses them w
 
 ### Other differences
 The upgrade also:
-- treats every package, service and group as new, once. Packages that are already installed are left alone, but services that were disabled are enabled again,
+- treats every package, service, group and hook task as new, once. Hook tasks like `pkg_enable_firewall` run again. Packages that are already installed are left alone, but services that were disabled are enabled again,
 - runs all migrations. Each migration first checks whether its change is needed, and is recorded as done without changing anything when it is not.

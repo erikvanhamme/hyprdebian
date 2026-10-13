@@ -7,6 +7,10 @@ TARGET_DIR=""
 STATE_DIR="/tmp/hyprdebian-upgrade"
 CONFIG_FILE="$STATE_DIR/config"
 
+# The hooks of the installer phases that the upgrade does not run. The tasks that the queuing
+# tasks attach to them, like pkg_enable_firewall, run in upg_hooks when the new version adds them.
+UPGRADE_HOOKS=(pkg_post svc_post u_post)
+
 in_target() {
     "$@"
 }
@@ -103,6 +107,11 @@ load_installed_config() {
     INSTALLED_PACKAGES=$(source "$INSTALLED_CONFIG_FILE" && echo "${PACKAGES:-}")
     INSTALLED_SERVICES=$(source "$INSTALLED_CONFIG_FILE" && echo "${SERVICES:-}")
     INSTALLED_USER_GROUPS=$(source "$INSTALLED_CONFIG_FILE" && echo "${USER_GROUPS:-}")
+
+    # The tasks that ran on the hooks of the installed version, one per line.
+    INSTALLED_HOOK_TASKS=$(source "$INSTALLED_CONFIG_FILE" && for hook in "${UPGRADE_HOOKS[@]}"; do
+        echo "${TASK_DEPS[$hook]:-}" | tr ',' '\n'
+    done)
 }
 
 # Prints the words of the first list that are not in the second list.
