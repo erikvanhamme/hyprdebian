@@ -207,6 +207,9 @@ b_console() {
 }
 
 b_buildtools() {
+    # Deployed before the kernel is installed, so no initramfs ever waits for a resume device.
+    file_deploy deploy/etc/initramfs-tools/conf.d/resume || return 1
+
     in_target apt install -y build-essential initramfs-tools
 }
 
