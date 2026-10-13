@@ -13,6 +13,8 @@ The upgrade must run as root, and from a terminal, because it can ask questions.
 
 The upgrade can be started again at any time. It starts fresh on every run, and every part of it only changes what is not up to date yet.
 
+Reboot the system after the upgrade. New services only start on the next boot, and migrations may change how the system boots, like the EFI mounts and the swap. The upgrade reminds you at the end.
+
 ## Before the upgrade
 Before it works out anything, the upgrade:
 1. **Checks that the system is up to date.** It runs `apt update`, and counts the packages `apt full-upgrade` would upgrade. When there are any, it recommends to upgrade the system first, and asks whether to continue anyway. The default is to stop. The upgrade installs new packages with their latest versions, and on a system that is behind, these can pull in upgrades of the packages they depend on, like `systemd`, while the rest of the system stays behind.
@@ -40,7 +42,7 @@ The state of the upgrade itself is kept in `/tmp/hyprdebian-upgrade`, and is rem
 6. Defines the root task `upgrade`.
 7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and marks the tasks that only make sense during an installation as done, so they are skipped.
 8. Adds the tasks that work out the queues to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
-9. Runs `execute_task "upgrade"`.
+9. Runs `execute_task "upgrade"`, and when it succeeds, recommends a reboot.
 
 ## Working out the queues
 The upgrade runs the tasks of the installer that decide what is installed, with the code of the new version:
@@ -113,7 +115,7 @@ When the merge is not finished, the file is left as it was, and the upgrade cont
 ### Templates
 The queued templates (see [Queues](Queues.md)) are rendered with the saved answers into `/tmp/hyprdebian-upgrade/templates`, and then handled like the other files in `/etc`. Rendering needs `python3-jinja2` on the system, which is one of the base packages.
 
-The templates for the disks, the boot loader and the apt sources (`fstab`, `crypttab`, `mdadm.conf`, the EFI mount units and the sources lists) are not queued, but rendered directly by their tasks during the installation. The upgrade never updates them. Only a migration changes them, like `0005-apt-sources` and `0007-efi-automount`.
+The templates for the disks, the boot loader and the apt sources (`fstab`, `crypttab`, `mdadm.conf`, the EFI mount units and the sources lists) are not queued, but rendered directly by their tasks during the installation. The upgrade never updates them. Only a migration changes them, like `0005-apt-sources`, `0007-efi-automount` and `0008-swap-encryption`.
 
 ## Packages, services and groups
 For packages, services and groups, the upgrade only acts on what the new version **adds**: what is in the new queue, but not in the queue saved by the installation or the last upgrade. A package that was removed, a service that was disabled or a group the user was taken out of after the installation is not brought back.
@@ -192,3 +194,4 @@ The upgrade also:
 | `0005-apt-sources` | Older versions defined the apt sources in the one-line format, in `/etc/apt/sources.list` and `sources.list.d/hyprdebian.local.list`. Renders `debian.sources` and, when the local repo is enabled, `hyprdebian.local.sources` from the templates when they are missing, like `b_apt_init`. Moves `sources.list` to `sources.list.bak`, which apt does not read, removes `hyprdebian.local.list` once `hyprdebian.local.sources` is there, and runs `apt update`. When the local repo is not enabled in the answers, `hyprdebian.local.list` is kept, so the repo is not lost. |
 | `0006-efi-sync-hook` | Older versions deployed the apt hook that runs `hd-sync-efi` on redundant installations to `/etc/apt/conf.d/99sync-efi`, which apt does not read, and let it call `/usr/local/sbin/hd-sync-efi`, which does not exist, so the secondary EFI partition was never synchronized. Removes the old hook, and `/etc/apt/conf.d` when it is empty. The upgrade adds the fixed hook in `/etc/apt/apt.conf.d` and installs `rsync`, which `hd-sync-efi` needs. |
 | `0007-efi-automount` | Older versions mounted the EFI partitions from `/etc/fstab`. Renders `boot-efi.mount`, and `boot-efi2.mount` on redundant drives, from the UUID in the fstab entry or of the mounted partition, adds the `.automount` units and enables them, like `b_mount_unit` does on a new installation. Then removes the entries for these mount points from `/etc/fstab`, keeping a copy in `/etc/fstab.bak`. The partitions stay mounted, and the automount units take over on the next boot. Units that are already there are left alone. |
+| `0008-swap-encryption` | Older versions used the swap partition unencrypted, also on an encrypted root filesystem. When the root is encrypted and `/etc/fstab` has a swap partition by UUID: installs `systemd-cryptsetup`, turns the swap off, adds the swap to `/etc/crypttab` with a random key on each boot, like `b_crypttab`, and points the swap entry in `/etc/fstab` to `/dev/mapper/swap`, keeping a copy in `/etc/fstab.swap.bak`. Then starts the encrypted swap, and rebuilds the initramfs, which would otherwise wait for the old swap partition to resume from on every boot. When the memory cannot hold what is in the swap, turning it off fails, and nothing is changed. The old partition is not wiped: what the old swap held stays on it until the encrypted swap overwrites it. |

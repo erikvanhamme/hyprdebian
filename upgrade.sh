@@ -68,3 +68,6 @@ source scripts/upgrade.sh
 
 # Start upgrade.
 execute_task "upgrade"
+
+# New services only start on the next boot, and migrations may change how the system boots.
+echo "The upgrade is done. Reboot the system to finish it."
