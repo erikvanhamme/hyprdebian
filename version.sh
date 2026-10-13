@@ -1,2 +1,2 @@
 # Installer version, shown in the start banner of install.sh.
-INSTALLER_VERSION="v0.159"
+INSTALLER_VERSION="v0.160"
