@@ -22,6 +22,7 @@ migrate() {
 
 - `migrate` is written like a task: it returns non-zero on failure, so use `|| return 1` between commands.
 - The answers (`Q_*`) are available, so a migration can check whether a feature is enabled.
+- The queues of the new version (`PACKAGES`, `SERVICES`, ...) are worked out before the migrations run, so a migration can check what the new version installs on the system.
 - Use `in_target` and `${TARGET_DIR}`, like the installer tasks.
 - A migration that needs a package the same version adds, installs it itself: migrations run before the new packages are installed.
 - Start `migrate` with a check whether the change is needed, and return 0 when it is not. A migration also runs on systems that already have the change, like systems installed after the change went into the installer but before the migration was added. Returning 0 records it as done, just like a migration that made the change.
