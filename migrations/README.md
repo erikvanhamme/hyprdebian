@@ -11,7 +11,9 @@ Add a file `NNNN-short-description.sh`, with the next free number, that defines 
 # Stops using the foo service, it is replaced by bar.
 migrate() {
     # Not needed when the service is already gone.
-    [[ -e ${TARGET_DIR}/etc/systemd/system/foo.service ]] || return 0
+    if [[ ! -e ${TARGET_DIR}/etc/systemd/system/foo.service ]]; then
+        return 0
+    fi
 
     in_target systemctl disable --now foo.service || return 1
     rm -f ${TARGET_DIR}/etc/systemd/system/foo.service
