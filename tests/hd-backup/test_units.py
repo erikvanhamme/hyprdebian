@@ -3,6 +3,10 @@
 import hashlib
 import os
 import stat
+import types
+
+from unittest import mock
+import stat
 
 from helpers import TempDirTestCase, load_hd_backup, make_socket, write_file
 
@@ -18,26 +22,110 @@ class TestTarBlocks(TempDirTestCase):
         self.assertEqual(hb.tar_blocks(513), 1024)
 
 
+def fake_status(kind='file', uid=1000, gid=1000, time_ns=1700000000_123456789):
+    # The fields of an lstat result that the estimate reads.
+    modes = {'file': stat.S_IFREG, 'dir': stat.S_IFDIR, 'symlink': stat.S_IFLNK}
+    return types.SimpleNamespace(st_mode=modes[kind] | 0o644, st_uid=uid, st_gid=gid, st_mtime_ns=time_ns,
+                                 st_atime_ns=time_ns, st_ctime_ns=time_ns)
+
+
+# The three time records with 10 digit seconds and 9 decimals: "30 mtime=1700000000.123456789\n".
+TIMES = 3 * 30
+
+
+class TestPaxRecordSize(TempDirTestCase):
+    def test_matches_records_of_tar(self):
+        for record in ['30 mtime=1700000000.123456789\n', '20 atime=1700000000\n', '11 atime=0\n',
+                       '14 mtime=-1.5\n', '31 mtime=99999999999.123456789\n']:
+            key, value = record.split(' ', 1)[1].rstrip('\n').split('=', 1)
+            self.assertEqual(hb.pax_record_size(key, len(value)), len(record), record)
+
+    def test_length_digits_grow_with_the_record(self):
+        # "99 path=<90 bytes>\n" is 99 bytes. One byte more needs a third digit: 101 bytes.
+        self.assertEqual(hb.pax_record_size('path', 90), 99)
+        self.assertEqual(hb.pax_record_size('path', 91), 101)
+        self.assertEqual(hb.pax_record_size('path', 991), 1002)
+
+
+class TestPaxTimeSize(TempDirTestCase):
+    def test_counts_all_decimals(self):
+        self.assertEqual(hb.pax_time_size('mtime', 1700000000_123456789), 30)
+        # tar writes "20 atime=1700000000\n" for a whole second, but the time can change before tar reads it.
+        self.assertEqual(hb.pax_time_size('atime', 1700000000_000000000), 30)
+
+    def test_short_negative_and_long_times(self):
+        self.assertEqual(hb.pax_time_size('mtime', 0), len('21 mtime=0.123456789\n'))
+        self.assertEqual(hb.pax_time_size('mtime', -1_500000000), len('22 mtime=-1.123456789\n'))
+        self.assertEqual(hb.pax_time_size('mtime', 99999999999_000000000), 31)
+
+
+class TestPaxDataSize(TempDirTestCase):
+    def test_short_path_has_only_times(self):
+        self.assertEqual(hb.pax_data_size('/a/b', fake_status(), 1), TIMES)
+
+    def test_path_record_over_100_bytes(self):
+        # The name in the tarball has no leading /: a path of 101 bytes is a name of 100.
+        self.assertEqual(hb.pax_data_size('/' + 'x' * 100, fake_status(), 1), TIMES)
+        self.assertEqual(hb.pax_data_size('/' + 'x' * 101, fake_status(), 1), TIMES + hb.pax_record_size('path', 101))
+
+    def test_directory_name_ends_with_slash(self):
+        self.assertEqual(hb.pax_data_size('/' + 'x' * 100, fake_status('dir'), 0),
+                         TIMES + hb.pax_record_size('path', 101))
+
+    def test_path_record_for_names_that_are_not_ascii(self):
+        self.assertEqual(hb.pax_data_size('/é', fake_status(), 1), TIMES + hb.pax_record_size('path', 2))
+
+    def test_linkpath_record(self):
+        self.assertEqual(hb.pax_data_size('/l', fake_status('symlink'), 0, 't' * 100), TIMES)
+        self.assertEqual(hb.pax_data_size('/l', fake_status('symlink'), 0, 't' * 101),
+                         TIMES + hb.pax_record_size('linkpath', 101))
+        self.assertEqual(hb.pax_data_size('/l', fake_status('symlink'), 0, 'ü'),
+                         TIMES + hb.pax_record_size('linkpath', 2))
+
+    def test_size_record_from_8_gib(self):
+        self.assertEqual(hb.pax_data_size('/f', fake_status(), 0o77777777777), TIMES)
+        self.assertEqual(hb.pax_data_size('/f', fake_status(), 0o77777777777 + 1),
+                         TIMES + hb.pax_record_size('size', 10))
+
+    def test_uid_and_gid_records_over_ustar_limit(self):
+        with mock.patch.object(hb, 'user_name', lambda uid: None), \
+                mock.patch.object(hb, 'group_name', lambda gid: None):
+            self.assertEqual(hb.pax_data_size('/f', fake_status(uid=2097151, gid=2097151), 1), TIMES)
+            self.assertEqual(hb.pax_data_size('/f', fake_status(uid=2097152, gid=3000000), 1),
+                             TIMES + hb.pax_record_size('uid', 7) + hb.pax_record_size('gid', 7))
+
+    def test_owner_name_records(self):
+        with mock.patch.object(hb, 'user_name', lambda uid: 'erik'), \
+                mock.patch.object(hb, 'group_name', lambda gid: 'g' * 40):
+            self.assertEqual(hb.pax_data_size('/f', fake_status(), 1), TIMES + hb.pax_record_size('gname', 40))
+        with mock.patch.object(hb, 'user_name', lambda uid: 'éric'), \
+                mock.patch.object(hb, 'group_name', lambda gid: 'users'):
+            self.assertEqual(hb.pax_data_size('/f', fake_status(), 1), TIMES + hb.pax_record_size('uname', 5))
+
+
+class TestOwnerNames(TempDirTestCase):
+    def test_known_and_unknown_ids(self):
+        self.assertEqual(hb.user_name(0), 'root')
+        self.assertEqual(hb.group_name(0), 'root')
+        # tar writes no name for an id without one, so there is no record for it.
+        self.assertIsNone(hb.user_name(3999999))
+        self.assertIsNone(hb.group_name(3999999))
+        self.assertEqual(hb.owner_name_size(None), 0)
+
+
 class TestTarItemSize(TempDirTestCase):
-    def test_short_path_empty_item(self):
-        # Extended header block, one block of extended header data and a ustar header block.
-        self.assertEqual(hb.tar_item_size('/a', 0), 3 * 512)
+    def test_headers_and_contents(self):
+        # Extended header block, one block of extended header data, ustar header block, then the contents.
+        self.assertEqual(hb.tar_item_size('/a', fake_status(), 0), 3 * 512)
+        self.assertEqual(hb.tar_item_size('/a', fake_status(), 1), 4 * 512)
+        self.assertEqual(hb.tar_item_size('/a', fake_status(), 512), 4 * 512)
+        self.assertEqual(hb.tar_item_size('/a', fake_status(), 513), 5 * 512)
 
-    def test_data_is_padded_to_blocks(self):
-        self.assertEqual(hb.tar_item_size('/a', 1), 4 * 512)
-        self.assertEqual(hb.tar_item_size('/a', 512), 4 * 512)
-        self.assertEqual(hb.tar_item_size('/a', 513), 5 * 512)
-
-    def test_long_path_takes_more_header_data(self):
-        self.assertGreater(hb.tar_item_size('/' + 'x' * 600, 0), hb.tar_item_size('/x', 0))
-
-    def test_long_link_target_takes_more_header_data(self):
-        self.assertGreater(hb.tar_item_size('/l', 0, 't' * 600), hb.tar_item_size('/l', 0, 't'))
-
-    def test_counts_bytes_not_characters(self):
-        # 'é' is 2 bytes in UTF-8: 150 of them do not fit with the margin in one block, 150 'e' do.
-        self.assertEqual(hb.tar_item_size('/' + 'e' * 150, 0), 3 * 512)
-        self.assertEqual(hb.tar_item_size('/' + 'é' * 150, 0), 4 * 512)
+    def test_extended_header_data_over_one_block(self):
+        # The times take 90 bytes, so a path record of 422 bytes fills the first block: a name of 412 bytes.
+        self.assertEqual(hb.pax_record_size('path', 412), 512 - TIMES)
+        self.assertEqual(hb.tar_item_size('/' + 'x' * 412, fake_status(), 0), 3 * 512)
+        self.assertEqual(hb.tar_item_size('/' + 'x' * 413, fake_status(), 0), 4 * 512)
 
 
 class TestIsExcluded(TempDirTestCase):

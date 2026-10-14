@@ -153,7 +153,10 @@ class TestFileList(WriteTestCase):
             [self.path('data', 'f1'), self.path('data', 'dir'), self.path('data', 'dir', 'sub'),
              self.path('data', 'dir', 'sub', 'f2')])
         self.assertEqual(entries[:-1], [os.fsencode(path.lstrip('/')) for path in expected])
-        self.assertEqual([symlink[1:] for symlink in symlinks], [(self.path('data', 'l1'), 'f1')])
+        self.assertEqual([(item.path, item.size) for item in symlinks], [(self.path('data', 'l1'), 0)])
+        # Every item knows the bytes it takes in the tarball: at least three header blocks.
+        for item in symlinks + files:
+            self.assertGreaterEqual(item.tar_size, 3 * 512)
 
     def test_leaves_out_what_is_written(self):
         self.record_written('bk')
@@ -181,7 +184,7 @@ class TestFileList(WriteTestCase):
         with quiet():
             name, symlinks, files = self.hb.write_create_filelist(self.db, self.fileset, self.backup,
                                                                   '/tmp/deletes_x.py')
-        self.assertIn(1000, [file[2] for file in files if file[1] == self.path('data', 'f1')])
+        self.assertIn(1000, [item.size for item in files if item.path == self.path('data', 'f1')])
 
     def test_fails_when_file_is_gone(self):
         os.remove(self.path('data', 'f1'))
@@ -239,8 +242,8 @@ class TestWritePrepare(WriteTestCase):
 class TestWriteUpdateDb(WriteTestCase):
     def test_records_tarball_and_links(self):
         carrier = self.value("SELECT number FROM carrier WHERE label='c1'")
-        files = self.rows('SELECT number, path, size FROM files')
-        symlinks = self.rows('SELECT number, path, target FROM symlinks')
+        files = [self.hb.WriteItem(*row, 0) for row in self.rows('SELECT number, path, size FROM files')]
+        symlinks = [self.hb.WriteItem(*row, 0, 0) for row in self.rows('SELECT number, path FROM symlinks')]
         with quiet():
             self.hb.write_update_db(self.db, carrier, 0, 6, 100, symlinks, files, False)
         self.assertEqual(self.rows('SELECT carrier_number, idx, size, files, symlinks, overhead FROM tarballs'),

@@ -16,8 +16,11 @@
 
 import argparse
 import datetime
+import functools
+import grp
 import hashlib
 import os
+import pwd
 import re
 import shlex
 import sqlite3
@@ -34,7 +37,7 @@ import tabulate
 
 from colorama import Fore
 
-TOOL_VERSION = 12
+TOOL_VERSION = 13
 DB_VERSION = 8
 DB_PATH = '~/.local/share/hyprdebian/hd-backup.db'
 
@@ -100,13 +103,90 @@ def tar_blocks(size):
     return (size + 511) // 512 * 512
 
 
-def tar_item_size(path, size, target=''):
-    # Every item in a pax tarball is an extended header (a header block and its data), a ustar header block and the
-    # data of the item. The extended header holds the times, and the path and link target when they are long. Its
-    # data is estimated generously: overestimating only means that fewer items are recorded as written when a carrier
-    # runs full.
-    pax_data = 256 + len(os.fsencode(path)) + len(os.fsencode(target))
-    return 512 + tar_blocks(pax_data) + 512 + tar_blocks(size)
+# Limits of the ustar header. A value over its limit goes in a record of the pax extended header.
+USTAR_NAME_SIZE = 100
+USTAR_MAX_SIZE = 0o77777777777
+USTAR_MAX_ID = 0o7777777
+USTAR_OWNER_NAME_SIZE = 32
+
+
+def pax_record_size(key, value_size):
+    # A pax record is "<length> <key>=<value>\n". The length counts the whole record, its own digits too.
+    rest = len(key) + value_size + 3
+    digits = 1
+    while len(str(rest + digits)) != digits:
+        digits += 1
+    return rest + digits
+
+
+def pax_time_size(key, time_ns):
+    # tar writes a time as seconds with up to 9 decimals, without trailing zeros. atime and ctime can change between
+    # this estimate and the moment tar reads them, so the longest form is counted: all 9 decimals.
+    seconds = len(str(abs(time_ns) // 1000000000))
+    if time_ns < 0:
+        seconds += 1
+    return pax_record_size(key, seconds + 1 + 9)
+
+
+def owner_name_size(name):
+    # The size of a pax record for a user or group name, when it does not fit in the ustar header.
+    if name is None or (len(name) < USTAR_OWNER_NAME_SIZE and name.isascii()):
+        return 0
+    return pax_record_size('uname', len(name.encode()))
+
+
+@functools.cache
+def user_name(uid):
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return None
+
+
+@functools.cache
+def group_name(gid):
+    try:
+        return grp.getgrgid(gid).gr_name
+    except KeyError:
+        return None
+
+
+def pax_data_size(path, status, size, target=''):
+    # The data of the pax extended header that tar writes for an item, with the options of write_tar. tar always
+    # writes atime and ctime, and mtime when it is not a whole second; it is counted always. The other records are
+    # only there when a value does not fit in the ustar header.
+    data = pax_time_size('mtime', status.st_mtime_ns)
+    data += pax_time_size('atime', status.st_atime_ns)
+    data += pax_time_size('ctime', status.st_ctime_ns)
+
+    # The name in the tarball is relative to /. A directory has a / at the end.
+    name = path.lstrip('/')
+    if stat.S_ISDIR(status.st_mode):
+        name += '/'
+    if len(name.encode()) > USTAR_NAME_SIZE or not name.isascii():
+        data += pax_record_size('path', len(name.encode()))
+
+    if len(target.encode()) > USTAR_NAME_SIZE or not target.isascii():
+        data += pax_record_size('linkpath', len(target.encode()))
+
+    if size > USTAR_MAX_SIZE:
+        data += pax_record_size('size', len(str(size)))
+
+    if status.st_uid > USTAR_MAX_ID:
+        data += pax_record_size('uid', len(str(status.st_uid)))
+    if status.st_gid > USTAR_MAX_ID:
+        data += pax_record_size('gid', len(str(status.st_gid)))
+
+    data += owner_name_size(user_name(status.st_uid))
+    data += owner_name_size(group_name(status.st_gid))
+
+    return data
+
+
+def tar_item_size(path, status, size, target=''):
+    # The bytes tar writes for an item: the extended header (a header block and its data), the ustar header block and
+    # the contents. status is the lstat of the item, size the size of its contents, target the target of a symlink.
+    return 512 + tar_blocks(pax_data_size(path, status, size, target)) + 512 + tar_blocks(size)
 
 #----------------------------------------------------------------------------------------------------------------------
 # Database
@@ -585,6 +665,9 @@ for path in paths:
         print(f'Could not remove {{full_path}}: {{e.strerror}}')
 '''
 
+# An item to write: its record number, its path, the size of its contents and the bytes it takes in the tarball.
+WriteItem = namedtuple('WriteItem', 'number path size tar_size')
+
 # How tar, or the tape pipeline, ended.
 TarResult = namedtuple('TarResult', 'bytes_written full changed failed')
 
@@ -655,31 +738,43 @@ def write_create_deletelist(db, fileset_number, backup_number):
     return deletelist_name, os.path.getsize(deletelist_name)
 
 
+def lstat_or_none(path):
+    try:
+        return os.lstat(path)
+    except FileNotFoundError:
+        return None
+
+
 def write_create_filelist(db, fileset_number, backup_number, deletelist_name):
     # The items to write: the files and symlinks of the fileset that are not in a tarball of this backup yet. They are
     # listed in the file list for tar, after the delete list.
     files_to_write = []
     for number, path, size in items_not_in_backup(db, FILE, 'files.number, files.path, files.size',
                                                   fileset_number, backup_number):
-        if os.path.islink(path) or not os.path.exists(path):
+        status = lstat_or_none(path)
+        if status is None or stat.S_ISLNK(status.st_mode):
             fail('There are files labeled as on disk that do not exist. Update the fileset first.')
 
         # tar writes the size the file has when it reads it. When the file grew since the fileset was updated, the
         # size on disk is used to work out what fits on a full carrier.
-        if os.path.isfile(path):
-            size = max(size, os.path.getsize(path))
+        if stat.S_ISREG(status.st_mode):
+            size = max(size, status.st_size)
 
-        files_to_write.append((number, path, size))
+        files_to_write.append(WriteItem(number, path, size, tar_item_size(path, status, size)))
 
-    symlinks_to_write = items_not_in_backup(db, SYMLINK, 'symlinks.number, symlinks.path, symlinks.target',
-                                            fileset_number, backup_number)
-    for number, path, target in symlinks_to_write:
-        if not os.path.islink(path):
+    symlinks_to_write = []
+    for number, path in items_not_in_backup(db, SYMLINK, 'symlinks.number, symlinks.path',
+                                            fileset_number, backup_number):
+        status = lstat_or_none(path)
+        if status is None or not stat.S_ISLNK(status.st_mode):
             fail('There are symlinks labeled as on disk that do not exist. Update the fileset first.')
+
+        # tar writes the target the symlink has now.
+        symlinks_to_write.append(WriteItem(number, path, 0, tar_item_size(path, status, 0, os.readlink(path))))
 
     # tar writes the items in this order. The names are separated by null characters, so that any character can be in
     # a name, and are relative to /. Every write has a file list of its own, removed after the write.
-    names = [deletelist_name] + [symlink[1] for symlink in symlinks_to_write] + [file[1] for file in files_to_write]
+    names = [deletelist_name] + [item.path for item in symlinks_to_write] + [item.path for item in files_to_write]
     descriptor, filelist_name = tempfile.mkstemp(prefix='hd-backup-filelist-', suffix='.txt')
     with os.fdopen(descriptor, 'w') as filelist:
         for name in names:
@@ -812,35 +907,31 @@ def write_tar(filelist_name, target, tarball_index, is_tape):
     return result.bytes_written, result.full
 
 
-def write_determine_written(bytes_written, full, symlinks_to_write, files_to_write, deletelist_name, deletelist_size):
+def write_determine_written(bytes_written, full, symlinks_to_write, files_to_write, deletelist_tar_size):
     if full:
         # An item is on the carrier when it ends within the bytes that were written. tar writes the items in the order
         # of the file list: the delete list, the symlinks, then the files.
         symlinks_written = []
         files_written = []
-        position = tar_item_size(deletelist_name, deletelist_size)
+        position = deletelist_tar_size
 
-        for symlink in symlinks_to_write:
-            number, path, target = symlink
-            position += tar_item_size(path, 0, target)
+        for item in symlinks_to_write:
+            position += item.tar_size
             if position > bytes_written:
                 break
-            symlinks_written.append(symlink)
+            symlinks_written.append(item)
 
         if len(symlinks_written) == len(symlinks_to_write):
-            for file in files_to_write:
-                number, path, size = file
-                position += tar_item_size(path, size)
+            for item in files_to_write:
+                position += item.tar_size
                 if position > bytes_written:
                     break
-                files_written.append(file)
+                files_written.append(item)
     else:
         symlinks_written = symlinks_to_write
         files_written = files_to_write
 
-    total_size = 0
-    for number, path, size in files_written:
-        total_size += size
+    total_size = sum(item.size for item in files_written)
 
     overhead = bytes_written - total_size
 
@@ -864,7 +955,7 @@ def write_update_db(db, carrier_number, tarball_index, total_size, overhead, sym
     for kind, items in ((SYMLINK, symlinks_written), (FILE, files_written)):
         for item in items:
             db.execute(f'INSERT INTO {kind.tarball_links}({kind.number}, tarball_number) VALUES(?, ?)',
-                       (item[0], tarball_number))
+                       (item.number, tarball_number))
 
     if full:
         db.execute('UPDATE carrier SET full=1 WHERE number=?', (carrier_number,))
@@ -882,6 +973,7 @@ def write_target(db, backup_name, target, is_tape):
     try:
         deletelist_name, deletelist_size = write_create_deletelist(db, fileset_number, backup_number)
         temp_files.append(deletelist_name)
+        deletelist_tar_size = tar_item_size(deletelist_name, os.lstat(deletelist_name), deletelist_size)
 
         filelist_name, symlinks_to_write, files_to_write = write_create_filelist(db, fileset_number, backup_number,
                                                                                  deletelist_name)
@@ -902,7 +994,7 @@ def write_target(db, backup_name, target, is_tape):
             os.remove(name)
 
     symlinks_written, files_written, overhead, total_size = write_determine_written(
-        bytes_written, full, symlinks_to_write, files_to_write, deletelist_name, deletelist_size)
+        bytes_written, full, symlinks_to_write, files_to_write, deletelist_tar_size)
 
     write_update_db(db, carrier_number, tarball_index, total_size, overhead, symlinks_written, files_written, full)
 

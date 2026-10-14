@@ -215,9 +215,10 @@ class DbTestCase(TempDirTestCase):
                     WHERE carrier.backup_number=?
                 )
             ''', (fileset_number, backup_number))
-        files = [(number, path, 0) for number, path in written['file']]
+        files = [self.hb.WriteItem(number, path, 0, 0) for number, path in written['file']]
+        symlinks = [self.hb.WriteItem(number, path, 0, 0) for number, path in written['symlink']]
         with quiet():
-            self.hb.write_update_db(self.db, carrier_number, index, 0, 0, written['symlink'], files, full)
+            self.hb.write_update_db(self.db, carrier_number, index, 0, 0, symlinks, files, full)
         return written
 
     def file_records(self, path):
