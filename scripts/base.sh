@@ -20,6 +20,7 @@ b_files() {
         deploy/etc/default/zramswap \
         deploy/etc/profile.d/local-bin-path.sh \
         deploy/etc/sysctl.d/50-zram.conf \
+        deploy/etc/systemd/system/getty@.service.d/numlock.conf \
         deploy/etc/update-motd.d/00-hyprdebian \
         deploy/etc/skel/.config/nano/nanorc \
         deploy/etc/skel/.bash_aliases \
