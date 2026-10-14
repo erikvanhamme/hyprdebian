@@ -117,6 +117,13 @@ def is_root():
     return os.geteuid() == 0
 
 
+def user_namespaces_work():
+    # Unprivileged user namespaces let a test mount a file system of its own, without root.
+    if shutil.which('unshare') is None:
+        return False
+    return subprocess.run(['unshare', '--map-root-user', '--mount', 'true'], capture_output=True).returncode == 0
+
+
 class TempDirTestCase(unittest.TestCase):
     # A test with its own temporary directory, removed afterwards. The temporary files of hd-backup go to the
     # subdirectory tmp, so a test can check which are left. Delete lists the tool leaves in /tmp during the test are
@@ -231,11 +238,13 @@ class CliTestCase(TempDirTestCase):
         os.makedirs(self.home)
         os.makedirs(self.data)
 
-    def run_cli(self, *args, expect=0, path_prefix=None):
+    def run_cli(self, *args, expect=0, path_prefix=None, wrapper=()):
+        # wrapper is a command that runs hd-backup, given as its last arguments.
         env = dict(os.environ, HOME=self.home, TMPDIR=self.tempdir)
         if path_prefix is not None:
             env['PATH'] = path_prefix + os.pathsep + env['PATH']
-        result = subprocess.run([sys.executable, HD_BACKUP] + list(args), env=env, capture_output=True, text=True)
+        result = subprocess.run(list(wrapper) + [sys.executable, HD_BACKUP] + list(args), env=env, capture_output=True,
+                                text=True)
         if expect is not None:
             self.assertEqual(result.returncode, expect,
                              f'hd-backup {" ".join(args)} exited with {result.returncode}:\n'

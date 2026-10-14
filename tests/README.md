@@ -24,7 +24,7 @@ python3 -m unittest test_scan.TestScan.test_recreated_file_is_on_disk_and_old_re
 ```
 
 ## hd-backup
-Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c`. They need `python3-colorama`, `python3-tabulate` and `tar`; the `blockwrite` tests also need `gcc`. They run as a normal user, and only touch temporary directories. A few tests are skipped as root, because root can read files without read permission.
+Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c`. They need `python3-colorama`, `python3-tabulate` and `tar`; the `blockwrite` tests also need `gcc`. They run as a normal user, and only touch temporary directories. A few tests are skipped as root, because root can read files without read permission. The test of a hard drive that runs full mounts a small tmpfs in a user namespace of its own, with `unshare` from util-linux; it is skipped where unprivileged user namespaces are not available.
 
 | File | Tests |
 | --- | --- |

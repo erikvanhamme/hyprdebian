@@ -34,7 +34,7 @@ import tabulate
 
 from colorama import Fore
 
-TOOL_VERSION = 11
+TOOL_VERSION = 12
 DB_VERSION = 8
 DB_PATH = '~/.local/share/hyprdebian/hd-backup.db'
 
@@ -730,6 +730,10 @@ def parse_tar_output(lines, returncode):
                 bytes_written = int(match.group())
         elif 'No space left on device' in line:
             full = True
+        elif re.search(r'Wrote only [0-9]+ of [0-9]+ bytes', line):
+            # A file system that runs full takes part of a record, and only refuses the next write. tar stops at the
+            # short write, without a "No space left on device".
+            full = True
         elif 'Broken pipe' in line:
             broken_pipes.append(line)
         elif 'file changed as we read it' in line:
@@ -778,6 +782,11 @@ def write_tar(filelist_name, target, tarball_index, is_tape):
 
     result = parse_tar_output(lines, process.returncode)
 
+    # On a hard drive, the size of the tarball is what is on the carrier. The totals of tar leave out a record that
+    # was only written in part when the drive ran full.
+    if not is_tape and os.path.exists(filename):
+        result = result._replace(bytes_written=os.path.getsize(filename))
+
     if result.failed:
         for line in lines:
             printc(line, Fore.RED)
@@ -791,6 +800,9 @@ def write_tar(filelist_name, target, tarball_index, is_tape):
     for line in lines:
         if 'Total bytes written' in line:
             printc(line, Fore.GREEN)
+        elif result.full and ('No space left on device' in line or 'Wrote only' in line):
+            # Why the carrier counts as full.
+            printc(line, Fore.YELLOW)
 
     for line in result.changed:
         printc(f'WARNING: {line}', Fore.YELLOW)

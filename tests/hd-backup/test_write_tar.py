@@ -25,12 +25,16 @@ class TestWriteTar(TempDirTestCase):
         path.start()
         self.addCleanup(path.stop)
 
-    def stub_tar(self, messages, status, stdout=''):
+    def stub_tar(self, messages, status, stdout='', tarball_size=None):
         # A tar that prints the messages on stderr and exits with the status. For a tape write, it puts stdout on
-        # the stream.
+        # the stream. With tarball_size, it writes a tarball of that size to the file given with -cf.
         lines = ' '.join(shlex.quote(message) for message in messages)
         printf = f"printf '%s\\n' {lines} >&2\n" if messages else ''
-        write_stub(self.bin, 'tar', f'#!/bin/sh\nprintf %s {shlex.quote(stdout)}\n{printf}exit {status}\n')
+        tarball = ''
+        if tarball_size is not None:
+            tarball = ('while [ $# -gt 0 ]; do if [ "$1" = "-cf" ]; then tarball="$2"; fi; shift; done\n'
+                       f'head -c {tarball_size} /dev/zero > "$tarball"\n')
+        write_stub(self.bin, 'tar', f'#!/bin/sh\n{tarball}printf %s {shlex.quote(stdout)}\n{printf}exit {status}\n')
 
     def target_for(self, is_tape):
         if is_tape:
@@ -88,6 +92,35 @@ class TestWriteTar(TempDirTestCase):
                        'tar: Error is not recoverable: exiting now', 'Total bytes written: 4194304'], 2)
         result, output = self.write_tar()
         self.assertEqual(result, (4194304, True))
+
+    def test_short_write_means_full(self):
+        # A file system that runs full takes part of the last record. tar then reports the short write, and not
+        # "No space left on device".
+        self.stub_tar(['tar: target/backup-0.tar: Wrote only 2097152 of 4194304 bytes',
+                       'tar: Error is not recoverable: exiting now', 'Total bytes written: 4194304'], 2)
+        result, output = self.write_tar()
+        self.assertEqual(result, (4194304, True))
+
+    def test_short_write_with_other_problem_fails(self):
+        self.stub_tar(['tar: data/g: Cannot open: Permission denied',
+                       'tar: target/backup-0.tar: Wrote only 2097152 of 4194304 bytes', TOTALS], 2)
+        self.assert_fails()
+
+    def test_bytes_on_hard_drive_are_the_tarball_size(self):
+        # tar counts only whole records. The part of the last record that is on the drive counts too.
+        self.stub_tar(['tar: target/backup-0.tar: Wrote only 2097152 of 4194304 bytes',
+                       'tar: Error is not recoverable: exiting now', 'Total bytes written: 4194304'], 2,
+                      tarball_size=6291456)
+        result, output = self.write_tar()
+        self.assertEqual(result, (6291456, True))
+
+    def test_bytes_on_tape_come_from_blockwrite_not_a_file(self):
+        self.stub_tar([], 0, stdout='tarball')
+        write_stub(self.bin, 'mbuffer', '#!/bin/sh\ncat\n')
+        write_stub(self.bin, 'blockwrite', '#!/bin/sh\ncat > "$1"\necho "Total bytes written: 4194304" >&2\n')
+        result, output = self.write_tar(is_tape=True)
+        # The device holds 7 bytes from the stub, blockwrite reports what a real drive would.
+        self.assertEqual(result, (4194304, False))
 
     def test_broken_pipe_when_full_is_expected(self):
         self.stub_tar(['Error writing block to device: No space left on device', 'cat: write error: Broken pipe',

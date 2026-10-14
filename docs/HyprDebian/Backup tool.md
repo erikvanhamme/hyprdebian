@@ -41,7 +41,7 @@ It is created on the first run. Because it is in the home directory, every user 
 
 The database has a version number. The tool refuses to work with a database of a different version (`Incompatible database version`). The current versions are shown in the start banner:
 ```
-Backuptool [tool V11, database V8]
+Backuptool [tool V12, database V8]
 ```
 
 The database is the only record of what is on which carrier. Keep a copy of it somewhere else than on the system it protects, for example on the backup carriers themselves.
@@ -167,7 +167,7 @@ Every tarball is one file on the tape. Tarball `N` is file number `N`.
 The time the write started and finished is printed, and at the end the number of files and symlinks backed up.
 
 ### When a carrier runs full
-When `tar` (on a hard drive) or `blockwrite` (on tape) reports `No space left on device`, the write is not treated as an error. The tool works out from the number of bytes that reached the carrier which items fit completely, records only those as written, and marks the carrier full. On tape, the count comes from `blockwrite`, because `tar` also counts what is still in the buffer of `mbuffer`. The size of the tar headers is estimated on the safe side, so an item near the end can be left out although it fits. The items that are not recorded are written by the next write, on the next carrier.
+When `tar` (on a hard drive) or `blockwrite` (on tape) reports `No space left on device`, or `tar` reports that it `Wrote only` part of a record, the write is not treated as an error. A hard drive that runs full usually takes part of the last record first, so `tar` reports the short write. The tool works out from the number of bytes that reached the carrier which items fit completely, records only those as written, and marks the carrier full. On a hard drive, the count is the size of the tarball file, which includes the record that was written in part. On tape, the count comes from `blockwrite`, because `tar` also counts what is still in the buffer of `mbuffer`. The size of the tar headers is estimated on the safe side, so an item near the end can be left out although it fits. The items that are not recorded are written by the next write, on the next carrier.
 
 On a hard drive, the incomplete tarball stays on the drive. The items at its end that are not recorded in the database are in it, but may be cut off.
 

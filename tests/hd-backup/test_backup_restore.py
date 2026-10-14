@@ -2,11 +2,13 @@
 # result with the live tree. Tape drives are replaced by stub programs.
 
 import os
+import shlex
 import shutil
+import subprocess
 import tarfile
 import unittest
 
-from helpers import CliTestCase, is_root, snapshot, write_file, write_stub
+from helpers import CliTestCase, is_root, snapshot, user_namespaces_work, write_file, write_stub
 
 # Stubs for the programs a tape write runs. mt-st logs its arguments. mbuffer passes the stream on.
 MT_ST_STUB = '#!/bin/sh\necho "$@" >> "$(dirname "$0")/mt-st.log"\n'
@@ -191,6 +193,91 @@ class TestWriteErrors(BackupTestCase):
         self.run_cli('write', 'bk', second)
         self.assertIn('All files of the fileset are on carrier', self.run_cli('summary').stdout)
         self.restore_and_compare(self.tarballs(second))
+
+
+@unittest.skipUnless(user_namespaces_work(), 'unprivileged user namespaces are not available')
+class TestFullDrive(BackupTestCase):
+    # A hard drive that runs full, played by a small tmpfs. It is mounted in a user namespace of its own, so no root
+    # is needed and nothing outside the test sees it. Like a real drive, it takes part of the last write of tar,
+    # and only refuses the next one. /dev/full refuses every write at once, so it does not show this.
+
+    def setUp(self):
+        super().setUp()
+        for name in ('a', 'b', 'c'):
+            self.write(name, os.urandom(3000000))
+        self.run_cli('add-fileset', 'fs', self.data)
+        self.run_cli('add-backup', 'bk', 'fs')
+        self.run_cli('add-carrier', 'bk', 'c1', 'c2')
+
+    def write_to_small_drive(self, size):
+        # Mounts a tmpfs of the size on the target, writes the backup to it, and copies the tarball out before the
+        # namespace and its tmpfs are gone.
+        drive = self.path('drive')
+        saved = self.path('saved')
+        os.makedirs(drive)
+        os.makedirs(saved)
+        script = (f'mount -t tmpfs -o size={size} none {shlex.quote(drive)} || exit 99; '
+                  f'"$@"; status=$?; cp {shlex.quote(drive)}/backup-0.tar {shlex.quote(saved)}/; exit $status')
+        result = self.run_cli('write', 'bk', drive, expect=None,
+                              wrapper=['unshare', '--map-root-user', '--mount', 'sh', '-c', script, 'sh'])
+        self.assertNotEqual(result.returncode, 99, 'could not mount a tmpfs')
+        return result, os.path.join(saved, 'backup-0.tar')
+
+    def complete_members(self, tarball):
+        # The items that are complete in a tarball that was cut off.
+        size = os.path.getsize(tarball)
+        complete = set()
+        with tarfile.open(tarball) as archive:
+            while True:
+                try:
+                    member = archive.next()
+                except tarfile.ReadError:
+                    break
+                if member is None:
+                    break
+                if member.offset_data + (member.size if member.isreg() else 0) <= size:
+                    complete.add('/' + member.name)
+        return complete
+
+    def recorded(self, label):
+        # The paths of the files recorded as written to a carrier.
+        rows = self.query('SELECT path FROM files '
+                          'JOIN file_tarball_links ON file_number=files.number '
+                          'JOIN tarballs ON tarballs.number=tarball_number '
+                          'JOIN carrier ON carrier.number=carrier_number '
+                          'WHERE label=?', (label,))
+        return {row[0] for row in rows}
+
+    def test_drive_runs_full_and_backup_continues_on_next_carrier(self):
+        # 6 MiB: tar writes one record of 4 MiB, and 2 MiB of the next.
+        result, tarball = self.write_to_small_drive('6m')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Wrote only 2097152 of 4194304 bytes', result.stdout + result.stderr)
+        self.assertEqual(self.query('SELECT label, full FROM carrier ORDER BY label'), [('c1', 1), ('c2', 0)])
+        self.assertEqual(os.path.getsize(tarball), 6291456)
+
+        # a and b are complete in the 6 MiB on the drive and are recorded. b ends in the record that was written in
+        # part, so it is only recorded because the size of the tarball is used, not the totals of tar.
+        recorded = self.recorded('c1')
+        self.assertEqual(recorded, {os.path.join(self.data, 'a'), os.path.join(self.data, 'b')})
+        self.assertLessEqual(recorded, self.complete_members(tarball))
+
+        # The next write puts c on the next carrier.
+        second = self.path('second')
+        os.makedirs(second)
+        self.run_cli('write', 'bk', second)
+        self.assertEqual(self.recorded('c2'), {os.path.join(self.data, 'c')})
+        self.assertIn('All files of the fileset are on carrier', self.run_cli('summary').stdout)
+
+        # A restore of both: tar stops with an error at the end of the cut off tarball, after a and b. The second
+        # tarball holds c, and its delete list runs at the end.
+        restore_dir = self.path('restore')
+        os.makedirs(restore_dir)
+        extract = subprocess.run(['tar', '-xf', tarball, '-C', restore_dir], capture_output=True)
+        self.assertNotEqual(extract.returncode, 0)
+        self.restore([os.path.join(second, 'backup-0.tar')], restore_dir)
+        self.assertEqual(snapshot(self.restored(restore_dir, self.data)), self.live())
+        self.assertEqual(self.new_deletelists(), [])
 
 
 class TestTape(BackupTestCase):
