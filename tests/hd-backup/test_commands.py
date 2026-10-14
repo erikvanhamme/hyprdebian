@@ -103,6 +103,8 @@ class TestCommands(CliTestCase):
         os.remove(os.path.join(self.data, 'f'))
         result = self.run_cli('write', 'bk', self.target, expect=1)
         self.assertIn('Update the fileset first', result.stdout)
+        # The delete list was made before the file list failed. It is removed as well.
+        self.assertEqual(self.new_deletelists(), [])
 
     def test_scan_warning_fails_the_command(self):
         os.mkdir(os.path.join(self.data, 'closed'))

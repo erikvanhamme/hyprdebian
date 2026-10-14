@@ -115,6 +115,38 @@ class TestWriteTar(TempDirTestCase):
         with open(self.device) as device:
             self.assertEqual(device.read(), 'tarball')
 
+    def test_mbuffer_log_is_unique_and_removed_after_success(self):
+        # The mbuffer stub writes to its log, and keeps the name of it.
+        self.stub_tar([], 0, stdout='tarball')
+        write_stub(self.bin, 'mbuffer', '#!/bin/sh\nwhile [ "$1" != "-l" ]; do shift; done\n'
+                                        'echo "$2" >> "$(dirname "$0")/logs"\necho logged > "$2"\ncat\n')
+        write_stub(self.bin, 'blockwrite', '#!/bin/sh\ncat > /dev/null\necho "Total bytes written: 0" >&2\n')
+        self.write_tar(is_tape=True)
+        self.write_tar(is_tape=True)
+        with open(os.path.join(self.bin, 'logs')) as file:
+            logs = file.read().splitlines()
+        self.assertEqual(len(set(logs)), 2)
+        for log in logs:
+            self.assertEqual(os.path.dirname(log), self.tempdir)
+        self.assertEqual(self.temp_files(), [])
+
+    def test_mbuffer_log_is_kept_after_failure(self):
+        self.stub_tar([], 0, stdout='tarball')
+        write_stub(self.bin, 'mbuffer', '#!/bin/sh\ncat > /dev/null\nexit 1\n')
+        write_stub(self.bin, 'blockwrite', '#!/bin/sh\ncat > /dev/null\necho "Total bytes written: 0" >&2\n')
+        output, redirect = capture()
+        with redirect, self.assertRaises(SystemExit):
+            hb.write_tar('/tmp/filelist.txt', self.device, 0, True)
+        logs = self.temp_files()
+        self.assertEqual(len(logs), 1)
+        self.assertTrue(logs[0].startswith('hd-backup-mbuffer-'))
+        self.assertIn(f'The log of mbuffer is in {os.path.join(self.tempdir, logs[0])}.', output.getvalue())
+
+    def test_disk_write_has_no_mbuffer_log(self):
+        self.stub_tar([TOTALS], 0)
+        self.write_tar()
+        self.assertEqual(self.temp_files(), [])
+
     def test_tape_pipeline_fails_when_tar_fails(self):
         # Without pipefail, the status of blockwrite at the end of the pipeline would hide the failure of tar.
         self.stub_tar([], 2, stdout='part of a tarball')

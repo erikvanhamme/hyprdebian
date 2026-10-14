@@ -123,6 +123,10 @@ class TestRoundTrip(BackupTestCase):
         self.assertIn('All files of the fileset are on carrier', summary)
         self.assertIn('All symlinks of the fileset are on carrier', summary)
 
+        # The file lists and delete lists of the writes are gone.
+        self.assertEqual(self.temp_files(), [])
+        self.assertEqual(self.new_deletelists(), [])
+
     def test_two_backups_of_one_fileset_are_independent(self):
         self.build_tree()
         self.run_cli('add-fileset', 'fs', self.data, '^' + os.path.join(self.data, '.cache'))
@@ -164,6 +168,9 @@ class TestWriteErrors(BackupTestCase):
         result = self.run_cli('write', 'bk', self.target, expect=1)
         self.assertIn('Cannot open: Permission denied', result.stdout)
         self.assertEqual(self.query('SELECT COUNT(*) FROM tarballs'), [(0,)])
+        # The file list and the delete list are removed after a failed write too.
+        self.assertEqual(self.temp_files(), [])
+        self.assertEqual(self.new_deletelists(), [])
         self.assertIn('There are 2 files not on carrier', self.run_cli('summary').stdout)
 
         # Fixed, the write succeeds, with the same tarball index.
@@ -221,6 +228,7 @@ class TestTape(BackupTestCase):
                                            f'-f {self.device} rewind'])
         self.assertEqual(self.query('SELECT files, symlinks FROM tarballs'), [(3, 1)])
         self.restore_and_compare([self.device])
+        self.assertEqual(self.temp_files(), [])
 
         # The second tarball skips over the first file on the tape.
         self.write('small', 'changed')
@@ -295,6 +303,11 @@ class TestTape(BackupTestCase):
         self.stub('blockwrite', BLOCKWRITE_BROKEN_STUB)
         result = self.write_tape(expect=1)
         self.assertIn('Input/output error', result.stdout)
+        # The mbuffer log is kept for a look at what went wrong. The file list and the delete list are gone.
+        self.assertEqual(self.new_deletelists(), [])
+        logs = self.temp_files()
+        self.assertEqual(len(logs), 1)
+        self.assertIn(f'The log of mbuffer is in {os.path.join(self.tempdir, logs[0])}.', result.stdout)
         self.assertEqual(self.query('SELECT COUNT(*) FROM tarballs'), [(0,)])
         self.assertEqual(self.query('SELECT full FROM carrier'), [(0,), (0,)])
         self.assertEqual(self.mt_calls()[-1], f'-f {self.device} rewind')

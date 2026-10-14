@@ -24,6 +24,7 @@ import sqlite3
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 
 from collections import namedtuple
@@ -33,16 +34,13 @@ import tabulate
 
 from colorama import Fore
 
-TOOL_VERSION = 10
+TOOL_VERSION = 11
 DB_VERSION = 8
 DB_PATH = '~/.local/share/hyprdebian/hd-backup.db'
 
 # tar writes records of 8192 blocks of 512 bytes: 4 MiB. On tape, every record is one block of the drive.
 TAR_BLOCKING_FACTOR = 8192
 TAPE_BLOCK_SIZE = TAR_BLOCKING_FACTOR * 512
-
-FILELIST_NAME = '/tmp/filelist.txt'
-MBUFFER_LOG_NAME = '/tmp/mbuffer.log'
 
 #----------------------------------------------------------------------------------------------------------------------
 # Helpers
@@ -644,8 +642,12 @@ def write_create_deletelist(db, fileset_number, backup_number):
     # In reverse order, the contents of a directory come before the directory itself.
     path_lines = ''.join(f'    {path!r},\n' for path in sorted(deleted_paths, reverse=True))
 
-    deletelist_name = f"/tmp/deletes_{time.strftime('%Y-%m-%d_%H:%M:%S')}.py"
-    with open(deletelist_name, 'w') as deletelist:
+    # Every write has a delete list of its own. The name starts with the time, so the delete lists of a restore sort
+    # in the order they were written. It is always in /tmp: the delete list finds the restore directory as the parent
+    # of the directory it is in.
+    descriptor, deletelist_name = tempfile.mkstemp(prefix=f"deletes_{time.strftime('%Y-%m-%d_%H:%M:%S')}_",
+                                                   suffix='.py', dir='/tmp')
+    with os.fdopen(descriptor, 'w') as deletelist:
         deletelist.write(DELETELIST_TEMPLATE.format(paths=path_lines))
 
     os.chmod(deletelist_name, 0o755)
@@ -676,13 +678,14 @@ def write_create_filelist(db, fileset_number, backup_number, deletelist_name):
             fail('There are symlinks labeled as on disk that do not exist. Update the fileset first.')
 
     # tar writes the items in this order. The names are separated by null characters, so that any character can be in
-    # a name, and are relative to /.
+    # a name, and are relative to /. Every write has a file list of its own, removed after the write.
     names = [deletelist_name] + [symlink[1] for symlink in symlinks_to_write] + [file[1] for file in files_to_write]
-    with open(FILELIST_NAME, 'w') as filelist:
+    descriptor, filelist_name = tempfile.mkstemp(prefix='hd-backup-filelist-', suffix='.txt')
+    with os.fdopen(descriptor, 'w') as filelist:
         for name in names:
             filelist.write(f'{name.lstrip('/')}\0')
 
-    return FILELIST_NAME, symlinks_to_write, files_to_write
+    return filelist_name, symlinks_to_write, files_to_write
 
 
 def run_mt(target, args, description):
@@ -752,16 +755,22 @@ def parse_tar_output(lines, returncode):
 
 
 def write_tar(filelist_name, target, tarball_index, is_tape):
-    tar = f'tar --no-recursion --hard-dereference -H pax -b {TAR_BLOCKING_FACTOR} --null --verbatim-files-from'
+    tar = (f'tar --no-recursion --hard-dereference -H pax -b {TAR_BLOCKING_FACTOR} --null --verbatim-files-from '
+           f'-C / -T {shlex.quote(filelist_name)}')
+    mbuffer_log_name = None
     if is_tape:
+        # Every write has an mbuffer log of its own. It is removed after a write that worked.
+        descriptor, mbuffer_log_name = tempfile.mkstemp(prefix='hd-backup-mbuffer-', suffix='.log')
+        os.close(descriptor)
+
         # blockwrite reports the bytes that are on the tape. The totals of tar would also count what is still in the
         # buffer of mbuffer when the tape runs full.
-        command = (f'{tar} -cf - -C / -T {filelist_name} '
-                   f'| mbuffer -m 8G -P 50 -q -l {MBUFFER_LOG_NAME} '
+        command = (f'{tar} -cf - '
+                   f'| mbuffer -m 8G -P 50 -q -l {shlex.quote(mbuffer_log_name)} '
                    f'| blockwrite {shlex.quote(target)}')
     else:
         filename = f'{target}/backup-{tarball_index}.tar'
-        command = f'{tar} -cf {shlex.quote(filename)} -C / -T {filelist_name} --totals'
+        command = f'{tar} -cf {shlex.quote(filename)} --totals'
 
     # With pipefail, a failure anywhere in the tape pipeline shows in the exit status.
     process = subprocess.run(['bash', '-o', 'pipefail', '-c', command], capture_output=True, text=True)
@@ -772,7 +781,12 @@ def write_tar(filelist_name, target, tarball_index, is_tape):
     if result.failed:
         for line in lines:
             printc(line, Fore.RED)
+        if mbuffer_log_name is not None:
+            printc(f'The log of mbuffer is in {mbuffer_log_name}.', Fore.RED)
         fail(f'Writing the tarball failed (exit status {process.returncode}). The database is not changed.')
+
+    if mbuffer_log_name is not None:
+        os.remove(mbuffer_log_name)
 
     for line in lines:
         if 'Total bytes written' in line:
@@ -851,20 +865,29 @@ def write_target(db, backup_name, target, is_tape):
 
     backup_number, fileset_number, carrier_number, tarball_index = write_prepare(db, backup_name, target)
 
-    deletelist_name, deletelist_size = write_create_deletelist(db, fileset_number, backup_number)
-    filelist_name, symlinks_to_write, files_to_write = write_create_filelist(db, fileset_number, backup_number,
-                                                                             deletelist_name)
+    # The delete list and the file list are only needed while tar runs. They are removed in any case.
+    temp_files = []
+    try:
+        deletelist_name, deletelist_size = write_create_deletelist(db, fileset_number, backup_number)
+        temp_files.append(deletelist_name)
 
-    # On tape, set the blocksize and compression and skip to the end of the last tarball first, and rewind the tape
-    # afterwards, also when the write failed.
-    if is_tape:
-        write_begin_tape(target, tarball_index)
-        try:
+        filelist_name, symlinks_to_write, files_to_write = write_create_filelist(db, fileset_number, backup_number,
+                                                                                 deletelist_name)
+        temp_files.append(filelist_name)
+
+        # On tape, set the blocksize and compression and skip to the end of the last tarball first, and rewind the
+        # tape afterwards, also when the write failed.
+        if is_tape:
+            write_begin_tape(target, tarball_index)
+            try:
+                bytes_written, full = write_tar(filelist_name, target, tarball_index, is_tape)
+            finally:
+                write_finalize_tape(target)
+        else:
             bytes_written, full = write_tar(filelist_name, target, tarball_index, is_tape)
-        finally:
-            write_finalize_tape(target)
-    else:
-        bytes_written, full = write_tar(filelist_name, target, tarball_index, is_tape)
+    finally:
+        for name in temp_files:
+            os.remove(name)
 
     symlinks_written, files_written, overhead, total_size = write_determine_written(
         bytes_written, full, symlinks_to_write, files_to_write, deletelist_name, deletelist_size)

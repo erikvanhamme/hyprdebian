@@ -15,6 +15,8 @@ import tarfile
 import tempfile
 import unittest
 
+from unittest import mock
+
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 HD_BACKUP = os.path.join(REPO, 'deploy', 'usr', 'local', 'bin', 'hd-backup')
 BLOCKWRITE_SOURCE = os.path.join(REPO, 'src', 'blockwrite.c')
@@ -116,11 +118,17 @@ def is_root():
 
 
 class TempDirTestCase(unittest.TestCase):
-    # A test with its own temporary directory, removed afterwards. Delete lists the tool leaves in /tmp during the
-    # test are removed too.
+    # A test with its own temporary directory, removed afterwards. The temporary files of hd-backup go to the
+    # subdirectory tmp, so a test can check which are left. Delete lists the tool leaves in /tmp during the test are
+    # removed too.
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix='hd-backup-test-')
+        self.tempdir = self.path('tmp')
+        os.makedirs(self.tempdir)
+        tempdir = mock.patch.object(tempfile, 'tempdir', self.tempdir)
+        tempdir.start()
+        self.addCleanup(tempdir.stop)
         self.deletelists_before = set(glob.glob('/tmp/deletes_*.py'))
 
     def tearDown(self):
@@ -131,6 +139,14 @@ class TempDirTestCase(unittest.TestCase):
 
     def path(self, *parts):
         return os.path.join(self.tmp, *parts)
+
+    def temp_files(self):
+        # The temporary files hd-backup left behind. Delete lists are always in /tmp, so they are counted separately.
+        return sorted(os.listdir(self.tempdir))
+
+    def new_deletelists(self):
+        # The delete lists in /tmp that are new since the test started.
+        return sorted(set(glob.glob('/tmp/deletes_*.py')) - self.deletelists_before)
 
 
 class DbTestCase(TempDirTestCase):
@@ -216,7 +232,7 @@ class CliTestCase(TempDirTestCase):
         os.makedirs(self.data)
 
     def run_cli(self, *args, expect=0, path_prefix=None):
-        env = dict(os.environ, HOME=self.home)
+        env = dict(os.environ, HOME=self.home, TMPDIR=self.tempdir)
         if path_prefix is not None:
             env['PATH'] = path_prefix + os.pathsep + env['PATH']
         result = subprocess.run([sys.executable, HD_BACKUP] + list(args), env=env, capture_output=True, text=True)

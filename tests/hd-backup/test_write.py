@@ -38,6 +38,15 @@ class TestDeleteList(WriteTestCase):
         self.assertEqual(size, os.path.getsize(name))
         self.assertEqual(stat.S_IMODE(os.stat(name).st_mode), 0o755)
 
+    def test_every_write_has_its_own_file(self):
+        first, size, paths = self.deletelist()
+        second, size, paths = self.deletelist()
+        self.assertNotEqual(first, second)
+        for name in (first, second):
+            # Always in /tmp, named after the time first.
+            self.assertEqual(os.path.dirname(name), '/tmp')
+            self.assertRegex(os.path.basename(name), r'^deletes_\d{4}-\d\d-\d\d_\d\d:\d\d:\d\d_.+\.py$')
+
     def test_lists_deleted_items_children_first(self):
         self.record_written('bk')
         shutil.rmtree(self.path('data', 'dir'))
@@ -126,6 +135,14 @@ class TestFileList(WriteTestCase):
         with open(name, 'rb') as file:
             return file.read().split(b'\0')
 
+    def test_every_write_has_its_own_file(self):
+        with quiet():
+            first = self.hb.write_create_filelist(self.db, self.fileset, self.backup, '/tmp/deletes_x.py')[0]
+            second = self.hb.write_create_filelist(self.db, self.fileset, self.backup, '/tmp/deletes_x.py')[0]
+        self.assertNotEqual(first, second)
+        self.assertEqual(os.path.dirname(first), self.tempdir)
+        self.assertEqual(self.read_filelist(first), self.read_filelist(second))
+
     def test_order_and_separator(self):
         with quiet():
             name, symlinks, files = self.hb.write_create_filelist(self.db, self.fileset, self.backup,
@@ -171,6 +188,8 @@ class TestFileList(WriteTestCase):
         with quiet(), self.assertRaises(SystemExit) as raised:
             self.hb.write_create_filelist(self.db, self.fileset, self.backup, '/tmp/deletes_x.py')
         self.assertEqual(raised.exception.code, 1)
+        # It fails before it makes the file list.
+        self.assertEqual(self.temp_files(), [])
 
     def test_fails_when_symlink_is_gone(self):
         os.remove(self.path('data', 'l1'))

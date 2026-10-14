@@ -41,7 +41,7 @@ It is created on the first run. Because it is in the home directory, every user 
 
 The database has a version number. The tool refuses to work with a database of a different version (`Incompatible database version`). The current versions are shown in the start banner:
 ```
-Backuptool [tool V10, database V8]
+Backuptool [tool V11, database V8]
 ```
 
 The database is the only record of what is on which carrier. Keep a copy of it somewhere else than on the system it protects, for example on the backup carriers themselves.
@@ -152,15 +152,15 @@ hd-backup write-tape BACKUP DEVICE
 Use the non-rewinding device, like `/dev/nst0`. The tool:
 1. Sets the block size of the drive to 4 MiB and turns on hardware compression (`mt-st`).
 2. Skips forward over the tarballs already on the tape (`mt-st fsf N`). The tape must be rewound when the write starts.
-3. Writes the tarball through `mbuffer` (8 GiB memory buffer, to keep the drive streaming) and `blockwrite` (fixed 4 MiB blocks with direct I/O).
+3. Writes the tarball through `mbuffer` (8 GiB memory buffer, to keep the drive streaming) and `blockwrite` (fixed 4 MiB blocks with direct I/O). The log of `mbuffer` goes to a temporary file in `/tmp`. It is removed after the write, unless the write failed: then the error message names it.
 4. Rewinds the tape, also when the write failed.
 
 Every tarball is one file on the tape. Tarball `N` is file number `N`.
 
 ### What a write does
 1. Picks the carrier and the next tarball index.
-2. Writes the delete list to `/tmp/deletes_<date>_<time>.py`. See [Deletes](#deletes).
-3. Writes the list of items to `/tmp/filelist.txt`: the delete list first, then the symlinks, then the files, sorted by path. The names are separated by null characters, so a name can contain any character. If a file in the list no longer exists, the write stops with `Update the fileset first`.
+2. Writes the delete list to `/tmp/deletes_<date>_<time>_<random>.py`, removed after the write. See [Deletes](#deletes).
+3. Writes the list of items to a temporary file in `/tmp`, removed after the write: the delete list first, then the symlinks, then the files, sorted by path. The names are separated by null characters, so a name can contain any character. If a file in the list no longer exists, the write stops with `Update the fileset first`.
 4. Runs `tar` in pax format, with 4 MiB records, without recursion (every directory is its own entry), relative to `/` and with hardlinks stored as separate files.
 5. Records the tarball and its items in the database.
 
@@ -185,11 +185,11 @@ hd-backup-unload home-01
 If the drive runs full, connect the next carrier and run `write` again.
 
 ## Deletes
-Every tarball contains a delete list: a small Python script with the files, directories and symlinks of the fileset that were deleted after they were written to a carrier of this backup. A path that was deleted and later created again is not in it. The list is written in the tarball as `tmp/deletes_<date>_<time>.py`.
+Every tarball contains a delete list: a small Python script with the files, directories and symlinks of the fileset that were deleted after they were written to a carrier of this backup. A path that was deleted and later created again is not in it. The list is written in the tarball as `tmp/deletes_<date>_<time>_<random>.py`. Every write has a name of its own, so a restore of several tarballs has all their delete lists in `R/tmp`. The one to run is the one of the last tarball, with the latest time in its name. `tar -tf` on the last tarball shows its name.
 
 The script removes its paths relative to the parent of its own directory. When the tarball is restored into a directory `R`, the list is at `R/tmp/`, and removes paths under `R`. It can be run from any directory:
 ```
-python R/tmp/deletes_<date>_<time>.py
+python R/tmp/deletes_<date>_<time>_<random>.py
 ```
 
 It removes the contents of a directory before the directory itself. It skips paths that do not exist, and reports the paths it cannot remove, for example a directory that still holds files that were not backed up. It is a help for a restore, not a guarantee.
@@ -253,4 +253,3 @@ hd-backup-unload POOL
 - Names that are not valid UTF-8 are not supported.
 - File permissions and ownership are stored by `tar` in the tarball, but are not tracked in the database: a change of only the permissions of a file is not seen as a change.
 - The tool does not check which carrier is mounted or loaded. See [Backups and carriers](#backups-and-carriers).
-- The temporary files `/tmp/filelist.txt` and `/tmp/mbuffer.log` have fixed names: do not run two writes at the same time.
