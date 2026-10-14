@@ -281,6 +281,16 @@ in_target() {
         "$@"
 }
 
+# Clones the checkout that runs the installer into SOURCE_DIR, so it is at the commit that installed
+# the system, and points origin at SOURCE_URL. The checkout belongs to the user.
+source_checkout() {
+    # The checkout that runs the installer belongs to the user that ran sudo. git only reads it as
+    # root when it is marked as safe.
+    git -c safe.directory="${PWD}" clone "${PWD}" "${TARGET_DIR}${SOURCE_DIR}" || return 1
+    git -C "${TARGET_DIR}${SOURCE_DIR}" remote set-url origin "${SOURCE_URL}" || return 1
+    in_target chown -R ${Q_USER}:${Q_USER} "${SOURCE_DIR}"
+}
+
 # Writes /etc/issue, the line the console shows above the login prompt, with the installed
 # version and suite. agetty replaces \e{...} with a color and \l with the name of the tty.
 write_issue() {

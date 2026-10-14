@@ -135,15 +135,21 @@ Subsequent boots will be normal.
 
 ## Upgrading
 
-An installed system can be upgraded to a newer version of hyprdebian. On the installed system, get the latest version of this repo and run the upgrade:
+An installed system can be upgraded to a newer version of hyprdebian. The installer puts a checkout of this repo in `/usr/src/hyprdebian`, owned by your user, at the version that installed the system. Get the latest version and run the upgrade:
+
+```
+cd /usr/src/hyprdebian
+git pull
+sudo ./upgrade.sh
+```
+
+A system installed by an older version has no checkout in `/usr/src/hyprdebian` yet. Clone this repo anywhere and run the upgrade from there once. The upgrade then clones it into `/usr/src/hyprdebian`:
 
 ```
 git clone https://github.com/erikvanhamme/hyprdebian.git
 cd hyprdebian
 sudo ./upgrade.sh
 ```
-
-In a repo that was cloned before, run `git pull` instead of the clone.
 
 The upgrade uses the answers given during the installation, and only asks the questions that were added since. It installs new packages, enables new services and updates the hyprdebian scripts and config files, including the ones in your home directory. When a config file was changed on your system, it asks whether to keep yours, take the new version or merge the two, in meld from the desktop or in sdiff from a console.
 

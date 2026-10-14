@@ -14,7 +14,7 @@ The installer is split into phases. Each phase has its own script in the `script
 | 9 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
 | 10 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
 | 11 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
-| 12 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. |
+| 12 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
 | 13 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. |
 
 Because packages are installed before files and templates are written, the files from `deploy/` and `templates/` overwrite the default configuration files that come with the packages. See [Queues](Queues.md).

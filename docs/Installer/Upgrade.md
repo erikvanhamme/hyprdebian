@@ -56,7 +56,7 @@ The upgrade runs the tasks of the installer that decide what is installed, with 
 
 These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (it downloads the fonts).
 
-Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`. Both are safe to repeat.
+Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`, from a copy of the source in `/tmp`. Both are safe to repeat.
 
 The questions are answered with the saved answers, without asking. Only a question without a saved answer is asked, like a question that was added after the installation. Its answer is saved with the others at the end of the upgrade.
 

@@ -44,6 +44,15 @@ u_groups() {
     in_target usermod -a -G "$groups" "${Q_USER}"
 }
 
+u_source() {
+    # git clone refuses a directory that is not empty, so a rerun starts from scratch.
+    if [[ -e ${TARGET_DIR}${SOURCE_DIR} ]]; then
+        rm -rf ${TARGET_DIR}${SOURCE_DIR} || return 1
+    fi
+
+    source_checkout
+}
+
 u_root_skel() {
     mkdir -p ${TARGET_DIR}/root/.config || return 1
     cp -r deploy/etc/skel/.config/nano ${TARGET_DIR}/root/.config || return 1
@@ -58,6 +67,7 @@ add_dependencies "u_main" \
     "u_skel" \
     "u_chown" \
     "u_groups" \
+    "u_source" \
     "u_root_skel" \
 
 add_dependencies "install" "u_pre" "u_main" "u_post"

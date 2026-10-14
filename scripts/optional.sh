@@ -215,11 +215,11 @@ o_backuptools() {
             
     fi
 
-    mkdir -p ${TARGET_DIR}/usr/src/hyprdebian || return 1
-
-    # Compile block write utility for backups on tape.
-    cp src/blockwrite.c ${TARGET_DIR}/usr/src/hyprdebian || return 1
-    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /usr/src/hyprdebian/blockwrite.c || return 1
+    # Compile block write utility for backups on tape. The source is compiled from /tmp, because
+    # /usr/src/hyprdebian is the checkout of the installer that u_source makes.
+    cp src/blockwrite.c ${TARGET_DIR}/tmp/blockwrite.c || return 1
+    in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /tmp/blockwrite.c || return 1
+    rm -f ${TARGET_DIR}/tmp/blockwrite.c
 }
 
 o_rust() {
