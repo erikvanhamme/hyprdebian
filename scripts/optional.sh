@@ -202,6 +202,8 @@ o_backuptools() {
         deploy/usr/local/bin/hd-backup-unload \
 
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
+        add_packages zstd
+
         add_files \
             deploy/etc/hyprdebian/vm-backups \
             deploy/etc/systemd/system/backup-vms.service \

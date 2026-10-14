@@ -24,31 +24,37 @@ echo " Starting Restore for: ${OLD_VM_NAME}"
 echo " Target VM Name:      ${NEW_VM_NAME}"
 echo "=========================================="
 
-# 1. Discover distinct dataset prefixes in the backup directory
-mapfile -t CLEAN_DS_LIST < <(find "${BACKUP_DIR}" -maxdepth 1 -name "*.zst" | sed -E 's/.*\/([^\/]+)\.[0-9]{4}\.zst$/\1/' | sort -u)
+# 1. The datasets to restore are the disks in the XML of the last finished backup. The stream files
+# have the slashes of the dataset names replaced by underscores.
+mapfile -t XML_DATASETS < <(xmllint --xpath "//devices/disk[@type='block' and (not(@device) or @device='disk')]/source/@dev" "${XML_SRC}" 2>/dev/null | grep -oP 'dev="/dev/zvol/\K[^"]+' || true)
 
-if [[ ${#CLEAN_DS_LIST[@]} -eq 0 ]]; then
-    echo "Error: No .zst stream files found in ${BACKUP_DIR}"
+if [[ ${#XML_DATASETS[@]} -eq 0 ]]; then
+    echo "Error: No ZFS volumes found in ${XML_SRC}"
     exit 1
 fi
 
-# The stream files have the slashes of the dataset names replaced by underscores. The original
-# names are looked up in the XML, so underscores in them survive. Swapping back is the fallback.
-mapfile -t XML_DATASETS < <(xmllint --xpath "//devices/disk[@type='block']/source/@dev" "${XML_SRC}" 2>/dev/null | grep -oP 'dev="/dev/zvol/\K[^"]+' || true)
+declare -A ORIG_DATASET
+CLEAN_DS_LIST=()
+for ds in "${XML_DATASETS[@]}"; do
+    clean_ds="${ds//\//_}"
+    ORIG_DATASET["${clean_ds}"]="${ds}"
+    CLEAN_DS_LIST+=("${clean_ds}")
 
-original_dataset() {
-    local clean_ds="$1"
-    local ds
+    if ! compgen -G "${BACKUP_DIR}/${clean_ds}.[0-9][0-9][0-9][0-9].zst" > /dev/null; then
+        echo "Error: No stream files found for ${ds} in ${BACKUP_DIR}"
+        exit 1
+    fi
+done
 
-    for ds in "${XML_DATASETS[@]}"; do
-        if [[ "${ds//\//_}" == "${clean_ds}" ]]; then
-            echo "${ds}"
-            return 0
-        fi
-    done
+# Streams of disks that were removed from the VM are left alone.
+while IFS= read -r stream; do
+    clean_ds=$(basename "${stream}")
+    clean_ds="${clean_ds%.[0-9][0-9][0-9][0-9].zst}"
 
-    echo "${clean_ds}" | tr '_' '/'
-}
+    if [[ -z "${ORIG_DATASET[${clean_ds}]+set}" ]]; then
+        echo "Skipping ${clean_ds}: it is not a disk of ${OLD_VM_NAME} in ${XML_SRC}."
+    fi
+done < <(find "${BACKUP_DIR}" -maxdepth 1 -name "*.[0-9][0-9][0-9][0-9].zst" | sed -E 's/\.[0-9]{4}\.zst$//' | sort -u)
 
 declare -A DATASET_MAP
 
@@ -58,7 +64,7 @@ echo "Configure destination ZFS dataset paths for each ZVOL."
 
 # 2. Interactive mapping prompt for target pool/dataset paths
 for clean_ds in "${CLEAN_DS_LIST[@]}"; do
-    orig_ds=$(original_dataset "${clean_ds}")
+    orig_ds="${ORIG_DATASET[${clean_ds}]}"
     default_target="${orig_ds}"
     
     read -rp "Target dataset for [${orig_ds}] (Default: ${default_target}): " target_ds
@@ -66,6 +72,19 @@ for clean_ds in "${CLEAN_DS_LIST[@]}"; do
     
     DATASET_MAP["${clean_ds}"]="${target_ds}"
 done
+
+# 2b. New MAC addresses keep a copy from clashing on the network with the original VM, but the
+# guest then sees new network cards. The choice is left to the user; the default keeps them.
+NEW_MACS=0
+MAC_COUNT=$(xmllint --xpath "count(//devices/interface/mac)" "${XML_SRC}" 2>/dev/null || echo 0)
+if [[ "${MAC_COUNT}" != "0" ]]; then
+    echo ""
+    echo "--- Network MAC Addresses ---"
+    read -rp "Give the network interfaces new MAC addresses? [y/N]: " answer
+    if [[ "${answer}" == [yY]* ]]; then
+        NEW_MACS=1
+    fi
+fi
 
 echo ""
 echo "--- Replaying Snapshot Streams ---"
@@ -75,11 +94,6 @@ for clean_ds in "${CLEAN_DS_LIST[@]}"; do
     target_ds="${DATASET_MAP[${clean_ds}]}"
     
     mapfile -t SEQ_FILES < <(find "${BACKUP_DIR}" -maxdepth 1 -name "${clean_ds}.[0-9][0-9][0-9][0-9].zst" | sort)
-    
-    if [[ ${#SEQ_FILES[@]} -eq 0 ]]; then
-        echo "Warning: No sequence files found for dataset ${clean_ds}, skipping."
-        continue
-    fi
 
     echo "Restoring to target dataset: ${target_ds}"
     
@@ -96,15 +110,27 @@ TEMP_XML=$(mktemp /tmp/vm_restore_XXXXXX.xml)
 trap 'rm -f "${TEMP_XML}"' EXIT
 cp "${XML_SRC}" "${TEMP_XML}"
 
-# 4a. Update VM name and remove UUID for new domain generation
+# 4a. Update VM name and remove UUID for new domain generation. The NVRAM gets its own file,
+# otherwise the restore would overwrite the one of the original VM and both would share it.
 if [[ "${OLD_VM_NAME}" != "${NEW_VM_NAME}" ]]; then
     sed -i "s|<name>${OLD_VM_NAME}</name>|<name>${NEW_VM_NAME}</name>|g" "${TEMP_XML}"
     sed -i '/<uuid>/d' "${TEMP_XML}"
+
+    OLD_NVRAM=$(xmllint --xpath "string(//os/nvram/text())" "${TEMP_XML}" 2>/dev/null || true)
+    if [[ -n "${OLD_NVRAM}" ]]; then
+        NEW_NVRAM="$(dirname "${OLD_NVRAM}")/${NEW_VM_NAME}_VARS.fd"
+        sed -i "s|>${OLD_NVRAM}</nvram>|>${NEW_NVRAM}</nvram>|" "${TEMP_XML}"
+    fi
 fi
 
-# 4b. Remap block device paths in XML from old ZVOL paths to new target paths
+# 4b. Remove the MAC addresses when asked, so libvirt generates new ones.
+if [[ ${NEW_MACS} -eq 1 ]]; then
+    sed -i '/<mac address=/d' "${TEMP_XML}"
+fi
+
+# 4c. Remap block device paths in XML from old ZVOL paths to new target paths
 for clean_ds in "${CLEAN_DS_LIST[@]}"; do
-    orig_ds=$(original_dataset "${clean_ds}")
+    orig_ds="${ORIG_DATASET[${clean_ds}]}"
     target_ds="${DATASET_MAP[${clean_ds}]}"
     
     old_dev="/dev/zvol/${orig_ds}"

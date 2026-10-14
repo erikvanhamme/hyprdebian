@@ -7,9 +7,5 @@ Type=oneshot
 ExecStart=/usr/local/bin/hd-backup-vms
 User=root
 Group=root
-RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
-
-[Install]
-WantedBy=multi-user.target

@@ -44,6 +44,14 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' INT TERM HUP
 
+# Only one backup of a VM may run at a time, e.g. a manual run during the one of the timer. They
+# would write the same stream files and destroy each other's snapshots.
+exec {LOCK_FD}>"/run/lock/hd-backup-vm-${VM_NAME}.lock"
+if ! flock -n "${LOCK_FD}"; then
+    echo "Error: a backup of ${VM_NAME} is already running." >&2
+    exit 1
+fi
+
 # Returns whether the backup folder holds streams of the dataset from before this run.
 has_earlier_streams() {
     local clean_ds_name="$1"
@@ -67,18 +75,32 @@ has_earlier_streams() {
 
 mkdir -p "${BACKUP_DIR}"
 
-# 1. Dump XML configuration (Always replaced)
+# 1. Dump XML configuration. It replaces the one in the backup folder only when the backup
+# finishes, so the folder never holds an XML with disks that have no streams.
 XML_PATH="${BACKUP_DIR}/${VM_NAME}.xml"
-virsh dumpxml --migratable "${VM_NAME}" > "${XML_PATH}"
+XML_TMP=$(mktemp "${XML_PATH}.XXXXXX")
+OUT_FILES+=("${XML_TMP}")
+virsh dumpxml --migratable "${VM_NAME}" > "${XML_TMP}"
 
-# 2. Extract NVRAM path if UEFI VM (Always replaced)
+# 2. Copy the NVRAM if UEFI VM. It also replaces the one in the backup folder only at the end.
+VARS_PATH="${BACKUP_DIR}/${VM_NAME}_VARS.fd"
+VARS_TMP=""
 NVRAM_PATH=$(virsh dumpxml "${VM_NAME}" | xmllint --xpath "string(//os/nvram/text())" - 2>/dev/null || true)
 if [[ -n "${NVRAM_PATH}" && -f "${NVRAM_PATH}" ]]; then
-    cp "${NVRAM_PATH}" "${BACKUP_DIR}/${VM_NAME}_VARS.fd"
+    VARS_TMP=$(mktemp "${VARS_PATH}.XXXXXX")
+    OUT_FILES+=("${VARS_TMP}")
+    cp "${NVRAM_PATH}" "${VARS_TMP}"
 fi
 
-# 3. Parse all block-type disk paths from XML. CD-ROM and floppy drives hold no VM data.
-mapfile -t ZVOL_PATHS < <(xmllint --xpath "//devices/disk[@type='block' and (not(@device) or @device='disk')]/source/@dev" "${XML_PATH}" 2>/dev/null | grep -oP 'dev="\K[^"]+' || true)
+# 3. Only ZFS volumes can be backed up, so the backup is refused when the VM has other disks, e.g.
+# image files, rather than leaving them out. CD-ROM and floppy drives hold no VM data.
+OTHER_DISKS=$(xmllint --xpath "count(//devices/disk[(not(@device) or @device='disk') and not(@type='block')])" "${XML_TMP}")
+if [[ "${OTHER_DISKS}" != "0" ]]; then
+    echo "Error: ${VM_NAME} has disks that are not ZFS volumes and cannot be backed up." >&2
+    exit 1
+fi
+
+mapfile -t ZVOL_PATHS < <(xmllint --xpath "//devices/disk[@type='block' and (not(@device) or @device='disk')]/source/@dev" "${XML_TMP}" 2>/dev/null | grep -oP 'dev="\K[^"]+' || true)
 
 if [[ ${#ZVOL_PATHS[@]} -eq 0 ]]; then
     echo "No block devices found for ${VM_NAME}."
@@ -162,13 +184,24 @@ for ds in "${ZFS_DATASETS[@]}"; do
     zfs send -i "@${PREV_SNAP}" "${ds}@${SNAP_NAME}" | zstd -T0 > "${OUT_FILE}"
 done
 
-# 8. Record the next sequence number and the new base snapshot in one step, so they always match.
+# 8. Put the XML and NVRAM of this run in place.
+mv "${XML_TMP}" "${XML_PATH}"
+if [[ -n "${VARS_TMP}" ]]; then
+    mv "${VARS_TMP}" "${VARS_PATH}"
+fi
+
+# 9. Record the next sequence number and the new base snapshot in one step, so they always match.
+# The streams are flushed to disk first, so a power cut cannot leave a sequence file that counts a
+# truncated stream. The second flush makes the sequence file durable before the old base snapshots
+# are destroyed.
+sync -f "${BACKUP_DIR}"
 TMP_SEQ=$(mktemp "${SEQ_FILE}.XXXXXX")
 echo "$((NEXT_IDX + 1)) ${SNAP_NAME}" > "${TMP_SEQ}"
 mv "${TMP_SEQ}" "${SEQ_FILE}"
+sync -f "${BACKUP_DIR}"
 FINISHED=1
 
-# 9. The current snapshot is the new base; the older backup snapshots are not needed anymore.
+# 10. The current snapshot is the new base; the older backup snapshots are not needed anymore.
 for ds in "${ZFS_DATASETS[@]}"; do
     mapfile -t OLD_SNAPS < <(zfs list -H -t snapshot -o name "${ds}" | grep -F "@backup-" | grep -vxF "${ds}@${SNAP_NAME}" || true)
 
@@ -177,7 +210,7 @@ for ds in "${ZFS_DATASETS[@]}"; do
     done
 done
 
-# 10. Change ownership of all backed up files including state file
+# 11. Change ownership of all backed up files including state file
 chown -R "${BACKUP_OWNER}" "${BACKUP_DIR}"
 
 echo "Backup #${SEQ_NUM} complete for ${VM_NAME}."
