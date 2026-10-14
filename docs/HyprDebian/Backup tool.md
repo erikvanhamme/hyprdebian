@@ -41,7 +41,7 @@ It is created on the first run. Because it is in the home directory, every user 
 
 The database has a version number. The tool refuses to work with a database of a different version (`Incompatible database version`). The current versions are shown in the start banner:
 ```
-Backuptool [tool V9, database V8]
+Backuptool [tool V10, database V8]
 ```
 
 The database is the only record of what is on which carrier. Keep a copy of it somewhere else than on the system it protects, for example on the backup carriers themselves.
@@ -70,6 +70,8 @@ hd-backup command <args...>
 | `remove-carrier` | `LABEL...` | Removes carriers, with their tarballs, from the database. |
 | `remove-backups` | `BACKUP...` | Removes backups, with their carriers and tarballs, from the database. |
 
+A command exits with status 1 when it fails, or when it reports an error and goes on with the rest of its work, like a fileset name that does not exist in `update-filesets`.
+
 The remove commands only change the database. They do not touch the files on disk or on the carriers, and they do not remove filesets.
 
 ## Filesets
@@ -88,7 +90,7 @@ For example:
 hd-backup add-fileset home /home/erik ^/home/erik/.cache ^/home/erik/Downloads
 ```
 
-Quote an exclusion if the shell could expand it. An exclusion matches every path that starts with the same text. `^/home/erik/tmp` also excludes `/home/erik/tmpfiles`.
+Quote an exclusion if the shell could expand it. An exclusion matches every path that starts with the same text. `^/home/erik/tmp` also excludes `/home/erik/tmpfiles`. The scan does not enter excluded directories.
 
 ### Scanning
 `add-fileset` and `add-paths` scan the fileset right away. After that, scan it again before every write:
@@ -106,15 +108,14 @@ The scan walks all the paths of the fileset, skips the exclusions, and records:
 
 A file counts as unchanged when its path, size and mtime match the database. Only new and changed files are hashed again, so a scan of a large fileset with few changes is fast.
 
-A changed file that is already on a carrier gets a new record, so the old version stays known as part of that carrier. A changed file that is not on any carrier yet is updated in place.
+A changed file that is already on a carrier gets a new record, so the old version stays known as part of that carrier. Only the newest record counts as on disk. A changed file that is not on any carrier yet is updated in place.
 
 A file that is gone from disk is removed from the database when it is on no carrier. When it is on a carrier, it is kept and marked as not on disk, so the next write can record the delete. See [Deletes](#deletes).
 
 The scan warns about:
 - Possible hardlinks (files with more than one link). They are backed up as separate files. After a restore they are separate copies, not hardlinks.
-- FIFOs. They are skipped.
-
-Sockets and device files are not supported.
+- FIFOs, sockets and device files. They are skipped.
+- Files and directories it cannot read, for example because of their permissions, and names that are not valid UTF-8. They are skipped, and the command exits with status 1. Fix the permissions, or exclude them.
 
 ## Backups and carriers
 A backup is added with:
@@ -152,25 +153,25 @@ Use the non-rewinding device, like `/dev/nst0`. The tool:
 1. Sets the block size of the drive to 4 MiB and turns on hardware compression (`mt-st`).
 2. Skips forward over the tarballs already on the tape (`mt-st fsf N`). The tape must be rewound when the write starts.
 3. Writes the tarball through `mbuffer` (8 GiB memory buffer, to keep the drive streaming) and `blockwrite` (fixed 4 MiB blocks with direct I/O).
-4. Rewinds the tape.
+4. Rewinds the tape, also when the write failed.
 
 Every tarball is one file on the tape. Tarball `N` is file number `N`.
 
 ### What a write does
 1. Picks the carrier and the next tarball index.
 2. Writes the delete list to `/tmp/deletes_<date>_<time>.py`. See [Deletes](#deletes).
-3. Writes the list of items to `/tmp/filelist.txt`: the delete list first, then the symlinks, then the files, sorted by path. If a file in the list no longer exists, the write stops with `Update the fileset first`.
+3. Writes the list of items to `/tmp/filelist.txt`: the delete list first, then the symlinks, then the files, sorted by path. The names are separated by null characters, so a name can contain any character. If a file in the list no longer exists, the write stops with `Update the fileset first`.
 4. Runs `tar` in pax format, with 4 MiB records, without recursion (every directory is its own entry), relative to `/` and with hardlinks stored as separate files.
 5. Records the tarball and its items in the database.
 
 The time the write started and finished is printed, and at the end the number of files and symlinks backed up.
 
 ### When a carrier runs full
-When `tar` reports `No space left on device`, the write is not treated as an error. The tool works out from the number of bytes `tar` wrote which items fit completely, records only those as written, and marks the carrier full. The items that did not fit are written by the next write, on the next carrier.
+When `tar` (on a hard drive) or `blockwrite` (on tape) reports `No space left on device`, the write is not treated as an error. The tool works out from the number of bytes that reached the carrier which items fit completely, records only those as written, and marks the carrier full. On tape, the count comes from `blockwrite`, because `tar` also counts what is still in the buffer of `mbuffer`. The size of the tar headers is estimated on the safe side, so an item near the end can be left out although it fits. The items that are not recorded are written by the next write, on the next carrier.
 
 On a hard drive, the incomplete tarball stays on the drive. The items at its end that are not recorded in the database are in it, but may be cut off.
 
-Any other `tar` error stops the tool, and the database is not changed.
+Any other error stops the tool, and the database is not changed. That includes a file that `tar` cannot read: fix its permissions or exclude it, and run the write again. A file that changes while `tar` reads it is only a warning: it is in the tarball, but its contents may be mixed.
 
 ### Typical run
 ```
@@ -184,15 +185,14 @@ hd-backup-unload home-01
 If the drive runs full, connect the next carrier and run `write` again.
 
 ## Deletes
-Every tarball contains a delete list: a small Python script with the paths that are marked as not on disk in the database, so files and symlinks that were deleted after they were backed up. It is written in the tarball as `tmp/deletes_<date>_<time>.py`.
+Every tarball contains a delete list: a small Python script with the files, directories and symlinks of the fileset that were deleted after they were written to a carrier of this backup. A path that was deleted and later created again is not in it. The list is written in the tarball as `tmp/deletes_<date>_<time>.py`.
 
-The script removes its paths relative to its own directory, with `..` in front of each path. When the tarball is restored into a directory `R`, the list is at `R/tmp/`, and it must be run from there:
+The script removes its paths relative to the parent of its own directory. When the tarball is restored into a directory `R`, the list is at `R/tmp/`, and removes paths under `R`. It can be run from any directory:
 ```
-cd R/tmp
-python deletes_<date>_<time>.py
+python R/tmp/deletes_<date>_<time>.py
 ```
 
-It removes the files first, then the directories. It stops at the first path it cannot remove, for example a path that was not restored, so it is a help for a restore, not a guarantee.
+It removes the contents of a directory before the directory itself. It skips paths that do not exist, and reports the paths it cannot remove, for example a directory that still holds files that were not backed up. It is a help for a restore, not a guarantee.
 
 ## Status
 ```
@@ -250,7 +250,7 @@ hd-backup-unload POOL
 ## Limitations
 - Hardlinks are backed up as separate files.
 - FIFOs, sockets and device files are not backed up.
-- Paths that contain a double quote (`"`) or a newline are not supported.
+- Names that are not valid UTF-8 are not supported.
 - File permissions and ownership are stored by `tar` in the tarball, but are not tracked in the database: a change of only the permissions of a file is not seen as a change.
 - The tool does not check which carrier is mounted or loaded. See [Backups and carriers](#backups-and-carriers).
 - The temporary files `/tmp/filelist.txt` and `/tmp/mbuffer.log` have fixed names: do not run two writes at the same time.

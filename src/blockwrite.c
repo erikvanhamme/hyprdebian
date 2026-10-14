@@ -8,6 +8,15 @@
 #define BLOCK_SIZE (4 * 1024 * 1024) // 4 MiB = 4,194,304 bytes
 #define ALIGNMENT  4096              // 4 KiB alignment for O_DIRECT
 
+// Bytes written to the device in full blocks. hd-backup reads this from the
+// report on stderr, to know how much of the archive is on the carrier when the
+// tape runs full.
+static unsigned long long total_written = 0;
+
+static void report_total(void) {
+    fprintf(stderr, "Total bytes written: %llu\n", total_written);
+}
+
 // Write one full block in a single write() call.
 // On tape every write() becomes one record, and with O_DIRECT the rest of a
 // partial write would start on an unaligned address, so a short write is an
@@ -17,6 +26,7 @@ static int write_block(int out_fd, const char *buffer, const char *what) {
         ssize_t bytes_written = write(out_fd, buffer, BLOCK_SIZE);
 
         if (bytes_written == BLOCK_SIZE) {
+            total_written += BLOCK_SIZE;
             return 0;
         }
 
@@ -72,6 +82,7 @@ int main(int argc, char *argv[]) {
                 if (write_block(out_fd, buffer, "block") != 0) {
                     free(buffer);
                     close(out_fd);
+                    report_total();
                     return EXIT_FAILURE;
                 }
                 total_read = 0; // Reset buffer counter
@@ -85,6 +96,7 @@ int main(int argc, char *argv[]) {
                 if (write_block(out_fd, buffer, "final block") != 0) {
                     free(buffer);
                     close(out_fd);
+                    report_total();
                     return EXIT_FAILURE;
                 }
             }
@@ -96,6 +108,7 @@ int main(int argc, char *argv[]) {
             perror("Error reading from stdin");
             free(buffer);
             close(out_fd);
+            report_total();
             return EXIT_FAILURE;
         }
     }
@@ -106,8 +119,10 @@ int main(int argc, char *argv[]) {
     // archive on the carrier is incomplete.
     if (close(out_fd) != 0) {
         perror("Error closing device");
+        report_total();
         return EXIT_FAILURE;
     }
 
+    report_total();
     return EXIT_SUCCESS;
 }
