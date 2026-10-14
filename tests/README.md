@@ -8,6 +8,14 @@ tests/run.sh
 tests/run.sh hd-backup
 ```
 
+Measure coverage (needs `python3-coverage`) for the suites that have a `.coveragerc`:
+```
+tests/run.sh --coverage
+tests/run.sh --coverage hd-backup
+```
+
+This prints a report per suite, with the lines and branches that did not run, and writes an HTML report to `tests/<suite>/htmlcov/index.html`. Programs a test runs as a separate process are measured too.
+
 Run one test file or one test from inside a suite directory:
 ```
 cd tests/hd-backup

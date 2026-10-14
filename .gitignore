@@ -3,3 +3,6 @@ repo/scripts/repo
 .vscode
 livecd/out
 __pycache__/
+.coverage
+.coverage.*
+htmlcov/

@@ -1,0 +1,14 @@
+# Coverage of hd-backup, for tests/run.sh --coverage.
+
+[run]
+branch = true
+# The command tests run hd-backup as a separate program. Measure those processes too, each in its own data file,
+# and combine them afterwards.
+parallel = true
+patch = subprocess
+# The tests run hd-backup by its own file name. It has no .py extension, so it must be named.
+include = */deploy/usr/local/bin/hd-backup
+
+[report]
+show_missing = true
+skip_covered = false
