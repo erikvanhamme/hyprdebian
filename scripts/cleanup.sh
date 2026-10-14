@@ -13,9 +13,10 @@ c_post() {
 }
 
 c_save_config() {
-    # upgrade.sh reads the answers back from this copy.
+    # upgrade.sh reads the answers back from this copy. install.sh defines the root task install,
+    # so command runs /usr/bin/install instead of that function.
     save_config INSTALLED_VERSION "${INSTALLER_VERSION}"
-    install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}" || return 1
+    command install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}" || return 1
 
     # The console shows the installed version above the login prompt.
     write_issue

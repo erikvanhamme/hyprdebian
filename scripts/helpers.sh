@@ -401,7 +401,8 @@ write_file() {
     local path="$1"
     local mode="$2"
 
-    install -d "$(dirname "$path")"
-    install -m "$mode" /dev/null "$path"
+    # command runs /usr/bin/install, not the root task install of install.sh.
+    command install -d "$(dirname "$path")"
+    command install -m "$mode" /dev/null "$path"
     cat > "$path"
 }
