@@ -73,6 +73,16 @@ def make_socket(path):
         os.chdir(old_cwd)
 
 
+def write_stub(directory, name, script):
+    # A stand-in for a program, found first on PATH when directory is put in front of it.
+    os.makedirs(directory, exist_ok=True)
+    path = os.path.join(directory, name)
+    with open(path, 'w') as file:
+        file.write(script)
+    os.chmod(path, 0o755)
+    return path
+
+
 def snapshot(root):
     # Describes a tree: the type of every item, the contents of files and the targets of symlinks.
     result = {}

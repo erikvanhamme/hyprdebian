@@ -75,6 +75,16 @@ class TestCommands(CliTestCase):
         for args in failing:
             self.run_cli(*args, expect=1)
 
+    def test_sql_error_fails(self):
+        # A database that is damaged, here by a missing table.
+        self.prepare()
+        db = self.db()
+        db.execute('DROP TABLE tarballs')
+        db.commit()
+        db.close()
+        result = self.run_cli('list-tarballs', expect=1)
+        self.assertIn('SQL exception: no such table: tarballs', result.stdout)
+
     def test_missing_arguments_are_a_usage_error(self):
         self.assertEqual(self.run_cli('add-backup', 'only-one', expect=None).returncode, 2)
         self.assertEqual(self.run_cli('no-such-command', expect=None).returncode, 2)

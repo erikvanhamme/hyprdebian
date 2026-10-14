@@ -4,7 +4,7 @@ import hashlib
 import os
 import unittest
 
-from helpers import DbTestCase, is_root, make_socket, quiet, write_file
+from helpers import DbTestCase, capture, is_root, make_socket, quiet, write_file
 
 
 class TestScan(DbTestCase):
@@ -133,6 +133,25 @@ class TestScan(DbTestCase):
         for name in names:
             self.assertEqual(len(self.file_records(self.path('data', name))), 1, name)
 
+    def test_hardlinks_are_separate_files_with_warning(self):
+        os.link(self.path('data', 'f1'), self.path('data', 'f1-link'))
+        output, redirect = capture()
+        with redirect:
+            self.hb.update_filesets(self.db, ['fs'])
+        self.assertIn(f'Found possible hardlink {self.path("data", "f1-link")}', output.getvalue())
+        self.assertFalse(self.hb.had_errors)
+        self.assertEqual(len(self.file_records(self.path('data', 'f1'))), 1)
+        self.assertEqual(len(self.file_records(self.path('data', 'f1-link'))), 1)
+
+    def test_many_items(self):
+        # The scan commits every 100 items. All of them end up in the database.
+        for index in range(250):
+            write_file(self.path('data', 'many', f'{index:03}'), str(index))
+        self.update('fs')
+        many = self.value('SELECT COUNT(*) FROM files WHERE path LIKE ?', (self.path('data', 'many') + '/%',))
+        self.assertEqual(many, 250)
+        self.assertEqual(self.value('SELECT COUNT(*) FROM file_fileset_links'), 3 + 1 + 250)
+
     def test_fifo_socket_and_device_are_skipped(self):
         os.mkfifo(self.path('data', 'fifo'))
         make_socket(self.path('data', 'sock'))
@@ -193,6 +212,16 @@ class TestExclusions(DbTestCase):
         os.chmod(self.path('data', 'cache', 'deep'), 0)
         self.add_fileset('fs', self.path('data'), '^' + self.path('data', 'cache'))
         self.assertFalse(self.hb.had_errors)
+
+    def test_exclusion_only_applies_where_it_matches(self):
+        # A fileset with two paths: the exclusion is in the second, and does not change the scan of the first.
+        write_file(self.path('other', 'cache', 'x'), 'x')
+        write_file(self.path('other', 'keep'), 'k')
+        self.add_fileset('fs', self.path('data'), self.path('other'), '^' + self.path('other', 'cache'))
+        paths = [row[0] for row in self.rows('SELECT path FROM files')]
+        self.assertIn(self.path('data', 'cache', 'deep', 'c'), paths)
+        self.assertIn(self.path('other', 'keep'), paths)
+        self.assertNotIn(self.path('other', 'cache', 'x'), paths)
 
     def test_excluded_path_of_fileset_is_not_scanned(self):
         self.add_fileset('fs', self.path('data'), '^' + self.path('data'))

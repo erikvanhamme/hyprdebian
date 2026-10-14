@@ -32,6 +32,7 @@ Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c
 | `test_accounting.py` | Which items count as written when a carrier runs full, also against real tar output. |
 | `test_scan.py` | Scanning filesets on an in-memory database: new, changed, deleted and recreated items, special files, exclusions. |
 | `test_write.py` | The parts of a write that do not run tar (delete list, file list, carrier choice, database update), and the backup, carrier, summary and manifest commands. |
+| `test_write_tar.py` | How the messages and exit status of tar and the tape pipeline are judged, with stub programs. |
 | `test_commands.py` | Every command run as a program, and its exit status. |
 | `test_backup_restore.py` | Backups written to a directory and to a stub tape drive, restored with tar and the delete list, and compared with the live files. |
 | `test_blockwrite.py` | `blockwrite`, compiled from source. |

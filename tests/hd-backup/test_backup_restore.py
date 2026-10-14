@@ -6,11 +6,20 @@ import shutil
 import tarfile
 import unittest
 
-from helpers import CliTestCase, is_root, snapshot, write_file
+from helpers import CliTestCase, is_root, snapshot, write_file, write_stub
 
 # Stubs for the programs a tape write runs. mt-st logs its arguments. mbuffer passes the stream on.
 MT_ST_STUB = '#!/bin/sh\necho "$@" >> "$(dirname "$0")/mt-st.log"\n'
 MBUFFER_STUB = '#!/bin/sh\ncat\n'
+
+# mt-st that fails on one command, given as the first argument of the stub: setblk, compression, fsf or rewind.
+MT_ST_FAILING_STUB = '''#!/bin/sh
+echo "$@" >> "$(dirname "$0")/mt-st.log"
+if [ "$3" = "{command}" ]; then
+    echo "/dev/nst0: Input/output error" >&2
+    exit 1
+fi
+'''
 
 # blockwrite that writes everything to the "device" (a regular file) and reports the total, like the real one.
 BLOCKWRITE_STUB = '''#!/bin/sh
@@ -196,10 +205,7 @@ class TestTape(BackupTestCase):
         self.run_cli('add-carrier', 'bk', 't1', 't2')
 
     def stub(self, name, script):
-        path = os.path.join(self.bin, name)
-        with open(path, 'w') as file:
-            file.write(script)
-        os.chmod(path, 0o755)
+        write_stub(self.bin, name, script)
 
     def write_tape(self, expect=0):
         return self.run_cli('write-tape', 'bk', self.device, expect=expect, path_prefix=self.bin)
@@ -255,6 +261,35 @@ class TestTape(BackupTestCase):
         self.stub('blockwrite', BLOCKWRITE_STUB)
         self.write_tape()
         self.assertIn('All files of the fileset are on carrier', self.run_cli('summary').stdout)
+
+    def test_mt_st_failure_before_writing(self):
+        self.stub('blockwrite', BLOCKWRITE_STUB)
+        self.stub('mt-st', MT_ST_FAILING_STUB.format(command='setblk'))
+        result = self.write_tape(expect=1)
+        self.assertIn('Could not set blocksize: mt-st error: /dev/nst0: Input/output error', result.stdout)
+        self.assertEqual(self.query('SELECT COUNT(*) FROM tarballs'), [(0,)])
+        self.assertEqual(os.path.getsize(self.device), 0)
+
+    def test_compression_and_skip_failures(self):
+        self.stub('blockwrite', BLOCKWRITE_STUB)
+        self.stub('mt-st', MT_ST_FAILING_STUB.format(command='compression'))
+        self.assertIn('Could not enable compression', self.write_tape(expect=1).stdout)
+
+        self.stub('mt-st', MT_ST_STUB)
+        self.write_tape()
+        self.write('small', 'changed')
+        self.run_cli('update-filesets', 'fs')
+        self.stub('mt-st', MT_ST_FAILING_STUB.format(command='fsf'))
+        self.assertIn('Could not advance tape to correct file record', self.write_tape(expect=1).stdout)
+        self.assertEqual(self.query('SELECT COUNT(*) FROM tarballs'), [(1,)])
+
+    def test_rewind_failure_is_reported_after_writing(self):
+        # The tarball is on the tape and is recorded, but the command fails, so the rewind is not missed.
+        self.stub('blockwrite', BLOCKWRITE_STUB)
+        self.stub('mt-st', MT_ST_FAILING_STUB.format(command='rewind'))
+        result = self.write_tape(expect=1)
+        self.assertIn('Could not rewind tape: mt-st error: /dev/nst0: Input/output error', result.stdout)
+        self.assertEqual(self.query('SELECT files, symlinks FROM tarballs'), [(3, 1)])
 
     def test_tape_error_fails_the_write_and_rewinds(self):
         self.stub('blockwrite', BLOCKWRITE_BROKEN_STUB)

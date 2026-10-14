@@ -306,6 +306,14 @@ class TestSummary(WriteTestCase):
         self.assertIn('Backup set bk:', output)
         self.assertIn('Backup set other:', output)
 
+    def test_exact_names(self):
+        self.add_backup('bk2', 'fs')
+        self.add_backup('other', 'fs')
+        output = self.summary('bk', 'other')
+        self.assertIn('Backup set bk:', output)
+        self.assertIn('Backup set other:', output)
+        self.assertNotIn('Backup set bk2:', output)
+
     def test_wildcard_and_literal_characters(self):
         self.add_backup('b.k', 'fs')
         self.add_backup('bxk-2', 'fs')
