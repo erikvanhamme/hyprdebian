@@ -313,6 +313,18 @@ random_mac() {
         "0x$2" "0x$3" "0x$4" "0x$5" "0x$6"
 }
 
+# Downloads the signing key of the hyprdebian repo from the repo itself, for the Signed-By of
+# hyprdebian.local.sources. apt-helper comes with apt, so the target needs no download tool.
+repo_key_download() {
+    local url="${Q_REPO%/}/hyprdebian-archive-keyring.pgp"
+    local tmp="/tmp/hyprdebian-archive-keyring.pgp"
+
+    echo "Downloading ${url}"
+    in_target /usr/lib/apt/apt-helper download-file "$url" "$tmp" || return 1
+    in_target install -m 0644 "$tmp" "${REPO_KEY}" || return 1
+    rm -f "${TARGET_DIR}${tmp}"
+}
+
 # Shows network interfaces.
 show_ifaces() {
     printf '%-12s %-12s %-12s %s\n' "INTERFACE" "TYPE" "PATH NAME" "IP ADDRESS"

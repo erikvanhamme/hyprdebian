@@ -38,7 +38,7 @@ These defaults are the same for every machine type (`DEFAULTS_common`):
 | `Q_CUPS` | Enable CUPS | `n` |
 | `Q_RUST` | Enable rust and syscargo support | `n` |
 | `Q_OPENSSH` | Enable OpenSSH server | `y` |
-| `Q_REPO` | Local hyprdebian repository URL | `http://repo.rsq-online.ddns.net:8080/` |
+| `Q_REPO` | Local hyprdebian repository URL | `http://repo.rsq-online.ddns.net/` |
 
 ## Machine type defaults
 These defaults differ per machine type (`DEFAULTS_desktop`, `DEFAULTS_laptop`, `DEFAULTS_server` and `DEFAULTS_vm`):

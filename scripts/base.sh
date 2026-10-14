@@ -187,6 +187,7 @@ b_apt_init() {
     template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
+        repo_key_download || return 1
         template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 || return 1
     fi
 
