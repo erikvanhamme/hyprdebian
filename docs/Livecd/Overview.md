@@ -2,9 +2,12 @@
 Hyprdebian has its own live ISO. It is a Debian trixie live system with everything the installer needs already on it, so the installer can skip its prerequisites phase.
 
 The live cd contains:
-- A GNOME desktop.
+- A text console, no desktop. The live user is logged in on the console automatically.
+- gpm, so the mouse works on the console for copy and paste.
+- An ssh server, so the installation can also be done from another machine.
+- NetworkManager. Wired networks come up by themselves, `nmtui` sets up wifi.
 - ZFS support. The ZFS kernel module is built with DKMS while the ISO is built and is loaded at boot.
-- The tools the installer needs: debootstrap, gparted, gdisk, git, mdadm and python3-jinja2.
+- The tools the installer needs: debootstrap, dosfstools, gdisk, git, mdadm, parted, python3-jinja2, unzip and wget.
 - A checkout of the hyprdebian repo in the home folder of the live user.
 - A `hyprdebian.release` file in the home folder of the live user. The installer looks for this file to know it is running on the hyprdebian live cd. When it is found, the prerequisites phase is skipped.
 
@@ -44,7 +47,7 @@ Notes:
 1. The container needs `--privileged` because live-build mounts filesystems and creates device nodes in its chroot.
 2. The whole build happens inside the container. Only the ISO is copied out. With `--rm` the build files are thrown away afterwards.
 3. HOST_UID and HOST_GID make the ISO owned by your own user instead of root.
-4. Every build starts from scratch and downloads all packages again. A build takes a while, mainly because of the desktop packages and the ZFS module.
+4. Every build starts from scratch and downloads all packages again. A build takes a while, mainly because of the ZFS module.
 5. `livecd/out` is in .gitignore.
 
 ### Following the build
@@ -84,7 +87,32 @@ Replace /dev/sdX with the USB stick. Everything on it will be lost.
 
 Boot from the USB stick. The live cd boots on both UEFI and BIOS machines.
 
-After boot, open a terminal and run:
+The live cd boots to a text console, logged in as the live user `user`. Its password is `live`.
+
+### Copy and paste on the console
+gpm runs on the console, so the mouse works there:
+- Select text with the left button. Double click selects a word, triple click a line.
+- Paste with the middle button.
+
+This is handy for disk wwn's: list them with `ls -l /dev/disk/by-id/`, select one and paste it where the installer asks for it.
+
+### Installing over ssh
+The ssh server is started at boot. Find the address of the live system with:
+```
+ip -br addr
+```
+
+Then log in from another machine with:
+```
+ssh user@<address>
+```
+
+The password is `live`. Wifi can be set up with `sudo nmtui`.
+
+The ssh host keys of the live cd can change between boots and between ISO builds. ssh then warns about a changed host key. Remove the old key with `ssh-keygen -R <address>`.
+
+### Running the installer
+Run:
 ```
 cd hyprdebian
 git pull

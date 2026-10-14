@@ -58,7 +58,7 @@ sudo ./install.sh
 
 ### From hyprdebian live ISO
 
-The hyprdebian live ISO is a Debian trixie live system with a GNOME desktop, ZFS support, the tools the installer needs and a checkout of this repo. The installer skips its prerequisites phase when it runs on it.
+The hyprdebian live ISO is a Debian trixie live system with a text console, ZFS support, an ssh server, the tools the installer needs and a checkout of this repo. The installer skips its prerequisites phase when it runs on it.
 
 To install you will need to create the live ISO by running the script in the livecd folder.
 
@@ -80,7 +80,9 @@ sudo dd if=livecd/out/hyprdebian-live-amd64.iso of=/dev/sdX bs=4M status=progres
 
 Replace /dev/sdX with the USB stick. Everything on it will be lost. The live cd boots on both UEFI and BIOS machines.
 
-After boot, open a terminal and run:
+The live cd boots to a text console, logged in as the live user. The mouse works on the console: select text with the left button and paste it with the middle button. You can also log in over ssh as user `user` with password `live`.
+
+Then run:
 
 ```
 cd hyprdebian

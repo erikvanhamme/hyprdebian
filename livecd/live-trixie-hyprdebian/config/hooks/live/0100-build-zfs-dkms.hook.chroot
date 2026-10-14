@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+# Detect installed kernel version inside the chroot
+KERNEL_VERSION=$(ls /lib/modules | head -n 1)
+
+if [ -n "$KERNEL_VERSION" ]; then
+  echo "Building ZFS DKMS modules for kernel: $KERNEL_VERSION"
+  dkms autoinstall -k "$KERNEL_VERSION" || dkms build -m zfs -v $(dpkg-query -W -f='${Version}\n' zfs-dkms | cut -d: -f2 | cut -d- -f1) -k "$KERNEL_VERSION"
+  depmod -a "$KERNEL_VERSION"
+else
+  echo "Error: No kernel headers/modules found in chroot." >&2
+  exit 1
+fi

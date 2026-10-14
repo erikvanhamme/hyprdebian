@@ -16,7 +16,6 @@ lb config \
 
 # Ensure ZFS support is baked in
 cat <<'EOF' > config/package-lists/zfs.list.chroot
-task-gnome-desktop
 build-essential
 kitty-terminfo
 linux-headers-amd64
@@ -25,14 +24,30 @@ zfsutils-linux
 EOF
 
 
-# Add gparted, git and other required tools
+# Add git and the other tools the installer needs
 cat <<'EOF' > config/package-lists/hyprdebian.list.chroot
+ca-certificates
 debootstrap
-gparted
+dosfstools
 gdisk
 git
 mdadm
+parted
 python3-jinja2
+unzip
+wget
+EOF
+
+
+# Text console only, no desktop. gpm gives a mouse on the console for copy
+# and paste, openssh-server allows installing over ssh and network-manager
+# brings up the network (nmtui for wifi).
+cat <<'EOF' > config/package-lists/console.list.chroot
+gpm
+network-manager
+openssh-server
+sudo
+user-setup
 EOF
 
 
@@ -70,6 +85,18 @@ fi
 EOF
 
 chmod +x config/hooks/live/0100-build-zfs-dkms.hook.chroot
+
+
+# Make sure the console mouse and the ssh server start at boot.
+cat <<'EOF' > config/hooks/live/0200-enable-services.hook.chroot
+#!/bin/sh
+set -e
+
+systemctl enable gpm.service
+systemctl enable ssh.service
+EOF
+
+chmod +x config/hooks/live/0200-enable-services.hook.chroot
 
 
 # Make sure ZFS module is loaded.
