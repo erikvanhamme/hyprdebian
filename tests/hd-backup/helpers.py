@@ -2,6 +2,8 @@
 
 import contextlib
 import glob
+import importlib.machinery
+import importlib.util
 import io
 import os
 import shutil
@@ -11,31 +13,29 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import types
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 HD_BACKUP = os.path.join(REPO, 'deploy', 'usr', 'local', 'bin', 'hd-backup')
 BLOCKWRITE_SOURCE = os.path.join(REPO, 'src', 'blockwrite.c')
 
-# The database version the tool expects. Kept in one place, so a schema change needs one edit here.
-DB_VERSION = 8
-
 _module = None
 
 
 def load_hd_backup():
-    # hd-backup handles its command line at the top level of the script, so it cannot be imported. Only the part
-    # before the Main section is executed: that defines all the functions, without running a command.
+    # Imports hd-backup as a module. It has no .py extension, so the loader is given explicitly. Importing it does
+    # not run a command: that only happens when it runs as a program.
     global _module
     if _module is None:
-        with open(HD_BACKUP) as file:
-            source = file.read()
-        end = source.index('\n# Main\n')
-        _module = types.ModuleType('hd_backup')
-        _module.__file__ = HD_BACKUP
-        exec(compile(source[:end], HD_BACKUP, 'exec'), _module.__dict__)
+        loader = importlib.machinery.SourceFileLoader('hd_backup', HD_BACKUP)
+        spec = importlib.util.spec_from_loader('hd_backup', loader)
+        _module = importlib.util.module_from_spec(spec)
+        loader.exec_module(_module)
     return _module
+
+
+# The database version the tool expects.
+DB_VERSION = load_hd_backup().DB_VERSION
 
 
 def quiet():
@@ -140,8 +140,8 @@ class DbTestCase(TempDirTestCase):
         super().setUp()
         self.hb = load_hd_backup()
         self.hb.had_errors = False
-        self.db = sqlite3.connect(':memory:')
-        self.hb.create_db(self.db, DB_VERSION)
+        with quiet():
+            self.db = self.hb.open_db(':memory:')
 
     def tearDown(self):
         self.db.close()
@@ -151,7 +151,8 @@ class DbTestCase(TempDirTestCase):
         return self.db.execute(query, params).fetchone()[0]
 
     def rows(self, query, params=()):
-        return self.db.execute(query, params).fetchall()
+        # As tuples, so they compare equal to the tuples in the tests.
+        return [tuple(row) for row in self.db.execute(query, params)]
 
     def add_fileset(self, name, *paths):
         with quiet():

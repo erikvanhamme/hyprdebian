@@ -37,6 +37,6 @@ Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c
 | `test_backup_restore.py` | Backups written to a directory and to a stub tape drive, restored with tar and the delete list, and compared with the live files. |
 | `test_blockwrite.py` | `blockwrite`, compiled from source. |
 
-`helpers.py` loads `hd-backup` for the tests. The script handles its command line at the top level, so it cannot be imported: the helper runs the part before the `# Main` section, which defines the functions.
+`helpers.py` imports `hd-backup` as a module for the tests. The script has no `.py` extension, so the helper gives the loader explicitly. Importing it runs no command: that only happens when it runs as a program.
 
 The tape tests take about 5 seconds each, because a tape write waits 5 seconds before it rewinds.
