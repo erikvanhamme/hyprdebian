@@ -18,7 +18,8 @@ Reboot the system after the upgrade. New services only start on the next boot, a
 ## Before the upgrade
 Before it works out anything, the upgrade:
 1. **Checks that the system is up to date.** It runs `apt update`, and counts the packages `apt full-upgrade` would upgrade. When there are any, it recommends to upgrade the system first, and asks whether to continue anyway. The default is to stop. The upgrade installs new packages with their latest versions, and on a system that is behind, these can pull in upgrades of the packages they depend on, like `systemd`, while the rest of the system stays behind.
-2. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates.
+2. **Snapshots the system.** It takes the snapshots `rpool/hyprdebian@upgrade-<date>_<time>` and `bpool/hyprdebian@upgrade-<date>_<time>`, like `upgrade-2026-10-15_143005`, so the upgrade can be undone with `zfs rollback`. When a snapshot cannot be created, the upgrade stops. `hd-up` takes the same snapshots before an `apt full-upgrade`, named `hd-up-<date>_<time>`.
+3. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates.
 
 ## State on the installed system
 The installer leaves two files on the installed system for the upgrade:
@@ -37,7 +38,7 @@ The state of the upgrade itself is kept in `/tmp/hyprdebian-upgrade`, and is rem
 1. Sources `version.sh` and the installer helper scripts, then `scripts/upgrade_helpers.sh` and `scripts/upgrade_detect.sh`. The upgrade helpers replace a few installer settings and functions, see [Upgrade helpers](#upgrade-helpers).
 2. Prints the start banner and checks that it runs as root.
 3. Creates a fresh state directory `/tmp/hyprdebian-upgrade`.
-4. Checks that the system is up to date (`check_up_to_date`), and installs the packages the upgrade needs (`install_prerequisites`). See [Before the upgrade](#before-the-upgrade).
+4. Checks that the system is up to date (`check_up_to_date`), snapshots it (`take_snapshots`), and installs the packages the upgrade needs (`install_prerequisites`). See [Before the upgrade](#before-the-upgrade).
 5. Loads the answers of the installation (`load_installed_config`, then `load_config`). The queues and dependencies in the saved config were worked out by the version that wrote it, so they are left out. The old queues are kept apart, to find out what the new version adds. Without a saved config, the answers are worked out from the system, see [Systems installed before the upgrade existed](#systems-installed-before-the-upgrade-existed).
 6. Defines the root task `upgrade`.
 7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and `scripts/packages.sh`, `scripts/services.sh` and `scripts/user.sh` for the tasks on their hooks (see [Hook tasks](#hook-tasks)), and marks the tasks that only make sense during an installation as done, so they are skipped.

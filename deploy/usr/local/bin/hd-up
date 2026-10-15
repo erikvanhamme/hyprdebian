@@ -2,7 +2,8 @@
 
 DATASET="rpool/hyprdebian"
 BOOT_DATASET="bpool/hyprdebian"
-SNAP_NAME="pre-upgrade-$(date +%Y-%m-%d_%H%M)"
+# Named like the snapshots of upgrade.sh: <script>-<date>_<time>.
+SNAP_NAME="hd-up-$(date +%Y-%m-%d_%H%M%S)"
 
 echo "--- 1. Syncing Repositories ---"
 sudo apt update

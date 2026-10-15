@@ -63,6 +63,28 @@ check_up_to_date() {
     done
 }
 
+# Snapshots the root and boot datasets before the upgrade changes anything, so it can be undone
+# with zfs rollback. The names follow hd-up: <script>-<date>_<time>, here upgrade-....
+take_snapshots() {
+    local name
+    name="upgrade-$(date +%Y-%m-%d_%H%M%S)"
+
+    if ! in_target zfs snapshot "rpool/hyprdebian@${name}"; then
+        echo "ERROR: Unable to create the snapshots, the upgrade is stopped." >&2
+        exit 1
+    fi
+
+    # The pools differ, so both snapshots cannot be taken in one atomic call. Drop the root
+    # snapshot again when the boot snapshot fails.
+    if ! in_target zfs snapshot "bpool/hyprdebian@${name}"; then
+        in_target zfs destroy "rpool/hyprdebian@${name}"
+        echo "ERROR: Unable to create the snapshots, the upgrade is stopped." >&2
+        exit 1
+    fi
+
+    echo "Snapshots created: rpool/hyprdebian@${name} bpool/hyprdebian@${name}"
+}
+
 # Installs the packages the upgrade needs on the system, like python3-jinja2 to render the
 # templates.
 install_prerequisites() {

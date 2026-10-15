@@ -28,8 +28,9 @@ rm -rf "$STATE_DIR"
 mkdir -p "$STATE_DIR"
 declare -A TASK_DEPS
 
-# Check that the system is up to date, then install what the upgrade itself needs.
+# Check that the system is up to date, snapshot it, then install what the upgrade itself needs.
 check_up_to_date
+take_snapshots
 install_prerequisites
 
 # Load the answers of the installation.
