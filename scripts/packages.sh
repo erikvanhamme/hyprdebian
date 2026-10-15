@@ -31,7 +31,7 @@ pkg_qemu_kvm() {
 pkg_enable_firewall() {
     # Allow SSH before enabling the firewall, so an upgrade over ssh keeps accepting connections.
     if [[ "${Q_OPENSSH}" == "true" ]]; then
-        in_target ufw allow SSH || return 1
+        ufw_allow_ssh || return 1
     fi
 
     in_target ufw enable || return 1

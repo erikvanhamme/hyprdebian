@@ -413,6 +413,16 @@ trim() {
     printf '%s' "$var"
 }
 
+# Lets the firewall accept ssh connections from the SSH_SUBNETS only. These are IPv4 subnets, so
+# ufw adds no rule for IPv6, and ssh over IPv6 is blocked.
+ufw_allow_ssh() {
+    local subnet
+
+    for subnet in "${SSH_SUBNETS[@]}"; do
+        in_target ufw allow from "${subnet}" to any port 22 proto tcp || return 1
+    done
+}
+
 write_file() {
     local path="$1"
     local mode="$2"
