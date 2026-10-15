@@ -256,6 +256,26 @@ o_openssh() {
     add_packages openssh-server kitty-terminfo
 }
 
+o_report() {
+    # Keep an existing token, so a rerun or an upgrade does not lock the system out of the
+    # dashboard, which only accepts the first token it sees for a host name.
+    if [[ -z "${REPORT_TOKEN:-}" ]]; then
+        REPORT_TOKEN=$(random_token)
+        save_config REPORT_TOKEN ${REPORT_TOKEN}
+    fi
+
+    add_packages python3
+
+    add_files \
+        deploy/etc/systemd/system/hd-report.service \
+        deploy/etc/systemd/system/hd-report.timer \
+        deploy/usr/local/bin/hd-report \
+
+    add_template templates/etc/hyprdebian/report.conf.j2 0600
+
+    add_services hd-report.timer
+}
+
 add_dependencies "o_desktop" \
     "o_font" \
     "o_greetd" \

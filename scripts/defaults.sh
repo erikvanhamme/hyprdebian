@@ -51,6 +51,8 @@ declare -gA DEFAULTS_common=(
     [Q_CUPS]="n"
     [Q_RUST]="n"
     [Q_OPENSSH]="y"
+    [Q_REPORT]="y"
+    [Q_REPORT_URL]="http://dash.rsq-online.ddns.net/"
 )
 
 declare -gA DEFAULTS_desktop=(

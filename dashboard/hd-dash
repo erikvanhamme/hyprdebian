@@ -1,0 +1,668 @@
+#!/usr/bin/python3
+
+# The hyprdebian dashboard. Every hyprdebian system POSTs a status report to it every 15 minutes
+# (hd-report), and it shows the latest report of every system on one page, with a short history.
+#
+#   hd-dash serve           runs the dashboard, see hd-dash.service
+#   hd-dash hosts           lists the known hosts and when they last reported
+#   hd-dash forget <host>   forgets a host and its token, so it can report with a new token
+#
+# A host is known by its host name. The first report of a host name registers its token, and
+# later reports must bring the same token. A reinstalled system has a new token: forget the host
+# first. The settings are in /etc/hyprdebian-dash.conf, or the file in $HD_DASH_CONFIG.
+
+import datetime
+import hashlib
+import html
+import json
+import os
+import re
+import shlex
+import sqlite3
+import sys
+import time
+import urllib.parse
+
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+CONFIG_FILE = os.environ.get("HD_DASH_CONFIG", "/etc/hyprdebian-dash.conf")
+
+DEFAULTS = {
+    "LISTEN": "0.0.0.0",
+    "PORT": "80",
+    "DATABASE": "/var/lib/hyprdebian-dash/dash.db",
+    # A host that did not report for this long is shown as stale. hd-report runs every 15 minutes.
+    "STALE_MINUTES": "45",
+    "HISTORY_DAYS": "30",
+}
+
+# The newest layout of a report this dashboard knows, see FORMAT in hd-report.
+FORMAT = 1
+
+MAX_REPORT_SIZE = 256 * 1024
+HOST_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,62}$")
+TOKEN = re.compile(r"^[A-Za-z0-9]{16,128}$")
+
+# A system that was not upgraded for this long gets a warning.
+UPGRADE_DAYS = 14
+
+# Pools fuller than these get a warning and an error.
+POOL_WARN = 80
+POOL_BAD = 90
+
+# The levels of the issues, from good to bad.
+LEVELS = ["ok", "info", "warn", "bad"]
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS hosts (
+    name TEXT PRIMARY KEY,
+    token TEXT NOT NULL,
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    address TEXT NOT NULL,
+    report TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS history (
+    host TEXT NOT NULL,
+    time INTEGER NOT NULL,
+    load REAL,
+    memory REAL,
+    pool REAL
+);
+CREATE INDEX IF NOT EXISTS history_host_time ON history (host, time);
+"""
+
+
+def parse_config(text):
+    """Parses KEY=value lines, with the value quoted like a shell would."""
+    config = dict(DEFAULTS)
+
+    for line in (text or "").splitlines():
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", line.strip())
+        if not match:
+            continue
+
+        try:
+            words = shlex.split(match.group(2))
+        except ValueError:
+            continue
+
+        config[match.group(1)] = words[0] if words else ""
+
+    return config
+
+
+def load_config():
+    try:
+        with open(CONFIG_FILE) as f:
+            return parse_config(f.read())
+    except FileNotFoundError:
+        return parse_config("")
+
+
+def connect(path):
+    db = sqlite3.connect(path, timeout=10)
+    db.row_factory = sqlite3.Row
+    db.executescript(SCHEMA)
+    return db
+
+
+def hash_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+# --- Receiving reports ---------------------------------------------------------------------------
+
+class Refused(Exception):
+    """A report that is not accepted, with the HTTP status to answer."""
+
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
+
+def number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+
+    return value
+
+
+def metrics(report):
+    """Returns the values of a report that are kept in the history: the load per CPU, and the
+    memory and the fullest pool in percent."""
+    load = None
+    values = report.get("load")
+    cpus = number(report.get("cpus")) or 1
+    if isinstance(values, list) and values and number(values[0]) is not None:
+        load = values[0] / cpus
+
+    memory = None
+    mem = report.get("memory")
+    if isinstance(mem, dict) and number(mem.get("total")) and number(mem.get("used")) is not None:
+        memory = 100 * mem["used"] / mem["total"]
+
+    pool = None
+    for entry in report.get("pools") or []:
+        if isinstance(entry, dict) and number(entry.get("capacity")) is not None:
+            pool = max(pool or 0, entry["capacity"])
+
+    return load, memory, pool
+
+
+def accept_report(db, body, authorization, address, now, history_days):
+    """Checks a report and stores it. Returns the host name. Raises Refused when it is refused."""
+    match = re.match(r"^Bearer (\S+)$", authorization or "")
+    if not match or not TOKEN.match(match.group(1)):
+        raise Refused(401, "missing or malformed token")
+    token = hash_token(match.group(1))
+
+    try:
+        report = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise Refused(400, "the report is not JSON")
+
+    if not isinstance(report, dict):
+        raise Refused(400, "the report is not a JSON object")
+
+    host = report.get("host")
+    if not isinstance(host, str) or not HOST_NAME.match(host):
+        raise Refused(400, "missing or malformed host name")
+
+    if not isinstance(report.get("format"), int) or report["format"] > FORMAT:
+        raise Refused(400, "unknown report format")
+
+    with db:
+        row = db.execute("SELECT token FROM hosts WHERE name = ?", (host,)).fetchone()
+
+        if row is None:
+            db.execute("INSERT INTO hosts (name, token, first_seen, last_seen, address, report) "
+                       "VALUES (?, ?, ?, ?, ?, ?)", (host, token, now, now, address, body.decode()))
+        elif row["token"] != token:
+            raise Refused(403, f"{host} reports with a different token, see hd-dash forget")
+        else:
+            db.execute("UPDATE hosts SET last_seen = ?, address = ?, report = ? WHERE name = ?",
+                       (now, address, body.decode(), host))
+
+        db.execute("INSERT INTO history (host, time, load, memory, pool) VALUES (?, ?, ?, ?, ?)",
+                   (host, now) + metrics(report))
+        db.execute("DELETE FROM history WHERE time < ?", (now - history_days * 86400,))
+
+    return host
+
+
+# --- Judging the state of a host ----------------------------------------------------------------
+
+def version_key(version):
+    return [int(part) if part.isdigit() else 0 for part in re.findall(r"\d+", version or "")]
+
+
+def age(seconds):
+    """Says how long ago something was, like 5 min or 3 days."""
+    seconds = max(0, int(seconds))
+
+    if seconds < 90:
+        return f"{seconds} s"
+    if seconds < 90 * 60:
+        return f"{round(seconds / 60)} min"
+    if seconds < 36 * 3600:
+        return f"{round(seconds / 3600)} h"
+
+    return f"{round(seconds / 86400)} days"
+
+
+def assess(report, last_seen, now, stale_minutes, newest_version):
+    """Returns the issues of a host, as (level, message) pairs."""
+    issues = []
+
+    def add(level, message):
+        issues.append((level, message))
+
+    if now - last_seen > stale_minutes * 60:
+        add("bad", f"No report for {age(now - last_seen)}")
+
+    units = report.get("units") or {}
+    failed = units.get("failed") or []
+    if failed:
+        add("bad", f"{len(failed)} failed: " + ", ".join(str(unit) for unit in failed))
+    elif units.get("state") not in ("running", None):
+        add("warn", f"System is {units.get('state')}")
+
+    for pool in report.get("pools") or []:
+        if pool.get("health") != "ONLINE":
+            add("bad", f"Pool {pool.get('name')} is {pool.get('health')}")
+
+        capacity = number(pool.get("capacity")) or 0
+        if capacity >= POOL_BAD:
+            add("bad", f"Pool {pool.get('name')} is {capacity}% full")
+        elif capacity >= POOL_WARN:
+            add("warn", f"Pool {pool.get('name')} is {capacity}% full")
+
+    for array in report.get("arrays") or []:
+        if array.get("degraded"):
+            add("bad", f"Array {array.get('name')} is degraded")
+
+    for timer in report.get("timers") or []:
+        if timer.get("result") not in ("success", "", None):
+            add("bad", f"{timer.get('service')} failed: {timer.get('result')}")
+
+    system = report.get("os") or {}
+    updates = report.get("updates") or {}
+    if updates.get("reboot_required") or (system.get("kernel_newest") and system.get("kernel_newest") != system.get("kernel")):
+        add("warn", "Reboot pending")
+
+    last_upgrade = number(updates.get("last_upgrade"))
+    if last_upgrade is None:
+        add("warn", "Never upgraded")
+    elif now - last_upgrade > UPGRADE_DAYS * 86400:
+        add("warn", f"Last upgrade {age(now - last_upgrade)} ago")
+
+    upgradable = number(updates.get("upgradable"))
+    if upgradable:
+        add("info", f"{upgradable} upgradable packages")
+
+    version = (report.get("hyprdebian") or {}).get("version")
+    if newest_version and version_key(version) < version_key(newest_version):
+        add("warn", f"Installer {version or 'unknown'}, newest is {newest_version}")
+
+    return issues
+
+
+def level_of(issues):
+    """The level of a host: its worst issue. Notes, like upgradable packages, leave a host good."""
+    worst = "ok"
+
+    for level, _ in issues:
+        if level != "info" and LEVELS.index(level) > LEVELS.index(worst):
+            worst = level
+
+    return worst
+
+
+def load_hosts(db, now, stale_minutes):
+    """Returns the hosts with their report, history and issues, the worst first."""
+    hosts = []
+
+    for row in db.execute("SELECT name, first_seen, last_seen, address, report FROM hosts"):
+        try:
+            report = json.loads(row["report"])
+        except ValueError:
+            report = {}
+
+        hosts.append({
+            "name": row["name"],
+            "first_seen": row["first_seen"],
+            "last_seen": row["last_seen"],
+            "address": row["address"],
+            "report": report,
+        })
+
+    versions = [(host["report"].get("hyprdebian") or {}).get("version") for host in hosts]
+    versions = [version for version in versions if version]
+    newest = max(versions, key=version_key) if versions else None
+
+    for host in hosts:
+        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, newest)
+        host["level"] = level_of(host["issues"])
+
+    hosts.sort(key=lambda host: (-LEVELS.index(host["level"]), host["name"]))
+    return hosts
+
+
+def load_history(db, host, since):
+    return db.execute("SELECT time, load, memory, pool FROM history WHERE host = ? AND time >= ? ORDER BY time",
+                      (host, since)).fetchall()
+
+
+# --- Pages -------------------------------------------------------------------------------------
+
+STYLE = """
+:root { --bg: #f4f4f5; --card: #ffffff; --text: #18181b; --dim: #71717a; --line: #e4e4e7;
+        --ok: #16a34a; --info: #2563eb; --warn: #d97706; --bad: #dc2626; --accent: #ea580c; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #111113; --card: #1c1c1f; --text: #e4e4e7; --dim: #a1a1aa; --line: #2e2e33;
+          --ok: #22c55e; --info: #60a5fa; --warn: #f59e0b; --bad: #f87171; --accent: #fb923c; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+       font: 14px/1.4 system-ui, sans-serif; }
+a { color: inherit; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 16px; }
+h1 { margin: 0; font-size: 20px; color: var(--accent); }
+h2 { margin: 0; font-size: 17px; }
+.dim { color: var(--dim); }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.card { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--ok);
+        border-radius: 8px; padding: 12px 14px; }
+.card.level-warn { border-left-color: var(--warn); }
+.card.level-bad { border-left-color: var(--bad); }
+.title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.title a { text-decoration: none; }
+table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+td { padding: 2px 0; vertical-align: top; }
+td:first-child { color: var(--dim); width: 90px; }
+ul.issues { margin: 8px 0 0; padding: 0; list-style: none; }
+ul.issues li { padding: 1px 0; }
+.ok { color: var(--ok); } .info { color: var(--info); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.bar { display: inline-block; width: 80px; height: 8px; background: var(--line); border-radius: 4px;
+       vertical-align: middle; margin-right: 6px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--info); }
+.bar.warn span { background: var(--warn); } .bar.bad span { background: var(--bad); }
+svg.spark { vertical-align: middle; }
+svg.spark polyline { fill: none; stroke: var(--info); stroke-width: 1.5; }
+svg.chart { width: 100%; height: 140px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+svg.chart polyline { fill: none; stroke: var(--info); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+svg.chart line { stroke: var(--line); vector-effect: non-scaling-stroke; }
+section { margin: 16px 0; }
+pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; overflow-x: auto; }
+"""
+
+
+def esc(value):
+    return html.escape("" if value is None else str(value))
+
+
+def size(value):
+    value = number(value)
+    if value is None:
+        return "?"
+
+    for unit in ["B", "KiB", "MiB", "GiB", "TiB"]:
+        if value < 1024 or unit == "TiB":
+            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
+        value /= 1024
+
+
+def when(timestamp, now):
+    """A time as how long ago, with the date in the tooltip."""
+    timestamp = number(timestamp)
+    if timestamp is None:
+        return '<span class="dim">never</span>'
+
+    stamp = datetime.datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M")
+    if timestamp > now:
+        return f'<span title="{stamp}">in {age(timestamp - now)}</span>'
+
+    return f'<span title="{stamp}">{age(now - timestamp)} ago</span>'
+
+
+def bar(percent):
+    percent = number(percent)
+    if percent is None:
+        return ""
+
+    level = "bad" if percent >= POOL_BAD else "warn" if percent >= POOL_WARN else ""
+    return f'<span class="bar {level}"><span style="width:{min(100, max(0, percent)):.0f}%"></span></span>'
+
+
+def polyline(points, start, end, top, width, height):
+    """Maps (time, value) points to the coordinates of an SVG polyline."""
+    span = max(1, end - start)
+    top = top or 1
+    return " ".join(f"{(t - start) / span * width:.1f},{height - min(v, top) / top * height:.1f}"
+                    for t, v in points if v is not None)
+
+
+def sparkline(rows, column, now, top=None):
+    points = [(row["time"], row[column]) for row in rows]
+    values = [v for _, v in points if v is not None]
+    if len(values) < 2:
+        return ""
+
+    top = top or max(1, max(values))
+    return (f'<svg class="spark" width="80" height="18" viewBox="0 0 80 18">'
+            f'<polyline points="{polyline(points, now - 86400, now, top, 80, 18)}"/></svg>')
+
+
+def chart(rows, column, now, days, top, label):
+    points = [(row["time"], row[column]) for row in rows]
+    values = [v for _, v in points if v is not None]
+    top = top or max([1] + values)
+    grid = "".join(f'<line x1="{x}" y1="0" x2="{x}" y2="100"/>' for x in range(0, 1000, max(1, round(1000 / days))))
+
+    return (f'<h2>{esc(label)} <span class="dim">· {days} days, top {top:g}</span></h2>'
+            f'<svg class="chart" viewBox="0 0 1000 100" preserveAspectRatio="none">{grid}'
+            f'<polyline points="{polyline(points, now - days * 86400, now, top, 1000, 100)}"/></svg>')
+
+
+def page(title, body, refresh=True):
+    meta = '<meta http-equiv="refresh" content="60">' if refresh else ""
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width, initial-scale=1">{meta}'
+            f'<title>{esc(title)}</title><style>{STYLE}</style></head><body>{body}</body></html>')
+
+
+def host_rows(host, history, now):
+    """The rows of the table of a host, on the overview and on its own page."""
+    report = host["report"]
+    hd = report.get("hyprdebian") or {}
+    system = report.get("os") or {}
+    memory = report.get("memory") or {}
+    updates = report.get("updates") or {}
+    units = report.get("units") or {}
+    load = report.get("load") or []
+
+    rows = [
+        ("Seen", when(host["last_seen"], now) + f' <span class="dim">from {esc(host["address"])}</span>'),
+        ("Version", f'{esc(hd.get("version") or "?")} <span class="dim">· {esc(hd.get("type"))} · {esc(hd.get("suite"))} · Debian {esc(system.get("debian"))}</span>'),
+        ("Kernel", esc(system.get("kernel"))),
+        ("Up", when(system.get("boot_time"), now).replace(" ago", "")),
+        ("Load", f'{sparkline(history, "load", now)} ' + esc(" ".join(f"{v:.2f}" for v in load if number(v) is not None)) +
+                 f' <span class="dim">· {esc(report.get("cpus"))} CPUs</span>'),
+    ]
+
+    if number(memory.get("total")):
+        percent = 100 * (memory.get("used") or 0) / memory["total"]
+        rows.append(("Memory", f'{bar(percent)}{size(memory.get("used"))} of {size(memory.get("total"))}'))
+
+    for pool in report.get("pools") or []:
+        health = pool.get("health")
+        rows.append(("Pool", f'{bar(pool.get("capacity"))}{esc(pool.get("name"))} '
+                             f'<span class="{"ok" if health == "ONLINE" else "bad"}">{esc(health)}</span> '
+                             f'<span class="dim">{esc(pool.get("capacity"))}% of {size(pool.get("size"))}</span>'))
+
+    for array in report.get("arrays") or []:
+        state = "degraded" if array.get("degraded") else array.get("state")
+        rows.append(("Array", f'{esc(array.get("name"))} <span class="{"bad" if array.get("degraded") else "ok"}">{esc(state)}</span>'))
+
+    failed = units.get("failed") or []
+    if failed:
+        rows.append(("Units", f'<span class="bad">{len(failed)} failed:</span> {esc(", ".join(map(str, failed)))}'))
+    else:
+        rows.append(("Units", f'<span class="ok">{esc(units.get("state") or "?")}</span>'))
+
+    upgradable = updates.get("upgradable")
+    rows.append(("Upgraded", when(updates.get("last_upgrade"), now) +
+                 (f' <span class="dim">· {esc(upgradable)} upgradable, lists {when(updates.get("lists_time"), now)}</span>'
+                  if upgradable is not None else "")))
+
+    snapshot = report.get("snapshot")
+    if isinstance(snapshot, dict):
+        rows.append(("Snapshot", f'{esc(snapshot.get("name"))} <span class="dim">{when(snapshot.get("time"), now)}</span>'))
+
+    for timer in report.get("timers") or []:
+        result = timer.get("result") or "?"
+        rows.append((esc(str(timer.get("unit", "")).removesuffix(".timer")),
+                     f'<span class="{"ok" if result == "success" else "bad"}">{esc(result)}</span> '
+                     f'<span class="dim">last {when(timer.get("last"), now)}, next {when(timer.get("next"), now)}</span>'))
+
+    return "".join(f"<tr><td>{label}</td><td>{value}</td></tr>" for label, value in rows)
+
+
+def issue_list(issues):
+    if not issues:
+        return '<ul class="issues"><li class="ok">All good</li></ul>'
+
+    return '<ul class="issues">' + "".join(f'<li class="{level}">{esc(message)}</li>' for level, message in issues) + "</ul>"
+
+
+def overview_page(db, now, stale_minutes):
+    hosts = load_hosts(db, now, stale_minutes)
+    counts = {level: sum(1 for host in hosts if host["level"] == level) for level in LEVELS}
+
+    cards = []
+    for host in hosts:
+        fqdn = host["report"].get("fqdn")
+        history = load_history(db, host["name"], now - 86400)
+        cards.append(
+            f'<div class="card level-{host["level"]}"><div class="title">'
+            f'<h2><a href="/host/{urllib.parse.quote(host["name"])}">{esc(host["name"])}</a></h2>'
+            f'<span class="dim">{esc(fqdn)}</span></div>'
+            f'{issue_list(host["issues"])}<table>{host_rows(host, history, now)}</table></div>')
+
+    summary = " · ".join(f'<span class="{level}">{counts[level]} {label}</span>'
+                         for level, label in [("bad", "failing"), ("warn", "warnings"), ("ok", "good")]
+                         if counts[level] or level == "ok")
+
+    body = (f'<header><h1>HyprDebian</h1><span>{len(hosts)} hosts · {summary}</span>'
+            f'<span class="dim">{datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M")}</span></header>')
+
+    if not hosts:
+        body += '<p class="dim">No reports yet. Systems with hd-report.timer report every 15 minutes.</p>'
+
+    return page("HyprDebian Dashboard", body + f'<div class="grid">{"".join(cards)}</div>')
+
+
+def host_page(db, name, now, stale_minutes, history_days):
+    hosts = [host for host in load_hosts(db, now, stale_minutes) if host["name"] == name]
+    if not hosts:
+        return None
+
+    host = hosts[0]
+    history = load_history(db, name, now - history_days * 86400)
+    day = [row for row in history if row["time"] >= now - 86400]
+
+    body = (f'<header><h1><a href="/" style="text-decoration:none">HyprDebian</a></h1>'
+            f'<h2>{esc(name)}</h2><span class="dim">{esc(host["report"].get("fqdn"))} · '
+            f'reporting since {when(host["first_seen"], now)}</span></header>'
+            f'<div class="card level-{host["level"]}">{issue_list(host["issues"])}<table>{host_rows(host, day, now)}</table></div>'
+            f'<section>{chart(history, "load", now, history_days, None, "Load per CPU")}</section>'
+            f'<section>{chart(history, "memory", now, history_days, 100, "Memory %")}</section>'
+            f'<section>{chart(history, "pool", now, history_days, 100, "Fullest pool %")}</section>'
+            f'<section><h2>Last report</h2><pre>{esc(json.dumps(host["report"], indent=2))}</pre></section>')
+
+    return page(f"{name} · HyprDebian Dashboard", body)
+
+
+# --- Server ------------------------------------------------------------------------------------
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "hd-dash"
+    config = DEFAULTS
+
+    def respond(self, status, content_type, body):
+        data = body.encode()
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def text(self, status, message):
+        self.respond(status, "text/plain; charset=utf-8", message + "\n")
+
+    def database(self):
+        return connect(self.config["DATABASE"])
+
+    def do_POST(self):
+        if self.path != "/report":
+            return self.text(404, "not found")
+
+        try:
+            length = int(self.headers.get("Content-Length", ""))
+        except ValueError:
+            return self.text(411, "Content-Length needed")
+
+        if length < 0 or length > MAX_REPORT_SIZE:
+            return self.text(413, "report too large")
+
+        body = self.rfile.read(length)
+        db = self.database()
+        try:
+            host = accept_report(db, body, self.headers.get("Authorization"), self.client_address[0],
+                                 int(time.time()), int(self.config["HISTORY_DAYS"]))
+        except Refused as refused:
+            self.log_message("refused report from %s: %s", self.client_address[0], refused)
+            return self.text(refused.status, str(refused))
+        finally:
+            db.close()
+
+        self.text(200, f"report of {host} stored")
+
+    def do_GET(self):
+        path = urllib.parse.urlsplit(self.path).path
+        now = int(time.time())
+        stale = int(self.config["STALE_MINUTES"])
+
+        db = self.database()
+        try:
+            if path == "/":
+                return self.respond(200, "text/html; charset=utf-8", overview_page(db, now, stale))
+
+            if path == "/api/hosts":
+                hosts = load_hosts(db, now, stale)
+                return self.respond(200, "application/json", json.dumps(hosts, indent=2))
+
+            if path.startswith("/host/"):
+                name = urllib.parse.unquote(path[6:])
+                body = host_page(db, name, now, stale, int(self.config["HISTORY_DAYS"]))
+                if body is not None:
+                    return self.respond(200, "text/html; charset=utf-8", body)
+        finally:
+            db.close()
+
+        self.text(404, "not found")
+
+    def log_message(self, format, *args):
+        # Reports arrive every 15 minutes from every host. Only refusals and errors are worth a line
+        # in the journal.
+        if args and isinstance(args[0], str) and args[0].startswith(("POST /report", "GET ")):
+            return
+
+        sys.stderr.write("%s - %s\n" % (self.address_string(), format % args))
+
+
+def serve(config):
+    connect(config["DATABASE"]).close()
+
+    Handler.config = config
+    server = ThreadingHTTPServer((config["LISTEN"], int(config["PORT"])), Handler)
+    print(f"hd-dash listening on {config['LISTEN']}:{config['PORT']}, database {config['DATABASE']}", flush=True)
+    server.serve_forever()
+
+
+def main(argv):
+    config = load_config()
+
+    if argv == ["serve"]:
+        serve(config)
+        return 0
+
+    if argv == ["hosts"]:
+        db = connect(config["DATABASE"])
+        now = int(time.time())
+        for host in load_hosts(db, now, int(config["STALE_MINUTES"])):
+            version = (host["report"].get("hyprdebian") or {}).get("version") or "?"
+            print(f'{host["name"]:<24} {host["level"]:<5} {version:<8} {host["address"]:<16} seen {age(now - host["last_seen"])} ago')
+        return 0
+
+    if len(argv) == 2 and argv[0] == "forget":
+        db = connect(config["DATABASE"])
+        with db:
+            removed = db.execute("DELETE FROM hosts WHERE name = ?", (argv[1],)).rowcount
+            db.execute("DELETE FROM history WHERE host = ?", (argv[1],))
+
+        if not removed:
+            print(f"ERROR: Unknown host {argv[1]}.", file=sys.stderr)
+            return 1
+
+        print(f"Forgot {argv[1]}. Its next report registers its token again.")
+        return 0
+
+    print("Usage: hd-dash serve | hosts | forget <host>", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

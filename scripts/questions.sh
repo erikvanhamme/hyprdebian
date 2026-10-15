@@ -242,6 +242,16 @@ q_repo() {
     fi
 }
 
+q_report() {
+    local default="$(get_default Q_REPORT "${Q_TYPE:-}")"
+    if ask_yes_no Q_REPORT "Send status reports to the hyprdebian dashboard" "${default}"; then
+        local default="$(get_default Q_REPORT_URL "${Q_TYPE:-}")"
+        ask Q_REPORT_URL "Hyprdebian dashboard URL" "${default}"
+
+        add_dependencies "o_main" "o_report"
+    fi
+}
+
 # Add additional questions here.
 
 add_dependencies "q_main" \
@@ -269,6 +279,7 @@ add_dependencies "q_main" \
     "q_rust" \
     "q_openssh" \
     "q_repo" \
+    "q_report" \
 
 # The password is never saved, so it must be asked again on every run.
 always_run "q_password"

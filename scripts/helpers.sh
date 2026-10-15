@@ -323,6 +323,12 @@ random_mac() {
         "0x$2" "0x$3" "0x$4" "0x$5" "0x$6"
 }
 
+# Prints a random token of 32 hex characters.
+random_token() {
+    od -An -N16 -tx1 /dev/urandom | tr -d ' \n'
+    echo
+}
+
 # Downloads the signing key of the hyprdebian repo from the repo itself, for the Signed-By of
 # hyprdebian.local.sources. apt-helper comes with apt, so the target needs no download tool.
 repo_key_download() {
