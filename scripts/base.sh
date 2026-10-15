@@ -248,7 +248,10 @@ b_grub2() {
         in_target mountpoint -q /boot/efi || in_target mount ${Q_DISK}-part1 /boot/efi || return 1
     fi
 
-    in_target apt install -y grub-efi-amd64 shim-signed os-prober- || return 1
+    # The boot entries are made below, so grub upgrades must not add entries of their own.
+    echo "grub-efi-amd64 grub2/update_nvram boolean false" | in_target debconf-set-selections || return 1
+
+    in_target apt install -y grub-efi-amd64 shim-signed mokutil efibootmgr os-prober- || return 1
     
     in_target update-initramfs -c -k all || return 1
     
@@ -257,12 +260,38 @@ b_grub2() {
     
     in_target update-grub || return 1
     
+    # The signed GRUB for Secure Boot only reads its config from /EFI/debian, so install there and
+    # give the boot entries their own names.
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy || return 1
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --no-nvram --recheck --no-floppy || return 1
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id=debian --no-nvram --recheck --no-floppy || return 1
+
+        efi_boot_entry ${Q_DISK_A} "HyprDebian (P)" || return 1
+        efi_boot_entry ${Q_DISK_B} "HyprDebian (S)"
     else
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --no-nvram --recheck --no-floppy || return 1
+
+        efi_boot_entry ${Q_DISK} "HyprDebian"
     fi
+}
+
+b_mok() {
+    # With Secure Boot on, the kernel only loads the ZFS module when shim trusts the key that DKMS
+    # signed it with. Ask shim to enroll that key; MokManager asks for MOK_PASSWORD on the next boot.
+    if [[ ! -f ${TARGET_DIR}/var/lib/dkms/mok.pub ]]; then
+        echo "ERROR: DKMS did not create the key to sign the ZFS module with."
+        return 1
+    fi
+
+    # MokManager uses a US keyboard layout, so the password only has letters that are in the same
+    # place on qwerty, azerty and qwertz. Keep an existing password, so a rerun uses the same one.
+    if [[ -z "${MOK_PASSWORD:-}" ]]; then
+        MOK_PASSWORD=$(od -An -N8 -tu1 /dev/urandom | awk -v c=bcdefghijknoprstuvx \
+            '{ for (i = 1; i <= NF; i++) printf "%s", substr(c, $i % length(c) + 1, 1) }')
+        save_config MOK_PASSWORD ${MOK_PASSWORD}
+    fi
+
+    printf '%s\n%s\n' "${MOK_PASSWORD}" "${MOK_PASSWORD}" | in_target mokutil --import /var/lib/dkms/mok.pub
 }
 
 b_systemd() {
@@ -332,6 +361,7 @@ add_dependencies "b_main" \
     "b_kernel" \
     "b_zfs_support" \
     "b_grub2" \
+    "b_mok" \
     "b_systemd" \
     "b_utilities" \
     "b_motd" \

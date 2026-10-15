@@ -8,14 +8,14 @@ The installer is split into phases. Each phase has its own script in the `script
 | 3 | Disk | `disk.sh` | `d_` | Stops swap and raid arrays, then wipes and discards the target disks. |
 | 4 | Partitions | `partition.sh` | `p_` | Creates the EFI, swap, boot pool and root pool partitions. |
 | 5 | Filesystems | `filesystem.sh` | `f_` | Creates the EFI filesystems, swap, the ZFS pools and the ZFS datasets. |
-| 6 | Base | `base.sh` | `b_` | Bootstraps Debian, sets up apt, the kernel, ZFS support and GRUB, and makes the system bootable. Also queues the packages, files and services every installation needs. |
+| 6 | Base | `base.sh` | `b_` | Bootstraps Debian, sets up apt, the kernel, ZFS support and GRUB, and makes the system bootable. Asks shim to enroll the key DKMS signs the ZFS module with, so the system also boots with Secure Boot on. Also queues the packages, files and services every installation needs. |
 | 7 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, wifi, firewall, docker, ...). |
 | 8 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
 | 9 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
 | 10 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
 | 11 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
 | 12 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
-| 13 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. |
+| 13 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. Shows the password to enroll the ZFS key with on the first boot. |
 
 Because packages are installed before files and templates are written, the files from `deploy/` and `templates/` overwrite the default configuration files that come with the packages. See [Queues](Queues.md).
 

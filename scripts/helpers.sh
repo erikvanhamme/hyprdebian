@@ -241,6 +241,23 @@ ask_yes_no() {
     done
 }
 
+# Makes the boot entry with the given name for the shim in /EFI/debian on the EFI partition of the
+# disk. Entries with that name are removed first, so a rerun does not add another one.
+efi_boot_entry() {
+    local disk="$1"
+    local label="$2"
+    local num
+
+    # efibootmgr prints entries as "Boot0001* name<tab>path", or with a space instead of the * when
+    # the entry is inactive.
+    for num in $(in_target efibootmgr | awk -F'\t' -v l="$label" \
+            '/^Boot[0-9A-Fa-f]{4}/ && substr($1, 11) == l { print substr($1, 5, 4) }'); do
+        in_target efibootmgr -q -b "$num" -B || return 1
+    done
+
+    in_target efibootmgr -q -c -d "$(readlink -f "$disk")" -p 1 -L "$label" -l '\EFI\debian\shimx64.efi'
+}
+
 file_deploy() {
     local src="$1"
     local prefix="${2:-${TARGET_DIR}}"

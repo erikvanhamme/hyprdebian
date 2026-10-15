@@ -87,6 +87,8 @@ Replace /dev/sdX with the USB stick. Everything on it will be lost.
 
 Boot from the USB stick. The live cd boots on both UEFI and BIOS machines.
 
+Turn Secure Boot off in the firmware before booting the live cd: the ZFS module of the live cd is signed with a key the firmware does not trust, so the live cd cannot load it with Secure Boot on. The installed system can use Secure Boot. On its first boot, MokManager asks to enroll the key of its ZFS module, with the password the installer shows at the end. Turn Secure Boot back on after that boot.
+
 The live cd boots to a text console, logged in as the live user `user`. Its password is `live`.
 
 ### Copy and paste on the console
