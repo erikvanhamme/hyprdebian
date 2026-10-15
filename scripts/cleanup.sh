@@ -47,9 +47,7 @@ c_unmount() {
 }
 
 c_mok_notice() {
-    echo "On the first boot, MokManager asks to enroll the key of the ZFS module, for Secure Boot."
-    echo "Press a key, then choose \"Enroll MOK\", \"Continue\" and \"Yes\", enter the password"
-    echo "${MOK_PASSWORD} and choose \"Reboot\". The password is also saved in ${INSTALLED_CONFIG_FILE}."
+    mok_notice
 }
 
 c_mok_password() {

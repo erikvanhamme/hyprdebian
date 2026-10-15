@@ -79,3 +79,8 @@ execute_task "upgrade"
 
 # New services only start on the next boot, and migrations may change how the system boots.
 echo "The upgrade is done. Reboot the system to finish it."
+
+# Shown again at the very end, so it is on screen when the upgrade ends.
+if [[ "${MOK_REQUESTED:-}" == "true" ]]; then
+    mok_notice
+fi

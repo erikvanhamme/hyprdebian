@@ -246,6 +246,15 @@ ask_yes_no() {
 efi_boot_entry() {
     local disk="$1"
     local label="$2"
+
+    efi_boot_entry_remove "$label" || return 1
+
+    in_target efibootmgr -q -c -d "$(readlink -f "$disk")" -p 1 -L "$label" -l '\EFI\debian\shimx64.efi'
+}
+
+# Removes the boot entries with the given name.
+efi_boot_entry_remove() {
+    local label="$1"
     local num
 
     # efibootmgr prints entries as "Boot0001* name<tab>path", or with a space instead of the * when
@@ -254,8 +263,6 @@ efi_boot_entry() {
             '/^Boot[0-9A-Fa-f]{4}/ && substr($1, 11) == l { print substr($1, 5, 4) }'); do
         in_target efibootmgr -q -b "$num" -B || return 1
     done
-
-    in_target efibootmgr -q -c -d "$(readlink -f "$disk")" -p 1 -L "$label" -l '\EFI\debian\shimx64.efi'
 }
 
 file_deploy() {
@@ -329,6 +336,33 @@ log_status() {
 }
 
 # Generates a random mac address.
+# Asks shim to enroll the key that DKMS signs the ZFS module with, because with Secure Boot on, the
+# kernel only loads the module when shim trusts that key. MokManager asks for MOK_PASSWORD on the
+# next boot.
+mok_import() {
+    if [[ ! -f ${TARGET_DIR}/var/lib/dkms/mok.pub ]]; then
+        echo "ERROR: DKMS did not create the key to sign the ZFS module with."
+        return 1
+    fi
+
+    # MokManager uses a US keyboard layout, so the password only has letters that are in the same
+    # place on qwerty, azerty and qwertz. Keep an existing password, so a rerun uses the same one.
+    if [[ -z "${MOK_PASSWORD:-}" ]]; then
+        MOK_PASSWORD=$(od -An -N8 -tu1 /dev/urandom | awk -v c=bcdefghijknoprstuvx \
+            '{ for (i = 1; i <= NF; i++) printf "%s", substr(c, $i % length(c) + 1, 1) }')
+        save_config MOK_PASSWORD ${MOK_PASSWORD}
+    fi
+
+    printf '%s\n%s\n' "${MOK_PASSWORD}" "${MOK_PASSWORD}" | in_target mokutil --import /var/lib/dkms/mok.pub
+}
+
+# Shows how to enroll the key that mok_import asked shim to enroll.
+mok_notice() {
+    echo "On the next boot, MokManager asks to enroll the key of the ZFS module, for Secure Boot."
+    echo "Press a key, then choose \"Enroll MOK\", \"Continue\" and \"Yes\", enter the password"
+    echo "${MOK_PASSWORD} and choose \"Reboot\". The password is also saved in ${INSTALLED_CONFIG_FILE}."
+}
+
 random_mac() {
     local bytes
     bytes=$(od -An -N6 -tx1 /dev/urandom)

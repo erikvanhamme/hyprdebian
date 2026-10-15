@@ -276,22 +276,7 @@ b_grub2() {
 }
 
 b_mok() {
-    # With Secure Boot on, the kernel only loads the ZFS module when shim trusts the key that DKMS
-    # signed it with. Ask shim to enroll that key; MokManager asks for MOK_PASSWORD on the next boot.
-    if [[ ! -f ${TARGET_DIR}/var/lib/dkms/mok.pub ]]; then
-        echo "ERROR: DKMS did not create the key to sign the ZFS module with."
-        return 1
-    fi
-
-    # MokManager uses a US keyboard layout, so the password only has letters that are in the same
-    # place on qwerty, azerty and qwertz. Keep an existing password, so a rerun uses the same one.
-    if [[ -z "${MOK_PASSWORD:-}" ]]; then
-        MOK_PASSWORD=$(od -An -N8 -tu1 /dev/urandom | awk -v c=bcdefghijknoprstuvx \
-            '{ for (i = 1; i <= NF; i++) printf "%s", substr(c, $i % length(c) + 1, 1) }')
-        save_config MOK_PASSWORD ${MOK_PASSWORD}
-    fi
-
-    printf '%s\n%s\n' "${MOK_PASSWORD}" "${MOK_PASSWORD}" | in_target mokutil --import /var/lib/dkms/mok.pub
+    mok_import
 }
 
 b_systemd() {
