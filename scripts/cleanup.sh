@@ -52,11 +52,19 @@ c_mok_notice() {
     echo "${MOK_PASSWORD} and choose \"Reboot\". The password is also saved in ${INSTALLED_CONFIG_FILE}."
 }
 
+c_mok_password() {
+    # Shown once more as the very last step, so it is on screen when the installer ends.
+    echo "MOK enrollment password: ${MOK_PASSWORD}"
+}
+
 add_dependencies "c_main" \
     "c_save_config" \
     "c_save_migrations" \
     "c_snapshots" \
     "c_unmount" \
     "c_mok_notice" \
+
+add_dependencies "c_post" \
+    "c_mok_password" \
 
 add_dependencies "install" "c_pre" "c_main" "c_post"
