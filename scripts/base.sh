@@ -258,23 +258,28 @@ b_grub2() {
     in_target update-grub || return 1
     
     if [[ "${Q_REDUNDANT}" == "true" ]]; then
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian (primary)" --recheck --no-floppy || return 1
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hyprdebian (secondary)" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hd-grub (primary)" --recheck --no-floppy || return 1
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi2 --bootloader-id="hd-grub (secondary)" --recheck --no-floppy
     else
-        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hyprdebian" --recheck --no-floppy
+        in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id="hd-grub" --recheck --no-floppy
     fi
 }
 
 # The bootloader packages are built by the deb phase, see deb_bootloader. Desktop systems get the
 # graphical one, which shows the menu on the wallpaper of hyprdebian-art, the others the text-only
 # one. The postinst of the package writes the bootloader and the UKIs to the ESPs that b_grub2
-# mounted, with the DKMS MOK that zfs-dkms created in b_zfs_support.
+# mounted, with the DKMS MOK that zfs-dkms created in b_zfs_support. pkg_boot_entries then adds
+# its firmware boot entries, ahead of those of grub.
 b_bootloader() {
     if [[ "${Q_DESKTOP}" == "true" ]]; then
         add_packages hyprdebian-bootloader-graphical
     else
         add_packages hyprdebian-bootloader-text
     fi
+
+    add_packages efibootmgr
+
+    add_dependencies "pkg_post" "pkg_boot_entries"
 }
 
 b_systemd() {
