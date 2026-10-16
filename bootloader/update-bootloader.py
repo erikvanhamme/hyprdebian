@@ -57,7 +57,10 @@ The most recent kernels are those whose /boot/vmlinuz-* was modified last.
 The UKIs are written oldest first, so that on a FAT partition the newest
 kernel also has the newest creation time, which is what the fallback of the
 bootloader goes by; each UKI also gets the modification time of its kernel.
-Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
+A UKI that would not change is not rewritten, so that its signature stays
+valid, unless an older one before it was: then it is rewritten too, to keep
+the creation times in order. With a new kernel that is the newest, only its
+UKI is written. Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys (all optional; defaults in DEFAULTS below):
 
@@ -196,8 +199,13 @@ def uki_name(version):
     return f"{UKI_PREFIX}{short}.efi"
 
 
+def same_efi(a, b):
+    """True if the PE files a and b are the same, apart from an Authenticode signature."""
+    return without_signature(a.read_bytes()) == without_signature(b.read_bytes())
+
+
 def build_ukis(config, esp, kernels):
-    """Writes the UKIs of the kernels. Returns their file names, newest first."""
+    """Writes the UKIs of the kernels that changed. Returns their file names, newest first."""
     linux = esp / "EFI" / "Linux"
     linux.mkdir(parents=True, exist_ok=True)
 
@@ -210,8 +218,10 @@ def build_ukis(config, esp, kernels):
     for extra in cmdline["extra"]:
         flags += ["--extra", extra]
 
-    # Oldest first: see the creation times in the description above.
+    # Oldest first: see the creation times in the description above. Once a
+    # UKI is written, all newer ones are written after it, changed or not.
     names = []
+    rewrite = False
     for version, vmlinuz, initrd in reversed(kernels):
         name = uki_name(version)
         names.insert(0, name)
@@ -222,9 +232,13 @@ def build_ukis(config, esp, kernels):
                 [sys.executable, SCRIPTS / "mkuki.py", vmlinuz, initrd, "--output", temporary, *flags],
                 check=True,
             )
+            if not rewrite and target.is_file() and same_efi(target, temporary):
+                print(f"Unchanged {target}", flush=True)
+                continue
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
+        rewrite = True
         mtime = vmlinuz.stat().st_mtime
         os.utime(target, (mtime, mtime))
         print(f"Wrote {target}", flush=True)
@@ -310,9 +324,7 @@ def build_efi(stub, target, sbat, sections):
                 ["ukify", "build", f"--stub={stub}", *options, f"--sbat={sbat}", f"--output={temporary}"],
                 check=True,
             )
-            if target.is_file() and without_signature(target.read_bytes()) == without_signature(
-                temporary.read_bytes()
-            ):
+            if target.is_file() and same_efi(target, temporary):
                 print(f"Unchanged {target}", flush=True)
                 return
             os.replace(temporary, target)
