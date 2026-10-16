@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Produces all the files the hyprdebian bootloader uses, in an EFI system partition.
 
-Reads the settings from a JSON config file (bootloader.json next to this
-script by default) and writes, below the directory given with --esp:
+Reads the settings from a JSON config file
+(/etc/hyprdebian/bootloader/bootloader.json by default) and writes, below the
+directory given with --esp:
 
     EFI/BOOT/BOOTX64.EFI      the compiled bootloader (--bootloader) with an
                               SBAT section; rewritten only when it changes
@@ -81,8 +82,15 @@ Config keys (all optional; defaults in DEFAULTS below):
 
 Needs python3-pil, systemd-ukify, and for the UKIs systemd-boot-efi.
 
+The package hyprdebian-bootloader (make deb) installs this script and its
+helpers in /usr/lib/hyprdebian/bootloader, next to the compiled bootloader
+and assets stub that --bootloader and --assets-stub default to, links it as
+/usr/sbin/hd-bootloader-update, and installs the config in
+/etc/hyprdebian/bootloader. From the source tree, make esp passes the files
+in build/ and the bootloader.json there instead.
+
 Example:
-    update-bootloader.py --esp /boot/efi --bootloader build/bootx64.efi --assets-stub build/assets.efi
+    hd-bootloader-update --esp /boot/efi
 """
 
 import argparse
@@ -98,9 +106,13 @@ from pathlib import Path
 
 from PIL import Image
 
-# text2png.py, png2bin.py, menubox.py and mkuki.py live next to this script.
+# text2png.py, png2bin.py, menubox.py and mkuki.py live next to this script,
+# also when it is started through the /usr/sbin/hd-bootloader-update link.
+# Installed, that is a directory of the package: importing them must not
+# leave __pycache__ directories there that dpkg does not know about.
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
+sys.dont_write_bytecode = True
 
 import menubox  # noqa: E402
 import mkuki  # noqa: E402
@@ -108,7 +120,7 @@ import png2bin  # noqa: E402
 import text2png  # noqa: E402
 
 DEFAULTS = {
-    "wallpaper": "../deploy/etc/skel/Pictures/wallpapers/wallpaper.png",
+    "wallpaper": "/usr/share/hyprdebian/bootloader/wallpaper.png",
     "res_x": 1920,
     "res_y": 1080,
     "timeout": 5,
@@ -361,20 +373,20 @@ def main():
     parser.add_argument(
         "--config",
         type=Path,
-        default=SCRIPTS / "bootloader.json",
-        help="JSON config file (default: bootloader.json next to this script)",
+        default=Path("/etc/hyprdebian/bootloader/bootloader.json"),
+        help="JSON config file (default: /etc/hyprdebian/bootloader/bootloader.json)",
     )
     parser.add_argument(
         "--bootloader",
         type=Path,
-        default=SCRIPTS / "build" / "bootx64.efi",
-        help="the compiled bootloader (default: build/bootx64.efi next to this script)",
+        default=SCRIPTS / "bootx64.efi",
+        help="the compiled bootloader (default: bootx64.efi next to this script)",
     )
     parser.add_argument(
         "--assets-stub",
         type=Path,
-        default=SCRIPTS / "build" / "assets.efi",
-        help="the compiled assets stub (default: build/assets.efi next to this script)",
+        default=SCRIPTS / "assets.efi",
+        help="the compiled assets stub (default: assets.efi next to this script)",
     )
     parser.add_argument("--boot-dir", type=Path, default=Path("/boot"), help="where the kernels are (default: /boot)")
     parser.add_argument(

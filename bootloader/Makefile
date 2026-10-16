@@ -9,6 +9,27 @@
 #               the 4 most recent kernels in /boot, with settings from
 #               bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
+#   make deb    build build/hyprdebian-bootloader_$(DEB_VERSION)_amd64.deb,
+#               which installs:
+#                 /usr/lib/hyprdebian/bootloader/   bootx64.efi, assets.efi,
+#                                                   the Python scripts and
+#                                                   update-esps.sh, which
+#                                                   runs the one below for
+#                                                   every ESP
+#                 /usr/sbin/hd-bootloader-update    a link to
+#                                                   update-bootloader.py
+#                 /usr/share/hyprdebian/bootloader/wallpaper.png
+#                 /etc/hyprdebian/bootloader/bootloader.json
+#                                                   bootloader.json with the
+#                                                   wallpaper above, a conffile
+#                 /etc/kernel/postinst.d/zz-hd-bootloader
+#                 /etc/kernel/postrm.d/zz-hd-bootloader
+#                 /etc/initramfs/post-update.d/zz-hd-bootloader
+#                                                   hooks from deb/etc that
+#                                                   run update-esps.sh when a
+#                                                   kernel or initrd changes,
+#                                                   conffiles
+#               Raise DEB_VERSION for every package that is handed out.
 #   make clean  remove build/
 
 BUILD := build
@@ -20,10 +41,25 @@ IMAGE := $(BUILD)/esp.img
 # Each UKI holds a whole initrd, which can be over 100MB.
 IMAGE_SIZE := 1G
 
-# What update-bootloader.py reads; the wallpaper is the one bootloader.json names.
-ESP_SOURCES := update-bootloader.py mkuki.py text2png.py png2bin.py menubox.py bootloader.json \
-	../deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
+SCRIPTS := update-bootloader.py mkuki.py text2png.py png2bin.py menubox.py
+# The wallpaper that bootloader.json names.
+WALLPAPER := ../deploy/etc/skel/Pictures/wallpapers/wallpaper.png
+
+# What update-bootloader.py reads.
+ESP_SOURCES := $(SCRIPTS) bootloader.json $(WALLPAPER) \
 	$(wildcard /boot/vmlinuz-* /boot/initrd.img-* /var/lib/dkms/mok.pub)
+
+DEB_NAME := hyprdebian-bootloader
+DEB_VERSION := 0.1
+DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_amd64.deb
+DEB_ROOT := $(BUILD)/deb
+DEB_LIB := /usr/lib/hyprdebian/bootloader
+DEB_SHARE := /usr/share/hyprdebian/bootloader
+DEB_CONF := /etc/hyprdebian/bootloader
+# The kernel and initramfs hooks, below deb/ at the path they are installed to.
+DEB_HOOKS := /etc/kernel/postinst.d/zz-hd-bootloader \
+	/etc/kernel/postrm.d/zz-hd-bootloader \
+	/etc/initramfs/post-update.d/zz-hd-bootloader
 
 CXX := clang++
 LD := lld-link
@@ -60,7 +96,7 @@ LDFLAGS := \
 	-entry:efi_main \
 	-nodefaultlib
 
-.PHONY: all esp image clean
+.PHONY: all esp image deb clean
 
 all: $(TARGET) $(ASSETS_STUB)
 
@@ -83,7 +119,8 @@ $(ASSETS_STUB): $(BUILD)/assets.obj
 esp: $(ESP_STAMP)
 
 $(ESP_STAMP): $(TARGET) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
-	$(PYTHON) update-bootloader.py --esp $(ESP) --bootloader $(TARGET) --assets-stub $(ASSETS_STUB)
+	$(PYTHON) update-bootloader.py --esp $(ESP) --config bootloader.json \
+		--bootloader $(TARGET) --assets-stub $(ASSETS_STUB)
 	touch $@
 
 image: $(IMAGE)
@@ -93,6 +130,32 @@ $(IMAGE): $(ESP_STAMP)
 	truncate -s $(IMAGE_SIZE) $@
 	$(MKFS_FAT) -F 32 -n HYPRDEBIAN $@
 	mcopy -s -m -i $@ $(ESP)/EFI ::/
+
+deb: $(DEB)
+
+# The package is built from a staged root in build/deb. update-bootloader.py
+# finds its helpers, bootx64.efi and assets.efi next to itself, also through
+# the link. The installed bootloader.json names the wallpaper by its absolute
+# path; the one here names it relative to the source tree. dpkg-deb makes all
+# files owned by root.
+$(DEB): $(TARGET) $(ASSETS_STUB) $(SCRIPTS) update-esps.sh bootloader.json $(WALLPAPER) \
+		deb/control $(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
+	rm -rf $(DEB_ROOT)
+	install -d $(DEB_ROOT)/DEBIAN $(DEB_ROOT)$(DEB_LIB) $(DEB_ROOT)/usr/sbin \
+		$(DEB_ROOT)$(DEB_SHARE) $(DEB_ROOT)$(DEB_CONF)
+	install -m 0644 $(TARGET) $(ASSETS_STUB) $(DEB_ROOT)$(DEB_LIB)/
+	install -m 0755 $(SCRIPTS) update-esps.sh $(DEB_ROOT)$(DEB_LIB)/
+	ln -s ../lib/hyprdebian/bootloader/update-bootloader.py $(DEB_ROOT)/usr/sbin/hd-bootloader-update
+	install -m 0644 $(WALLPAPER) $(DEB_ROOT)$(DEB_SHARE)/wallpaper.png
+	$(PYTHON) -c 'import json, sys; config = json.load(open(sys.argv[1])); config["wallpaper"] = sys.argv[2]; print(json.dumps(config, indent=4))' \
+		bootloader.json $(DEB_SHARE)/wallpaper.png > $(DEB_ROOT)$(DEB_CONF)/bootloader.json
+	chmod 0644 $(DEB_ROOT)$(DEB_CONF)/bootloader.json
+	for hook in $(DEB_HOOKS); do install -D -m 0755 deb$$hook $(DEB_ROOT)$$hook; done
+	printf '%s\n' $(DEB_CONF)/bootloader.json $(DEB_HOOKS) > $(DEB_ROOT)/DEBIAN/conffiles
+	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
+		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(DEB_ROOT) | cut -f1)/" \
+		deb/control > $(DEB_ROOT)/DEBIAN/control
+	dpkg-deb --root-owner-group --build $(DEB_ROOT) $@
 
 clean:
 	rm -rf $(BUILD)

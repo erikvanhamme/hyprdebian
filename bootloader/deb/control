@@ -1,0 +1,19 @@
+Package: hyprdebian-bootloader
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, python3-pil, systemd-ukify, systemd-boot-efi, fontconfig
+Recommends: dkms, openssl
+Section: admin
+Priority: optional
+Description: HyprDebian minimalist EFI bootloader
+ A small UEFI bootloader that shows a menu of the unified kernel images (UKIs)
+ of the most recent kernels, each in a normal and a ZFS recovery profile, on
+ the HyprDebian wallpaper.
+ .
+ hd-bootloader-update builds the UKIs and writes them, the bootloader and
+ assets.efi to an EFI system partition. assets.efi holds the settings, the
+ images, the menu and the DKMS MOK, which the bootloader hands to the kernel
+ so that it loads the DKMS-built ZFS module under Secure Boot. The settings
+ are in /etc/hyprdebian/bootloader/bootloader.json.
