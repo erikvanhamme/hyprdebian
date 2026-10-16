@@ -136,6 +136,13 @@ pkg_secureboot_keys() {
     mv ${TARGET_DIR}${tmp} ${TARGET_DIR}${dir}
 }
 
+# The postinst of the bootloader package wrote the bootloader, assets.efi and the UKIs to the ESPs
+# in pkg_install, before pkg_secureboot_keys generated the keys, so they are unsigned. Runs the
+# same update again, which now signs them with the db key, and leaves them unchanged otherwise.
+pkg_sign_esps() {
+    in_target /usr/lib/hyprdebian/bootloader/update-esps.sh
+}
+
 pkg_qemu_kvm() {
 
     # Add a mask for the secrets file that ships with debian systemd.
