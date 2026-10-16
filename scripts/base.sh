@@ -265,6 +265,18 @@ b_grub2() {
     fi
 }
 
+# The bootloader packages are built by the deb phase, see deb_bootloader. Desktop systems get the
+# graphical one, which shows the menu on the wallpaper of hyprdebian-art, the others the text-only
+# one. The postinst of the package writes the bootloader and the UKIs to the ESPs that b_grub2
+# mounted, with the DKMS MOK that zfs-dkms created in b_zfs_support.
+b_bootloader() {
+    if [[ "${Q_DESKTOP}" == "true" ]]; then
+        add_packages hyprdebian-bootloader-graphical
+    else
+        add_packages hyprdebian-bootloader-text
+    fi
+}
+
 b_systemd() {
     if [[ "${Q_TYPE}" != "vm" ]]; then
         add_packages systemd-timesyncd
@@ -332,6 +344,7 @@ add_dependencies "b_main" \
     "b_kernel" \
     "b_zfs_support" \
     "b_grub2" \
+    "b_bootloader" \
     "b_systemd" \
     "b_utilities" \
     "b_motd" \

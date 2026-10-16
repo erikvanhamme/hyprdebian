@@ -61,7 +61,7 @@ Two of the `o_` tasks do more than queuing, and do that again on every upgrade: 
 
 The questions are answered with the saved answers, without asking. Only a question without a saved answer is asked, like a question that was added after the installation. Its answer is saved with the others at the end of the upgrade.
 
-The other base tasks, like `b_fstab`, `b_kernel` and `b_grub2`, are not run. They set up the disks and the boot loader, and what they queue is not part of the upgrade.
+The other base tasks, like `b_fstab`, `b_kernel`, `b_grub2` and `b_bootloader`, are not run. They set up the disks and the boot loader, and what they queue is not part of the upgrade.
 
 ## Upgrade phase
 The upgrade phase is in `scripts/upgrade.sh`, and is built like the [phases](Phases.md) of the installer:
