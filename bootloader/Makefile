@@ -4,12 +4,14 @@
 #               FRONTENDS, the core (bootloader.cpp) linked with that
 #               frontend (<frontend>.cpp), and build/assets.efi, the stub that
 #               update-bootloader.py adds the assets to
-#   make esp    run update-bootloader.py into build/esp/: EFI/BOOT/BOOTX64.EFI,
-#               the bootloader of the frontend that bootloader.json names;
-#               EFI/BOOT/assets.efi, the stub with the config, the menu rows,
-#               the DKMS MOK (/var/lib/dkms/mok.pub) and the assets of that
-#               frontend added as sections; and the UKIs of the 4 most recent
-#               kernels in /boot, with settings from bootloader.json
+#   make esp    run update-bootloader.py into build/esp/ with the config that
+#               the package of ESP_FRONTEND installs,
+#               deb/$(ESP_FRONTEND)/bootloader.json: EFI/BOOT/BOOTX64.EFI, the
+#               bootloader of that frontend; EFI/BOOT/assets.efi, the stub
+#               with the config, the menu rows, the DKMS MOK
+#               (/var/lib/dkms/mok.pub) and the assets of that frontend added
+#               as sections; and the UKIs of the 4 most recent kernels in
+#               /boot. make esp ESP_FRONTEND=text tries another frontend.
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make deb    build build/hyprdebian-bootloader-<frontend>_$(DEB_VERSION)_amd64.deb
 #               for every frontend in FRONTENDS. Only one of them can be
@@ -45,12 +47,17 @@ BUILD := build
 # A frontend shows the menu; see bootloader.hpp. Each has a <frontend>.cpp
 # here, a <frontend>.py that builds its assets, which with its helpers is in
 # SCRIPTS_<frontend>, and a deb/<frontend>/ with the control file and the
-# config of its package. deb/text/ is ready for a text-only frontend.
+# config of its package, which holds the defaults of that package.
+# deb/text/ is ready for a text-only frontend.
 FRONTENDS := graphical
 TARGETS := $(FRONTENDS:%=$(BUILD)/bootx64-%.efi)
 ASSETS_STUB := $(BUILD)/assets.efi
 ESP := $(BUILD)/esp
-ESP_STAMP := $(BUILD)/esp.stamp
+# The frontend that make esp writes to build/esp/, with its config.
+ESP_FRONTEND := graphical
+ESP_CONFIG := deb/$(ESP_FRONTEND)/bootloader.json
+# A stamp per frontend, so that make esp runs again when ESP_FRONTEND changes.
+ESP_STAMP := $(BUILD)/esp-$(ESP_FRONTEND).stamp
 IMAGE := $(BUILD)/esp.img
 # Each UKI holds a whole initrd, which can be over 100MB.
 IMAGE_SIZE := 1G
@@ -59,12 +66,14 @@ IMAGE_SIZE := 1G
 CORE_SCRIPTS := update-bootloader.py mkuki.py
 SCRIPTS_graphical := graphical.py text2png.py png2bin.py menubox.py
 SCRIPTS := $(CORE_SCRIPTS) $(foreach frontend,$(FRONTENDS),$(SCRIPTS_$(frontend)))
-# The wallpaper that bootloader.json names, as the package hyprdebian-art
-# installs it.
+# The wallpaper that deb/graphical/bootloader.json names, as the package
+# hyprdebian-art installs it.
 WALLPAPER := /usr/share/backgrounds/hyprdebian/emerald-1920x1080.png
+# What update-bootloader.py reads for a frontend, besides its config.
+ESP_INPUTS_graphical := $(WALLPAPER)
 
 # What update-bootloader.py reads.
-ESP_SOURCES := $(SCRIPTS) bootloader.json $(WALLPAPER) \
+ESP_SOURCES := $(SCRIPTS) $(ESP_CONFIG) $(ESP_INPUTS_$(ESP_FRONTEND)) \
 	$(wildcard /boot/vmlinuz-* /boot/initrd.img-* /var/lib/dkms/mok.pub)
 
 DEB_NAME := hyprdebian-bootloader
@@ -139,8 +148,9 @@ $(ASSETS_STUB): $(BUILD)/assets.obj
 esp: $(ESP_STAMP)
 
 # update-bootloader.py picks the bootx64-<frontend>.efi in build/.
-$(ESP_STAMP): $(TARGETS) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
-	$(PYTHON) update-bootloader.py --esp $(ESP) --config bootloader.json \
+$(ESP_STAMP): $(BUILD)/bootx64-$(ESP_FRONTEND).efi $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
+	rm -f $(BUILD)/esp-*.stamp
+	$(PYTHON) update-bootloader.py --esp $(ESP) --config $(ESP_CONFIG) \
 		--bootloader-dir $(BUILD) --assets-stub $(ASSETS_STUB)
 	touch $@
 

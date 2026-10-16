@@ -14,8 +14,20 @@ The work area holds ten rows of text, so the banner and the menu labels are
 rendered at a tenth of its height. Images are in the raw image format of
 png2bin.py.
 
-Config keys it uses: wallpaper, res_x, res_y, banner_text, font, color,
-selected_color and border_width; see update-bootloader.py.
+Config keys of the graphical frontend, besides those of every frontend (see
+update-bootloader.py), of which it uses banner_text:
+
+    wallpaper       PNG or other image; a relative path is relative to the
+                    config file
+    res_x, res_y    display resolution of the bootloader: the size of the
+                    background
+    font            fontconfig name or file of the font for all texts
+    color           colour of unselected menu labels
+    selected_color  colour of the selected menu label and the menu box border
+    border_width    width of the menu box border in pixels
+
+Their defaults are in DEFAULTS below; the package installs them in its config,
+deb/graphical/bootloader.json, and the two should match.
 
 Needs python3-pil, and fontconfig for the font.
 """
@@ -27,6 +39,19 @@ from PIL import Image
 import menubox
 import png2bin
 import text2png
+
+# The config keys of the graphical frontend, with their defaults.
+DEFAULTS = {
+    "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
+    "res_x": 1920,
+    "res_y": 1080,
+    "font": "JetBrainsMono Nerd Font Mono",
+    "color": "#0066cc",
+    "selected_color": "#ff6600",
+    "border_width": 5,
+}
+# Those of its keys that are file paths.
+PATH_KEYS = ["wallpaper"]
 
 # Rows of text that fit in the menu box.
 ROWS = 10

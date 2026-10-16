@@ -61,7 +61,7 @@ that is gone.
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
 Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
-Config keys (all optional; defaults in DEFAULTS below):
+Config keys of every frontend:
 
     frontend        what shows the menu: graphical
     timeout         seconds before the default entry boots
@@ -69,15 +69,11 @@ Config keys (all optional; defaults in DEFAULTS below):
                     command lines, see mkuki.py
     banner_text     text of the banner
 
-  for the graphical frontend:
-    wallpaper       PNG or other image; a relative path is relative to the
-                    config file
-    res_x, res_y    display resolution of the bootloader: the size of the
-                    background
-    font            fontconfig name or file of the font for all texts
-    color           colour of unselected menu labels
-    selected_color  colour of the selected menu label and the menu box border
-    border_width    width of the menu box border in pixels
+and those of the frontend, in DEFAULTS of its module (graphical.py). The
+package of each frontend installs a config with all of its keys and their
+defaults, deb/<frontend>/bootloader.json. All keys are optional: a key that
+is missing from the config gets the default here or in the module of the
+frontend, which should match. A key of another frontend is an error.
 
 Needs systemd-ukify, and for the UKIs systemd-boot-efi. The graphical frontend
 needs python3-pil and fontconfig.
@@ -87,8 +83,9 @@ and its helpers in /usr/lib/hyprdebian/bootloader, with the module and the
 compiled bootloader of its frontend and the assets stub that --bootloader-dir
 and --assets-stub default to, links it as /usr/sbin/hd-bootloader-update, and
 installs the config for its frontend in /etc/hyprdebian/bootloader. There is
-a package per frontend, and only one of them can be installed. From the source tree, make esp passes the files
-in build/ and the bootloader.json there instead.
+a package per frontend, and only one of them can be installed. From the
+source tree, make esp passes the files in build/ and the config of a package
+in deb/ instead.
 
 Example:
     hd-bootloader-update --esp /boot/efi
@@ -116,22 +113,20 @@ sys.dont_write_bytecode = True
 import mkuki  # noqa: E402
 
 # The frontends, by the name in the config. Each has a module <frontend>.py
-# next to this script, with a sections(config, labels) function that builds
-# its sections. A package installs only the module of its own frontend, so a
-# module is only imported when the config names it.
+# next to this script, with:
+#   DEFAULTS                  its config keys with their defaults
+#   PATH_KEYS                 those of its keys that are file paths, which
+#                             may be relative to the config file
+#   sections(config, labels)  builds its sections
+# A package installs only the module of its own frontend, so a module is only
+# imported when the config names it.
 FRONTENDS = ["graphical"]
 
+# The config keys of every frontend, with their defaults.
 DEFAULTS = {
     "frontend": "graphical",
-    "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
-    "res_x": 1920,
-    "res_y": 1080,
     "timeout": 5,
     "banner_text": "HyprDebian Bootloader",
-    "font": "JetBrainsMono Nerd Font Mono",
-    "color": "#0066cc",
-    "selected_color": "#ff6600",
-    "border_width": 5,
     "cmdline": {"root": "ZFS=rpool/hyprdebian", "quiet": True, "splash": True, "extra": []},
 }
 
@@ -159,21 +154,30 @@ OLD_ASSETS = ["EFI/BOOT/hyprdebian.conf", "EFI/background.bin", "EFI/banner.bin"
 
 
 def load_config(path):
+    """Returns the config in path, completed with the defaults, and the module of its frontend."""
     with open(path) as f:
         config = json.load(f)
-    unknown = set(config) - set(DEFAULTS)
-    if unknown:
-        sys.exit(f"{path}: unknown settings: {', '.join(sorted(unknown))}")
-    cmdline = {**DEFAULTS["cmdline"], **config.get("cmdline", {})}
-    config = {**DEFAULTS, **config, "cmdline": cmdline}
-    if config["frontend"] not in FRONTENDS:
-        sys.exit(f"{path}: unknown frontend {config['frontend']!r}; known: {', '.join(FRONTENDS)}")
 
-    wallpaper = Path(config["wallpaper"])
-    if not wallpaper.is_absolute():
-        wallpaper = Path(path).resolve().parent / wallpaper
-    config["wallpaper"] = wallpaper
-    return config
+    name = config.get("frontend", DEFAULTS["frontend"])
+    if name not in FRONTENDS:
+        sys.exit(f"{path}: unknown frontend {name!r}; known: {', '.join(FRONTENDS)}")
+    if not (SCRIPTS / f"{name}.py").is_file():
+        sys.exit(f"{path}: the {name} frontend is not installed; it is in the package hyprdebian-bootloader-{name}")
+    frontend = importlib.import_module(name)
+
+    defaults = {**DEFAULTS, **frontend.DEFAULTS}
+    unknown = set(config) - set(defaults)
+    if unknown:
+        sys.exit(f"{path}: unknown settings for the {name} frontend: {', '.join(sorted(unknown))}")
+    cmdline = {**DEFAULTS["cmdline"], **config.get("cmdline", {})}
+    config = {**defaults, **config, "cmdline": cmdline}
+
+    for key in frontend.PATH_KEYS:
+        value = Path(config[key])
+        if not value.is_absolute():
+            value = Path(path).resolve().parent / value
+        config[key] = value
+    return config, frontend
 
 
 def find_kernels(boot_dir):
@@ -374,12 +378,8 @@ def main():
     )
     args = parser.parse_args()
 
-    config = load_config(args.config)
-    name = config["frontend"]
-    if not (SCRIPTS / f"{name}.py").is_file():
-        sys.exit(f"{args.config}: the {name} frontend is not installed; it is in the package hyprdebian-bootloader-{name}")
-    frontend = importlib.import_module(name)
-    bootloader = args.bootloader_dir / f"bootx64-{name}.efi"
+    config, frontend = load_config(args.config)
+    bootloader = args.bootloader_dir / f"bootx64-{config['frontend']}.efi"
 
     for path in (bootloader, args.assets_stub):
         if not path.is_file():
