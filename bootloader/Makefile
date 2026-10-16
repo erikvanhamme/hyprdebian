@@ -41,7 +41,8 @@
 #               deb/postinst, which runs update-esps.sh when the package is
 #               installed or upgraded. The graphical
 #               package depends on hyprdebian-art for the wallpaper and on
-#               fonts-jetbrainsmono-nerd for the font, both built in ../art.
+#               fonts-jetbrainsmono-nerd for the font, both built in ../art;
+#               the text package needs neither.
 #               Raise DEB_VERSION for every package that is handed out.
 #   make clean  remove build/
 
@@ -50,8 +51,7 @@ BUILD := build
 # here, a <frontend>.py that builds its assets, which with its helpers is in
 # SCRIPTS_<frontend>, and a deb/<frontend>/ with the control file and the
 # config of its package, which holds the defaults of that package.
-# deb/text/ is ready for a text-only frontend.
-FRONTENDS := graphical
+FRONTENDS := graphical text
 TARGETS := $(FRONTENDS:%=$(BUILD)/bootx64-%.efi)
 ASSETS_STUB := $(BUILD)/assets.efi
 ESP := $(BUILD)/esp
@@ -67,12 +67,14 @@ IMAGE_SIZE := 1G
 # The Python scripts of every package, and those of each frontend.
 CORE_SCRIPTS := update-bootloader.py mkuki.py
 SCRIPTS_graphical := graphical.py text2png.py png2bin.py menubox.py
+SCRIPTS_text := text.py
 SCRIPTS := $(CORE_SCRIPTS) $(foreach frontend,$(FRONTENDS),$(SCRIPTS_$(frontend)))
 # The wallpaper that deb/graphical/bootloader.json names, as the package
 # hyprdebian-art installs it.
 WALLPAPER := /usr/share/backgrounds/hyprdebian/emerald-1920x1080.png
 # What update-bootloader.py reads for a frontend, besides its config.
 ESP_INPUTS_graphical := $(WALLPAPER)
+ESP_INPUTS_text :=
 
 # What update-bootloader.py reads.
 ESP_SOURCES := $(SCRIPTS) $(ESP_CONFIG) $(ESP_INPUTS_$(ESP_FRONTEND)) \

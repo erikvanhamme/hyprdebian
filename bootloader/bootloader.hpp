@@ -3,7 +3,8 @@
 //
 // The core loads assets.efi, builds the menu from its slots, handles the keys
 // and boots the selected UKI. A frontend shows the menu: graphical.cpp draws
-// it on the wallpaper with the label images in assets.efi. The Makefile links
+// it on the wallpaper with the label images in assets.efi, text.cpp on the
+// text console of the firmware with the label texts. The Makefile links
 // the core with one frontend into bootx64-<frontend>.efi; update-bootloader.py
 // adds the assets that frontend needs to assets.efi.
 

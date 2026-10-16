@@ -25,6 +25,8 @@ directory given with --esp:
                                 graphical the background, the banner and
                                           the label images of the rows; see
                                           graphical.py
+                                text      the banner and the label texts of
+                                          the rows; see text.py
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
                               recent kernels in /boot
@@ -63,17 +65,19 @@ Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys of every frontend:
 
-    frontend        what shows the menu: graphical
+    frontend        what shows the menu: graphical, or text for the text
+                    console of the firmware
     timeout         seconds before the default entry boots
     cmdline         root, quiet, splash and extra (a list) for the kernel
                     command lines, see mkuki.py
     banner_text     text of the banner
 
-and those of the frontend, in DEFAULTS of its module (graphical.py). The
-package of each frontend installs a config with all of its keys and their
-defaults, deb/<frontend>/bootloader.json. All keys are optional: a key that
-is missing from the config gets the default here or in the module of the
-frontend, which should match. A key of another frontend is an error.
+and those of the frontend, in DEFAULTS of its module (graphical.py,
+text.py). The package of each frontend installs a config with all of its
+keys and their defaults, deb/<frontend>/bootloader.json. All keys are
+optional: a key that is missing from the config gets the default here or in
+the module of the frontend, which should match. A key of another frontend is
+an error.
 
 Needs systemd-ukify, and for the UKIs systemd-boot-efi. The graphical frontend
 needs python3-pil and fontconfig.
@@ -120,7 +124,7 @@ import mkuki  # noqa: E402
 #   sections(config, labels)  builds its sections
 # A package installs only the module of its own frontend, so a module is only
 # imported when the config names it.
-FRONTENDS = ["graphical"]
+FRONTENDS = ["graphical", "text"]
 
 # The config keys of every frontend, with their defaults.
 DEFAULTS = {
