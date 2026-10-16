@@ -60,6 +60,7 @@ mark_done "q_suite"
 mark_done "q_disk"
 mark_done "q_password"
 mark_done "q_kernel"
+mark_done "o_art"
 mark_done "o_font"
 
 add_dependencies "upgrade" \

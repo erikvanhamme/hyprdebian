@@ -44,6 +44,11 @@ o_firewall() {
     fi
 }
 
+# The art package with the wallpapers is built by the deb phase, see deb_art.
+o_art() {
+    add_packages hyprdebian-art
+}
+
 # The font package is built by the deb phase, see deb_font.
 o_font() {
     add_packages fontconfig fonts-jetbrainsmono-nerd
@@ -82,7 +87,6 @@ o_hyprland() {
             deploy/etc/skel/.config/wofi/config \
             deploy/etc/skel/.config/wofi/style.css \
             deploy/etc/skel/.local/share/nwg-look/gsettings \
-            deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
             deploy/usr/local/bin/hd-ask-poweroff \
             deploy/usr/local/bin/hd-ask-reboot \
             deploy/usr/local/bin/hd-cmd-screensaver \
@@ -271,6 +275,7 @@ o_report() {
 }
 
 add_dependencies "o_desktop" \
+    "o_art" \
     "o_font" \
     "o_greetd" \
     "o_hyprland" \

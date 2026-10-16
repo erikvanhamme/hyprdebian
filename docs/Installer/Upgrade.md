@@ -55,7 +55,7 @@ The upgrade runs the tasks of the installer that decide what is installed, with 
 | `b_systemd`, `b_utilities`, `b_network` | The base packages, files, templates, services and groups. |
 | `o_main` | The selected optional components. |
 
-These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (its package is built by the deb phase, which the upgrade does not run).
+These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_art` and `o_font` (their packages are built by the deb phase, which the upgrade does not run).
 
 Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`, from a copy of the source in `/tmp`. Both are safe to repeat.
 
@@ -94,7 +94,7 @@ The files in `/etc`, the rendered templates and the files in the home directorie
 
 - **Keep mine** leaves the file as it is.
 - **Take new** replaces the content with the new version.
-- **Merge** opens a merge tool, see [Changed files](#changed-files). A file that is not a text file, like the wallpaper, cannot be merged.
+- **Merge** opens a merge tool, see [Changed files](#changed-files). A file that is not a text file cannot be merged.
 
 The upgrade writes into the existing file, so its owner and mode stay the same. A file that is added gets the mode of the new version, and in a home directory it is owned by the user.
 
