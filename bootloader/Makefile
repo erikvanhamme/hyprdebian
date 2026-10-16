@@ -99,7 +99,14 @@ GNU_EFI_INC := /usr/include/efi
 # come from the headers of the Debian package gnu-efi; nothing of gnu-efi is
 # linked in. There is no C or C++ runtime; the only other headers used are
 # the <stdint.h> and <stddef.h> that come with clang.
+#
+# The efibind.h of gnu-efi 3.0 (trixie) only leaves the int types to
+# <stdint.h> when __STDC_VERSION__ is C99 or later. C++ does not define it, so
+# efibind.h defines them again, int8_t as char, which clashes with the
+# signed char of <stdint.h>. Defining it as C17 skips those typedefs and
+# changes nothing else; gnu-efi 4.0 does not need it, but takes it as well.
 CXXFLAGS := \
+	-D__STDC_VERSION__=201710L \
 	--target=x86_64-unknown-windows \
 	-std=c++23 \
 	-ffreestanding \
