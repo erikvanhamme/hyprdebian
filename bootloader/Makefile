@@ -81,7 +81,7 @@ ESP_SOURCES := $(SCRIPTS) $(ESP_CONFIG) $(ESP_INPUTS_$(ESP_FRONTEND)) \
 	$(wildcard /boot/vmlinuz-* /boot/initrd.img-* /var/lib/dkms/mok.pub)
 
 DEB_NAME := hyprdebian-bootloader
-DEB_VERSION := 0.1
+DEB_VERSION := 0.2
 DEBS := $(FRONTENDS:%=$(BUILD)/$(DEB_NAME)-%_$(DEB_VERSION)_amd64.deb)
 DEB_LIB := /usr/lib/hyprdebian/bootloader
 DEB_CONF := /etc/hyprdebian/bootloader
