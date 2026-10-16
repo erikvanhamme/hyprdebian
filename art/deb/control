@@ -1,0 +1,10 @@
+Package: hyprdebian-art
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Section: graphics
+Priority: optional
+Description: HyprDebian wallpapers
+ The Emerald wallpaper of Debian 12, rendered to PNG at 3840x2160, 3440x1440,
+ 1920x1080 and 1024x768, in /usr/share/backgrounds/hyprdebian.
