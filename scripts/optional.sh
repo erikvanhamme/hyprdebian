@@ -44,15 +44,9 @@ o_firewall() {
     fi
 }
 
+# The font package is built by the deb phase, see deb_font.
 o_font() {
-    in_target apt install -y fontconfig wget unzip || return 1
-    mkdir -p ${TARGET_DIR}/usr/local/share/fonts || return 1
-
-    # A rerun overwrites a partial download and the fonts unzipped before, without asking.
-    local zip=${STATE_DIR}/JetBrainsMono.zip
-    wget -O ${zip} https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip || return 1
-    unzip -o ${zip} -d ${TARGET_DIR}/usr/local/share/fonts || return 1
-    rm -f ${zip}
+    add_packages fontconfig fonts-jetbrainsmono-nerd
 }
 
 o_greetd() {

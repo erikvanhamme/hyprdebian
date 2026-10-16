@@ -55,7 +55,7 @@ The upgrade runs the tasks of the installer that decide what is installed, with 
 | `b_systemd`, `b_utilities`, `b_network` | The base packages, files, templates, services and groups. |
 | `o_main` | The selected optional components. |
 
-These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (it downloads the fonts).
+These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_font` (its package is built by the deb phase, which the upgrade does not run).
 
 Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`, from a copy of the source in `/tmp`. Both are safe to repeat.
 

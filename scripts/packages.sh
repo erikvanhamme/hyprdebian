@@ -17,8 +17,28 @@ pkg_utilities() {
     in_target update-command-not-found
 }
 
+# Packages that the deb phase built are in no repo. Their .deb files are copied into the target
+# and passed to apt by path, so apt installs them and their dependencies in the same run.
 pkg_install() {
-    in_target apt install -y ${PACKAGES[*]}
+    local package deb
+    local install=()
+    local debs="/tmp/hyprdebian-debs"
+
+    mkdir -p ${TARGET_DIR}${debs} || return 1
+
+    for package in "${PACKAGES[@]}"; do
+        deb=$(local_deb "$package")
+
+        if [[ -n "$deb" ]]; then
+            cp "$deb" ${TARGET_DIR}${debs}/ || return 1
+            install+=("${debs}/$(basename "$deb")")
+        else
+            install+=("$package")
+        fi
+    done
+
+    in_target apt install -y "${install[@]}" || return 1
+    rm -rf ${TARGET_DIR}${debs}
 }
 
 pkg_qemu_kvm() {

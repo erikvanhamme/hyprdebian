@@ -12,6 +12,8 @@ The queue functions are in `scripts/helpers.sh`:
 | `SERVICES` | `add_services unit...` | `svc_enable` | Services |
 | `USER_GROUPS` | `add_user_groups group...` | `u_groups` | User |
 
+Packages that the deb phase built, such as `fonts-jetbrainsmono-nerd`, are queued by name like any other package. They are in no repo, so `pkg_install` copies their `.deb` files from `/tmp/hyprdebian` into the target and passes them to apt by path, in the same `apt install` as the other packages.
+
 Entries that are already in a queue are not added twice. The queues are saved in the configuration file, so they survive a restart of the installer. See [Idempotency](Idempotency.md).
 
 ## Timing

@@ -298,6 +298,24 @@ write_issue() {
         > "${TARGET_DIR}/etc/issue"
 }
 
+# Prints the path of the .deb file of a package that the deb phase built, or nothing when the deb
+# phase did not build the package. Package names have no underscore, so the prefix matches only
+# that package.
+# Usage: local_deb <package>
+local_deb() {
+    local debs
+
+    shopt -s nullglob
+    debs=("${DEB_DIR}/${1}"_*.deb)
+    shopt -u nullglob
+
+    if (( ${#debs[@]} == 0 )); then
+        return 0
+    fi
+
+    echo "${debs[0]}"
+}
+
 log_status() {
     local color="$1"
     local label="$2"
