@@ -37,7 +37,9 @@
 #                                                   run update-esps.sh when a
 #                                                   kernel or initrd changes,
 #                                                   conffiles
-#               with the control file deb/<frontend>/control. The graphical
+#               with the control file deb/<frontend>/control and the postinst
+#               deb/postinst, which runs update-esps.sh when the package is
+#               installed or upgraded. The graphical
 #               package depends on hyprdebian-art for the wallpaper and on
 #               fonts-jetbrainsmono-nerd for the font, both built in ../art.
 #               Raise DEB_VERSION for every package that is handed out.
@@ -176,7 +178,7 @@ deb: $(DEBS)
 .SECONDEXPANSION:
 $(BUILD)/$(DEB_NAME)-%_$(DEB_VERSION)_amd64.deb: $(BUILD)/bootx64-%.efi $(ASSETS_STUB) \
 		$(CORE_SCRIPTS) $$(SCRIPTS_$$*) update-esps.sh deb/%/control deb/%/bootloader.json \
-		$(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
+		deb/postinst $(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
 	rm -rf $(BUILD)/deb-$*
 	install -d $(BUILD)/deb-$*/DEBIAN $(BUILD)/deb-$*$(DEB_LIB) $(BUILD)/deb-$*/usr/sbin \
 		$(BUILD)/deb-$*$(DEB_CONF)
@@ -189,6 +191,7 @@ $(BUILD)/$(DEB_NAME)-%_$(DEB_VERSION)_amd64.deb: $(BUILD)/bootx64-%.efi $(ASSETS
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(BUILD)/deb-$* | cut -f1)/" \
 		deb/$*/control > $(BUILD)/deb-$*/DEBIAN/control
+	install -m 0755 deb/postinst $(BUILD)/deb-$*/DEBIAN/postinst
 	dpkg-deb --root-owner-group --build $(BUILD)/deb-$* $@
 
 clean:
