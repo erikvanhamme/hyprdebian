@@ -1,21 +1,27 @@
-// hyprdebian EFI bootloader.
+// hyprdebian EFI bootloader: the core.
 //
 // Freestanding C++23: no runtime library, no exceptions, no RTTI. The UEFI
 // types come from the headers of the Debian package gnu-efi; nothing of
 // gnu-efi is linked in.
+//
+// The core loads assets.efi, builds the menu, handles the keys and boots the
+// selected UKI. A frontend, linked in by the Makefile, shows the menu; see
+// bootloader.hpp.
 
-#include <stddef.h>
-#include <stdint.h>
+#include "bootloader.hpp"
 
-#include <efi.h>
+namespace hd {
+
+EFI_HANDLE image = nullptr;
+EFI_SYSTEM_TABLE* st = nullptr;
+EFI_BOOT_SERVICES* bs = nullptr;
+
+CHAR16* efi_string(const char16_t* text)
+{
+    return reinterpret_cast<CHAR16*>(const_cast<char16_t*>(text));
+}
 
 namespace {
-
-// A view of a block of bytes in memory.
-struct Bytes {
-    uint8_t* data = nullptr;
-    size_t size = 0;
-};
 
 // Settings from the .config section, with their defaults.
 struct Config {
@@ -23,19 +29,16 @@ struct Config {
 };
 
 // The assets are sections that update-bootloader.py adds to a stub PE file,
-// assets.efi next to the bootloader: the config, the background, the banner,
-// the menu rows and the DKMS MOK. They can change without touching the
+// assets.efi next to the bootloader: the config, the menu rows, the DKMS MOK
+// and what the frontend shows. They can change without touching the
 // bootloader. The bootloader loads assets.efi with LoadImage, so that with
 // Secure Boot on the firmware checks its signature, and reads the sections
 // from the loaded image; it never starts it. Without a usable assets.efi the
 // bootloader shows an error and returns to the firmware: the kernel cannot
-// load the ZFS module without the MOK. The bootloader takes the display
-// resolution from the size of the background.
+// load the ZFS module without the MOK.
 constexpr const char16_t* assets_directory = u"\\EFI\\BOOT";
 constexpr const char16_t* assets_name = u"assets.efi";
 constexpr const char* config_section = ".config";
-constexpr const char* background_section = ".backgnd";
-constexpr const char* banner_section = ".banner";
 
 // The DKMS MOK: an EFI_SIGNATURE_LIST with the X.509 certificate that DKMS
 // signs modules such as ZFS with. Under Secure Boot the kernel only loads
@@ -53,37 +56,19 @@ constexpr size_t max_name_length = 256;
 
 // The menu has a row per slot, top to bottom. Per slot, assets.efi holds the
 // UKI to boot and its profile as "name profile", such as
-// "HyprDebian-Kernel-7.2.10.efi 1", and the label in the unselected and in
-// the selected colour.
-constexpr size_t slot_count = 8;
+// "HyprDebian-Kernel-7.2.10.efi 1"; the frontend has its own sections for
+// how the row looks.
 constexpr const char* slot_sections[slot_count] = {
     ".slot1", ".slot2", ".slot3", ".slot4", ".slot5", ".slot6", ".slot7", ".slot8",
 };
-constexpr const char* label_sections[slot_count][2] = {
-    {".lbl1", ".lbl1s"}, {".lbl2", ".lbl2s"}, {".lbl3", ".lbl3s"}, {".lbl4", ".lbl4s"},
-    {".lbl5", ".lbl5s"}, {".lbl6", ".lbl6s"}, {".lbl7", ".lbl7s"}, {".lbl8", ".lbl8s"},
-};
-
-// Size of the width and height fields in front of the pixels of an image.
-constexpr size_t image_header_size = 8;
-
-// The largest images the bootloader accepts: the resolution of an 8K display.
-// The limits also keep width * height * 4 far from overflowing.
-constexpr uint32_t max_image_width = 7680;
-constexpr uint32_t max_image_height = 4320;
 
 // The UEFI APIs take non-const pointers to their GUIDs.
-EFI_GUID graphics_output_protocol_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 EFI_GUID loaded_image_protocol_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 EFI_GUID simple_file_system_protocol_guid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 EFI_GUID device_path_protocol_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
 // LINUX_EFI_MOK_VARIABLE_TABLE_GUID of the kernel.
 EFI_GUID mok_variable_table_guid = {0xc451ed2b, 0x9694, 0x45d3, {0xba, 0xba, 0xed, 0x9f, 0x89, 0x88, 0xa3, 0x89}};
 
-EFI_HANDLE image = nullptr;
-EFI_SYSTEM_TABLE* st = nullptr;
-EFI_BOOT_SERVICES* bs = nullptr;
-EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = nullptr;
 // The device (partition) the bootloader was loaded from.
 EFI_HANDLE boot_device = nullptr;
 // assets.efi and where the firmware loaded it in memory. Null if it could not
@@ -95,43 +80,17 @@ uint64_t assets_size = 0;
 // installed just before the UKI starts.
 void* mok_table = nullptr;
 
-// A row of the menu: the UKI file name in uki_directory, the profile to boot
-// it in, its labels (0 unselected, 1 selected) and where they are drawn.
+// A row of the menu: the UKI file name in uki_directory and the profile to
+// boot it in.
 struct MenuEntry {
     char16_t name[max_name_length];
     uint32_t profile;
-    Bytes labels[2];
-    uint32_t x;
-    uint32_t y;
 };
 
 // The rows of the menu, top to bottom, and the selected one.
 MenuEntry menu[slot_count];
 size_t menu_count = 0;
 size_t selected = 0;
-
-// The background image, kept to redraw the parts under menu rows. Empty if
-// it could not be loaded; the screen is black then.
-Bytes background;
-uint32_t background_width = 0;
-uint32_t background_height = 0;
-
-// The work area: the black box that menubox.py draws on the background. It
-// is 80% of the screen in both directions, centred, and holds ten rows.
-struct WorkArea {
-    uint32_t x;
-    uint32_t y;
-    uint32_t width;
-    uint32_t height;
-    uint32_t row_height;
-};
-constexpr uint32_t work_area_rows = 10;
-
-// gnu-efi declares strings as CHAR16* (uint16_t); this converts a u"" literal.
-CHAR16* efi_string(const char16_t* text)
-{
-    return reinterpret_cast<CHAR16*>(const_cast<char16_t*>(text));
-}
 
 size_t string_length(const char16_t* text)
 {
@@ -230,104 +189,12 @@ void parse_config(Bytes text, Config& config)
     }
 }
 
-// Switches the graphics output to width x height.
-// Returns false if no such mode exists or the switch fails.
-bool set_display_mode(uint32_t width, uint32_t height)
-{
-    if (bs->LocateProtocol(&graphics_output_protocol_guid, nullptr, reinterpret_cast<void**>(&gop))
-        != EFI_SUCCESS) {
-        gop = nullptr;
-        return false;
-    }
-
-    for (UINT32 mode = 0; mode < gop->Mode->MaxMode; ++mode) {
-        UINTN size_of_info = 0;
-        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* info = nullptr;
-        if (gop->QueryMode(gop, mode, &size_of_info, &info) != EFI_SUCCESS) {
-            continue;
-        }
-
-        const bool match =
-            info->HorizontalResolution == width && info->VerticalResolution == height;
-        bs->FreePool(info);
-
-        if (match) {
-            return gop->SetMode(gop, mode) == EFI_SUCCESS;
-        }
-    }
-
-    return false;
-}
-
-// Clips a rectangle to width_limit x height_limit. Returns false if nothing
-// of it is left.
-bool clip(uint32_t x, uint32_t y, uint32_t& width, uint32_t& height, uint32_t width_limit,
-          uint32_t height_limit)
-{
-    if (x >= width_limit || y >= height_limit) {
-        return false;
-    }
-    if (width > width_limit - x) {
-        width = width_limit - x;
-    }
-    if (height > height_limit - y) {
-        height = height_limit - y;
-    }
-    return width != 0 && height != 0;
-}
-
-// Fills a rectangle of the screen with black. It is clipped to the screen.
-void clear_rectangle(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
-{
-    if (gop == nullptr) {
-        return;
-    }
-    if (!clip(x, y, width, height, gop->Mode->Info->HorizontalResolution, gop->Mode->Info->VerticalResolution)) {
-        return;
-    }
-    EFI_GRAPHICS_OUTPUT_BLT_PIXEL black{};
-    gop->Blt(gop, &black, EfiBltVideoFill, 0, 0, x, y, width, height, 0);
-}
-
-// Copies a rectangle of the background to the same place on the screen. Its
-// B, G, R, A pixels are the EFI_GRAPHICS_OUTPUT_BLT_PIXEL layout, so one Blt
-// does it. Without a background the rectangle is cleared to black.
-void draw_background(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
-{
-    if (gop == nullptr) {
-        return;
-    }
-    if (background.size == 0) {
-        clear_rectangle(x, y, width, height);
-        return;
-    }
-    if (!clip(x, y, width, height, gop->Mode->Info->HorizontalResolution, gop->Mode->Info->VerticalResolution)
-        || !clip(x, y, width, height, background_width, background_height)) {
-        return;
-    }
-    auto* pixels = reinterpret_cast<EFI_GRAPHICS_OUTPUT_BLT_PIXEL*>(background.data + image_header_size);
-    gop->Blt(gop, pixels, EfiBltBufferToVideo, x, y, x, y, width, height, static_cast<UINTN>(background_width) * 4);
-}
-
-// Draws the whole background. Parts of the screen it does not cover, when
-// the display could not be switched to its size, are black.
-void draw_full_background()
-{
-    if (gop == nullptr) {
-        return;
-    }
-    const uint32_t screen_width = gop->Mode->Info->HorizontalResolution;
-    const uint32_t screen_height = gop->Mode->Info->VerticalResolution;
-    if (background_width < screen_width || background_height < screen_height) {
-        clear_rectangle(0, 0, screen_width, screen_height);
-    }
-    draw_background(0, 0, screen_width, screen_height);
-}
-
 uint16_t read_u16_le(const uint8_t* bytes)
 {
     return static_cast<uint16_t>(bytes[0] | bytes[1] << 8);
 }
+
+} // namespace
 
 uint32_t read_u32_le(const uint8_t* bytes)
 {
@@ -335,70 +202,7 @@ uint32_t read_u32_le(const uint8_t* bytes)
            | static_cast<uint32_t>(bytes[2]) << 16 | static_cast<uint32_t>(bytes[3]) << 24;
 }
 
-// Checks that buffer holds an image in the format of png2bin.py and returns
-// its size: the width and height may be at most max_image_width and
-// max_image_height, and exactly width * height pixels of 4 bytes must follow.
-// The assets come from a partition anyone with root or physical access can
-// write, so nothing may use their size before this check.
-bool image_size(Bytes buffer, uint32_t& width, uint32_t& height)
-{
-    if (buffer.size < image_header_size) {
-        return false;
-    }
-    width = read_u32_le(buffer.data);
-    height = read_u32_le(buffer.data + 4);
-    if (width > max_image_width || height > max_image_height) {
-        return false;
-    }
-    return buffer.size - image_header_size == static_cast<size_t>(width) * height * 4;
-}
-
-// Mixes a colour channel of the image into the framebuffer by its alpha.
-uint32_t blend(uint32_t src, uint32_t dst, uint32_t alpha)
-{
-    return (src * alpha + dst * (255 - alpha) + 127) / 255;
-}
-
-// Draws an image made by png2bin.py on the framebuffer with its top left
-// corner at x, y. The image is clipped to the screen.
-bool blit(Bytes buffer, uint32_t x, uint32_t y)
-{
-    uint32_t width = 0;
-    uint32_t height = 0;
-    if (gop == nullptr || !image_size(buffer, width, height)) {
-        return false;
-    }
-    const uint8_t* pixels = buffer.data + image_header_size;
-
-    const EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* info = gop->Mode->Info;
-    bool bgr = false;
-    if (info->PixelFormat == PixelBlueGreenRedReserved8BitPerColor) {
-        bgr = true;
-    } else if (info->PixelFormat != PixelRedGreenBlueReserved8BitPerColor) {
-        return false;
-    }
-
-    auto* frame_buffer = reinterpret_cast<uint8_t*>(gop->Mode->FrameBufferBase);
-
-    for (uint32_t row = 0; row < height && y + row < info->VerticalResolution; ++row) {
-        for (uint32_t col = 0; col < width && x + col < info->HorizontalResolution; ++col) {
-            const uint8_t* src = pixels + (static_cast<size_t>(row) * width + col) * 4;
-            uint8_t* dst =
-                frame_buffer
-                + (static_cast<size_t>(y + row) * info->PixelsPerScanLine + x + col) * 4;
-
-            // The image is stored as B, G, R, A.
-            const uint32_t alpha = src[3];
-            const uint8_t blue = bgr ? 0 : 2;
-            const uint8_t red = bgr ? 2 : 0;
-            dst[blue] = static_cast<uint8_t>(blend(src[0], dst[blue], alpha));
-            dst[1] = static_cast<uint8_t>(blend(src[1], dst[1], alpha));
-            dst[red] = static_cast<uint8_t>(blend(src[2], dst[red], alpha));
-        }
-    }
-
-    return true;
-}
+namespace {
 
 // Opens a file or directory on the volume the bootloader was loaded from.
 // Returns nullptr on failure.
@@ -425,10 +229,10 @@ EFI_FILE_PROTOCOL* open_file(const char16_t* path)
     return file;
 }
 
-// Finds a section (at most 8 characters, such as ".banner") of assets.efi in
-// the memory the firmware loaded it into. Every offset is checked against the
-// size of the loaded image. Returns empty Bytes if there is no such section
-// or assets.efi is not loaded.
+} // namespace
+
+// Finds the section in the memory the firmware loaded assets.efi into. Every
+// offset is checked against the size of the loaded image.
 Bytes asset_section(const char* name)
 {
     const uint8_t* base = assets_base;
@@ -478,6 +282,8 @@ Bytes asset_section(const char* name)
 
     return {};
 }
+
+namespace {
 
 // Builds the path of a file in uki_directory. Returns false if it does not
 // fit in path.
@@ -542,91 +348,25 @@ bool parse_slot(Bytes text, MenuEntry& entry)
     return true;
 }
 
-// The work area on the current screen, computed as menubox.py does: its size
-// is 80% of the screen, rounded to the nearest pixel.
-WorkArea work_area()
-{
-    const uint32_t screen_width = gop->Mode->Info->HorizontalResolution;
-    const uint32_t screen_height = gop->Mode->Info->VerticalResolution;
-    const uint32_t width = (screen_width * 8 + 5) / 10;
-    const uint32_t height = (screen_height * 8 + 5) / 10;
-    return {(screen_width - width) / 2, (screen_height - height) / 2, width, height, height / work_area_rows};
-}
-
-// The x at which an image of the given width is centred in the work area.
-uint32_t centred_x(const WorkArea& area, uint32_t width)
-{
-    return width < area.width ? area.x + (area.width - width) / 2 : area.x;
-}
-
-// Draws an image centred in a row of the work area, starting at top.
-void draw_centred(Bytes image_data, const WorkArea& area, uint32_t top)
-{
-    uint32_t width = 0;
-    uint32_t height = 0;
-    if (image_size(image_data, width, height)) {
-        const uint32_t y = height < area.row_height ? top + (area.row_height - height) / 2 : top;
-        blit(image_data, centred_x(area, width), y);
-    }
-}
-
 // Fills menu with a row per slot in assets.efi, in slot order. Slots that are
-// not of the form "name profile", lack one of their two valid labels or name
-// a UKI that does not exist are left out. The rows start half a row below the
-// banner in the top row of the work area; each label is centred in its row.
+// not of the form "name profile", name a UKI that does not exist or that the
+// frontend does not take are left out.
 void build_menu()
 {
-    if (gop == nullptr) {
-        return;
-    }
-
-    const WorkArea area = work_area();
-    const uint32_t first_row = area.y + area.row_height + area.row_height / 2;
-
     for (size_t slot = 0; slot < slot_count; ++slot) {
         MenuEntry& entry = menu[menu_count];
-        if (!parse_slot(asset_section(slot_sections[slot]), entry)) {
+        if (!parse_slot(asset_section(slot_sections[slot]), entry) || !uki_exists(entry.name)
+            || !frontend::add_row(slot, menu_count)) {
             continue;
         }
-        entry.labels[0] = asset_section(label_sections[slot][0]);
-        entry.labels[1] = asset_section(label_sections[slot][1]);
-        uint32_t label_width = 0;
-        uint32_t label_height = 0;
-        uint32_t selected_width = 0;
-        uint32_t selected_height = 0;
-        if (!image_size(entry.labels[0], label_width, label_height)
-            || !image_size(entry.labels[1], selected_width, selected_height) || !uki_exists(entry.name)) {
-            continue;
-        }
-        const uint32_t top = first_row + static_cast<uint32_t>(menu_count) * area.row_height;
-        if (top + area.row_height > area.y + area.height) {
-            return;
-        }
-        entry.x = centred_x(area, label_width);
-        entry.y = label_height < area.row_height ? top + (area.row_height - label_height) / 2 : top;
         ++menu_count;
     }
-}
-
-// Draws a row of the menu in its unselected or selected colour. The label is
-// blended onto the screen, so the background under it is redrawn first.
-void draw_entry(size_t index, bool is_selected)
-{
-    const MenuEntry& entry = menu[index];
-    const Bytes label = entry.labels[is_selected ? 1 : 0];
-    uint32_t width = 0;
-    uint32_t height = 0;
-    if (!image_size(label, width, height)) {
-        return;
-    }
-    draw_background(entry.x, entry.y, width, height);
-    blit(label, entry.x, entry.y);
 }
 
 void draw_menu()
 {
     for (size_t i = 0; i < menu_count; ++i) {
-        draw_entry(i, i == selected);
+        frontend::draw_row(i, i == selected);
     }
 }
 
@@ -736,13 +476,11 @@ void unload_assets()
     if (assets_image == nullptr) {
         return;
     }
+    frontend::release_assets();
     bs->UnloadImage(assets_image);
     assets_image = nullptr;
     assets_base = nullptr;
     assets_size = 0;
-    background = {};
-    background_width = 0;
-    background_height = 0;
 }
 
 // Moves the selection one row up or down; it stops at the first and last row.
@@ -751,9 +489,9 @@ void up()
     if (selected == 0) {
         return;
     }
-    draw_entry(selected, false);
+    frontend::draw_row(selected, false);
     --selected;
-    draw_entry(selected, true);
+    frontend::draw_row(selected, true);
 }
 
 void down()
@@ -761,9 +499,9 @@ void down()
     if (selected + 1 >= menu_count) {
         return;
     }
-    draw_entry(selected, false);
+    frontend::draw_row(selected, false);
     ++selected;
-    draw_entry(selected, true);
+    frontend::draw_row(selected, true);
 }
 
 // Handles key presses until Enter is pressed. If no key is pressed within
@@ -929,11 +667,7 @@ void* build_mok_table()
 // efi_main to return to the firmware, which then tries the next boot option.
 EFI_STATUS fail(const char16_t* message, EFI_STATUS status)
 {
-    // The text console may cover only part of a large screen; clearing it
-    // would leave the menu around it.
-    if (gop != nullptr) {
-        clear_rectangle(0, 0, gop->Mode->Info->HorizontalResolution, gop->Mode->Info->VerticalResolution);
-    }
+    frontend::clear();
     st->ConOut->ClearScreen(st->ConOut);
     st->ConOut->OutputString(st->ConOut, efi_string(u"HyprDebian bootloader: "));
     st->ConOut->OutputString(st->ConOut, efi_string(message));
@@ -948,6 +682,10 @@ EFI_STATUS fail(const char16_t* message, EFI_STATUS status)
 }
 
 } // namespace
+
+} // namespace hd
+
+using namespace hd;
 
 extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system_table)
 {
@@ -978,20 +716,9 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     Config config;
     parse_config(asset_section(config_section), config);
 
-    // The background sets the display resolution.
-    background = asset_section(background_section);
-    if (!image_size(background, background_width, background_height)) {
-        background = {};
-        background_width = 0;
-        background_height = 0;
-    }
-    if (!set_display_mode(background_width, background_height) && gop == nullptr) {
+    if (!frontend::init()) {
         return EFI_UNSUPPORTED;
     }
-    draw_full_background();
-
-    const WorkArea area = work_area();
-    draw_centred(asset_section(banner_section), area, area.y);
 
     build_menu();
     if (menu_count == 0) {
@@ -1003,8 +730,7 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     run_key_loop(config.timeout);
 
     // The kernel does not need the assets; free their memory before booting.
-    // The menu keeps its own copy of the name and profile, so they stay valid;
-    // only its labels point into assets.efi.
+    // The menu keeps its own copy of the name and profile, so they stay valid.
     const MenuEntry& entry = menu[selected];
     unload_assets();
 

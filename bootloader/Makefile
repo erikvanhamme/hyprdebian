@@ -1,17 +1,19 @@
 # Builds the hyprdebian EFI bootloader and a FAT32 disk image to boot it in QEMU.
 #
-#   make        build build/bootx64.efi and build/assets.efi, the stub that
+#   make        build build/bootx64-<frontend>.efi for every frontend in
+#               FRONTENDS, the core (bootloader.cpp) linked with that
+#               frontend (<frontend>.cpp), and build/assets.efi, the stub that
 #               update-bootloader.py adds the assets to
 #   make esp    run update-bootloader.py into build/esp/: EFI/BOOT/BOOTX64.EFI,
-#               the bootloader; EFI/BOOT/assets.efi, the stub with the
-#               config, background, banner, menu rows and the DKMS MOK
-#               (/var/lib/dkms/mok.pub) added as sections; and the UKIs of
-#               the 4 most recent kernels in /boot, with settings from
-#               bootloader.json
+#               the bootloader of the frontend that bootloader.json names;
+#               EFI/BOOT/assets.efi, the stub with the config, the menu rows,
+#               the DKMS MOK (/var/lib/dkms/mok.pub) and the assets of that
+#               frontend added as sections; and the UKIs of the 4 most recent
+#               kernels in /boot, with settings from bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make deb    build build/hyprdebian-bootloader_$(DEB_VERSION)_amd64.deb,
 #               which installs:
-#                 /usr/lib/hyprdebian/bootloader/   bootx64.efi, assets.efi,
+#                 /usr/lib/hyprdebian/bootloader/   bootx64-*.efi, assets.efi,
 #                                                   the Python scripts and
 #                                                   update-esps.sh, which
 #                                                   runs the one below for
@@ -33,7 +35,10 @@
 #   make clean  remove build/
 
 BUILD := build
-TARGET := $(BUILD)/bootx64.efi
+# A frontend shows the menu; see bootloader.hpp. Each has a <frontend>.cpp
+# here and a <frontend>.py that builds its assets.
+FRONTENDS := graphical
+TARGETS := $(FRONTENDS:%=$(BUILD)/bootx64-%.efi)
 ASSETS_STUB := $(BUILD)/assets.efi
 ESP := $(BUILD)/esp
 ESP_STAMP := $(BUILD)/esp.stamp
@@ -41,7 +46,7 @@ IMAGE := $(BUILD)/esp.img
 # Each UKI holds a whole initrd, which can be over 100MB.
 IMAGE_SIZE := 1G
 
-SCRIPTS := update-bootloader.py mkuki.py text2png.py png2bin.py menubox.py
+SCRIPTS := update-bootloader.py mkuki.py $(FRONTENDS:%=%.py) text2png.py png2bin.py menubox.py
 # The wallpaper that bootloader.json names.
 WALLPAPER := ../deploy/etc/skel/Pictures/wallpapers/wallpaper.png
 
@@ -98,16 +103,20 @@ LDFLAGS := \
 
 .PHONY: all esp image deb clean
 
-all: $(TARGET) $(ASSETS_STUB)
+all: $(TARGETS) $(ASSETS_STUB)
 
 $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/%.obj: %.cpp | $(BUILD)
+$(BUILD)/%.obj: %.cpp bootloader.hpp | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(BUILD)/bootloader.obj
+$(BUILD)/bootx64-%.efi: $(BUILD)/bootloader.obj $(BUILD)/%.obj
 	$(LD) $(LDFLAGS) -out:$@ $^
+
+# Made by chained pattern rules, so make would delete them as intermediate
+# files and rebuild them every time.
+.SECONDARY: $(BUILD)/bootloader.obj $(FRONTENDS:%=$(BUILD)/%.obj)
 
 # ukify adds the sections to the headers of the stub, but lld-link leaves
 # only room for the stub's own one in the headers it pads to the file
@@ -118,9 +127,10 @@ $(ASSETS_STUB): $(BUILD)/assets.obj
 
 esp: $(ESP_STAMP)
 
-$(ESP_STAMP): $(TARGET) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
+# update-bootloader.py picks the bootx64-<frontend>.efi in build/.
+$(ESP_STAMP): $(TARGETS) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
 	$(PYTHON) update-bootloader.py --esp $(ESP) --config bootloader.json \
-		--bootloader $(TARGET) --assets-stub $(ASSETS_STUB)
+		--bootloader-dir $(BUILD) --assets-stub $(ASSETS_STUB)
 	touch $@
 
 image: $(IMAGE)
@@ -134,16 +144,16 @@ $(IMAGE): $(ESP_STAMP)
 deb: $(DEB)
 
 # The package is built from a staged root in build/deb. update-bootloader.py
-# finds its helpers, bootx64.efi and assets.efi next to itself, also through
+# finds its helpers, bootx64-*.efi and assets.efi next to itself, also through
 # the link. The installed bootloader.json names the wallpaper by its absolute
 # path; the one here names it relative to the source tree. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(TARGET) $(ASSETS_STUB) $(SCRIPTS) update-esps.sh bootloader.json $(WALLPAPER) \
+$(DEB): $(TARGETS) $(ASSETS_STUB) $(SCRIPTS) update-esps.sh bootloader.json $(WALLPAPER) \
 		deb/control $(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
 	rm -rf $(DEB_ROOT)
 	install -d $(DEB_ROOT)/DEBIAN $(DEB_ROOT)$(DEB_LIB) $(DEB_ROOT)/usr/sbin \
 		$(DEB_ROOT)$(DEB_SHARE) $(DEB_ROOT)$(DEB_CONF)
-	install -m 0644 $(TARGET) $(ASSETS_STUB) $(DEB_ROOT)$(DEB_LIB)/
+	install -m 0644 $(TARGETS) $(ASSETS_STUB) $(DEB_ROOT)$(DEB_LIB)/
 	install -m 0755 $(SCRIPTS) update-esps.sh $(DEB_ROOT)$(DEB_LIB)/
 	ln -s ../lib/hyprdebian/bootloader/update-bootloader.py $(DEB_ROOT)/usr/sbin/hd-bootloader-update
 	install -m 0644 $(WALLPAPER) $(DEB_ROOT)$(DEB_SHARE)/wallpaper.png

@@ -5,27 +5,26 @@ Reads the settings from a JSON config file
 (/etc/hyprdebian/bootloader/bootloader.json by default) and writes, below the
 directory given with --esp:
 
-    EFI/BOOT/BOOTX64.EFI      the compiled bootloader (--bootloader) with an
-                              SBAT section; rewritten only when it changes
+    EFI/BOOT/BOOTX64.EFI      the compiled bootloader of the frontend,
+                              bootx64-<frontend>.efi in --bootloader-dir,
+                              with an SBAT section; rewritten only when it
+                              changes
     EFI/BOOT/assets.efi       the assets stub (--assets-stub) with the assets
                               added as PE sections:
                                 .config   the bootloader config: the timeout
-                                .backgnd  the wallpaper, scaled and cropped to
-                                          res_x x res_y, with the work area
-                                          (the menu box of menubox.py) over
-                                          it; the bootloader takes its
-                                          resolution from this image
-                                .banner   banner_text in white
                                 .slotN    for menu row N (1 to 8, top to
                                           bottom): the UKI file name in
                                           EFI/Linux and the profile to boot,
                                           such as
                                           "HyprDebian-Kernel-7.2.10.efi 1"
-                                .lblN     the label of row N, unselected
-                                .lblNs    the label of row N, selected
                                 .mok      the DKMS MOK (--mok) as an
                                           EFI_SIGNATURE_LIST, which the
                                           bootloader hands to the kernel
+                              and the sections of the frontend, which shows
+                              the menu, built by <frontend>.py:
+                                graphical the background, the banner and
+                                          the label images of the rows; see
+                                          graphical.py
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
                               recent kernels in /boot
@@ -43,7 +42,8 @@ too. Without a usable assets.efi the bootloader shows an error and does not
 boot.
 
 With the assets in a file of their own, a change of the config, the
-wallpaper or the texts leaves BOOTX64.EFI alone. assets.efi is a PE image
+wallpaper or the texts leaves BOOTX64.EFI alone; a change of the frontend
+replaces it. assets.efi is a PE image
 that is never started: the bootloader loads it with LoadImage, so that with
 Secure Boot on the firmware checks its signature as it does for BOOTX64.EFI,
 and reads the sections from the loaded image. For Secure Boot, sign
@@ -58,33 +58,32 @@ is interrupted: first the UKIs, then assets.efi and BOOTX64.EFI, and only
 then are the UKIs of older kernels removed, so assets.efi never names a UKI
 that is gone.
 
-The work area holds ten rows of text, so the banner and the menu labels are
-rendered at a tenth of its height. Images are in the raw image format of
-png2bin.py.
-
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
 Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys (all optional; defaults in DEFAULTS below):
 
+    frontend        what shows the menu: graphical
+    timeout         seconds before the default entry boots
+    cmdline         root, quiet, splash and extra (a list) for the kernel
+                    command lines, see mkuki.py
+    banner_text     text of the banner
+
+  for the graphical frontend:
     wallpaper       PNG or other image; a relative path is relative to the
                     config file
     res_x, res_y    display resolution of the bootloader: the size of the
                     background
-    timeout         seconds before the default entry boots
-    banner_text     text of the banner
     font            fontconfig name or file of the font for all texts
     color           colour of unselected menu labels
     selected_color  colour of the selected menu label and the menu box border
     border_width    width of the menu box border in pixels
-    cmdline         root, quiet, splash and extra (a list) for the kernel
-                    command lines, see mkuki.py
 
 Needs python3-pil, systemd-ukify, and for the UKIs systemd-boot-efi.
 
 The package hyprdebian-bootloader (make deb) installs this script and its
 helpers in /usr/lib/hyprdebian/bootloader, next to the compiled bootloader
-and assets stub that --bootloader and --assets-stub default to, links it as
+and assets stub that --bootloader-dir and --assets-stub default to, links it as
 /usr/sbin/hd-bootloader-update, and installs the config in
 /etc/hyprdebian/bootloader. From the source tree, make esp passes the files
 in build/ and the bootloader.json there instead.
@@ -94,7 +93,6 @@ Example:
 """
 
 import argparse
-import io
 import json
 import os
 import struct
@@ -104,9 +102,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from PIL import Image
-
-# text2png.py, png2bin.py, menubox.py and mkuki.py live next to this script,
+# mkuki.py and the frontend modules with their helpers live next to this script,
 # also when it is started through the /usr/sbin/hd-bootloader-update link.
 # Installed, that is a directory of the package: importing them must not
 # leave __pycache__ directories there that dpkg does not know about.
@@ -114,12 +110,15 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 sys.dont_write_bytecode = True
 
-import menubox  # noqa: E402
+import graphical  # noqa: E402
 import mkuki  # noqa: E402
-import png2bin  # noqa: E402
-import text2png  # noqa: E402
+
+# The frontends, by the name in the config: the module that builds the
+# sections of each, with a sections(config, labels) function.
+FRONTENDS = {"graphical": graphical}
 
 DEFAULTS = {
+    "frontend": "graphical",
     "wallpaper": "/usr/share/hyprdebian/bootloader/wallpaper.png",
     "res_x": 1920,
     "res_y": 1080,
@@ -136,9 +135,6 @@ DEFAULTS = {
 # row per profile of the KERNEL_COUNT most recent kernels.
 SLOT_COUNT = 8
 KERNEL_COUNT = SLOT_COUNT // len(mkuki.PROFILE_SUFFIXES)
-# Rows of text that fit in the menu box.
-ROWS = 10
-BANNER_COLOR = "#ffffff"
 UKI_PREFIX = "HyprDebian-Kernel-"
 
 # The SBAT sections of the bootloader and of assets.efi: the standard header
@@ -166,28 +162,14 @@ def load_config(path):
         sys.exit(f"{path}: unknown settings: {', '.join(sorted(unknown))}")
     cmdline = {**DEFAULTS["cmdline"], **config.get("cmdline", {})}
     config = {**DEFAULTS, **config, "cmdline": cmdline}
+    if config["frontend"] not in FRONTENDS:
+        sys.exit(f"{path}: unknown frontend {config['frontend']!r}; known: {', '.join(FRONTENDS)}")
 
     wallpaper = Path(config["wallpaper"])
     if not wallpaper.is_absolute():
         wallpaper = Path(path).resolve().parent / wallpaper
     config["wallpaper"] = wallpaper
     return config
-
-
-def to_bin(image):
-    """Converts a Pillow image to the bootloader's raw image format with png2bin.py."""
-    png = io.BytesIO()
-    image.save(png, "PNG")
-    return png2bin.convert(png.getvalue())
-
-
-def scale_to_cover(image, width, height):
-    """Scales the image to cover width x height and crops it to that, centred."""
-    scale = max(width / image.width, height / image.height)
-    scaled = image.resize((round(image.width * scale), round(image.height * scale)), Image.LANCZOS)
-    left = (scaled.width - width) // 2
-    top = (scaled.height - height) // 2
-    return scaled.crop((left, top, left + width, top + height))
 
 
 def find_kernels(boot_dir):
@@ -287,26 +269,17 @@ def remove_old_ukis(esp, keep):
             print(f"Removed {old}", flush=True)
 
 
-def slot_sections(config, uki_names, text_height):
-    """Returns the .slotN, .lblN and .lblNs sections of the menu rows.
+def menu_rows(uki_names):
+    """Returns (UKI file name, profile, label) of the menu rows, at most SLOT_COUNT.
 
     A row per profile of each UKI, newest UKI first. The label is the UKI
     file name without .efi, followed by the suffix of the profile.
     """
-    sections = {}
-    slot = 0
+    rows = []
     for name in uki_names:
         for profile, suffix in enumerate(mkuki.PROFILE_SUFFIXES):
-            slot += 1
-            if slot > SLOT_COUNT:
-                return sections
-            text = name.removesuffix(".efi") + suffix
-            sections[f".slot{slot}"] = f"{name} {profile}\n".encode()
-            sections[f".lbl{slot}"] = to_bin(text2png.render(text, config["color"], config["font"], text_height))
-            sections[f".lbl{slot}s"] = to_bin(
-                text2png.render(text, config["selected_color"], config["font"], text_height)
-            )
-    return sections
+            rows.append((name, profile, name.removesuffix(".efi") + suffix))
+    return rows[:SLOT_COUNT]
 
 
 def without_signature(data):
@@ -377,10 +350,10 @@ def main():
         help="JSON config file (default: /etc/hyprdebian/bootloader/bootloader.json)",
     )
     parser.add_argument(
-        "--bootloader",
+        "--bootloader-dir",
         type=Path,
-        default=SCRIPTS / "bootx64.efi",
-        help="the compiled bootloader (default: bootx64.efi next to this script)",
+        default=SCRIPTS,
+        help="where the compiled bootloaders, bootx64-<frontend>.efi, are (default: next to this script)",
     )
     parser.add_argument(
         "--assets-stub",
@@ -397,37 +370,28 @@ def main():
     )
     args = parser.parse_args()
 
-    for path in (args.bootloader, args.assets_stub):
+    config = load_config(args.config)
+    frontend = FRONTENDS[config["frontend"]]
+    bootloader = args.bootloader_dir / f"bootx64-{config['frontend']}.efi"
+
+    for path in (bootloader, args.assets_stub):
         if not path.is_file():
             sys.exit(f"{path}: not a file; build the bootloader first")
     if not args.mok.is_file():
         sys.exit(f"{args.mok}: not a file; the DKMS MOK is needed to boot with the ZFS module")
     mok = mok_signature_list(args.mok)
 
-    config = load_config(args.config)
-    res_x, res_y = config["res_x"], config["res_y"]
-    border_width = config["border_width"]
     config_text = f"timeout {config['timeout']}\n".encode()
 
-    # 1. The background: the wallpaper with the menu box.
-    with Image.open(config["wallpaper"]) as wallpaper:
-        background = scale_to_cover(wallpaper.convert("RGB"), res_x, res_y)
-    background = menubox.draw_box(background, config["selected_color"], border_width).convert("RGB")
-
-    # 2. A tenth of the height of the work area is the height of the texts.
-    _, _, _, box_height = menubox.box_geometry(res_x, res_y)
-    text_height = box_height // ROWS
-
-    # 3. The banner.
-    banner = text2png.render(config["banner_text"], BANNER_COLOR, config["font"], text_height)
-
-    # 4. The UKIs.
+    # 1. The UKIs.
     kernels = find_kernels(args.boot_dir)
     if not kernels:
         sys.exit(f"no kernels with an initrd found in {args.boot_dir}")
     uki_names = build_ukis(config, args.esp, kernels)
+    rows = menu_rows(uki_names)
 
-    # 5. The assets: the config, the background, the banner and the menu rows.
+    # 2. The assets: the config, the menu rows, the DKMS MOK and the sections
+    # of the frontend.
     boot = args.esp / "EFI" / "BOOT"
     build_efi(
         args.assets_stub,
@@ -435,17 +399,16 @@ def main():
         ASSETS_SBAT,
         {
             ".config": config_text,
-            ".backgnd": to_bin(background),
-            ".banner": to_bin(banner),
-            **slot_sections(config, uki_names, text_height),
+            **{f".slot{slot}": f"{name} {profile}\n".encode() for slot, (name, profile, _) in enumerate(rows, 1)},
             ".mok": mok,
+            **frontend.sections(config, [label for _, _, label in rows]),
         },
     )
 
-    # 6. The bootloader.
-    build_efi(args.bootloader, boot / "BOOTX64.EFI", SBAT, {})
+    # 3. The bootloader.
+    build_efi(bootloader, boot / "BOOTX64.EFI", SBAT, {})
 
-    # 7. Only now that assets.efi no longer names them, the UKIs of older kernels.
+    # 4. Only now that assets.efi no longer names them, the UKIs of older kernels.
     remove_old_ukis(args.esp, set(uki_names))
 
     for old in OLD_ASSETS:
