@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Livecd/Overview.md",
+                "file": "Installer/Phases.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Overview"
+              "title": "Phases"
             }
           }
         ],
@@ -205,8 +205,8 @@
   },
   "active": "b665cb09c3898fee",
   "lastOpenFiles": [
-    "Local repository/Overview.md",
     "Livecd/Overview.md",
+    "Local repository/Overview.md",
     "HyprDebian/Backup tool.md",
     "Installer/Upgrade.md.tmp.36501.5328fc8df1ed",
     "Installer/Upgrade.md.tmp.36501.ad8914291e5f",

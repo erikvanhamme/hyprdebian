@@ -4,6 +4,7 @@
 TARGET_DIR=/mnt
 STATE_DIR="/tmp/hyprdebian"
 CONFIG_FILE="$STATE_DIR/config"
+DEB_DIR="$STATE_DIR" # Where the deb phase collects the .deb files it builds.
 INSTALLED_CONFIG_FILE="/etc/hyprdebian/installer.config" # Copy of the config on the installed system.
 MIGRATIONS_FILE="/etc/hyprdebian/migrations" # The migrations applied on the installed system.
 REPO_KEY="/usr/share/keyrings/hyprdebian-archive-keyring.pgp" # Signing key of the hyprdebian repo, also in hyprdebian.local.sources.j2.

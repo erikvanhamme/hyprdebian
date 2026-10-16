@@ -5,17 +5,18 @@ The installer is split into phases. Each phase has its own script in the `script
 | --- | --- | --- | --- | --- |
 | 1 | Questions | `questions.sh` | `q_` | Asks the user for the main inputs, and adds the dependencies and queue entries that follow from the answers. See [Questions](Questions.md). |
 | 2 | Prerequisites | `prereqs.sh` | `pr_` | Installs the tools the installer needs on the live system. Skipped on the hyprdebian live cd. |
-| 3 | Disk | `disk.sh` | `d_` | Stops swap and raid arrays, then wipes and discards the target disks. |
-| 4 | Partitions | `partition.sh` | `p_` | Creates the EFI, swap, boot pool and root pool partitions. |
-| 5 | Filesystems | `filesystem.sh` | `f_` | Creates the EFI filesystems, swap, the ZFS pools and the ZFS datasets. |
-| 6 | Base | `base.sh` | `b_` | Bootstraps Debian, sets up apt, the kernel, ZFS support and GRUB, and makes the system bootable. Also queues the packages, files and services every installation needs. |
-| 7 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, wifi, firewall, docker, ...). |
-| 8 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
-| 9 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
-| 10 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
-| 11 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
-| 12 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
-| 13 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. |
+| 3 | Debs | `deb.sh` | `deb_` | Builds the bootloader, art and font packages in the checkout the installer runs from, as the owner of the checkout, and collects the `.deb` files in `/tmp/hyprdebian`. |
+| 4 | Disk | `disk.sh` | `d_` | Stops swap and raid arrays, then wipes and discards the target disks. |
+| 5 | Partitions | `partition.sh` | `p_` | Creates the EFI, swap, boot pool and root pool partitions. |
+| 6 | Filesystems | `filesystem.sh` | `f_` | Creates the EFI filesystems, swap, the ZFS pools and the ZFS datasets. |
+| 7 | Base | `base.sh` | `b_` | Bootstraps Debian, sets up apt, the kernel, ZFS support and GRUB, and makes the system bootable. Also queues the packages, files and services every installation needs. |
+| 8 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, wifi, firewall, docker, ...). |
+| 9 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
+| 10 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
+| 11 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
+| 12 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
+| 13 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
+| 14 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. |
 
 Because packages are installed before files and templates are written, the files from `deploy/` and `templates/` overwrite the default configuration files that come with the packages. See [Queues](Queues.md).
 
@@ -58,6 +59,7 @@ The last line hooks the phase into the root task. The phase script must also be 
 # Load tasks/deps for all the phases, in order.
 source scripts/questions.sh
 source scripts/prereqs.sh
+source scripts/deb.sh
 source scripts/disk.sh
 source scripts/partition.sh
 source scripts/filesystem.sh
