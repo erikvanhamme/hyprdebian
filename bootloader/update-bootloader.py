@@ -48,11 +48,10 @@ wallpaper or the texts leaves BOOTX64.EFI alone; a change of the frontend
 replaces it. assets.efi is a PE image
 that is never started: the bootloader loads it with LoadImage, so that with
 Secure Boot on the firmware checks its signature as it does for BOOTX64.EFI,
-and reads the sections from the loaded image. For Secure Boot, sign
-assets.efi after every run that rewrites it, and BOOTX64.EFI after every run
-that rewrites that. As assets.efi names the UKIs, it changes with every new
-kernel. ukify adds the sections, so that they are loaded into memory, and an
-SBAT entry to each file. A file whose contents would not change is not
+and reads the sections from the loaded image. As assets.efi names the UKIs,
+it changes with every new kernel, and is signed again with it, see below.
+ukify adds the sections, so that they are loaded into memory, and an SBAT
+entry to each file. A file whose contents would not change is not
 rewritten.
 
 The files are written in an order that leaves a bootable ESP if the script
@@ -79,7 +78,16 @@ optional: a key that is missing from the config gets the default here or in
 the module of the frontend, which should match. A key of another frontend is
 an error.
 
-Needs systemd-ukify, and for the UKIs systemd-boot-efi. The graphical frontend
+With the Secure Boot keys of the system, which the installer generates in
+/etc/hyprdebian/secureboot, BOOTX64.EFI, assets.efi and the UKIs are signed
+with the db key (--db-key and --db-cert) by sbsign, before they replace the
+files on the ESP. A file whose contents would not change is still signed
+again when it does not verify with the db certificate, as after the keys
+were generated or replaced. Without the keys the files are written
+unsigned, with a message saying so.
+
+Needs systemd-ukify, and for the UKIs systemd-boot-efi. Signing needs
+sbsigntool. The graphical frontend
 needs python3-pil and fontconfig.
 
 The package hyprdebian-bootloader-<frontend> (make deb) installs this script
@@ -99,6 +107,7 @@ import argparse
 import importlib
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -219,8 +228,60 @@ def same_efi(a, b):
     return without_signature(a.read_bytes()) == without_signature(b.read_bytes())
 
 
-def build_ukis(config, esp, kernels):
-    """Writes the UKIs of the kernels that changed. Returns their file names, newest first."""
+def secure_boot_signing(key, cert):
+    """Returns (key, cert) of the db key to sign with, or None to write the files unsigned.
+
+    Missing or unreadable keys are not an error: the files are written
+    unsigned, with a message saying why. With the keys there, sbsign and
+    sbverify of sbsigntool are needed.
+    """
+    for path in (key, cert):
+        if not path.is_file():
+            print(f"Not signing for Secure Boot: {path} is missing", flush=True)
+            return None
+        if not os.access(path, os.R_OK):
+            print(f"Not signing for Secure Boot: {path} cannot be read", flush=True)
+            return None
+    for tool in ("sbsign", "sbverify"):
+        if shutil.which(tool) is None:
+            sys.exit(f"{tool} is missing; install sbsigntool to sign with {key}")
+    print(f"Signing for Secure Boot with {key}", flush=True)
+    return key, cert
+
+
+def signed_with(path, signing):
+    """True if the PE file path has a signature that verifies with the certificate of signing."""
+    _, cert = signing
+    result = subprocess.run(["sbverify", "--cert", cert, path], capture_output=True)
+    return result.returncode == 0
+
+
+def unchanged(target, temporary, signing):
+    """True if target can stay: it holds what temporary does and, when signing, is signed with the db key."""
+    if not target.is_file() or not same_efi(target, temporary):
+        return False
+    if signing is None:
+        return True
+    return signed_with(target, signing)
+
+
+def sign(path, signing):
+    """Signs the PE file path in place with the db key of signing, if any."""
+    if signing is None:
+        return
+    key, cert = signing
+    signed = path.with_name(f"{path.name}.signed")
+    try:
+        subprocess.run(
+            ["sbsign", "--key", key, "--cert", cert, "--output", signed, path], check=True, capture_output=True
+        )
+        os.replace(signed, path)
+    finally:
+        signed.unlink(missing_ok=True)
+
+
+def build_ukis(config, esp, kernels, signing):
+    """Writes the UKIs of the kernels that changed, signed if signing. Returns their file names, newest first."""
     linux = esp / "EFI" / "Linux"
     linux.mkdir(parents=True, exist_ok=True)
 
@@ -244,9 +305,10 @@ def build_ukis(config, esp, kernels):
                 [sys.executable, SCRIPTS / "mkuki.py", vmlinuz, initrd, "--output", temporary, *flags],
                 check=True,
             )
-            if target.is_file() and same_efi(target, temporary):
+            if unchanged(target, temporary, signing):
                 print(f"Unchanged {target}", flush=True)
                 continue
+            sign(temporary, signing)
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
@@ -324,11 +386,12 @@ def without_signature(data):
     return bytes(result).rstrip(b"\0")
 
 
-def build_efi(stub, target, sbat, sections):
+def build_efi(stub, target, sbat, sections, signing):
     """Writes target: the PE file stub with an SBAT section and the given {name: data} sections added.
 
-    If target already holds that, signed or not, it is left alone, so that
-    its Secure Boot signature stays valid.
+    The new file is signed if signing. If target already holds that, it is
+    left alone, so that its Secure Boot signature stays valid: unsigned or
+    signed with any key without signing, signed with the db key with it.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.tmp")
@@ -343,9 +406,10 @@ def build_efi(stub, target, sbat, sections):
                 ["ukify", "build", f"--stub={stub}", *options, f"--sbat={sbat}", f"--output={temporary}"],
                 check=True,
             )
-            if target.is_file() and same_efi(target, temporary):
+            if unchanged(target, temporary, signing):
                 print(f"Unchanged {target}", flush=True)
                 return
+            sign(temporary, signing)
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
@@ -380,6 +444,18 @@ def main():
         default=Path("/var/lib/dkms/mok.pub"),
         help="certificate of the DKMS MOK, DER or PEM (default: /var/lib/dkms/mok.pub)",
     )
+    parser.add_argument(
+        "--db-key",
+        type=Path,
+        default=Path("/etc/hyprdebian/secureboot/db.key"),
+        help="Secure Boot db key to sign the files with (default: /etc/hyprdebian/secureboot/db.key)",
+    )
+    parser.add_argument(
+        "--db-cert",
+        type=Path,
+        default=Path("/etc/hyprdebian/secureboot/db.crt"),
+        help="PEM certificate of the db key (default: /etc/hyprdebian/secureboot/db.crt)",
+    )
     args = parser.parse_args()
 
     config, frontend = load_config(args.config)
@@ -391,6 +467,7 @@ def main():
     if not args.mok.is_file():
         sys.exit(f"{args.mok}: not a file; the DKMS MOK is needed to boot with the ZFS module")
     mok = mok_signature_list(args.mok)
+    signing = secure_boot_signing(args.db_key, args.db_cert)
 
     config_text = f"timeout {config['timeout']}\n".encode()
 
@@ -398,7 +475,7 @@ def main():
     kernels = find_kernels(args.boot_dir)
     if not kernels:
         sys.exit(f"no kernels with an initrd found in {args.boot_dir}")
-    uki_names = build_ukis(config, args.esp, kernels)
+    uki_names = build_ukis(config, args.esp, kernels, signing)
     rows = menu_rows(uki_names)
 
     # 2. The assets: the config, the menu rows, the DKMS MOK and the sections
@@ -414,10 +491,11 @@ def main():
             ".mok": mok,
             **frontend.sections(config, [label for _, _, label in rows]),
         },
+        signing,
     )
 
     # 3. The bootloader.
-    build_efi(bootloader, boot / "BOOTX64.EFI", SBAT, {})
+    build_efi(bootloader, boot / "BOOTX64.EFI", SBAT, {}, signing)
 
     # 4. Only now that assets.efi no longer names them, the UKIs of older kernels.
     remove_old_ukis(args.esp, set(uki_names))

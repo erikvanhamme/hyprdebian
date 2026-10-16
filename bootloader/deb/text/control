@@ -4,7 +4,7 @@ Architecture: amd64
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: python3, systemd-ukify, systemd-boot-efi
-Recommends: dkms, openssl
+Recommends: dkms, openssl, sbsigntool
 Provides: hyprdebian-bootloader
 Conflicts: hyprdebian-bootloader
 Replaces: hyprdebian-bootloader
@@ -19,4 +19,6 @@ Description: HyprDebian minimalist EFI bootloader, text-only
  assets.efi to an EFI system partition. assets.efi holds the settings, the
  menu and the DKMS MOK, which the bootloader hands to the kernel so that it
  loads the DKMS-built ZFS module under Secure Boot. The settings are in
- /etc/hyprdebian/bootloader/bootloader.json.
+ /etc/hyprdebian/bootloader/bootloader.json. With the Secure Boot keys of
+ the system in /etc/hyprdebian/secureboot, it signs the bootloader,
+ assets.efi and the UKIs with the db key, using sbsign.
