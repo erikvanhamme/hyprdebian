@@ -6,6 +6,7 @@ TARGET_DIR=""
 # Keep the upgrade state apart from an installation, and start fresh on every run.
 STATE_DIR="/tmp/hyprdebian-upgrade"
 CONFIG_FILE="$STATE_DIR/config"
+DEB_DIR="$STATE_DIR"
 
 # The hooks of the installer phases that the upgrade does not run. The tasks that the queuing
 # tasks attach to them, like pkg_enable_firewall, run in upg_hooks when the new version adds them.
@@ -27,6 +28,17 @@ accept_default() {
 # Succeeds when a package is installed.
 is_installed() {
     [[ "$(dpkg-query -W -f='${db:Status-Status}' "$1" 2>/dev/null)" == "installed" ]]
+}
+
+# Succeeds when a .deb file holds a newer version of a package than the one that is installed.
+# Usage: is_newer_deb <deb> <package>
+is_newer_deb() {
+    local new old
+
+    new=$(dpkg-deb -f "$1" Version) || return 1
+    old=$(dpkg-query -W -f='${Version}' "$2" 2>/dev/null) || return 1
+
+    dpkg --compare-versions "$new" gt "$old"
 }
 
 # Checks that the packages of the system are up to date. The upgrade installs the new packages
@@ -85,13 +97,14 @@ take_snapshots() {
     echo "Snapshots created: rpool/hyprdebian@${name} bpool/hyprdebian@${name}"
 }
 
-# Installs the packages the upgrade needs on the system, like python3-jinja2 to render the
-# templates.
+# Installs the packages the upgrade needs on the system: python3-jinja2 to render the templates,
+# and for the deb phase the tools that build the bootloader (clang, gnu-efi, lld, make) and the
+# font package (wget, unzip).
 install_prerequisites() {
     local package
     local packages=()
 
-    for package in python3-jinja2; do
+    for package in python3-jinja2 clang gnu-efi lld make wget unzip; do
         if ! is_installed "$package"; then
             packages+=("$package")
         fi

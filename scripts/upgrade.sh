@@ -52,19 +52,32 @@ upg_migrations() {
 }
 
 # Installs the packages the new version adds. Packages that were removed after an earlier
-# installation or upgrade are not installed again.
+# installation or upgrade are not installed again. Packages that the deb phase built are in no
+# repo, so apt gets their .deb files, and never upgrades them itself: a build with a newer version
+# than the installed package replaces it.
 upg_packages() {
-    local package
+    local package deb new
     local install=()
+    local upgrade=()
     local keep_out=()
 
-    for package in $(new_items "${PACKAGES[*]}" "${INSTALLED_PACKAGES:-}"); do
-        if [[ "$package" != *- ]]; then
-            install+=("$package")
+    new=" $(new_items "${PACKAGES[*]}" "${INSTALLED_PACKAGES:-}") "
+
+    for package in "${PACKAGES[@]}"; do
+        if [[ "$package" == *- ]]; then
+            continue
+        fi
+
+        deb=$(local_deb "$package")
+
+        if [[ "$new" == *" ${package} "* ]]; then
+            install+=("${deb:-$package}")
+        elif [[ -n "$deb" ]] && is_installed "$package" && is_newer_deb "$deb" "$package"; then
+            upgrade+=("$deb")
         fi
     done
 
-    if (( ${#install[@]} == 0 )); then
+    if (( ${#install[@]} == 0 && ${#upgrade[@]} == 0 )); then
         return 0
     fi
 
@@ -78,11 +91,20 @@ upg_packages() {
         fi
     done
 
-    echo "New packages: ${install[*]}"
     in_target apt update || return 1
 
-    # Upgrading the packages that are already installed is left to the user.
-    in_target apt install --no-upgrade "${install[@]}" "${keep_out[@]}"
+    # The packages the deb phase built are upgraded first, as apt does not know their newer
+    # versions, and a new package may need them.
+    if (( ${#upgrade[@]} > 0 )); then
+        echo "Newer builds: ${upgrade[*]##*/}"
+        in_target apt install "${upgrade[@]}" "${keep_out[@]}" || return 1
+    fi
+
+    # Upgrading the other packages that are already installed is left to the user.
+    if (( ${#install[@]} > 0 )); then
+        echo "New packages: ${install[*]##*/}"
+        in_target apt install --no-upgrade "${install[@]}" "${keep_out[@]}" || return 1
+    fi
 }
 
 # Deploys the files in /etc/skel and /usr/local/bin that differ from the ones on the system.

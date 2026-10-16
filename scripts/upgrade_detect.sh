@@ -39,6 +39,35 @@ has_mirror() {
     zpool status rpool 2>/dev/null | grep -qw mirror
 }
 
+# Prints a /dev/disk/by-id link of the disk with the ESP that is mounted at the given path, the
+# form in which the installer asks for the disks. Prints nothing when it cannot be found. Listing
+# the ESP mounts it when it is automounted.
+# Usage: esp_disk <mount point>
+esp_disk() {
+    local part disk link
+
+    if ! ls -A "${TARGET_DIR}$1/" > /dev/null 2>&1; then
+        return 0
+    fi
+
+    part=$(findmnt -n -o SOURCE -t vfat "${TARGET_DIR}$1" 2>/dev/null | head -n 1) || true
+    if [[ -z "$part" ]]; then
+        return 0
+    fi
+
+    disk=$(lsblk -n -d -o PKNAME "$part" 2>/dev/null) || true
+    if [[ -z "$disk" ]]; then
+        return 0
+    fi
+
+    for link in /dev/disk/by-id/*; do
+        if [[ "$link" != *-part* && "$(readlink -f "$link")" == "/dev/${disk}" ]]; then
+            echo "$link"
+            return 0
+        fi
+    done
+}
+
 # Succeeds when the root pool is encrypted.
 has_encryption() {
     [[ "$(zfs get -H -o value encryption rpool 2>/dev/null)" =~ ^aes ]]
@@ -88,6 +117,14 @@ detect_config() {
     # The disks.
     save_detected Q_REDUNDANT "$(detected_bool has_mirror)"
     save_detected Q_ENCRYPT "$(detected_bool has_encryption)"
+
+    # The disks of the ESPs, for the firmware boot entries of the bootloader.
+    if has_mirror; then
+        save_detected Q_DISK_A "$(esp_disk /boot/efi)"
+        save_detected Q_DISK_B "$(esp_disk /boot/efi2)"
+    else
+        save_detected Q_DISK "$(esp_disk /boot/efi)"
+    fi
 
     # The size of the swap partition in GiB, rounded. zram swap is not a partition.
     swap=$(awk 'NR > 1 && $1 !~ /zram/ {print int(($3 + 524288) / 1048576); exit}' /proc/swaps 2>/dev/null) || true

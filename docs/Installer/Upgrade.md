@@ -19,7 +19,7 @@ Reboot the system after the upgrade. New services only start on the next boot, a
 Before it works out anything, the upgrade:
 1. **Checks that the system is up to date.** It runs `apt update`, and counts the packages `apt full-upgrade` would upgrade. When there are any, it recommends to upgrade the system first, and asks whether to continue anyway. The default is to stop. The upgrade installs new packages with their latest versions, and on a system that is behind, these can pull in upgrades of the packages they depend on, like `systemd`, while the rest of the system stays behind.
 2. **Snapshots the system.** It takes the snapshots `rpool/hyprdebian@upgrade-<date>_<time>` and `bpool/hyprdebian@upgrade-<date>_<time>`, like `upgrade-2026-10-15_143005`, so the upgrade can be undone with `zfs rollback`. When a snapshot cannot be created, the upgrade stops. `hd-up` takes the same snapshots before an `apt full-upgrade`, named `hd-up-<date>_<time>`.
-3. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates.
+3. **Installs the packages the upgrade itself needs**, when they are missing: `python3-jinja2`, which renders the templates, and the tools of the [deb phase](#locally-built-packages): `clang`, `gnu-efi`, `lld` and `make` for the bootloader, `wget` and `unzip` for the font package.
 
 ## State on the installed system
 The installer leaves two files on the installed system for the upgrade:
@@ -41,8 +41,8 @@ The state of the upgrade itself is kept in `/tmp/hyprdebian-upgrade`, and is rem
 4. Checks that the system is up to date (`check_up_to_date`), snapshots it (`take_snapshots`), and installs the packages the upgrade needs (`install_prerequisites`). See [Before the upgrade](#before-the-upgrade).
 5. Loads the answers of the installation (`load_installed_config`, then `load_config`). The queues and dependencies in the saved config were worked out by the version that wrote it, so they are left out. The old queues are kept apart, to find out what the new version adds. Without a saved config, the answers are worked out from the system, see [Systems installed before the upgrade existed](#systems-installed-before-the-upgrade-existed).
 6. Defines the root task `upgrade`.
-7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, and `scripts/packages.sh`, `scripts/services.sh` and `scripts/user.sh` for the tasks on their hooks (see [Hook tasks](#hook-tasks)), and marks the tasks that only make sense during an installation as done, so they are skipped.
-8. Adds the tasks that work out the queues to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
+7. Sources `scripts/questions.sh`, `scripts/base.sh` and `scripts/optional.sh`, `scripts/deb.sh` for the deb phase, and `scripts/packages.sh`, `scripts/services.sh` and `scripts/user.sh` for the tasks on their hooks (see [Hook tasks](#hook-tasks)), and marks the tasks that only make sense during an installation as done, so they are skipped.
+8. Adds the tasks that work out the queues and `deb_main` to `upgrade`, then sources `scripts/upgrade.sh`, the upgrade phase.
 9. Runs `execute_task "upgrade"`, and when it succeeds, recommends a reboot.
 
 ## Working out the queues
@@ -52,16 +52,22 @@ The upgrade runs the tasks of the installer that decide what is installed, with 
 | --- | --- |
 | `q_main` | The questions, and through them the `o_` tasks of the selected components. |
 | `b_files`, `b_templates` | The base files and templates. |
+| `b_bootloader`, `b_secureboot` | The bootloader package, `efibootmgr` and the Secure Boot tools, with their hook tasks `pkg_boot_entries`, `pkg_secureboot_keys` and `pkg_sign_esps`. |
 | `b_systemd`, `b_utilities`, `b_network` | The base packages, files, templates, services and groups. |
 | `o_main` | The selected optional components. |
 
-These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download), and `o_art` and `o_font` (their packages are built by the deb phase, which the upgrade does not run).
+These tasks are skipped: `q_suite` (the suite of an installed system is kept), `q_disk`, `q_password` and `q_kernel` (they ask about the disks, the password and a kernel download).
 
 Two of the `o_` tasks do more than queuing, and do that again on every upgrade: `o_wifi` masks `systemd-networkd-wait-online.service`, and `o_backuptools` compiles `blockwrite` into `/usr/local/bin`, from a copy of the source in `/tmp`. Both are safe to repeat.
 
 The questions are answered with the saved answers, without asking. Only a question without a saved answer is asked, like a question that was added after the installation. Its answer is saved with the others at the end of the upgrade.
 
-The other base tasks, like `b_fstab`, `b_kernel`, `b_grub2` and `b_bootloader`, are not run. They set up the disks and the boot loader, and what they queue is not part of the upgrade.
+The other base tasks, like `b_fstab`, `b_kernel` and `b_grub2`, are not run. They set up the disks and the boot loader, and what they queue is not part of the upgrade.
+
+## Locally built packages
+The bootloader packages, `hyprdebian-art` and `fonts-jetbrainsmono-nerd` are in no repo: the deb phase of the installer builds them from the checkout (see [Phases](Phases.md)). The upgrade runs the same phase, `deb_main` in `scripts/deb.sh`, after working out the queues and before the upgrade phase. It builds all of them into `/tmp/hyprdebian-upgrade`, as the owner of the checkout, and stops when a build fails.
+
+`upg_packages` passes the `.deb` file to apt for each of these packages that is new. apt never upgrades them itself, as no apt source has them, so `upg_packages` also installs a build whose version is newer than the installed package. That is how a new version of the bootloader reaches an installed system. Raise the version of a package (`DEB_VERSION` in `bootloader/Makefile`, `art/version`) for every change that should reach installed systems.
 
 ## Upgrade phase
 The upgrade phase is in `scripts/upgrade.sh`, and is built like the [phases](Phases.md) of the installer:
@@ -70,7 +76,7 @@ The upgrade phase is in `scripts/upgrade.sh`, and is built like the [phases](Pha
 | --- | --- | --- |
 | `upg_pre` | `upg_session` | Looks for the Wayland session the upgrade was started from, for merges in meld. |
 | `upg_main` | `upg_migrations` | Runs the migrations that did not run on the system yet. |
-| | `upg_packages` | Installs the packages the new version adds. |
+| | `upg_packages` | Installs the packages the new version adds, and newer builds of the [locally built packages](#locally-built-packages). |
 | | `upg_files` | Copies the files in `/etc/skel` and `/usr/local/bin` that differ from the system. |
 | | `upg_etc` | Updates the other deployed files, all in `/etc`. |
 | | `upg_templates` | Updates the files rendered from the queued templates. |
@@ -122,7 +128,7 @@ The templates for the disks, the boot loader and the apt sources (`fstab`, `cryp
 ## Packages, services and groups
 For packages, services and groups, the upgrade only acts on what the new version **adds**: what is in the new queue, but not in the queue saved by the installation or the last upgrade. A package that was removed, a service that was disabled or a group the user was taken out of after the installation is not brought back.
 
-- **Packages** are installed with `apt update` and `apt install --no-upgrade`. Packages that are already installed are not upgraded. Upgrading the system is left to the user. apt asks before it installs extra dependencies. Answering no stops the upgrade. Queue entries that keep a package out, like `avahi-daemon-`, are passed along only for packages that are not installed, so a new package cannot pull them in. An installed package is never removed this way.
+- **Packages** are installed with `apt update` and `apt install --no-upgrade`. Packages that are already installed are not upgraded, except for the [locally built packages](#locally-built-packages). Upgrading the system is left to the user. apt asks before it installs extra dependencies. Answering no stops the upgrade. Queue entries that keep a package out, like `avahi-daemon-`, are passed along only for packages that are not installed, so a new package cannot pull them in. An installed package is never removed this way.
 - **Services** are only enabled, not started, so they start on the next boot. Starting a service on a running system can disturb it. `rotate-machine-id`, for example, would change the machine id right away. `systemctl daemon-reload` runs on every upgrade, because unit files may have changed.
 - **Groups** take effect after the user logs in again.
 
@@ -148,11 +154,11 @@ See [Migrations](Migrations.md) for the migrations so far and what each one does
 | Name | In the installer | In the upgrade |
 | --- | --- | --- |
 | `TARGET_DIR` | `/mnt` | Empty, the upgrade works on the running system. |
-| `STATE_DIR`, `CONFIG_FILE` | `/tmp/hyprdebian` | `/tmp/hyprdebian-upgrade` |
+| `STATE_DIR`, `CONFIG_FILE`, `DEB_DIR` | `/tmp/hyprdebian` | `/tmp/hyprdebian-upgrade` |
 | `in_target` | Runs a command in a `chroot` of `/mnt`. | Runs the command directly. |
 | `accept_default` | Answers a question with its default when the machine type defaults are used. | Answers a question with its saved answer, when there is one. |
 
-It also has the functions the upgrade uses: `is_installed`, `check_up_to_date`, `install_prerequisites`, `load_installed_config`, `new_items`, `find_session`, `merge_file` and `update_file`. The detection of the answers is in `scripts/upgrade_detect.sh`.
+It also has the functions the upgrade uses: `is_installed`, `is_newer_deb`, `check_up_to_date`, `install_prerequisites`, `load_installed_config`, `new_items`, `find_session`, `merge_file` and `update_file`. The detection of the answers is in `scripts/upgrade_detect.sh`.
 
 ## Changing the installer with the upgrade in mind
 Because the upgrade runs the installer tasks that work out the queues, a few rules keep them working for both:
@@ -174,6 +180,7 @@ The upgrade works out the answers from the state of the system (`detect_config` 
 | `Q_SUITE` | The suite in `debian.sources`, or in the older `sources.list`. `sid`, or no suite found, is saved as `unstable`. |
 | `Q_TYPE` | `hostnamectl chassis`. |
 | `Q_REDUNDANT`, `Q_ENCRYPT` | A mirror in `rpool`, and the encryption of `rpool`. |
+| `Q_DISK`, or `Q_DISK_A` and `Q_DISK_B` | The disks of the ESPs mounted at `/boot/efi` and `/boot/efi2`, as a `/dev/disk/by-id` link. `pkg_boot_entries` adds the firmware boot entries of the bootloader on them. They are not asked. |
 | `Q_SWAP` | The size of the swap partition in `/proc/swaps`, in GiB. zram swap is not counted. |
 | `Q_USER`, `Q_FULLNAME` | The first regular user with a home directory in `/home`. |
 | `Q_HOSTNAME`, `Q_FQDN` | `/etc/hostname`, and the `127.0.1.1` line in `/etc/hosts`. |
