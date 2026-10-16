@@ -4,8 +4,10 @@
 Reads the settings from a JSON config file (bootloader.json next to this
 script by default) and writes, below the directory given with --esp:
 
-    EFI/BOOT/BOOTX64.EFI      the compiled bootloader (--bootloader) with its
-                              assets added as PE sections:
+    EFI/BOOT/BOOTX64.EFI      the compiled bootloader (--bootloader) with an
+                              SBAT section; rewritten only when it changes
+    EFI/BOOT/assets.efi       the assets stub (--assets-stub) with the assets
+                              added as PE sections:
                                 .config   the bootloader config: the timeout
                                 .backgnd  the wallpaper, scaled and cropped to
                                           res_x x res_y, with the work area
@@ -17,11 +19,15 @@ script by default) and writes, below the directory given with --esp:
                               multi-profile UKIs (mkuki.py) of the 4 most
                               recent kernels in /boot, with the menu labels
 
-With the assets inside BOOTX64.EFI, signing that one file for Secure Boot
-covers them too: the firmware checks the signature over all sections before
-it starts the bootloader, which then reads them from its own loaded image.
-ukify adds the sections, so that they are loaded into memory, and an SBAT
-entry for the bootloader.
+With the assets in a file of their own, a change of the config, the
+wallpaper or the texts leaves BOOTX64.EFI alone. assets.efi is a PE image
+that is never started: the bootloader loads it with LoadImage, so that with
+Secure Boot on the firmware checks its signature as it does for BOOTX64.EFI,
+and reads the sections from the loaded image. For Secure Boot, sign
+assets.efi after every run that rewrites it, and BOOTX64.EFI after every run
+that rewrites that. ukify adds the sections, so that they are loaded into
+memory, and an SBAT entry to each file. A file whose contents would not
+change is not rewritten.
 
 The work area holds ten rows of text, so the banner and the menu labels in
 the UKIs are rendered at a tenth of its height. Images are in the raw image
@@ -51,13 +57,14 @@ Config keys (all optional; defaults in DEFAULTS below):
 Needs python3-pil, systemd-ukify, and for the UKIs systemd-boot-efi.
 
 Example:
-    update-bootloader.py --esp /boot/efi --bootloader build/bootx64.efi
+    update-bootloader.py --esp /boot/efi --bootloader build/bootx64.efi --assets-stub build/assets.efi
 """
 
 import argparse
 import io
 import json
 import os
+import struct
 import subprocess
 import sys
 import tempfile
@@ -93,13 +100,12 @@ ROWS = 10
 BANNER_COLOR = "#ffffff"
 UKI_PREFIX = "HyprDebian-Kernel-"
 
-# The SBAT section of the bootloader: the standard header line, then our
-# entry. Raise the generation of our entry (its second field) when a security
-# fix must make older bootloaders revocable.
-SBAT = (
-    "sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\n"
-    "hyprdebian-boot,1,HyprDebian,hyprdebian-boot,1,HyprDebian bootloader\n"
-)
+# The SBAT sections of the bootloader and of assets.efi: the standard header
+# line, then our entry. Raise the generation of an entry (its second field)
+# when a security fix must make older files revocable.
+SBAT_HEADER = "sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\n"
+SBAT = SBAT_HEADER + "hyprdebian-boot,1,HyprDebian,hyprdebian-boot,1,HyprDebian bootloader\n"
+ASSETS_SBAT = SBAT_HEADER + "hyprdebian-assets,1,HyprDebian,hyprdebian-assets,1,HyprDebian bootloader assets\n"
 
 # Assets that earlier versions of this script wrote as loose files.
 OLD_ASSETS = ["EFI/BOOT/hyprdebian.conf", "EFI/background.bin", "EFI/banner.bin", "EFI/BOOT/tux.bin"]
@@ -211,12 +217,44 @@ def build_ukis(config, esp, boot_dir, label_height):
             print(f"Removed {old}", flush=True)
 
 
-def build_bootloader(bootloader, esp, sections):
-    """Writes EFI/BOOT/BOOTX64.EFI: the bootloader with the given {name: data} sections added."""
-    boot = esp / "EFI" / "BOOT"
-    boot.mkdir(parents=True, exist_ok=True)
-    target = boot / "BOOTX64.EFI"
-    temporary = boot / ".BOOTX64.EFI.tmp"
+def without_signature(data):
+    """Returns PE file data without its Authenticode signature, as it was before signing.
+
+    sbsign appends the signature (the certificate table) to the end of the
+    file, points the security entry of the data directories at it, pads the
+    file to 8 bytes before it and sets the checksum. This drops the table,
+    clears the entry and the checksum, and strips the trailing padding.
+    Returns data unchanged if it is not a PE32+ file.
+    """
+    if len(data) < 64 or data[:2] != b"MZ":
+        return data
+    (pe_offset,) = struct.unpack_from("<I", data, 0x3C)
+    optional_header = pe_offset + 24
+    if data[pe_offset : pe_offset + 4] != b"PE\0\0" or len(data) < optional_header + 152:
+        return data
+    (magic,) = struct.unpack_from("<H", data, optional_header)
+    if magic != 0x20B:
+        return data
+
+    checksum = optional_header + 64
+    # The security entry is the fifth of the data directories, which start at
+    # offset 112 of a PE32+ optional header.
+    security = optional_header + 112 + 4 * 8
+    table_offset, _ = struct.unpack_from("<II", data, security)
+    result = bytearray(data[:table_offset] if table_offset else data)
+    result[checksum : checksum + 4] = bytes(4)
+    result[security : security + 8] = bytes(8)
+    return bytes(result).rstrip(b"\0")
+
+
+def build_efi(stub, target, sbat, sections):
+    """Writes target: the PE file stub with an SBAT section and the given {name: data} sections added.
+
+    If target already holds that, signed or not, it is left alone, so that
+    its Secure Boot signature stays valid.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.tmp")
     with tempfile.TemporaryDirectory() as tmp:
         options = []
         for name, data in sections.items():
@@ -225,9 +263,14 @@ def build_bootloader(bootloader, esp, sections):
             options.append(f"--section={name}:@{path}")
         try:
             subprocess.run(
-                ["ukify", "build", f"--stub={bootloader}", *options, f"--sbat={SBAT}", f"--output={temporary}"],
+                ["ukify", "build", f"--stub={stub}", *options, f"--sbat={sbat}", f"--output={temporary}"],
                 check=True,
             )
+            if target.is_file() and without_signature(target.read_bytes()) == without_signature(
+                temporary.read_bytes()
+            ):
+                print(f"Unchanged {target}", flush=True)
+                return
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
@@ -249,11 +292,18 @@ def main():
         default=SCRIPTS / "build" / "bootx64.efi",
         help="the compiled bootloader (default: build/bootx64.efi next to this script)",
     )
+    parser.add_argument(
+        "--assets-stub",
+        type=Path,
+        default=SCRIPTS / "build" / "assets.efi",
+        help="the compiled assets stub (default: build/assets.efi next to this script)",
+    )
     parser.add_argument("--boot-dir", type=Path, default=Path("/boot"), help="where the kernels are (default: /boot)")
     args = parser.parse_args()
 
-    if not args.bootloader.is_file():
-        sys.exit(f"{args.bootloader}: not a file; build the bootloader first")
+    for path in (args.bootloader, args.assets_stub):
+        if not path.is_file():
+            sys.exit(f"{path}: not a file; build the bootloader first")
 
     config = load_config(args.config)
     res_x, res_y = config["res_x"], config["res_y"]
@@ -275,12 +325,17 @@ def main():
     # 4. The UKIs, with their menu labels.
     build_ukis(config, args.esp, args.boot_dir, text_height)
 
-    # 5. The bootloader with the config, the background and the banner.
-    build_bootloader(
-        args.bootloader,
-        args.esp,
+    # 5. The assets: the config, the background and the banner.
+    boot = args.esp / "EFI" / "BOOT"
+    build_efi(
+        args.assets_stub,
+        boot / "assets.efi",
+        ASSETS_SBAT,
         {".config": config_text, ".backgnd": to_bin(background), ".banner": to_bin(banner)},
     )
+
+    # 6. The bootloader.
+    build_efi(args.bootloader, boot / "BOOTX64.EFI", SBAT, {})
 
     for old in OLD_ASSETS:
         path = args.esp / old

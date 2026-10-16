@@ -22,11 +22,15 @@ struct Config {
     uint32_t timeout = 5; // Seconds to wait for a key before booting.
 };
 
-// The sections that update-bootloader.py adds to this bootloader's own PE
-// file: the config, the background and the banner. A Secure Boot signature
-// over the file covers them, and the firmware has loaded them into memory
-// with the rest of the bootloader. The bootloader takes the display
-// resolution from the size of the background.
+// The assets are sections that update-bootloader.py adds to a stub PE file,
+// assets.efi next to the bootloader: the config, the background and the
+// banner. They can change without touching the bootloader. The bootloader
+// loads assets.efi with LoadImage, so that with Secure Boot on the firmware
+// checks its signature, and reads the sections from the loaded image; it
+// never starts it. The bootloader takes the display resolution from the size
+// of the background.
+constexpr const char16_t* assets_directory = u"\\EFI\\BOOT";
+constexpr const char16_t* assets_name = u"assets.efi";
 constexpr const char* config_section = ".config";
 constexpr const char* background_section = ".backgnd";
 constexpr const char* banner_section = ".banner";
@@ -75,11 +79,13 @@ EFI_HANDLE image = nullptr;
 EFI_SYSTEM_TABLE* st = nullptr;
 EFI_BOOT_SERVICES* bs = nullptr;
 EFI_GRAPHICS_OUTPUT_PROTOCOL* gop = nullptr;
-// The device (partition) the bootloader was loaded from, and where the
-// firmware loaded the bootloader in memory.
+// The device (partition) the bootloader was loaded from.
 EFI_HANDLE boot_device = nullptr;
-const uint8_t* image_base = nullptr;
-uint64_t image_size_in_memory = 0;
+// assets.efi and where the firmware loaded it in memory. Null if it could not
+// be loaded or failed the Secure Boot check.
+EFI_HANDLE assets_image = nullptr;
+const uint8_t* assets_base = nullptr;
+uint64_t assets_size = 0;
 
 // The UKIs found in uki_directory, and pointers to them sorted from the most
 // recently created to the oldest.
@@ -464,14 +470,14 @@ bool later(const EFI_TIME& a, const EFI_TIME& b)
     return a.Nanosecond > b.Nanosecond;
 }
 
-// Finds a section (at most 8 characters, such as ".banner") of the
-// bootloader itself in the memory the firmware loaded it into. Every offset
-// is checked against the size of the loaded image. Returns empty Bytes if
-// there is no such section.
-Bytes own_section(const char* name)
+// Finds a section (at most 8 characters, such as ".banner") of assets.efi in
+// the memory the firmware loaded it into. Every offset is checked against the
+// size of the loaded image. Returns empty Bytes if there is no such section
+// or assets.efi is not loaded.
+Bytes asset_section(const char* name)
 {
-    const uint8_t* base = image_base;
-    const uint64_t size = image_size_in_memory;
+    const uint8_t* base = assets_base;
+    const uint64_t size = assets_size;
     if (base == nullptr || size < 64 || base[0] != 'M' || base[1] != 'Z') {
         return {};
     }
@@ -819,6 +825,57 @@ EFI_DEVICE_PATH* file_device_path(const char16_t* directory, const char16_t* nam
     return static_cast<EFI_DEVICE_PATH*>(buffer);
 }
 
+// Loads assets.efi with LoadImage, which checks its Secure Boot signature,
+// and sets assets_image, assets_base and assets_size. Without assets.efi, or
+// if it fails the check, the bootloader runs with its defaults: a black
+// screen and the default timeout.
+void load_assets()
+{
+    EFI_DEVICE_PATH* path = file_device_path(assets_directory, assets_name);
+    if (path == nullptr) {
+        return;
+    }
+
+    EFI_HANDLE handle = nullptr;
+    const EFI_STATUS status = bs->LoadImage(FALSE, image, path, nullptr, 0, &handle);
+    bs->FreePool(path);
+    // On EFI_SECURITY_VIOLATION the firmware has loaded the image anyway,
+    // only it may not be started. Its contents failed the check, so it is
+    // unloaded and none of it is used.
+    if (status != EFI_SUCCESS) {
+        if (handle != nullptr) {
+            bs->UnloadImage(handle);
+        }
+        return;
+    }
+
+    EFI_LOADED_IMAGE_PROTOCOL* loaded_assets = nullptr;
+    if (bs->HandleProtocol(handle, &loaded_image_protocol_guid, reinterpret_cast<void**>(&loaded_assets))
+        != EFI_SUCCESS) {
+        bs->UnloadImage(handle);
+        return;
+    }
+
+    assets_image = handle;
+    assets_base = static_cast<const uint8_t*>(loaded_assets->ImageBase);
+    assets_size = loaded_assets->ImageSize;
+}
+
+// Unloads assets.efi. Nothing may use the assets afterwards.
+void unload_assets()
+{
+    if (assets_image == nullptr) {
+        return;
+    }
+    bs->UnloadImage(assets_image);
+    assets_image = nullptr;
+    assets_base = nullptr;
+    assets_size = 0;
+    background = {};
+    background_width = 0;
+    background_height = 0;
+}
+
 // Moves the selection one row up or down; it stops at the first and last row.
 void up()
 {
@@ -952,14 +1009,14 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
         return EFI_LOAD_ERROR;
     }
     boot_device = loaded_image->DeviceHandle;
-    image_base = static_cast<const uint8_t*>(loaded_image->ImageBase);
-    image_size_in_memory = loaded_image->ImageSize;
+
+    load_assets();
 
     Config config;
-    parse_config(own_section(config_section), config);
+    parse_config(asset_section(config_section), config);
 
     // The background sets the display resolution.
-    background = own_section(background_section);
+    background = asset_section(background_section);
     if (!image_size(background, background_width, background_height)) {
         background = {};
         background_width = 0;
@@ -971,7 +1028,7 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     draw_full_background();
 
     const WorkArea area = work_area();
-    draw_centred(own_section(banner_section), area, area.y);
+    draw_centred(asset_section(banner_section), area, area.y);
 
     find_ukis();
     build_menu();
@@ -980,6 +1037,8 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     st->ConIn->Reset(st->ConIn, FALSE);
     run_key_loop(config.timeout);
 
+    // The kernel does not need the assets; free their memory before booting.
+    unload_assets();
     boot();
 
     return EFI_SUCCESS;

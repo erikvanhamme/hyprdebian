@@ -1,10 +1,12 @@
 # Builds the hyprdebian EFI bootloader and a FAT32 disk image to boot it in QEMU.
 #
-#   make        build build/bootx64.efi
+#   make        build build/bootx64.efi and build/assets.efi, the stub that
+#               update-bootloader.py adds the assets to
 #   make esp    run update-bootloader.py into build/esp/: EFI/BOOT/BOOTX64.EFI,
-#               the bootloader with its config, background and banner added
-#               as sections, and the UKIs of the 4 most recent kernels in
-#               /boot, with settings from bootloader.json
+#               the bootloader; EFI/BOOT/assets.efi, the stub with the
+#               config, background and banner added as sections; and the UKIs
+#               of the 4 most recent kernels in /boot, with settings from
+#               bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make clean  remove build/
 #
@@ -14,8 +16,7 @@
 
 BUILD := build
 TARGET := $(BUILD)/bootx64.efi
-SOURCES := bootloader.cpp
-OBJECTS := $(SOURCES:%.cpp=$(BUILD)/%.obj)
+ASSETS_STUB := $(BUILD)/assets.efi
 ESP := $(BUILD)/esp
 ESP_STAMP := $(BUILD)/esp.stamp
 IMAGE := $(BUILD)/esp.img
@@ -64,7 +65,7 @@ LDFLAGS := \
 
 .PHONY: all esp image clean
 
-all: $(TARGET)
+all: $(TARGET) $(ASSETS_STUB)
 
 $(BUILD):
 	mkdir -p $@
@@ -72,13 +73,20 @@ $(BUILD):
 $(BUILD)/%.obj: %.cpp | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJECTS)
+$(TARGET): $(BUILD)/bootloader.obj
 	$(LD) $(LDFLAGS) -out:$@ $^
+
+# ukify adds the sections to the headers of the stub, but lld-link leaves
+# only room for the stub's own one in the headers it pads to the file
+# alignment of 512 bytes. With a file alignment of 4096 there is room for
+# dozens.
+$(ASSETS_STUB): $(BUILD)/assets.obj
+	$(LD) $(LDFLAGS) -filealign:4096 -out:$@ $^
 
 esp: $(ESP_STAMP)
 
-$(ESP_STAMP): $(TARGET) $(ESP_SOURCES) | $(BUILD)
-	$(PYTHON) update-bootloader.py --esp $(ESP) --bootloader $(TARGET)
+$(ESP_STAMP): $(TARGET) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
+	$(PYTHON) update-bootloader.py --esp $(ESP) --bootloader $(TARGET) --assets-stub $(ASSETS_STUB)
 	touch $@
 
 image: $(IMAGE)
