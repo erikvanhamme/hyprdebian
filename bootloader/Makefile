@@ -4,15 +4,15 @@
 #               update-bootloader.py adds the assets to
 #   make esp    run update-bootloader.py into build/esp/: EFI/BOOT/BOOTX64.EFI,
 #               the bootloader; EFI/BOOT/assets.efi, the stub with the
-#               config, background and banner added as sections; and the UKIs
-#               of the 4 most recent kernels in /boot, with settings from
-#               bootloader.json
+#               config, background, banner and menu rows added as sections;
+#               and the UKIs of the 4 most recent kernels in /boot, with
+#               settings from bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make clean  remove build/
 #
 # update-bootloader.py gives each UKI the modification time of its kernel,
-# and mcopy -m makes that the creation time in the image, which the
-# bootloader sorts the UKIs by.
+# and mcopy -m makes that the creation time in the image. Without a valid
+# assets.efi, the bootloader boots the UKI created last.
 
 BUILD := build
 TARGET := $(BUILD)/bootx64.efi

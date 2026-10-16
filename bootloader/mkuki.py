@@ -13,20 +13,10 @@ entries that hyprdebian installs:
 The systemd stub boots profile 0 unless the bootloader passes "@1" as the
 first word of the command line.
 
-For the bootloader menu, the UKI also holds a pre-rendered label per profile,
-in the unselected and the selected colour:
+The menu labels of the profiles are not in the UKI: update-bootloader.py puts
+them in assets.efi, with a label suffix per profile from PROFILE_SUFFIXES.
 
-    .label0   .label0s   profile 0: the name of the UKI file without .efi,
-                         or --name
-    .label1   .label1s   profile 1: the same, followed by " (recovery)"
-
-Each label is rendered by text2png.py and converted by png2bin.py into the
-raw image format that the bootloader blits. The font and colours default to
-those of the mako config that hyprdebian installs. update-bootloader.py
-passes the label height that fits its menu layout.
-
-Needs the packages systemd-ukify, systemd-boot-efi and python3-pil, and the
-font (fc-match must find it).
+Needs the packages systemd-ukify and systemd-boot-efi.
 
 Example:
     mkuki.py /boot/vmlinuz-$(uname -r) /boot/initrd.img-$(uname -r) \\
@@ -39,17 +29,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# text2png.py and png2bin.py live next to this script.
-SCRIPTS = Path(__file__).resolve().parent
-
 DEFAULT_ROOT = "ZFS=rpool/hyprdebian"
-
-# From deploy/etc/skel/.config/mako/config: font, text-color (unselected) and
-# border-color (selected).
-DEFAULT_FONT = "JetBrainsMono Nerd Font Mono"
-DEFAULT_COLOR = "#0066cc"
-DEFAULT_SELECTED_COLOR = "#ff6600"
-DEFAULT_LABEL_HEIGHT = 86
 
 # Profile 0. ukify puts the profile of the base UKI first, and the base holds
 # the command line that the extra profiles replace.
@@ -61,6 +41,9 @@ EXTRA_PROFILES = [
     ("ID=recovery\nTITLE=ZFS recovery (BusyBox shell)", ["break=premount"], " (recovery)"),
 ]
 
+# The suffix of the menu label of each profile, by profile number.
+PROFILE_SUFFIXES = [""] + [suffix for _, _, suffix in EXTRA_PROFILES]
+
 
 def base_cmdline(args):
     words = [f"root={args.root}", "ro"]
@@ -70,17 +53,6 @@ def base_cmdline(args):
         words.append("splash")
     words.extend(args.extra)
     return words
-
-
-def render_label(text, color, font, height, output):
-    """Renders text into output in the bootloader's raw image format."""
-    png = output.with_suffix(".png")
-    subprocess.run(
-        [sys.executable, SCRIPTS / "text2png.py", "--text", text, "--color", color, "--font", font,
-         "--height", str(height), "--output", png],
-        check=True,
-    )
-    subprocess.run([sys.executable, SCRIPTS / "png2bin.py", png, output], check=True)
 
 
 def ukify(args, *options):
@@ -104,20 +76,6 @@ def main():
         metavar="ARG",
         help="extra kernel argument for all profiles; can be given more than once",
     )
-    parser.add_argument(
-        "--label-height",
-        type=int,
-        default=DEFAULT_LABEL_HEIGHT,
-        help=f"height of the menu labels in pixels (default: {DEFAULT_LABEL_HEIGHT})",
-    )
-    parser.add_argument("--font", default=DEFAULT_FONT, help=f"font of the labels (default: {DEFAULT_FONT})")
-    parser.add_argument("--color", default=DEFAULT_COLOR, help=f"unselected label colour (default: {DEFAULT_COLOR})")
-    parser.add_argument(
-        "--selected-color",
-        default=DEFAULT_SELECTED_COLOR,
-        help=f"selected label colour (default: {DEFAULT_SELECTED_COLOR})",
-    )
-    parser.add_argument("--name", help="name in the menu labels (default: the output file name without .efi)")
     parser.add_argument("--ukify", default="ukify", help="ukify command (default: ukify)")
     args = parser.parse_args()
 
@@ -126,17 +84,8 @@ def main():
             sys.exit(f"{path}: not a file")
 
     base = base_cmdline(args)
-    name = args.name or args.output.name.removesuffix(".efi")
-    label_texts = [name] + [name + suffix for _, _, suffix in EXTRA_PROFILES]
 
     with tempfile.TemporaryDirectory() as tmp:
-        label_sections = []
-        for number, text in enumerate(label_texts):
-            for section, color in ((f".label{number}", args.color), (f".label{number}s", args.selected_color)):
-                label_file = Path(tmp) / f"{section[1:]}.bin"
-                render_label(text, color, args.font, args.label_height, label_file)
-                label_sections.append(f"--section={section}:@{label_file}")
-
         profile_files = []
         for number, (profile, extra, _) in enumerate(EXTRA_PROFILES, start=1):
             profile_file = Path(tmp) / f"profile{number}.efi"
@@ -154,7 +103,6 @@ def main():
             f"--initrd={args.initrd}",
             f"--profile={DEFAULT_PROFILE}",
             f"--cmdline={' '.join(base)}",
-            *label_sections,
             *(f"--join-profile={path}" for path in profile_files),
             f"--output={args.output}",
         )

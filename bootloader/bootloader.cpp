@@ -23,42 +23,34 @@ struct Config {
 };
 
 // The assets are sections that update-bootloader.py adds to a stub PE file,
-// assets.efi next to the bootloader: the config, the background and the
-// banner. They can change without touching the bootloader. The bootloader
-// loads assets.efi with LoadImage, so that with Secure Boot on the firmware
-// checks its signature, and reads the sections from the loaded image; it
-// never starts it. The bootloader takes the display resolution from the size
-// of the background.
+// assets.efi next to the bootloader: the config, the background, the banner
+// and the menu rows. They can change without touching the bootloader. The
+// bootloader loads assets.efi with LoadImage, so that with Secure Boot on the
+// firmware checks its signature, and reads the sections from the loaded
+// image; it never starts it. The bootloader takes the display resolution from
+// the size of the background.
 constexpr const char16_t* assets_directory = u"\\EFI\\BOOT";
 constexpr const char16_t* assets_name = u"assets.efi";
 constexpr const char* config_section = ".config";
 constexpr const char* background_section = ".backgnd";
 constexpr const char* banner_section = ".banner";
 
-// The UKIs to choose from are the .efi files in this directory.
+// The UKIs are the .efi files in this directory.
 constexpr const char16_t* uki_directory = u"\\EFI\\Linux";
-constexpr size_t max_ukis = 32;
 // FAT allows file names of 255 characters; one more for the terminating nul.
 constexpr size_t max_name_length = 256;
 
-// The menu labels that mkuki.py puts in each UKI: per profile, the label in
-// the unselected and in the selected colour.
-constexpr size_t profile_count = 2;
-constexpr const char* label_sections[profile_count][2] = {
-    {".label0", ".label0s"},
-    {".label1", ".label1s"},
+// The menu has a row per slot, top to bottom. Per slot, assets.efi holds the
+// UKI to boot and its profile as "name profile", such as
+// "HyprDebian-Kernel-7.2.10.efi 1", and the label in the unselected and in
+// the selected colour.
+constexpr size_t slot_count = 8;
+constexpr const char* slot_sections[slot_count] = {
+    ".slot1", ".slot2", ".slot3", ".slot4", ".slot5", ".slot6", ".slot7", ".slot8",
 };
-
-// The menu offers the profiles of the most recent UKIs only: 8 rows.
-constexpr size_t menu_ukis = 4;
-constexpr size_t menu_rows = menu_ukis * profile_count;
-
-struct Uki {
-    char16_t name[max_name_length];
-    EFI_TIME created;
-    // Indexed by profile, then 0 for unselected and 1 for selected. Empty if
-    // the UKI has no such section.
-    Bytes labels[profile_count][2];
+constexpr const char* label_sections[slot_count][2] = {
+    {".lbl1", ".lbl1s"}, {".lbl2", ".lbl2s"}, {".lbl3", ".lbl3s"}, {".lbl4", ".lbl4s"},
+    {".lbl5", ".lbl5s"}, {".lbl6", ".lbl6s"}, {".lbl7", ".lbl7s"}, {".lbl8", ".lbl8s"},
 };
 
 // Size of the width and height fields in front of the pixels of an image.
@@ -87,22 +79,18 @@ EFI_HANDLE assets_image = nullptr;
 const uint8_t* assets_base = nullptr;
 uint64_t assets_size = 0;
 
-// The UKIs found in uki_directory, and pointers to them sorted from the most
-// recently created to the oldest.
-Uki ukis[max_ukis];
-Uki* sorted_ukis[max_ukis];
-size_t uki_count = 0;
-
-// A row of the menu: a profile of a UKI and where its label is drawn.
+// A row of the menu: the UKI file name in uki_directory, the profile to boot
+// it in, its labels (0 unselected, 1 selected) and where they are drawn.
 struct MenuEntry {
-    const Uki* uki;
-    size_t profile;
+    char16_t name[max_name_length];
+    uint32_t profile;
+    Bytes labels[2];
     uint32_t x;
     uint32_t y;
 };
 
 // The rows of the menu, top to bottom, and the selected one.
-MenuEntry menu[menu_rows];
+MenuEntry menu[slot_count];
 size_t menu_count = 0;
 size_t selected = 0;
 
@@ -482,7 +470,9 @@ Bytes asset_section(const char* name)
         return {};
     }
 
-    // See read_section for the layout of the headers.
+    // The DOS header starts with "MZ" and holds the offset of the PE header
+    // at 0x3c. The PE header is "PE\0\0" followed by the COFF header, the
+    // optional header and the section table.
     const uint64_t pe_offset = read_u32_le(base + 0x3c);
     if (pe_offset > size || size - pe_offset < 24) {
         return {};
@@ -499,6 +489,8 @@ Bytes asset_section(const char* name)
     }
 
     for (uint16_t i = 0; i < section_count; ++i) {
+        // Name (8 bytes, padded with nul bytes), virtual size, virtual
+        // address, ...
         const uint8_t* section = base + section_table + i * 40;
 
         size_t n = 0;
@@ -520,118 +512,85 @@ Bytes asset_section(const char* name)
     return {};
 }
 
-// Reads size bytes at offset of a file. Returns false on failure.
-bool read_at(EFI_FILE_PROTOCOL* file, uint64_t offset, void* buffer, size_t size)
+// Builds the path of a file in uki_directory. Returns false if it does not
+// fit in path.
+bool uki_path(const char16_t* name, char16_t (&path)[16 + max_name_length])
 {
-    if (file->SetPosition(file, offset) != EFI_SUCCESS) {
-        return false;
-    }
-    UINTN read_size = size;
-    return file->Read(file, &read_size, buffer) == EFI_SUCCESS && read_size == size;
-}
-
-// Reads the section with the given name (at most 8 characters, such as
-// ".label0") of a PE file such as a UKI into a buffer from the pool. Only
-// the headers and that section are read, not the whole file. Returns empty
-// Bytes if there is no such section or on failure.
-Bytes read_section(EFI_FILE_PROTOCOL* file, const char* name)
-{
-    // The DOS header starts with "MZ" and holds the offset of the PE header
-    // at 0x3c.
-    uint8_t dos_header[64];
-    if (!read_at(file, 0, dos_header, sizeof(dos_header)) || dos_header[0] != 'M' || dos_header[1] != 'Z') {
-        return {};
-    }
-    const uint32_t pe_offset = read_u32_le(dos_header + 0x3c);
-
-    // "PE\0\0" followed by the COFF header.
-    uint8_t pe_header[24];
-    if (!read_at(file, pe_offset, pe_header, sizeof(pe_header)) || pe_header[0] != 'P' || pe_header[1] != 'E'
-        || pe_header[2] != 0 || pe_header[3] != 0) {
-        return {};
-    }
-    const uint16_t section_count = read_u16_le(pe_header + 4 + 2);
-    const uint16_t optional_header_size = read_u16_le(pe_header + 4 + 16);
-    const uint64_t section_table = pe_offset + sizeof(pe_header) + optional_header_size;
-
-    for (uint16_t i = 0; i < section_count; ++i) {
-        // Name (8 bytes, padded with nul bytes), virtual size, virtual address,
-        // size of raw data, pointer to raw data, ...
-        uint8_t section[40];
-        if (!read_at(file, section_table + i * sizeof(section), section, sizeof(section))) {
-            return {};
-        }
-
-        size_t n = 0;
-        while (n < 8 && name[n] != '\0' && section[n] == static_cast<uint8_t>(name[n])) {
-            ++n;
-        }
-        if (name[n] != '\0' || (n < 8 && section[n] != 0)) {
-            continue;
-        }
-
-        // The raw data is padded to the file alignment; the virtual size is
-        // the size of the data itself.
-        const uint32_t virtual_size = read_u32_le(section + 8);
-        const uint32_t raw_size = read_u32_le(section + 16);
-        const uint32_t raw_offset = read_u32_le(section + 20);
-        const uint32_t size = virtual_size != 0 && virtual_size < raw_size ? virtual_size : raw_size;
-
-        void* buffer = nullptr;
-        if (bs->AllocatePool(EfiLoaderData, size, &buffer) != EFI_SUCCESS) {
-            return {};
-        }
-        if (!read_at(file, raw_offset, buffer, size)) {
-            bs->FreePool(buffer);
-            return {};
-        }
-        return {static_cast<uint8_t*>(buffer), size};
-    }
-
-    return {};
-}
-
-// Reads the menu labels of a UKI.
-void load_labels(Uki& uki)
-{
-    // uki_directory, a backslash, the name and the terminating nul.
-    char16_t path[16 + max_name_length];
     size_t length = 0;
     for (const char16_t* c = uki_directory; *c != u'\0'; ++c) {
         path[length++] = *c;
     }
     path[length++] = u'\\';
-    for (const char16_t* c = uki.name; *c != u'\0'; ++c) {
+    for (const char16_t* c = name; *c != u'\0'; ++c) {
+        if (length == sizeof(path) / sizeof(path[0]) - 1) {
+            return false;
+        }
         path[length++] = *c;
     }
     path[length] = u'\0';
-
-    EFI_FILE_PROTOCOL* file = open_file(path);
-    if (file == nullptr) {
-        return;
-    }
-    for (size_t profile = 0; profile < profile_count; ++profile) {
-        for (size_t selected = 0; selected < 2; ++selected) {
-            uki.labels[profile][selected] = read_section(file, label_sections[profile][selected]);
-        }
-    }
-    file->Close(file);
+    return true;
 }
 
-// Fills ukis with the .efi files in uki_directory, sorts sorted_ukis from the
-// most recently created to the oldest, and loads the menu labels of the
-// newest menu_ukis.
-void find_ukis()
+// True if the UKI file exists in uki_directory.
+bool uki_exists(const char16_t* name)
+{
+    char16_t path[16 + max_name_length];
+    if (!uki_path(name, path)) {
+        return false;
+    }
+    EFI_FILE_PROTOCOL* file = open_file(path);
+    if (file == nullptr) {
+        return false;
+    }
+    file->Close(file);
+    return true;
+}
+
+// Reads a slot of the form "name profile": a UKI file name in uki_directory
+// of printable ASCII without slashes or backslashes, a space and a profile
+// number of one digit. Trailing white space and a newline are allowed.
+// Returns false if the slot is not of that form.
+bool parse_slot(Bytes text, MenuEntry& entry)
+{
+    size_t end = text.size;
+    while (end > 0 && (is_space(text.data[end - 1]) || text.data[end - 1] == '\n')) {
+        --end;
+    }
+    if (end < 3 || text.data[end - 2] != ' ' || text.data[end - 1] < '0' || text.data[end - 1] > '9') {
+        return false;
+    }
+    const size_t name_length = end - 2;
+    if (name_length >= max_name_length) {
+        return false;
+    }
+    for (size_t i = 0; i < name_length; ++i) {
+        const uint8_t c = text.data[i];
+        if (c <= ' ' || c > '~' || c == '/' || c == '\\') {
+            return false;
+        }
+        entry.name[i] = static_cast<char16_t>(c);
+    }
+    entry.name[name_length] = u'\0';
+    entry.profile = text.data[end - 1] - '0';
+    return true;
+}
+
+// Finds the most recently created .efi file in uki_directory, the UKI the
+// bootloader boots without a valid assets.efi. Returns false if there is
+// none.
+bool find_newest_uki(char16_t (&name)[max_name_length])
 {
     EFI_FILE_PROTOCOL* directory = open_file(uki_directory);
     if (directory == nullptr) {
-        return;
+        return false;
     }
 
     // Reading a directory returns one EFI_FILE_INFO per call, followed by the
     // file name. This is large enough for any FAT file name.
     alignas(8) static uint8_t buffer[sizeof(EFI_FILE_INFO) + max_name_length * sizeof(CHAR16)];
 
+    bool found = false;
+    EFI_TIME newest{};
     for (;;) {
         UINTN size = sizeof(buffer);
         if (directory->Read(directory, &size, buffer) != EFI_SUCCESS || size == 0) {
@@ -642,37 +601,21 @@ void find_ukis()
         if ((info->Attribute & EFI_FILE_DIRECTORY) != 0 || !has_efi_extension(info->FileName)) {
             continue;
         }
-        if (uki_count == max_ukis) {
-            break;
+        // UKIs created at the same time keep their directory order.
+        if (found && !later(info->CreateTime, newest)) {
+            continue;
         }
 
-        Uki& uki = ukis[uki_count];
         size_t i = 0;
         for (; i < max_name_length - 1 && info->FileName[i] != 0; ++i) {
-            uki.name[i] = static_cast<char16_t>(info->FileName[i]);
+            name[i] = static_cast<char16_t>(info->FileName[i]);
         }
-        uki.name[i] = u'\0';
-        uki.created = info->CreateTime;
-        sorted_ukis[uki_count] = &uki;
-        ++uki_count;
+        name[i] = u'\0';
+        newest = info->CreateTime;
+        found = true;
     }
     directory->Close(directory);
-
-    // Insertion sort, newest first; UKIs created at the same time keep their
-    // directory order.
-    for (size_t i = 1; i < uki_count; ++i) {
-        Uki* uki = sorted_ukis[i];
-        size_t j = i;
-        while (j > 0 && later(uki->created, sorted_ukis[j - 1]->created)) {
-            sorted_ukis[j] = sorted_ukis[j - 1];
-            --j;
-        }
-        sorted_ukis[j] = uki;
-    }
-
-    for (size_t i = 0; i < uki_count && i < menu_ukis; ++i) {
-        load_labels(*sorted_ukis[i]);
-    }
+    return found;
 }
 
 // The work area on the current screen, computed as menubox.py does: its size
@@ -703,10 +646,10 @@ void draw_centred(Bytes image_data, const WorkArea& area, uint32_t top)
     }
 }
 
-// Fills menu with a row per profile of the newest menu_ukis UKIs, newest
-// first. Profiles without two valid labels are left out. The rows start half a row
-// below the banner in the top row of the work area; each label is centred in
-// its row.
+// Fills menu with a row per slot in assets.efi, in slot order. Slots that are
+// not of the form "name profile", lack one of their two valid labels or name
+// a UKI that does not exist are left out. The rows start half a row below the
+// banner in the top row of the work area; each label is centred in its row.
 void build_menu()
 {
     if (gop == nullptr) {
@@ -716,25 +659,28 @@ void build_menu()
     const WorkArea area = work_area();
     const uint32_t first_row = area.y + area.row_height + area.row_height / 2;
 
-    for (size_t i = 0; i < uki_count && i < menu_ukis; ++i) {
-        for (size_t profile = 0; profile < profile_count; ++profile) {
-            const Uki* uki = sorted_ukis[i];
-            const Bytes label = uki->labels[profile][0];
-            uint32_t label_width = 0;
-            uint32_t label_height = 0;
-            uint32_t selected_width = 0;
-            uint32_t selected_height = 0;
-            if (!image_size(label, label_width, label_height)
-                || !image_size(uki->labels[profile][1], selected_width, selected_height)) {
-                continue;
-            }
-            const uint32_t top = first_row + static_cast<uint32_t>(menu_count) * area.row_height;
-            if (top + area.row_height > area.y + area.height) {
-                return;
-            }
-            const uint32_t y = label_height < area.row_height ? top + (area.row_height - label_height) / 2 : top;
-            menu[menu_count++] = {uki, profile, centred_x(area, label_width), y};
+    for (size_t slot = 0; slot < slot_count; ++slot) {
+        MenuEntry& entry = menu[menu_count];
+        if (!parse_slot(asset_section(slot_sections[slot]), entry)) {
+            continue;
         }
+        entry.labels[0] = asset_section(label_sections[slot][0]);
+        entry.labels[1] = asset_section(label_sections[slot][1]);
+        uint32_t label_width = 0;
+        uint32_t label_height = 0;
+        uint32_t selected_width = 0;
+        uint32_t selected_height = 0;
+        if (!image_size(entry.labels[0], label_width, label_height)
+            || !image_size(entry.labels[1], selected_width, selected_height) || !uki_exists(entry.name)) {
+            continue;
+        }
+        const uint32_t top = first_row + static_cast<uint32_t>(menu_count) * area.row_height;
+        if (top + area.row_height > area.y + area.height) {
+            return;
+        }
+        entry.x = centred_x(area, label_width);
+        entry.y = label_height < area.row_height ? top + (area.row_height - label_height) / 2 : top;
+        ++menu_count;
     }
 }
 
@@ -743,7 +689,7 @@ void build_menu()
 void draw_entry(size_t index, bool is_selected)
 {
     const MenuEntry& entry = menu[index];
-    const Bytes label = entry.uki->labels[entry.profile][is_selected ? 1 : 0];
+    const Bytes label = entry.labels[is_selected ? 1 : 0];
     uint32_t width = 0;
     uint32_t height = 0;
     if (!image_size(label, width, height)) {
@@ -948,16 +894,11 @@ void run_key_loop(uint32_t timeout)
     }
 }
 
-// Starts the selected UKI in the selected profile. Returns only if that
-// fails or the UKI exits.
-void boot()
+// Starts a UKI in uki_directory in the given profile (0 to 9). Returns only
+// if that fails or the UKI exits.
+void boot(const char16_t* name, uint32_t profile)
 {
-    if (menu_count == 0) {
-        return;
-    }
-
-    const MenuEntry& entry = menu[selected];
-    EFI_DEVICE_PATH* path = file_device_path(uki_directory, entry.uki->name);
+    EFI_DEVICE_PATH* path = file_device_path(uki_directory, name);
     if (path == nullptr) {
         return;
     }
@@ -966,6 +907,10 @@ void boot()
     const EFI_STATUS load_status = bs->LoadImage(FALSE, image, path, nullptr, 0, &uki_image);
     bs->FreePool(path);
     if (load_status != EFI_SUCCESS) {
+        // On EFI_SECURITY_VIOLATION the image is loaded but may not be started.
+        if (uki_image != nullptr) {
+            bs->UnloadImage(uki_image);
+        }
         return;
     }
 
@@ -979,7 +924,7 @@ void boot()
     // The command line of the UKI; the systemd stub takes @N as profile N.
     // It must stay valid while the UKI runs.
     static char16_t options[] = u"@0";
-    options[1] = static_cast<char16_t>(u'0' + entry.profile);
+    options[1] = static_cast<char16_t>(u'0' + profile);
     loaded_uki->LoadOptions = options;
     loaded_uki->LoadOptionsSize = sizeof(options);
 
@@ -988,6 +933,16 @@ void boot()
     bs->StartImage(uki_image, &exit_data_size, &exit_data);
     if (exit_data != nullptr) {
         bs->FreePool(exit_data);
+    }
+}
+
+// Without a valid assets.efi, or without a usable slot in it, there is no
+// menu: boots profile 0 of the most recently created UKI.
+void boot_newest_uki()
+{
+    static char16_t name[max_name_length];
+    if (find_newest_uki(name)) {
+        boot(name, 0);
     }
 }
 
@@ -1011,6 +966,10 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     boot_device = loaded_image->DeviceHandle;
 
     load_assets();
+    if (assets_image == nullptr) {
+        boot_newest_uki();
+        return EFI_NOT_FOUND;
+    }
 
     Config config;
     parse_config(asset_section(config_section), config);
@@ -1030,16 +989,23 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     const WorkArea area = work_area();
     draw_centred(asset_section(banner_section), area, area.y);
 
-    find_ukis();
     build_menu();
+    if (menu_count == 0) {
+        unload_assets();
+        boot_newest_uki();
+        return EFI_NOT_FOUND;
+    }
     draw_menu();
 
     st->ConIn->Reset(st->ConIn, FALSE);
     run_key_loop(config.timeout);
 
     // The kernel does not need the assets; free their memory before booting.
+    // The menu keeps its own copy of the name and profile, so they stay valid;
+    // only its labels point into assets.efi.
+    const MenuEntry& entry = menu[selected];
     unload_assets();
-    boot();
+    boot(entry.name, entry.profile);
 
     return EFI_SUCCESS;
 }

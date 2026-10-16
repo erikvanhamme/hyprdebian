@@ -15,9 +15,23 @@ script by default) and writes, below the directory given with --esp:
                                           it; the bootloader takes its
                                           resolution from this image
                                 .banner   banner_text in white
+                                .slotN    for menu row N (1 to 8, top to
+                                          bottom): the UKI file name in
+                                          EFI/Linux and the profile to boot,
+                                          such as
+                                          "HyprDebian-Kernel-7.2.10.efi 1"
+                                .lblN     the label of row N, unselected
+                                .lblNs    the label of row N, selected
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
-                              recent kernels in /boot, with the menu labels
+                              recent kernels in /boot
+
+The menu has a row per profile of each of those kernels, newest kernel
+first. With the labels and the file names in assets.efi, Secure Boot covers
+everything the menu shows and which UKI each row boots; the UKI itself is
+checked when the bootloader starts it. Without a valid assets.efi the
+bootloader boots profile 0 of the most recently created UKI in EFI/Linux
+without a menu.
 
 With the assets in a file of their own, a change of the config, the
 wallpaper or the texts leaves BOOTX64.EFI alone. assets.efi is a PE image
@@ -25,19 +39,25 @@ that is never started: the bootloader loads it with LoadImage, so that with
 Secure Boot on the firmware checks its signature as it does for BOOTX64.EFI,
 and reads the sections from the loaded image. For Secure Boot, sign
 assets.efi after every run that rewrites it, and BOOTX64.EFI after every run
-that rewrites that. ukify adds the sections, so that they are loaded into
-memory, and an SBAT entry to each file. A file whose contents would not
-change is not rewritten.
+that rewrites that. As assets.efi names the UKIs, it changes with every new
+kernel. ukify adds the sections, so that they are loaded into memory, and an
+SBAT entry to each file. A file whose contents would not change is not
+rewritten.
 
-The work area holds ten rows of text, so the banner and the menu labels in
-the UKIs are rendered at a tenth of its height. Images are in the raw image
-format of png2bin.py.
+The files are written in an order that leaves a bootable ESP if the script
+is interrupted: first the UKIs, then assets.efi and BOOTX64.EFI, and only
+then are the UKIs of older kernels removed, so assets.efi never names a UKI
+that is gone.
+
+The work area holds ten rows of text, so the banner and the menu labels are
+rendered at a tenth of its height. Images are in the raw image format of
+png2bin.py.
 
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
 The UKIs are written oldest first, so that on a FAT partition the newest
-kernel also has the newest creation time, which is what the bootloader sorts
-by; each UKI also gets the modification time of its kernel. Other
-HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
+kernel also has the newest creation time, which is what the fallback of the
+bootloader goes by; each UKI also gets the modification time of its kernel.
+Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys (all optional; defaults in DEFAULTS below):
 
@@ -77,6 +97,7 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
 import menubox  # noqa: E402
+import mkuki  # noqa: E402
 import png2bin  # noqa: E402
 import text2png  # noqa: E402
 
@@ -93,8 +114,10 @@ DEFAULTS = {
     "cmdline": {"root": "ZFS=rpool/hyprdebian", "quiet": True, "splash": True, "extra": []},
 }
 
-# The bootloader menu offers this many kernels (menu_ukis in bootloader.cpp).
-KERNEL_COUNT = 4
+# The bootloader menu has this many rows (slot_count in bootloader.cpp), a
+# row per profile of the KERNEL_COUNT most recent kernels.
+SLOT_COUNT = 8
+KERNEL_COUNT = SLOT_COUNT // len(mkuki.PROFILE_SUFFIXES)
 # Rows of text that fit in the menu box.
 ROWS = 10
 BANNER_COLOR = "#ffffff"
@@ -173,17 +196,13 @@ def uki_name(version):
     return f"{UKI_PREFIX}{short}.efi"
 
 
-def build_ukis(config, esp, boot_dir, label_height):
+def build_ukis(config, esp, kernels):
+    """Writes the UKIs of the kernels. Returns their file names, newest first."""
     linux = esp / "EFI" / "Linux"
     linux.mkdir(parents=True, exist_ok=True)
 
-    kernels = find_kernels(boot_dir)
-    if not kernels:
-        sys.exit(f"no kernels with an initrd found in {boot_dir}")
-
     cmdline = config["cmdline"]
-    flags = ["--root", cmdline["root"], "--label-height", str(label_height), "--font", config["font"],
-             "--color", config["color"], "--selected-color", config["selected_color"]]
+    flags = ["--root", cmdline["root"]]
     if not cmdline["quiet"]:
         flags.append("--no-quiet")
     if not cmdline["splash"]:
@@ -192,16 +211,15 @@ def build_ukis(config, esp, boot_dir, label_height):
         flags += ["--extra", extra]
 
     # Oldest first: see the creation times in the description above.
-    keep = set()
+    names = []
     for version, vmlinuz, initrd in reversed(kernels):
         name = uki_name(version)
-        keep.add(name)
+        names.insert(0, name)
         target = linux / name
         temporary = linux / f".{name}.tmp"
         try:
             subprocess.run(
-                [sys.executable, SCRIPTS / "mkuki.py", vmlinuz, initrd, "--output", temporary,
-                 "--name", name.removesuffix(".efi"), *flags],
+                [sys.executable, SCRIPTS / "mkuki.py", vmlinuz, initrd, "--output", temporary, *flags],
                 check=True,
             )
             os.replace(temporary, target)
@@ -210,11 +228,37 @@ def build_ukis(config, esp, boot_dir, label_height):
         mtime = vmlinuz.stat().st_mtime
         os.utime(target, (mtime, mtime))
         print(f"Wrote {target}", flush=True)
+    return names
 
-    for old in linux.glob(f"{UKI_PREFIX}*.efi"):
+
+def remove_old_ukis(esp, keep):
+    """Removes the HyprDebian-Kernel-*.efi files in EFI/Linux whose names are not in keep."""
+    for old in (esp / "EFI" / "Linux").glob(f"{UKI_PREFIX}*.efi"):
         if old.name not in keep:
             old.unlink()
             print(f"Removed {old}", flush=True)
+
+
+def slot_sections(config, uki_names, text_height):
+    """Returns the .slotN, .lblN and .lblNs sections of the menu rows.
+
+    A row per profile of each UKI, newest UKI first. The label is the UKI
+    file name without .efi, followed by the suffix of the profile.
+    """
+    sections = {}
+    slot = 0
+    for name in uki_names:
+        for profile, suffix in enumerate(mkuki.PROFILE_SUFFIXES):
+            slot += 1
+            if slot > SLOT_COUNT:
+                return sections
+            text = name.removesuffix(".efi") + suffix
+            sections[f".slot{slot}"] = f"{name} {profile}\n".encode()
+            sections[f".lbl{slot}"] = to_bin(text2png.render(text, config["color"], config["font"], text_height))
+            sections[f".lbl{slot}s"] = to_bin(
+                text2png.render(text, config["selected_color"], config["font"], text_height)
+            )
+    return sections
 
 
 def without_signature(data):
@@ -322,20 +366,31 @@ def main():
     # 3. The banner.
     banner = text2png.render(config["banner_text"], BANNER_COLOR, config["font"], text_height)
 
-    # 4. The UKIs, with their menu labels.
-    build_ukis(config, args.esp, args.boot_dir, text_height)
+    # 4. The UKIs.
+    kernels = find_kernels(args.boot_dir)
+    if not kernels:
+        sys.exit(f"no kernels with an initrd found in {args.boot_dir}")
+    uki_names = build_ukis(config, args.esp, kernels)
 
-    # 5. The assets: the config, the background and the banner.
+    # 5. The assets: the config, the background, the banner and the menu rows.
     boot = args.esp / "EFI" / "BOOT"
     build_efi(
         args.assets_stub,
         boot / "assets.efi",
         ASSETS_SBAT,
-        {".config": config_text, ".backgnd": to_bin(background), ".banner": to_bin(banner)},
+        {
+            ".config": config_text,
+            ".backgnd": to_bin(background),
+            ".banner": to_bin(banner),
+            **slot_sections(config, uki_names, text_height),
+        },
     )
 
     # 6. The bootloader.
     build_efi(args.bootloader, boot / "BOOTX64.EFI", SBAT, {})
+
+    # 7. Only now that assets.efi no longer names them, the UKIs of older kernels.
+    remove_old_ukis(args.esp, set(uki_names))
 
     for old in OLD_ASSETS:
         path = args.esp / old
