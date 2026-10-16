@@ -4,7 +4,8 @@
 // work area over it, the banner in the top row of the work area and a label
 // image per menu row, in the unselected or the selected colour. The images
 // are sections of assets.efi in the raw image format of png2bin.py; the
-// bootloader takes the display resolution from the size of the background.
+// bootloader takes the display resolution from the size of the background
+// and the place of the work area from the .area section.
 
 #include "bootloader.hpp"
 
@@ -14,6 +15,7 @@ namespace {
 
 constexpr const char* background_section = ".backgnd";
 constexpr const char* banner_section = ".banner";
+constexpr const char* area_section = ".area";
 
 // Per slot, the label in the unselected and in the selected colour.
 constexpr const char* label_sections[slot_count][2] = {
@@ -50,8 +52,9 @@ Bytes background;
 uint32_t background_width = 0;
 uint32_t background_height = 0;
 
-// The work area: the black box that menubox.py draws on the background. It
-// is 80% of the screen in both directions, centred, and holds ten rows.
+// The work area: the black box that menubox.py draws on the background. Its
+// size and place are set in bootloader.json and come in the .area section;
+// it holds ten rows.
 struct WorkArea {
     uint32_t x;
     uint32_t y;
@@ -60,6 +63,13 @@ struct WorkArea {
     uint32_t row_height;
 };
 constexpr uint32_t work_area_rows = 10;
+
+// Size of the .area section: the left, top, width and height of the work
+// area in pixels on the background, each a 32-bit little-endian integer.
+constexpr size_t area_section_size = 16;
+
+// The work area, set by init.
+WorkArea area = {};
 
 // Switches the graphics output to width x height.
 // Returns false if no such mode exists or the switch fails.
@@ -220,12 +230,26 @@ bool blit(Bytes buffer, uint32_t x, uint32_t y)
     return true;
 }
 
-// The work area on the current screen, computed as menubox.py does: its size
-// is 80% of the screen, rounded to the nearest pixel.
+// The work area of the .area section. Without a valid one, such as when it
+// does not fit on the screen, it is the default of menubox.py: 80% of the
+// screen, rounded to the nearest pixel, and centred.
 WorkArea work_area()
 {
     const uint32_t screen_width = gop->Mode->Info->HorizontalResolution;
     const uint32_t screen_height = gop->Mode->Info->VerticalResolution;
+
+    const Bytes section = asset_section(area_section);
+    if (section.size == area_section_size) {
+        const uint32_t x = read_u32_le(section.data);
+        const uint32_t y = read_u32_le(section.data + 4);
+        const uint32_t width = read_u32_le(section.data + 8);
+        const uint32_t height = read_u32_le(section.data + 12);
+        if (width >= work_area_rows && height >= work_area_rows && x <= screen_width
+            && width <= screen_width - x && y <= screen_height && height <= screen_height - y) {
+            return {x, y, width, height, height / work_area_rows};
+        }
+    }
+
     const uint32_t width = (screen_width * 8 + 5) / 10;
     const uint32_t height = (screen_height * 8 + 5) / 10;
     return {(screen_width - width) / 2, (screen_height - height) / 2, width, height, height / work_area_rows};
@@ -267,7 +291,7 @@ bool init()
     }
     draw_full_background();
 
-    const WorkArea area = work_area();
+    area = work_area();
     draw_centred(asset_section(banner_section), area, area.y);
     return true;
 }
@@ -289,7 +313,6 @@ bool add_row(size_t slot, size_t row)
         return false;
     }
 
-    const WorkArea area = work_area();
     const uint32_t first_row = area.y + area.row_height + area.row_height / 2;
     const uint32_t top = first_row + static_cast<uint32_t>(row) * area.row_height;
     if (top + area.row_height > area.y + area.height) {
