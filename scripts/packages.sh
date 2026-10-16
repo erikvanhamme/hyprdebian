@@ -89,6 +89,53 @@ pkg_boot_entries() {
     fi
 }
 
+# Generates the Secure Boot keys of the system in SECUREBOOT_DIR: the platform key (PK), the key
+# exchange key (KEK) and the signature database key (db), all with the same owner GUID (GUID.txt).
+# Each has its private key (.key), its certificate as PEM (.crt) for sbsign and as DER (.cer) for
+# the key menus of firmware setups, an EFI signature list (.esl) and a signed update (.auth) for
+# efi-updatevar or KeyTool: PK signs its own and that of KEK, KEK signs that of db. The bootloader,
+# assets.efi and the UKIs are signed with the db key. RSA 2048 is the key size that the UEFI spec
+# requires every firmware to support.
+#
+# The keys are made in a directory of their own that only root can enter, and moved into place
+# when they are all there. Existing keys are kept, so a rerun or an upgrade never replaces keys
+# that may already be enrolled in the firmware.
+pkg_secureboot_keys() {
+    local dir="${SECUREBOOT_DIR}"
+    local tmp="${SECUREBOOT_DIR}.tmp"
+    local guid name
+
+    if [[ -d ${TARGET_DIR}${dir} ]]; then
+        return 0
+    fi
+
+    rm -rf ${TARGET_DIR}${tmp} || return 1
+    mkdir -p "$(dirname ${TARGET_DIR}${dir})" || return 1
+    mkdir -m 0700 ${TARGET_DIR}${tmp} || return 1
+
+    guid=$(in_target uuidgen --random) || return 1
+    echo "$guid" > ${TARGET_DIR}${tmp}/GUID.txt || return 1
+
+    for name in PK KEK db; do
+        in_target openssl req -new -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \
+            -subj "/CN=HyprDebian ${Q_HOSTNAME} Secure Boot ${name}/" \
+            -keyout ${tmp}/${name}.key -out ${tmp}/${name}.crt || return 1
+        in_target openssl x509 -in ${tmp}/${name}.crt -outform DER -out ${tmp}/${name}.cer || return 1
+        in_target cert-to-efi-sig-list -g "$guid" ${tmp}/${name}.crt ${tmp}/${name}.esl || return 1
+    done
+
+    in_target sign-efi-sig-list -g "$guid" -k ${tmp}/PK.key -c ${tmp}/PK.crt \
+        PK ${tmp}/PK.esl ${tmp}/PK.auth || return 1
+    in_target sign-efi-sig-list -g "$guid" -k ${tmp}/PK.key -c ${tmp}/PK.crt \
+        KEK ${tmp}/KEK.esl ${tmp}/KEK.auth || return 1
+    in_target sign-efi-sig-list -g "$guid" -k ${tmp}/KEK.key -c ${tmp}/KEK.crt \
+        db ${tmp}/db.esl ${tmp}/db.auth || return 1
+
+    chown -R 0:0 ${TARGET_DIR}${tmp} || return 1
+    chmod 0600 ${TARGET_DIR}${tmp}/* || return 1
+    mv ${TARGET_DIR}${tmp} ${TARGET_DIR}${dir}
+}
+
 pkg_qemu_kvm() {
 
     # Add a mask for the secrets file that ships with debian systemd.

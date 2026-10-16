@@ -10,6 +10,7 @@ MIGRATIONS_FILE="/etc/hyprdebian/migrations" # The migrations applied on the ins
 REPO_KEY="/usr/share/keyrings/hyprdebian-archive-keyring.pgp" # Signing key of the hyprdebian repo, also in hyprdebian.local.sources.j2.
 SOURCE_URL="https://github.com/erikvanhamme/hyprdebian.git" # The origin of the checkout of the installer on the installed system.
 SOURCE_DIR="/usr/src/hyprdebian" # Where the checkout of the installer goes on the installed system.
+SECUREBOOT_DIR="/etc/hyprdebian/secureboot" # The Secure Boot keys of the installed system.
 
 # Color constants.
 if [[ -t 1 ]]; then

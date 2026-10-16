@@ -282,6 +282,16 @@ b_bootloader() {
     add_dependencies "pkg_post" "pkg_boot_entries"
 }
 
+# The packages to sign the hyprdebian bootloader, assets.efi and the UKIs for Secure Boot with keys
+# of the owner: openssl makes the keys, efitools turns their certificates into the signed updates
+# that enroll them in the firmware, sbsigntool signs and checks the EFI files, uuid-runtime gives
+# the owner GUID of the keys. pkg_secureboot_keys generates the keys once these are installed.
+b_secureboot() {
+    add_packages openssl efitools sbsigntool uuid-runtime
+
+    add_dependencies "pkg_post" "pkg_secureboot_keys"
+}
+
 b_systemd() {
     if [[ "${Q_TYPE}" != "vm" ]]; then
         add_packages systemd-timesyncd
@@ -350,6 +360,7 @@ add_dependencies "b_main" \
     "b_zfs_support" \
     "b_grub2" \
     "b_bootloader" \
+    "b_secureboot" \
     "b_systemd" \
     "b_utilities" \
     "b_motd" \
