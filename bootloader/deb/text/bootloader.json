@@ -1,0 +1,11 @@
+{
+    "frontend": "text",
+    "timeout": 5,
+    "banner_text": "HyprDebian Bootloader",
+    "cmdline": {
+        "root": "ZFS=rpool/hyprdebian",
+        "quiet": true,
+        "splash": true,
+        "extra": []
+    }
+}

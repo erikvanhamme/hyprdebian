@@ -1,6 +1,6 @@
 {
     "frontend": "graphical",
-    "wallpaper": "../deploy/etc/skel/Pictures/wallpapers/wallpaper.png",
+    "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
     "res_x": 1920,
     "res_y": 1080,
     "timeout": 5,

@@ -17,7 +17,7 @@ png2bin.py.
 Config keys it uses: wallpaper, res_x, res_y, banner_text, font, color,
 selected_color and border_width; see update-bootloader.py.
 
-Needs python3-pil.
+Needs python3-pil, and fontconfig for the font.
 """
 
 import io

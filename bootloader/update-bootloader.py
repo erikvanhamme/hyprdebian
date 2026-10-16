@@ -79,13 +79,15 @@ Config keys (all optional; defaults in DEFAULTS below):
     selected_color  colour of the selected menu label and the menu box border
     border_width    width of the menu box border in pixels
 
-Needs python3-pil, systemd-ukify, and for the UKIs systemd-boot-efi.
+Needs systemd-ukify, and for the UKIs systemd-boot-efi. The graphical frontend
+needs python3-pil and fontconfig.
 
-The package hyprdebian-bootloader (make deb) installs this script and its
-helpers in /usr/lib/hyprdebian/bootloader, next to the compiled bootloader
-and assets stub that --bootloader-dir and --assets-stub default to, links it as
-/usr/sbin/hd-bootloader-update, and installs the config in
-/etc/hyprdebian/bootloader. From the source tree, make esp passes the files
+The package hyprdebian-bootloader-<frontend> (make deb) installs this script
+and its helpers in /usr/lib/hyprdebian/bootloader, with the module and the
+compiled bootloader of its frontend and the assets stub that --bootloader-dir
+and --assets-stub default to, links it as /usr/sbin/hd-bootloader-update, and
+installs the config for its frontend in /etc/hyprdebian/bootloader. There is
+a package per frontend, and only one of them can be installed. From the source tree, make esp passes the files
 in build/ and the bootloader.json there instead.
 
 Example:
@@ -93,6 +95,7 @@ Example:
 """
 
 import argparse
+import importlib
 import json
 import os
 import struct
@@ -110,16 +113,17 @@ SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 sys.dont_write_bytecode = True
 
-import graphical  # noqa: E402
 import mkuki  # noqa: E402
 
-# The frontends, by the name in the config: the module that builds the
-# sections of each, with a sections(config, labels) function.
-FRONTENDS = {"graphical": graphical}
+# The frontends, by the name in the config. Each has a module <frontend>.py
+# next to this script, with a sections(config, labels) function that builds
+# its sections. A package installs only the module of its own frontend, so a
+# module is only imported when the config names it.
+FRONTENDS = ["graphical"]
 
 DEFAULTS = {
     "frontend": "graphical",
-    "wallpaper": "/usr/share/hyprdebian/bootloader/wallpaper.png",
+    "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
     "res_x": 1920,
     "res_y": 1080,
     "timeout": 5,
@@ -371,8 +375,11 @@ def main():
     args = parser.parse_args()
 
     config = load_config(args.config)
-    frontend = FRONTENDS[config["frontend"]]
-    bootloader = args.bootloader_dir / f"bootx64-{config['frontend']}.efi"
+    name = config["frontend"]
+    if not (SCRIPTS / f"{name}.py").is_file():
+        sys.exit(f"{args.config}: the {name} frontend is not installed; it is in the package hyprdebian-bootloader-{name}")
+    frontend = importlib.import_module(name)
+    bootloader = args.bootloader_dir / f"bootx64-{name}.efi"
 
     for path in (bootloader, args.assets_stub):
         if not path.is_file():

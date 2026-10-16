@@ -11,19 +11,23 @@
 #               frontend added as sections; and the UKIs of the 4 most recent
 #               kernels in /boot, with settings from bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
-#   make deb    build build/hyprdebian-bootloader_$(DEB_VERSION)_amd64.deb,
-#               which installs:
-#                 /usr/lib/hyprdebian/bootloader/   bootx64-*.efi, assets.efi,
-#                                                   the Python scripts and
-#                                                   update-esps.sh, which
+#   make deb    build build/hyprdebian-bootloader-<frontend>_$(DEB_VERSION)_amd64.deb
+#               for every frontend in FRONTENDS. Only one of them can be
+#               installed: each provides, conflicts with and replaces
+#               hyprdebian-bootloader. Each installs:
+#                 /usr/lib/hyprdebian/bootloader/   bootx64-<frontend>.efi,
+#                                                   assets.efi,
+#                                                   update-bootloader.py,
+#                                                   mkuki.py, the Python
+#                                                   scripts of the frontend
+#                                                   and update-esps.sh, which
 #                                                   runs the one below for
 #                                                   every ESP
 #                 /usr/sbin/hd-bootloader-update    a link to
 #                                                   update-bootloader.py
-#                 /usr/share/hyprdebian/bootloader/wallpaper.png
 #                 /etc/hyprdebian/bootloader/bootloader.json
-#                                                   bootloader.json with the
-#                                                   wallpaper above, a conffile
+#                                                   deb/<frontend>/bootloader.json,
+#                                                   a conffile
 #                 /etc/kernel/postinst.d/zz-hd-bootloader
 #                 /etc/kernel/postrm.d/zz-hd-bootloader
 #                 /etc/initramfs/post-update.d/zz-hd-bootloader
@@ -31,12 +35,17 @@
 #                                                   run update-esps.sh when a
 #                                                   kernel or initrd changes,
 #                                                   conffiles
+#               with the control file deb/<frontend>/control. The graphical
+#               package depends on hyprdebian-art for the wallpaper and on
+#               fonts-jetbrainsmono-nerd for the font, both built in ../art.
 #               Raise DEB_VERSION for every package that is handed out.
 #   make clean  remove build/
 
 BUILD := build
 # A frontend shows the menu; see bootloader.hpp. Each has a <frontend>.cpp
-# here and a <frontend>.py that builds its assets.
+# here, a <frontend>.py that builds its assets, which with its helpers is in
+# SCRIPTS_<frontend>, and a deb/<frontend>/ with the control file and the
+# config of its package. deb/text/ is ready for a text-only frontend.
 FRONTENDS := graphical
 TARGETS := $(FRONTENDS:%=$(BUILD)/bootx64-%.efi)
 ASSETS_STUB := $(BUILD)/assets.efi
@@ -46,9 +55,13 @@ IMAGE := $(BUILD)/esp.img
 # Each UKI holds a whole initrd, which can be over 100MB.
 IMAGE_SIZE := 1G
 
-SCRIPTS := update-bootloader.py mkuki.py $(FRONTENDS:%=%.py) text2png.py png2bin.py menubox.py
-# The wallpaper that bootloader.json names.
-WALLPAPER := ../deploy/etc/skel/Pictures/wallpapers/wallpaper.png
+# The Python scripts of every package, and those of each frontend.
+CORE_SCRIPTS := update-bootloader.py mkuki.py
+SCRIPTS_graphical := graphical.py text2png.py png2bin.py menubox.py
+SCRIPTS := $(CORE_SCRIPTS) $(foreach frontend,$(FRONTENDS),$(SCRIPTS_$(frontend)))
+# The wallpaper that bootloader.json names, as the package hyprdebian-art
+# installs it.
+WALLPAPER := /usr/share/backgrounds/hyprdebian/emerald-1920x1080.png
 
 # What update-bootloader.py reads.
 ESP_SOURCES := $(SCRIPTS) bootloader.json $(WALLPAPER) \
@@ -56,10 +69,8 @@ ESP_SOURCES := $(SCRIPTS) bootloader.json $(WALLPAPER) \
 
 DEB_NAME := hyprdebian-bootloader
 DEB_VERSION := 0.1
-DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_amd64.deb
-DEB_ROOT := $(BUILD)/deb
+DEBS := $(FRONTENDS:%=$(BUILD)/$(DEB_NAME)-%_$(DEB_VERSION)_amd64.deb)
 DEB_LIB := /usr/lib/hyprdebian/bootloader
-DEB_SHARE := /usr/share/hyprdebian/bootloader
 DEB_CONF := /etc/hyprdebian/bootloader
 # The kernel and initramfs hooks, below deb/ at the path they are installed to.
 DEB_HOOKS := /etc/kernel/postinst.d/zz-hd-bootloader \
@@ -133,6 +144,10 @@ $(ESP_STAMP): $(TARGETS) $(ASSETS_STUB) $(ESP_SOURCES) | $(BUILD)
 		--bootloader-dir $(BUILD) --assets-stub $(ASSETS_STUB)
 	touch $@
 
+$(WALLPAPER):
+	@echo "$@ is missing: install the package hyprdebian-art, built by ../art/create-deb.sh" >&2
+	@exit 1
+
 image: $(IMAGE)
 
 $(IMAGE): $(ESP_STAMP)
@@ -141,31 +156,30 @@ $(IMAGE): $(ESP_STAMP)
 	$(MKFS_FAT) -F 32 -n HYPRDEBIAN $@
 	mcopy -s -m -i $@ $(ESP)/EFI ::/
 
-deb: $(DEB)
+deb: $(DEBS)
 
-# The package is built from a staged root in build/deb. update-bootloader.py
-# finds its helpers, bootx64-*.efi and assets.efi next to itself, also through
-# the link. The installed bootloader.json names the wallpaper by its absolute
-# path; the one here names it relative to the source tree. dpkg-deb makes all
-# files owned by root.
-$(DEB): $(TARGETS) $(ASSETS_STUB) $(SCRIPTS) update-esps.sh bootloader.json $(WALLPAPER) \
-		deb/control $(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
-	rm -rf $(DEB_ROOT)
-	install -d $(DEB_ROOT)/DEBIAN $(DEB_ROOT)$(DEB_LIB) $(DEB_ROOT)/usr/sbin \
-		$(DEB_ROOT)$(DEB_SHARE) $(DEB_ROOT)$(DEB_CONF)
-	install -m 0644 $(TARGETS) $(ASSETS_STUB) $(DEB_ROOT)$(DEB_LIB)/
-	install -m 0755 $(SCRIPTS) update-esps.sh $(DEB_ROOT)$(DEB_LIB)/
-	ln -s ../lib/hyprdebian/bootloader/update-bootloader.py $(DEB_ROOT)/usr/sbin/hd-bootloader-update
-	install -m 0644 $(WALLPAPER) $(DEB_ROOT)$(DEB_SHARE)/wallpaper.png
-	$(PYTHON) -c 'import json, sys; config = json.load(open(sys.argv[1])); config["wallpaper"] = sys.argv[2]; print(json.dumps(config, indent=4))' \
-		bootloader.json $(DEB_SHARE)/wallpaper.png > $(DEB_ROOT)$(DEB_CONF)/bootloader.json
-	chmod 0644 $(DEB_ROOT)$(DEB_CONF)/bootloader.json
-	for hook in $(DEB_HOOKS); do install -D -m 0755 deb$$hook $(DEB_ROOT)$$hook; done
-	printf '%s\n' $(DEB_CONF)/bootloader.json $(DEB_HOOKS) > $(DEB_ROOT)/DEBIAN/conffiles
+# Each package is built from a staged root in build/deb-<frontend>.
+# update-bootloader.py finds its helpers, bootx64-<frontend>.efi and
+# assets.efi next to itself, also through the link. dpkg-deb makes all files
+# owned by root. The scripts of the frontend are a prerequisite through
+# secondary expansion, which expands $$* to the frontend.
+.SECONDEXPANSION:
+$(BUILD)/$(DEB_NAME)-%_$(DEB_VERSION)_amd64.deb: $(BUILD)/bootx64-%.efi $(ASSETS_STUB) \
+		$(CORE_SCRIPTS) $$(SCRIPTS_$$*) update-esps.sh deb/%/control deb/%/bootloader.json \
+		$(addprefix deb,$(DEB_HOOKS)) | $(BUILD)
+	rm -rf $(BUILD)/deb-$*
+	install -d $(BUILD)/deb-$*/DEBIAN $(BUILD)/deb-$*$(DEB_LIB) $(BUILD)/deb-$*/usr/sbin \
+		$(BUILD)/deb-$*$(DEB_CONF)
+	install -m 0644 $(BUILD)/bootx64-$*.efi $(ASSETS_STUB) $(BUILD)/deb-$*$(DEB_LIB)/
+	install -m 0755 $(CORE_SCRIPTS) $(SCRIPTS_$*) update-esps.sh $(BUILD)/deb-$*$(DEB_LIB)/
+	ln -s ../lib/hyprdebian/bootloader/update-bootloader.py $(BUILD)/deb-$*/usr/sbin/hd-bootloader-update
+	install -m 0644 deb/$*/bootloader.json $(BUILD)/deb-$*$(DEB_CONF)/bootloader.json
+	for hook in $(DEB_HOOKS); do install -D -m 0755 deb$$hook $(BUILD)/deb-$*$$hook; done
+	printf '%s\n' $(DEB_CONF)/bootloader.json $(DEB_HOOKS) > $(BUILD)/deb-$*/DEBIAN/conffiles
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
-		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(DEB_ROOT) | cut -f1)/" \
-		deb/control > $(DEB_ROOT)/DEBIAN/control
-	dpkg-deb --root-owner-group --build $(DEB_ROOT) $@
+		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(BUILD)/deb-$* | cut -f1)/" \
+		deb/$*/control > $(BUILD)/deb-$*/DEBIAN/control
+	dpkg-deb --root-owner-group --build $(BUILD)/deb-$* $@
 
 clean:
 	rm -rf $(BUILD)
