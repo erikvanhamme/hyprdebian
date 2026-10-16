@@ -1,0 +1,17 @@
+{
+    "wallpaper": "../deploy/etc/skel/Pictures/wallpapers/wallpaper.png",
+    "res_x": 1920,
+    "res_y": 1080,
+    "timeout": 5,
+    "banner_text": "HyprDebian Bootloader",
+    "font": "JetBrainsMono Nerd Font Mono",
+    "color": "#0066cc",
+    "selected_color": "#ff6600",
+    "border_width": 5,
+    "cmdline": {
+        "root": "ZFS=rpool/hyprdebian",
+        "quiet": true,
+        "splash": true,
+        "extra": []
+    }
+}
