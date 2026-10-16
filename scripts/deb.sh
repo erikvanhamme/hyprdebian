@@ -13,13 +13,21 @@ deb_post() {
 }
 
 # Runs a command in the checkout as the owner of the checkout, so the build directories in it stay
-# owned by that user and not by root.
+# owned by that user and not by root. The command gets a clean environment: install.sh exports all
+# its variables and functions with set -a, and its function install would replace the install
+# command in the build scripts.
 # Usage: deb_as_owner <command> [<argument> ...]
 deb_as_owner() {
-    local owner
+    local owner home
 
     owner=$(stat -c %U .) || return 1
-    runuser -u "$owner" -- "$@"
+    home=$(getent passwd "$owner" | cut -d: -f6) || return 1
+
+    runuser -u "$owner" -- /usr/bin/env -i \
+        HOME="$home" \
+        TERM="${TERM}" \
+        PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+        "$@"
 }
 
 # Builds a package with an art script and copies it to DEB_DIR. Old builds of the package are
