@@ -8,6 +8,7 @@ The live cd contains:
 - NetworkManager. Wired networks come up by themselves, `nmtui` sets up wifi.
 - ZFS support. The ZFS kernel module is built with DKMS while the ISO is built and is loaded at boot.
 - The tools the installer needs: debootstrap, dosfstools, gdisk, git, mdadm, parted, python3-jinja2, unzip and wget.
+- The tools to build the bootloader, art and font packages: clang, gnu-efi, lld and make.
 - A checkout of the hyprdebian repo in the home folder of the live user.
 - A `hyprdebian.release` file in the home folder of the live user. The installer looks for this file to know it is running on the hyprdebian live cd. When it is found, the prerequisites phase is skipped.
 

@@ -39,6 +39,18 @@ wget
 EOF
 
 
+# The tools to build the bootloader, art and font packages. bootloader/Makefile
+# compiles with clang++, links with lld-link (lld) against the UEFI headers of
+# gnu-efi and packs the debs with dpkg-deb. art/create-font-deb.sh also needs
+# wget and unzip, which are in the list above.
+cat <<'EOF' > config/package-lists/bootloader.list.chroot
+clang
+gnu-efi
+lld
+make
+EOF
+
+
 # Text console only, no desktop. gpm gives a mouse on the console for copy
 # and paste, openssh-server allows installing over ssh and network-manager
 # brings up the network (nmtui for wifi).
