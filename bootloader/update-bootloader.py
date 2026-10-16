@@ -22,6 +22,9 @@ script by default) and writes, below the directory given with --esp:
                                           "HyprDebian-Kernel-7.2.10.efi 1"
                                 .lblN     the label of row N, unselected
                                 .lblNs    the label of row N, selected
+                                .mok      the DKMS MOK (--mok) as an
+                                          EFI_SIGNATURE_LIST, which the
+                                          bootloader hands to the kernel
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
                               recent kernels in /boot
@@ -29,9 +32,14 @@ script by default) and writes, below the directory given with --esp:
 The menu has a row per profile of each of those kernels, newest kernel
 first. With the labels and the file names in assets.efi, Secure Boot covers
 everything the menu shows and which UKI each row boots; the UKI itself is
-checked when the bootloader starts it. Without a valid assets.efi the
-bootloader boots profile 0 of the most recently created UKI in EFI/Linux
-without a menu.
+checked when the bootloader starts it.
+
+The ZFS module is built by DKMS and signed with the DKMS MOK, the key pair in
+/var/lib/dkms/mok.key and mok.pub. Under Secure Boot the kernel loads it only
+if it trusts that key. With shim, shim hands its MOKs to the kernel; here the
+bootloader does that with the MOK in assets.efi, so Secure Boot covers it
+too. Without a usable assets.efi the bootloader shows an error and does not
+boot.
 
 With the assets in a file of their own, a change of the config, the
 wallpaper or the texts leaves BOOTX64.EFI alone. assets.efi is a PE image
@@ -54,13 +62,7 @@ rendered at a tenth of its height. Images are in the raw image format of
 png2bin.py.
 
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
-The UKIs are written oldest first, so that on a FAT partition the newest
-kernel also has the newest creation time, which is what the fallback of the
-bootloader goes by; each UKI also gets the modification time of its kernel.
-A UKI that would not change is not rewritten, so that its signature stays
-valid, unless an older one before it was: then it is rewritten too, to keep
-the creation times in order. With a new kernel that is the newest, only its
-UKI is written. Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
+Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys (all optional; defaults in DEFAULTS below):
 
@@ -91,6 +93,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 from PIL import Image
@@ -132,6 +135,12 @@ UKI_PREFIX = "HyprDebian-Kernel-"
 SBAT_HEADER = "sbat,1,SBAT Version,sbat,1,https://github.com/rhboot/shim/blob/main/SBAT.md\n"
 SBAT = SBAT_HEADER + "hyprdebian-boot,1,HyprDebian,hyprdebian-boot,1,HyprDebian bootloader\n"
 ASSETS_SBAT = SBAT_HEADER + "hyprdebian-assets,1,HyprDebian,hyprdebian-assets,1,HyprDebian bootloader assets\n"
+
+# EFI_CERT_X509_GUID: the type of an EFI_SIGNATURE_LIST of X.509 certificates.
+CERT_X509_GUID = uuid.UUID("a5c059a1-94e4-4aa7-87b5-ab155c2bf072")
+# The owner of the MOK in the signature list: SHIM_LOCK_GUID, as shim and
+# mokutil use for MOKs.
+MOK_OWNER_GUID = uuid.UUID("605dab50-e046-4300-abb6-3dd810dd8b23")
 
 # Assets that earlier versions of this script wrote as loose files.
 OLD_ASSETS = ["EFI/BOOT/hyprdebian.conf", "EFI/background.bin", "EFI/banner.bin", "EFI/BOOT/tux.bin"]
@@ -218,13 +227,10 @@ def build_ukis(config, esp, kernels):
     for extra in cmdline["extra"]:
         flags += ["--extra", extra]
 
-    # Oldest first: see the creation times in the description above. Once a
-    # UKI is written, all newer ones are written after it, changed or not.
     names = []
-    rewrite = False
-    for version, vmlinuz, initrd in reversed(kernels):
+    for version, vmlinuz, initrd in kernels:
         name = uki_name(version)
-        names.insert(0, name)
+        names.append(name)
         target = linux / name
         temporary = linux / f".{name}.tmp"
         try:
@@ -232,17 +238,33 @@ def build_ukis(config, esp, kernels):
                 [sys.executable, SCRIPTS / "mkuki.py", vmlinuz, initrd, "--output", temporary, *flags],
                 check=True,
             )
-            if not rewrite and target.is_file() and same_efi(target, temporary):
+            if target.is_file() and same_efi(target, temporary):
                 print(f"Unchanged {target}", flush=True)
                 continue
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
-        rewrite = True
-        mtime = vmlinuz.stat().st_mtime
-        os.utime(target, (mtime, mtime))
         print(f"Wrote {target}", flush=True)
     return names
+
+
+def mok_signature_list(path):
+    """Returns the certificate in path, DER or PEM, as an EFI_SIGNATURE_LIST with that one certificate.
+
+    The list is the header (type, list size, signature header size 0,
+    signature size) and one signature: the owner GUID and the DER certificate.
+    """
+    data = path.read_bytes()
+    if data.startswith(b"-----BEGIN"):
+        result = subprocess.run(
+            ["openssl", "x509", "-in", path, "-outform", "DER"], check=True, capture_output=True
+        )
+        data = result.stdout
+    if not data.startswith(b"\x30"):
+        sys.exit(f"{path}: not an X.509 certificate in DER or PEM")
+    signature = MOK_OWNER_GUID.bytes_le + data
+    header = CERT_X509_GUID.bytes_le + struct.pack("<III", 28 + len(signature), 0, len(signature))
+    return header + signature
 
 
 def remove_old_ukis(esp, keep):
@@ -355,11 +377,20 @@ def main():
         help="the compiled assets stub (default: build/assets.efi next to this script)",
     )
     parser.add_argument("--boot-dir", type=Path, default=Path("/boot"), help="where the kernels are (default: /boot)")
+    parser.add_argument(
+        "--mok",
+        type=Path,
+        default=Path("/var/lib/dkms/mok.pub"),
+        help="certificate of the DKMS MOK, DER or PEM (default: /var/lib/dkms/mok.pub)",
+    )
     args = parser.parse_args()
 
     for path in (args.bootloader, args.assets_stub):
         if not path.is_file():
             sys.exit(f"{path}: not a file; build the bootloader first")
+    if not args.mok.is_file():
+        sys.exit(f"{args.mok}: not a file; the DKMS MOK is needed to boot with the ZFS module")
+    mok = mok_signature_list(args.mok)
 
     config = load_config(args.config)
     res_x, res_y = config["res_x"], config["res_y"]
@@ -395,6 +426,7 @@ def main():
             ".backgnd": to_bin(background),
             ".banner": to_bin(banner),
             **slot_sections(config, uki_names, text_height),
+            ".mok": mok,
         },
     )
 

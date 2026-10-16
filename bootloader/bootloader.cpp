@@ -23,17 +23,28 @@ struct Config {
 };
 
 // The assets are sections that update-bootloader.py adds to a stub PE file,
-// assets.efi next to the bootloader: the config, the background, the banner
-// and the menu rows. They can change without touching the bootloader. The
-// bootloader loads assets.efi with LoadImage, so that with Secure Boot on the
-// firmware checks its signature, and reads the sections from the loaded
-// image; it never starts it. The bootloader takes the display resolution from
-// the size of the background.
+// assets.efi next to the bootloader: the config, the background, the banner,
+// the menu rows and the DKMS MOK. They can change without touching the
+// bootloader. The bootloader loads assets.efi with LoadImage, so that with
+// Secure Boot on the firmware checks its signature, and reads the sections
+// from the loaded image; it never starts it. Without a usable assets.efi the
+// bootloader shows an error and returns to the firmware: the kernel cannot
+// load the ZFS module without the MOK. The bootloader takes the display
+// resolution from the size of the background.
 constexpr const char16_t* assets_directory = u"\\EFI\\BOOT";
 constexpr const char16_t* assets_name = u"assets.efi";
 constexpr const char* config_section = ".config";
 constexpr const char* background_section = ".backgnd";
 constexpr const char* banner_section = ".banner";
+
+// The DKMS MOK: an EFI_SIGNATURE_LIST with the X.509 certificate that DKMS
+// signs modules such as ZFS with. Under Secure Boot the kernel only loads
+// modules signed with a key it trusts. Shim hands its MOKs to the kernel in
+// an EFI configuration table, the MOK variable table; the bootloader does the
+// same with this one, in the entry MokListRT. The entry MokListTrustedRT
+// tells the kernel to trust the MOKs for modules: it puts them in its
+// .machine keyring rather than the .platform keyring.
+constexpr const char* mok_section = ".mok";
 
 // The UKIs are the .efi files in this directory.
 constexpr const char16_t* uki_directory = u"\\EFI\\Linux";
@@ -66,6 +77,8 @@ EFI_GUID graphics_output_protocol_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 EFI_GUID loaded_image_protocol_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 EFI_GUID simple_file_system_protocol_guid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 EFI_GUID device_path_protocol_guid = EFI_DEVICE_PATH_PROTOCOL_GUID;
+// LINUX_EFI_MOK_VARIABLE_TABLE_GUID of the kernel.
+EFI_GUID mok_variable_table_guid = {0xc451ed2b, 0x9694, 0x45d3, {0xba, 0xba, 0xed, 0x9f, 0x89, 0x88, 0xa3, 0x89}};
 
 EFI_HANDLE image = nullptr;
 EFI_SYSTEM_TABLE* st = nullptr;
@@ -78,6 +91,9 @@ EFI_HANDLE boot_device = nullptr;
 EFI_HANDLE assets_image = nullptr;
 const uint8_t* assets_base = nullptr;
 uint64_t assets_size = 0;
+// The MOK variable table built from the .mok section of assets.efi, to be
+// installed just before the UKI starts.
+void* mok_table = nullptr;
 
 // A row of the menu: the UKI file name in uki_directory, the profile to boot
 // it in, its labels (0 unselected, 1 selected) and where they are drawn.
@@ -409,55 +425,6 @@ EFI_FILE_PROTOCOL* open_file(const char16_t* path)
     return file;
 }
 
-// True if the name ends in .efi, in any case.
-bool has_efi_extension(const CHAR16* name)
-{
-    size_t length = 0;
-    while (name[length] != 0) {
-        ++length;
-    }
-    if (length < 4) {
-        return false;
-    }
-
-    const char16_t* extension = u".efi";
-    for (size_t i = 0; i < 4; ++i) {
-        CHAR16 c = name[length - 4 + i];
-        if (c >= u'A' && c <= u'Z') {
-            c = static_cast<CHAR16>(c - u'A' + u'a');
-        }
-        if (c != extension[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// True if time a is later than time b. The time zone is ignored: FAT stores
-// local times without one.
-bool later(const EFI_TIME& a, const EFI_TIME& b)
-{
-    if (a.Year != b.Year) {
-        return a.Year > b.Year;
-    }
-    if (a.Month != b.Month) {
-        return a.Month > b.Month;
-    }
-    if (a.Day != b.Day) {
-        return a.Day > b.Day;
-    }
-    if (a.Hour != b.Hour) {
-        return a.Hour > b.Hour;
-    }
-    if (a.Minute != b.Minute) {
-        return a.Minute > b.Minute;
-    }
-    if (a.Second != b.Second) {
-        return a.Second > b.Second;
-    }
-    return a.Nanosecond > b.Nanosecond;
-}
-
 // Finds a section (at most 8 characters, such as ".banner") of assets.efi in
 // the memory the firmware loaded it into. Every offset is checked against the
 // size of the loaded image. Returns empty Bytes if there is no such section
@@ -573,49 +540,6 @@ bool parse_slot(Bytes text, MenuEntry& entry)
     entry.name[name_length] = u'\0';
     entry.profile = text.data[end - 1] - '0';
     return true;
-}
-
-// Finds the most recently created .efi file in uki_directory, the UKI the
-// bootloader boots without a valid assets.efi. Returns false if there is
-// none.
-bool find_newest_uki(char16_t (&name)[max_name_length])
-{
-    EFI_FILE_PROTOCOL* directory = open_file(uki_directory);
-    if (directory == nullptr) {
-        return false;
-    }
-
-    // Reading a directory returns one EFI_FILE_INFO per call, followed by the
-    // file name. This is large enough for any FAT file name.
-    alignas(8) static uint8_t buffer[sizeof(EFI_FILE_INFO) + max_name_length * sizeof(CHAR16)];
-
-    bool found = false;
-    EFI_TIME newest{};
-    for (;;) {
-        UINTN size = sizeof(buffer);
-        if (directory->Read(directory, &size, buffer) != EFI_SUCCESS || size == 0) {
-            break;
-        }
-
-        const auto* info = reinterpret_cast<const EFI_FILE_INFO*>(buffer);
-        if ((info->Attribute & EFI_FILE_DIRECTORY) != 0 || !has_efi_extension(info->FileName)) {
-            continue;
-        }
-        // UKIs created at the same time keep their directory order.
-        if (found && !later(info->CreateTime, newest)) {
-            continue;
-        }
-
-        size_t i = 0;
-        for (; i < max_name_length - 1 && info->FileName[i] != 0; ++i) {
-            name[i] = static_cast<char16_t>(info->FileName[i]);
-        }
-        name[i] = u'\0';
-        newest = info->CreateTime;
-        found = true;
-    }
-    directory->Close(directory);
-    return found;
 }
 
 // The work area on the current screen, computed as menubox.py does: its size
@@ -772,9 +696,8 @@ EFI_DEVICE_PATH* file_device_path(const char16_t* directory, const char16_t* nam
 }
 
 // Loads assets.efi with LoadImage, which checks its Secure Boot signature,
-// and sets assets_image, assets_base and assets_size. Without assets.efi, or
-// if it fails the check, the bootloader runs with its defaults: a black
-// screen and the default timeout.
+// and sets assets_image, assets_base and assets_size. They stay null without
+// assets.efi or if it fails the check.
 void load_assets()
 {
     EFI_DEVICE_PATH* path = file_device_path(assets_directory, assets_name);
@@ -936,14 +859,92 @@ void boot(const char16_t* name, uint32_t profile)
     }
 }
 
-// Without a valid assets.efi, or without a usable slot in it, there is no
-// menu: boots profile 0 of the most recently created UKI.
-void boot_newest_uki()
+// Checks that the bytes are one EFI_SIGNATURE_LIST and nothing else: its
+// SignatureListSize matches, and after the 28 byte header and the signature
+// header there is a whole number of signatures, at least one, each more than
+// the 16 byte owner GUID.
+bool is_signature_list(Bytes list)
 {
-    static char16_t name[max_name_length];
-    if (find_newest_uki(name)) {
-        boot(name, 0);
+    constexpr size_t list_header_size = 28;
+    if (list.size < list_header_size) {
+        return false;
     }
+    const uint32_t list_size = read_u32_le(list.data + 16);
+    const uint32_t header_size = read_u32_le(list.data + 20);
+    const uint32_t signature_size = read_u32_le(list.data + 24);
+    if (list_size != list.size || signature_size <= 16 || list.size - list_header_size < header_size) {
+        return false;
+    }
+    const size_t signatures_size = list.size - list_header_size - header_size;
+    return signatures_size != 0 && signatures_size % signature_size == 0;
+}
+
+// Appends an entry to the MOK variable table: the name, nul padded to 256
+// bytes, the size of the data as a uint64 and the data.
+void put_mok_entry(uint8_t*& out, const char* name, const uint8_t* data, size_t size)
+{
+    size_t i = 0;
+    for (; name[i] != '\0'; ++i) {
+        *out++ = static_cast<uint8_t>(name[i]);
+    }
+    for (; i < 256; ++i) {
+        *out++ = 0;
+    }
+    for (size_t byte = 0; byte < 8; ++byte) {
+        *out++ = static_cast<uint8_t>(static_cast<uint64_t>(size) >> (8 * byte));
+    }
+    for (size_t byte = 0; byte < size; ++byte) {
+        *out++ = data[byte];
+    }
+}
+
+// Builds the MOK variable table from the .mok section of assets.efi, in
+// memory that the kernel keeps: MokListRT with the signature list,
+// MokListTrustedRT with the byte 1 that shim puts there too, and the
+// terminating entry with an empty name and no data. Returns nullptr if there
+// is no valid .mok section or no memory.
+void* build_mok_table()
+{
+    const Bytes list = asset_section(mok_section);
+    if (!is_signature_list(list)) {
+        return nullptr;
+    }
+
+    constexpr size_t entry_header_size = 256 + 8;
+    const uint8_t trusted = 1;
+    const size_t size = 3 * entry_header_size + list.size + sizeof(trusted);
+    void* table = nullptr;
+    if (bs->AllocatePool(EfiRuntimeServicesData, size, &table) != EFI_SUCCESS) {
+        return nullptr;
+    }
+
+    auto* out = static_cast<uint8_t*>(table);
+    put_mok_entry(out, "MokListRT", list.data, list.size);
+    put_mok_entry(out, "MokListTrustedRT", &trusted, sizeof(trusted));
+    put_mok_entry(out, "", nullptr, 0);
+    return table;
+}
+
+// Shows an error on the console, waits for a key and returns the status for
+// efi_main to return to the firmware, which then tries the next boot option.
+EFI_STATUS fail(const char16_t* message, EFI_STATUS status)
+{
+    // The text console may cover only part of a large screen; clearing it
+    // would leave the menu around it.
+    if (gop != nullptr) {
+        clear_rectangle(0, 0, gop->Mode->Info->HorizontalResolution, gop->Mode->Info->VerticalResolution);
+    }
+    st->ConOut->ClearScreen(st->ConOut);
+    st->ConOut->OutputString(st->ConOut, efi_string(u"HyprDebian bootloader: "));
+    st->ConOut->OutputString(st->ConOut, efi_string(message));
+    st->ConOut->OutputString(st->ConOut, efi_string(u"\r\nPress a key to return to the firmware.\r\n"));
+
+    st->ConIn->Reset(st->ConIn, FALSE);
+    UINTN index = 0;
+    bs->WaitForEvent(1, &st->ConIn->WaitForKey, &index);
+    EFI_INPUT_KEY key{};
+    st->ConIn->ReadKeyStroke(st->ConIn, &key);
+    return status;
 }
 
 } // namespace
@@ -967,8 +968,11 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
 
     load_assets();
     if (assets_image == nullptr) {
-        boot_newest_uki();
-        return EFI_NOT_FOUND;
+        return fail(u"EFI\\BOOT\\assets.efi is missing or failed the Secure Boot check.", EFI_NOT_FOUND);
+    }
+    mok_table = build_mok_table();
+    if (mok_table == nullptr) {
+        return fail(u"assets.efi holds no valid DKMS MOK.", EFI_NOT_FOUND);
     }
 
     Config config;
@@ -991,9 +995,7 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
 
     build_menu();
     if (menu_count == 0) {
-        unload_assets();
-        boot_newest_uki();
-        return EFI_NOT_FOUND;
+        return fail(u"assets.efi names no UKI in EFI\\Linux that exists.", EFI_NOT_FOUND);
     }
     draw_menu();
 
@@ -1005,7 +1007,12 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     // only its labels point into assets.efi.
     const MenuEntry& entry = menu[selected];
     unload_assets();
+
+    // The MOK variable table goes to the kernel through the system table.
+    if (bs->InstallConfigurationTable(&mok_variable_table_guid, mok_table) != EFI_SUCCESS) {
+        return fail(u"The DKMS MOK could not be handed to the kernel.", EFI_OUT_OF_RESOURCES);
+    }
     boot(entry.name, entry.profile);
 
-    return EFI_SUCCESS;
+    return fail(u"The selected UKI could not be started.", EFI_LOAD_ERROR);
 }

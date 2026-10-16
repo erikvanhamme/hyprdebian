@@ -4,15 +4,12 @@
 #               update-bootloader.py adds the assets to
 #   make esp    run update-bootloader.py into build/esp/: EFI/BOOT/BOOTX64.EFI,
 #               the bootloader; EFI/BOOT/assets.efi, the stub with the
-#               config, background, banner and menu rows added as sections;
-#               and the UKIs of the 4 most recent kernels in /boot, with
-#               settings from bootloader.json
+#               config, background, banner, menu rows and the DKMS MOK
+#               (/var/lib/dkms/mok.pub) added as sections; and the UKIs of
+#               the 4 most recent kernels in /boot, with settings from
+#               bootloader.json
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make clean  remove build/
-#
-# update-bootloader.py gives each UKI the modification time of its kernel,
-# and mcopy -m makes that the creation time in the image. Without a valid
-# assets.efi, the bootloader boots the UKI created last.
 
 BUILD := build
 TARGET := $(BUILD)/bootx64.efi
@@ -26,7 +23,7 @@ IMAGE_SIZE := 1G
 # What update-bootloader.py reads; the wallpaper is the one bootloader.json names.
 ESP_SOURCES := update-bootloader.py mkuki.py text2png.py png2bin.py menubox.py bootloader.json \
 	../deploy/etc/skel/Pictures/wallpapers/wallpaper.png \
-	$(wildcard /boot/vmlinuz-* /boot/initrd.img-*)
+	$(wildcard /boot/vmlinuz-* /boot/initrd.img-* /var/lib/dkms/mok.pub)
 
 CXX := clang++
 LD := lld-link
