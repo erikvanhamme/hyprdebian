@@ -1,0 +1,97 @@
+#!/bin/bash
+# hd-installer: installs HyprDebian on the disks of this computer, from a live system.
+#
+#     hd-installer           run the installation, or continue it after a failure
+#     hd-installer --reset   forget the answers and the finished tasks, then start over
+#
+# The installation is a tree of tasks (scripts/dependencies.sh) in phases. Each phase is a file
+# in scripts/ whose tasks are dependencies of the task install_root. The answers and the
+# finished tasks are kept in /tmp/hd-installer, so a rerun continues where the last run stopped.
+# Run it as root.
+set -euo pipefail
+
+INSTALLER_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+SCRIPTS_DIR="${INSTALLER_DIR}/scripts"
+
+# Source functions and constants.
+source "${SCRIPTS_DIR}/constants.sh"
+source "${SCRIPTS_DIR}/config.sh"
+source "${SCRIPTS_DIR}/defaults.sh"
+source "${SCRIPTS_DIR}/dependencies.sh"
+source "${SCRIPTS_DIR}/helpers.sh"
+source "${SCRIPTS_DIR}/helpers-disk.sh"
+source "${SCRIPTS_DIR}/helpers-host.sh"
+source "${SCRIPTS_DIR}/helpers-network.sh"
+source "${SCRIPTS_DIR}/helpers-user.sh"
+
+usage() {
+    echo "Usage: hd-installer [--reset]"
+    echo
+    echo "Installs HyprDebian on the disks of this computer. A rerun continues where the last"
+    echo "run stopped; --reset forgets the answers and the finished tasks in ${STATE_DIR} first."
+}
+
+# The version of the installer, from version.json next to this script.
+installer_version() {
+    local major minor
+    major=$(sed -n 's/.*"major" *: *\([0-9]*\).*/\1/p' "${INSTALLER_DIR}/version.json")
+    minor=$(sed -n 's/.*"minor" *: *\([0-9]*\).*/\1/p' "${INSTALLER_DIR}/version.json")
+    echo "${major}.${minor}"
+}
+
+# Command line.
+reset=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --reset)
+            reset=true
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+if [[ ${EUID} -ne 0 ]]; then
+    echo "Error: hd-installer must be run as root." >&2
+    exit 1
+fi
+
+if [[ "${reset}" == "true" ]]; then
+    rm -rf "${STATE_DIR}"
+fi
+
+# Start banner.
+echo "=== HyprDebian installer $(installer_version) ==="
+
+# Prepare idempotency and config paths.
+mkdir -p "${STATE_DIR}"
+declare -A TASK_DEPS
+
+# Load the configuration.
+load_config
+
+# Installation task. It is not named install, which would hide the install command from every
+# task.
+install_root() {
+    return 0
+}
+
+# Load tasks/deps for all the phases, in order.
+source "${SCRIPTS_DIR}/questions.sh"
+source "${SCRIPTS_DIR}/disk.sh"
+source "${SCRIPTS_DIR}/partition.sh"
+source "${SCRIPTS_DIR}/filesystem.sh"
+source "${SCRIPTS_DIR}/base.sh"
+source "${SCRIPTS_DIR}/packages.sh"
+source "${SCRIPTS_DIR}/user.sh"
+source "${SCRIPTS_DIR}/cleanup.sh"
+
+# Start installation.
+execute_task "install_root"

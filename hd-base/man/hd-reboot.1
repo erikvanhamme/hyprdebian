@@ -1,0 +1,54 @@
+.TH HD-REBOOT 1 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-reboot, hd-poweroff \- reboot or power off the system, on a desktop and without one
+.SH SYNOPSIS
+.B hd-reboot
+.br
+.B hd-poweroff
+.SH DESCRIPTION
+.B hd-reboot
+reboots the system and
+.B hd-poweroff
+powers it off.
+.PP
+In a Hyprland session, when
+.B hyprshutdown
+is installed, they let it close the applications and show
+.B Rebooting
+or
+.B Shutting down
+first, then run
+.B systemctl reboot
+or
+.BR "systemctl poweroff" .
+A session is recognized by
+.B HYPRLAND_INSTANCE_SIGNATURE
+in the environment, which Hyprland sets for the programs it starts.
+.PP
+Otherwise, as on the console, over ssh, or on a system without a desktop,
+they run
+.B systemctl reboot
+or
+.B systemctl poweroff
+right away.
+Whether the user may do that is up to
+.BR polkit (8),
+as for
+.BR systemctl (1)
+itself: a user who is logged in on the console of the system may, a user
+over ssh is asked for the password of an administrator.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+The exit status of
+.B hyprshutdown
+or
+.BR systemctl ;
+1 when it cannot be started.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR systemctl (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

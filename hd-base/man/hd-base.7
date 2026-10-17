@@ -6,14 +6,156 @@ The meta package
 .B hd-base
 depends on the packages that every hyprdebian system has, so that they are
 installed with it and stay installed.
-It installs no files of its own besides this man page, and configures
-nothing: a package it pulls in is set up the way that package does it.
+Besides the settings below, a package it pulls in is set up the way that
+package does it.
+.PP
+It installs
+.BR hd-up (1),
+which upgrades the system after a ZFS snapshot,
+.BR hd-reboot (1)
+and
+.BR hd-poweroff (1),
+which reboot and power off the system with
+.B hyprshutdown
+in a Hyprland session and with
+.B systemctl
+otherwise, and the files that new users
+get in their home directory, from
+.IR /etc/skel :
+.TP
+.I .bash_aliases
+.B ls
+and
+.B ll
+with
+.BR eza (1),
+and a history search on Ctrl-R with
+.BR fzf (1).
+.TP
+.I .gitconfig
+.BR delta (1)
+as the pager and diff filter of
+.BR git (1).
+.TP
+.I .config/nano/nanorc
+Indents with four spaces, remembers the search history, and colors the
+interface and the syntax.
+.PP
+It also sets up the system:
+.TP
+.I /etc/profile.d/local\-bin\-path.sh
+Adds
+.I ~/.local/bin
+to the
+.B PATH
+of login shells, when that folder exists.
+.TP
+.I /etc/apt/preferences.d/00\-block\-unwanted
+Keeps apt from installing
+.BR ifupdown ,
+as
+.BR systemd-networkd (8)
+runs the network,
+.BR os-prober ,
+and
+.BR turnstile .
+.TP
+.I /usr/lib/systemd/system/getty@.service.d/numlock.conf
+Turns Num Lock on for a console before its login prompt shows, with
+.BR setleds (1).
+.TP
+.I /etc/update\-motd.d/00\-hyprdebian
+Shows the HyprDebian banner after a login on the console or over ssh, with
+the version of HyprDebian from
+.IR /etc/hyprdebian/version.json ,
+the type of the installation, from the key
+.B hd-installer
+of
+.IR /etc/hyprdebian/config.json ,
+the suite and the Debian version, the kernel, the uptime, the load, the
+memory, the health of the ZFS pools and the RAID arrays, and the failed
+units.
+.TP
+.I /usr/lib/systemd/zram\-generator.conf.d/hyprdebian.conf
+A swap in compressed RAM,
+.IR /dev/zram0 ,
+of a quarter of the RAM, compressed with zstd, with priority 16384, so it is
+used before the swap on disk; see
+.BR zram-generator.conf (5).
+.TP
+.I /usr/lib/sysctl.d/50\-zram.conf
+Sets
+.B vm.swappiness
+to 180, as swapping to zram is cheaper than dropping the page cache, and
+.B vm.page\-cluster
+to 0, as reading ahead does not help with zram.
+.TP
+.I /usr/lib/systemd/resolved.conf.d/00\-direct\-uplink.conf
+Has
+.BR systemd-resolved (8)
+pass the queries straight to the name servers of the network: no stub
+resolver on 127.0.0.53, no cache, no LLMNR, no multicast DNS and no fallback
+servers.
+.TP
+.I /usr/lib/systemd/system\-preset/00\-ignore\-all.preset
+Ignores every preset, so no service is enabled because a preset says so.
+.PP
+The postinst masks
+.BR systemd-firstboot.service ,
+.BR systemd-preset-all.service ,
+.BR systemd-machine-id-commit.service ,
+.B rpcbind.socket
+and
+.B rpcbind.service
+on the first installation; a unit that the admin unmasks again stays
+unmasked on upgrades, and a purge unmasks them.
+It also points
+.I /etc/resolv.conf
+at
+.IR /run/systemd/resolve/resolv.conf ,
+the name servers themselves, in place of the stub resolver, when it is the
+link that
+.B systemd-resolved
+made.
+It empties
+.IR /etc/motd ,
+on the first installation like the masks, and diverts
+.I /etc/update\-motd.d/10\-uname
+of base-files to
+.IR 10\-uname.base\-files ,
+which
+.BR run-parts (8)
+skips, as the banner already shows the kernel; a removal of the package
+puts it back.
+It diverts
+.I /etc/issue
+of base-files to
+.I /etc/issue.debian
+and has
+.BR hd-issue (8)
+write the HyprDebian login banner there, with the version, the type and the
+suite, on every installation and upgrade; a removal of the package puts the
+banner of base-files back.
+.TP
+.I /etc/hyprdebian/version.json
+The version of HyprDebian, as
+.B {"major": 1, "minor": 0}
+for 1.0, which is also the version of
+.BR hd-base .
+The banners show it.
 .SH PACKAGES
 .TP
 .B hyprdebian
 .BR hd-network ,
 the network configuration; see
 .BR hd-network (7).
+.B python3
+and
+.BR sudo ,
+for
+.BR hd-up (1);
+.BR kbd ,
+for Num Lock on the console.
 .TP
 .B Remote access and firewall
 .B openssh-server
@@ -49,9 +191,10 @@ and
 .TP
 .B System services
 .BR systemd-resolved ,
-name resolution, and
-.BR rsyslog ,
-logging.
+name resolution.
+The logs stay in the journal of
+.BR systemd-journald (8);
+there is no syslog daemon.
 .TP
 .B Command line tools
 .BR eza ,
@@ -70,7 +213,10 @@ logging.
 .BR man-db ,
 .B apt-file
 and
-.BR zram-tools .
+.BR systemd-zram-generator .
+It conflicts with
+.BR zram-tools ,
+which would set up a second zram swap.
 .PP
 .B firmware-linux
 and
@@ -78,7 +224,64 @@ and
 are in the
 .B non-free-firmware
 component of Debian, which the apt sources must include.
+.SH FILES
+.TP
+.I /usr/bin/hd-up
+Upgrades the system after a ZFS snapshot.
+.TP
+.I /usr/bin/hd-reboot
+.TQ
+.I /usr/bin/hd-poweroff
+Reboot and power off the system.
+.TP
+.I /usr/sbin/hd-issue
+Writes the login banner in
+.IR /etc/issue .
+.TP
+.I /etc/hyprdebian/version.json
+The version of HyprDebian, a conffile.
+.TP
+.I /etc/skel/.bash_aliases
+.TQ
+.I /etc/skel/.gitconfig
+.TQ
+.I /etc/skel/.config/nano/nanorc
+The files new users get, conffiles.
+.TP
+.I /etc/profile.d/local\-bin\-path.sh
+Adds
+.I ~/.local/bin
+to the
+.BR PATH ,
+a conffile.
+.TP
+.I /etc/apt/preferences.d/00\-block\-unwanted
+The packages apt never installs, a conffile.
+.TP
+.I /etc/update\-motd.d/00\-hyprdebian
+The banner after a login, a conffile.
+.TP
+.I /usr/lib/systemd/system/getty@.service.d/numlock.conf
+Num Lock on the console.
+.TP
+.I /usr/lib/systemd/zram\-generator.conf.d/hyprdebian.conf
+The zram swap.
+.TP
+.I /usr/lib/sysctl.d/50\-zram.conf
+The sysctls for the zram swap.
+.TP
+.I /usr/lib/systemd/resolved.conf.d/00\-direct\-uplink.conf
+The config of systemd-resolved.
+.TP
+.I /usr/lib/systemd/system\-preset/00\-ignore\-all.preset
+No presets.
 .SH SEE ALSO
-.BR hd-network (7)
+.BR hd-up (1),
+.BR hd-reboot (1),
+.BR hd-issue (8),
+.BR hd-network (7),
+.BR zram-generator.conf (5),
+.BR resolved.conf (5),
+.BR systemd.preset (5)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

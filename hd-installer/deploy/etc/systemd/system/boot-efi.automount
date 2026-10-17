@@ -1,0 +1,14 @@
+[Unit]
+Description=EFI System Partition Automount Trigger
+Documentation=man:systemd.automount(5)
+DefaultDependencies=no
+After=zfs-mount.service
+Requires=zfs-mount.service
+Before=local-fs.target
+
+[Automount]
+Where=/boot/efi
+TimeoutIdleSec=60
+
+[Install]
+WantedBy=local-fs.target

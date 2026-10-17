@@ -1,0 +1,298 @@
+#!/bin/bash
+# The base phase: installs the base system with debootstrap on the ZFS pool, writes the files that
+# depend on the disks and the answers, adds the Debian and HyprDebian package repositories, and
+# installs the kernel and ZFS. The other packages are marked with add_packages and installed by the
+# packages phase.
+
+b_pre() {
+    return 0
+}
+
+b_main() {
+    return 0
+}
+
+b_post() {
+    return 0
+}
+
+b_bootstrap() {
+    mkdir -p "${TARGET_DIR}/run" || return 1
+    mount -t tmpfs tmpfs "${TARGET_DIR}/run" || return 1
+    mkdir -p "${TARGET_DIR}/run/lock" || return 1
+    mkdir -p "${TARGET_DIR}/var/lib" || return 1
+
+    debootstrap --arch=amd64 --exclude=ifupdown --include=ca-certificates "${Q_SUITE}" \
+        "${TARGET_DIR}" http://deb.debian.org/debian
+}
+
+b_templates() {
+
+    # These templates need to be rendered for sure.
+    template_render templates/etc/hostname.j2 || return 1
+    template_render templates/etc/hosts.j2
+}
+
+b_fstab() {
+    if (( Q_SWAP > 0 )) && [[ "${Q_ENCRYPT}" == "true" ]]; then
+        template_render templates/etc/fstab.j2 0644 swap_crypt=true
+    elif (( Q_SWAP > 0 )); then
+        local swap_part swap_uuid
+        swap_part="$(part "${Q_ROOT_DISK_A}" "${PART_SWAP}")"
+        if [[ "${Q_ROOT_REDUNDANT}" == "true" ]]; then
+            swap_part=/dev/md/swap
+        fi
+        swap_uuid=$(blkid -s UUID -o value "${swap_part}")
+
+        if [[ -z "${swap_uuid}" ]]; then
+            echo "ERROR: Unable to determine UUIDs for fstab."
+            return 1
+        fi
+
+        template_render templates/etc/fstab.j2 0644 swap_uuid="${swap_uuid}"
+    else
+        template_render templates/etc/fstab.j2
+    fi
+}
+
+b_mdadm() {
+    if [[ "${Q_ROOT_REDUNDANT}" != "true" ]] || (( Q_SWAP == 0 )); then
+        return 0
+    fi
+
+    local mdadm_array
+    mdadm_array=$(mdadm --detail --brief /dev/md/swap)
+
+    if [[ -z "${mdadm_array}" ]]; then
+        echo "ERROR: Unable to determine the swap array for mdadm.conf."
+        return 1
+    fi
+
+    # Written before mdadm is installed, so its postinst keeps this file.
+    template_render templates/etc/mdadm/mdadm.conf.j2 0644 mdadm_array="${mdadm_array}" \
+        || return 1
+
+    add_packages mdadm
+}
+
+b_crypttab() {
+    if [[ "${Q_ENCRYPT}" != "true" ]] || (( Q_SWAP == 0 )); then
+        return 0
+    fi
+
+    # The swap device is overwritten on every boot, so refer to it by a name that can
+    # never point at another device.
+    local swap_device swap_id
+    if [[ "${Q_ROOT_REDUNDANT}" == "true" ]]; then
+        swap_id=$(mdadm --detail --export /dev/md/swap | sed -n 's/^MD_UUID=//p')
+        swap_device=/dev/disk/by-id/md-uuid-${swap_id}
+    else
+        swap_id=$(blkid -s PARTUUID -o value "$(part "${Q_ROOT_DISK_A}" "${PART_SWAP}")")
+        swap_device=/dev/disk/by-partuuid/${swap_id}
+    fi
+
+    if [[ -z "${swap_id}" ]]; then
+        echo "ERROR: Unable to determine the swap device for crypttab."
+        return 1
+    fi
+
+    template_render templates/etc/crypttab.j2 0644 swap_device="${swap_device}" || return 1
+
+    add_packages systemd-cryptsetup
+}
+
+# The EFI system partitions are automounted on /boot/efi and, on mirrored ESP disks, /boot/efi2,
+# where the bootloader writes its files. After b_mount, as systemctl enables the units in the
+# target.
+b_mount_unit() {
+    local efi_uuid efi2_uuid
+    efi_uuid=$(blkid -s UUID -o value "$(part "${Q_ESP_DISK_A}" "${PART_ESP}")")
+
+    if [[ -z "${efi_uuid}" ]]; then
+        echo "ERROR: Unable to determine UUIDs for fstab."
+        return 1
+    fi
+
+    template_render templates/etc/systemd/system/boot-efi.mount.j2 0644 efi_uuid="${efi_uuid}" \
+        || return 1
+    file_deploy deploy/etc/systemd/system/boot-efi.automount || return 1
+    in_target systemctl enable boot-efi.automount || return 1
+
+    if [[ "${Q_ESP_REDUNDANT}" != "true" ]]; then
+        return 0
+    fi
+
+    efi2_uuid=$(blkid -s UUID -o value "$(part "${Q_ESP_DISK_B}" "${PART_ESP}")")
+
+    if [[ -z "${efi2_uuid}" ]]; then
+        echo "ERROR: Unable to determine UUIDs for fstab."
+        return 1
+    fi
+
+    template_render templates/etc/systemd/system/boot-efi2.mount.j2 0644 \
+        efi2_uuid="${efi2_uuid}" || return 1
+    file_deploy deploy/etc/systemd/system/boot-efi2.automount || return 1
+    in_target systemctl enable boot-efi2.automount
+}
+
+b_zfs_cache() {
+    mkdir -p "${TARGET_DIR}/etc/zfs" || return 1
+    cp /etc/zfs/zpool.cache "${TARGET_DIR}/etc/zfs"
+}
+
+b_mount() {
+    mount --make-private --rbind /dev  "${TARGET_DIR}/dev" || return 1
+    mount --make-private --rbind /proc "${TARGET_DIR}/proc" || return 1
+    mount --make-private --rbind /sys  "${TARGET_DIR}/sys" || return 1
+
+    # /dev is shared with the live system, so leave its /dev/log alone. Its symlink
+    # points at /run/systemd/journal/dev-log, so expose the journal socket there.
+    mkdir -p "${TARGET_DIR}/run/systemd/journal" || return 1
+    touch "${TARGET_DIR}/run/systemd/journal/dev-log" || return 1
+    mount --bind /run/systemd/journal/dev-log "${TARGET_DIR}/run/systemd/journal/dev-log"
+}
+
+# The Debian repositories, and the HyprDebian repository, which the hd-* packages come from.
+b_apt_init() {
+    template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
+
+    repo_key_download || return 1
+    template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 || return 1
+
+    rm -f "${TARGET_DIR}/etc/apt/sources.list" || return 1
+
+    in_target apt update
+}
+
+b_console() {
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration \
+        console-setup || return 1
+
+    in_target dpkg-reconfigure locales || return 1
+
+    in_target dpkg-reconfigure tzdata || return 1
+
+    in_target dpkg-reconfigure keyboard-configuration || return 1
+
+    in_target dpkg-reconfigure console-setup
+}
+
+b_buildtools() {
+    # Deployed before the kernel is installed, so no initramfs ever waits for a resume device.
+    file_deploy deploy/etc/initramfs-tools/conf.d/resume || return 1
+
+    in_target apt install -y build-essential initramfs-tools
+}
+
+b_kernel() {
+    in_target apt install -y linux-image-amd64 linux-headers-amd64
+}
+
+b_zfs_support() {
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y zfs-dkms zfsutils-linux \
+        zfs-initramfs
+}
+
+# Mounts the EFI system partitions in the target, where the bootloader writes its files in the
+# packages phase.
+b_esp() {
+    mkdir -p "${TARGET_DIR}/boot/efi" || return 1
+    if ! mountpoint -q "${TARGET_DIR}/boot/efi"; then
+        mount "$(part "${Q_ESP_DISK_A}" "${PART_ESP}")" "${TARGET_DIR}/boot/efi" || return 1
+    fi
+
+    if [[ "${Q_ESP_REDUNDANT}" != "true" ]]; then
+        return 0
+    fi
+
+    mkdir -p "${TARGET_DIR}/boot/efi2" || return 1
+    if ! mountpoint -q "${TARGET_DIR}/boot/efi2"; then
+        mount "$(part "${Q_ESP_DISK_B}" "${PART_ESP}")" "${TARGET_DIR}/boot/efi2" || return 1
+    fi
+}
+
+# Desktops and laptops get the graphical bootloader, the others the text-only one. Its postinst
+# does not write the ESPs: pkg_esps does that once all packages are installed, with the DKMS MOK
+# that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-secboot. pkg_boot_entries
+# then adds its firmware boot entries.
+b_bootloader() {
+    if [[ "${Q_TYPE}" == "desktop" || "${Q_TYPE}" == "laptop" ]]; then
+        add_packages hd-bootloader-gfx
+    else
+        add_packages hd-bootloader-txt
+    fi
+
+    add_packages efibootmgr
+
+    add_dependencies "pkg_post" "pkg_esps" "pkg_boot_entries"
+}
+
+# The Secure Boot keys of the owner, which hd-secboot generates when it is installed. The
+# bootloader signs its files with them.
+b_secureboot() {
+    add_packages hd-secboot
+}
+
+b_systemd() {
+    if [[ "${Q_TYPE}" != "vm" ]]; then
+        add_packages systemd-timesyncd
+    fi
+
+    add_packages systemd-resolved
+
+    # adm lets the user read the logs, which stay in the systemd journal.
+    add_user_groups adm
+}
+
+# The packages of every HyprDebian system are the dependencies of hd-base, which also installs the
+# files in /etc/skel that root gets in pkg_root_skel and the user in u_skel.
+b_utilities() {
+    add_packages hd-base
+
+    if [[ "${Q_TYPE}" == "vm" ]]; then
+        add_packages qemu-guest-agent
+    fi
+
+    add_dependencies "pkg_post" "pkg_utilities" "pkg_root_skel"
+}
+
+# ufw comes with hd-base. pkg_enable_firewall turns it on once it is installed.
+b_firewall() {
+    add_dependencies "pkg_post" "pkg_enable_firewall"
+}
+
+# The network is configured with the hd-network-* commands once hd-network is installed, see
+# pkg_network. Wifi needs iwd, which also handles the login on the wifi network.
+b_network() {
+    add_packages hd-network
+
+    if [[ "${Q_WIFI}" == "true" ]]; then
+        add_packages iwd firmware-iwlwifi
+    fi
+
+    add_dependencies "pkg_post" "pkg_network"
+}
+
+add_dependencies "b_main" \
+    "b_bootstrap" \
+    "b_templates" \
+    "b_fstab" \
+    "b_mdadm" \
+    "b_crypttab" \
+    "b_zfs_cache"  \
+    "b_mount" \
+    "b_mount_unit" \
+    "b_apt_init" \
+    "b_console" \
+    "b_buildtools" \
+    "b_kernel" \
+    "b_zfs_support" \
+    "b_esp" \
+    "b_bootloader" \
+    "b_secureboot" \
+    "b_systemd" \
+    "b_utilities" \
+    "b_firewall" \
+    "b_network" \
+
+add_dependencies "install_root" "b_pre" "b_main" "b_post"

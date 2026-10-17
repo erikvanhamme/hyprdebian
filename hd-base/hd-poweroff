@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+"""Powers off the system, on a desktop and without one.
+
+The package hd-base installs this as /usr/bin/hd-poweroff.
+
+    hd-poweroff   power off
+
+In a Hyprland session with hyprshutdown, hyprshutdown closes the applications and shows
+"Shutting down" first, then runs systemctl poweroff. Otherwise, as on the console, over ssh or on a
+system without a desktop, systemctl poweroff runs right away. Whether the user may do that is up to
+polkit, as for systemctl itself.
+"""
+
+import argparse
+import os
+import shutil
+import sys
+
+ACTION = "poweroff"
+TITLE = "Shutting down"
+
+
+def on_desktop():
+    """True in a Hyprland session that has hyprshutdown."""
+    return bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")) and \
+        shutil.which("hyprshutdown") is not None
+
+
+def main():
+    argparse.ArgumentParser(
+        description=f"{ACTION.capitalize()} the system: with hyprshutdown in a Hyprland session, "
+        f"otherwise with systemctl {ACTION}.").parse_args()
+
+    if on_desktop():
+        command = ["hyprshutdown", "-t", TITLE, "--post-cmd", f"systemctl {ACTION}"]
+    else:
+        command = ["systemctl", ACTION]
+
+    try:
+        os.execvp(command[0], command)
+    except OSError as e:
+        print(f"Error: Cannot run {command[0]}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

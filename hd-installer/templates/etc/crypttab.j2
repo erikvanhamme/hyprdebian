@@ -1,0 +1,4 @@
+# /etc/crypttab: see crypttab(5)
+#
+# <target name>  <source device>  <key file>  <options>
+swap  {{ swap_device }}  /dev/urandom  plain,swap,cipher=aes-xts-plain64,size=512

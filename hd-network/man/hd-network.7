@@ -37,9 +37,17 @@ which name ethernet and wifi interfaces by their path, such as
 and
 .BR wlp2s0 ,
 and give them a persistent MAC address.
+They come before
+.I 99\-default.link
+of systemd, so its naming policy is not used for these interfaces.
 A file with the same name in
 .I /etc/systemd/network
 takes their place.
+.PP
+The initramfs holds a copy of the
+.I .link
+files, so the interfaces get the same names from the start of the boot.
+Installing or upgrading the package has initramfs-tools rebuild it.
 .SH SETTINGS
 The key
 .B hd-network

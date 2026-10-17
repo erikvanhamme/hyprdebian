@@ -1,0 +1,57 @@
+.TH HD-UP 1 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-up \- upgrade the system after a ZFS snapshot
+.SH SYNOPSIS
+.B hd-up
+.SH DESCRIPTION
+.B hd-up
+upgrades the system with
+.BR apt (8),
+after a snapshot of the root dataset, so an upgrade that went wrong can be
+undone with
+.BR "zfs rollback" .
+.IP 1. 4
+It updates the package lists.
+.IP 2. 4
+It shows the packages that can be upgraded, and stops when there are none.
+.IP 3. 4
+It asks whether to go on; anything but
+.B y
+stops it.
+.IP 4. 4
+It takes the snapshot
+.BI rpool/hyprdebian@hd-up- date _ time\fR,
+such as
+.BR rpool/hyprdebian@hd-up-2026-10-17_143000 ,
+and stops when that fails.
+.IP 5. 4
+It runs
+.BR "apt full-upgrade" ,
+so upgrades that need new packages or remove old ones are not held back.
+.PP
+Run it as a user who may use
+.BR sudo (8),
+or as root.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when the system is up to date or the upgrade was cancelled, otherwise the
+exit status of the command that failed.
+.SH EXAMPLES
+Undo the last upgrade, after a reboot into a system that still works, or
+from a live system:
+.PP
+.RS
+.nf
+zfs list \-t snapshot rpool/hyprdebian
+zfs rollback rpool/hyprdebian@hd\-up\-2026\-10\-17_143000
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-base (7),
+.BR apt (8),
+.BR zfs-rollback (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

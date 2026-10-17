@@ -1,0 +1,74 @@
+.TH HD-ISSUE 8 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-issue \- write the HyprDebian login banner
+.SH SYNOPSIS
+.B hd-issue
+.SH DESCRIPTION
+.B hd-issue
+writes the banner in
+.IR /etc/issue ,
+which the console shows above the login prompt:
+.PP
+.RS
+.BI "HyprDebian " version " \(md " type " \(md " suite " \(md " console
+.RE
+.PP
+with the version of HyprDebian from
+.IR /etc/hyprdebian/version.json ,
+the type of the installation from
+.B type
+in the key
+.B hd-installer
+of
+.IR /etc/hyprdebian/config.json ,
+the suite of the HyprDebian packages from
+.IR /etc/apt/sources.list.d/hyprdebian.local.sources ,
+and the name of the console.
+.B HyprDebian
+is shown in brown.
+A value that cannot be found shows as
+.BR unknown .
+.PP
+The postinst of
+.B hd-base
+runs it on every installation and upgrade, and the installer once more after
+it saved the type.
+Run it after changing the type or the suite yourself.
+.B hd-base
+diverts the
+.I /etc/issue
+of base-files to
+.IR /etc/issue.debian .
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXAMPLES
+Save the type of an installation that does not have it yet, and show it in
+the banner:
+.PP
+.RS
+.nf
+hd-config-update hd-installer '{"type": "vm"}'
+hd-issue
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/issue
+The login banner.
+.TP
+.I /etc/issue.debian
+The banner of base-files.
+.TP
+.I /etc/hyprdebian/version.json
+The version of HyprDebian.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR hd-config-update (8),
+.BR agetty (8),
+.BR issue (5)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

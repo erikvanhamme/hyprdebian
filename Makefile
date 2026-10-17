@@ -13,7 +13,7 @@
 # more named <name>_<version>_<arch>.deb, and clean. Add every new package
 # directory to PACKAGES.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-base
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-base hd-installer
 OUT := packages
 
 .PHONY: all clean $(PACKAGES)

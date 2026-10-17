@@ -3,23 +3,34 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: hd-network,
+Depends: python3, sudo, kbd, hd-network,
  openssh-server, kitty-terminfo, ufw,
  zfs-dkms, zfsutils-linux, zfs-initramfs, build-essential, initramfs-tools,
  firmware-linux, firmware-qlogic, efibootmgr,
  locales, keyboard-configuration, console-setup, ca-certificates,
- systemd-resolved, rsyslog,
+ systemd-resolved,
  eza, fzf, nfs-common, psmisc, net-tools, pciutils, usbutils, acpi,
  bash-completion, git, git-delta, ack, command-not-found, man-db, apt-file,
- zram-tools
+ systemd-zram-generator
+Conflicts: zram-tools
 Section: metapackages
 Priority: optional
 Description: HyprDebian base system
  Depends on the packages that every hyprdebian system has, so that they are
  installed with it and stay installed: the network configuration of
  hd-network, the SSH server and the firewall, ZFS with the tools to build its
- module, the firmware, the console, name resolution and logging, and the
+ module, the firmware, the console, name resolution, and the
  command line tools.
  .
- It installs no files of its own besides its man page, and configures
- nothing.
+ It also installs hd-up, which upgrades the system after a ZFS snapshot,
+ hd-reboot and hd-poweroff, which work on a desktop and without one,
+ and the files that new users get in their home directory: aliases for eza
+ and fzf, a git config with delta, and a nano config. It adds ~/.local/bin to
+ the PATH, keeps ifupdown, os-prober and turnstile from being installed, and
+ turns Num Lock on at the console login. It sets up the zram swap, the
+ resolver without a stub, and no presets, masks the units HyprDebian does not
+ use, and points /etc/resolv.conf at the name servers of systemd-resolved.
+ After a login it shows the HyprDebian banner and the state of the system:
+ the pools, the RAID arrays and the failed units. Above the login prompt it
+ shows the version, the type of the installation and the suite, written in
+ /etc/issue by hd-issue.

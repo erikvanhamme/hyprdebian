@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+"""Upgrades the system with apt, after a ZFS snapshot of the root.
+
+The package hd-base installs this as /usr/bin/hd-up.
+
+    hd-up   update the package lists, show the upgrades, and on a yes take a snapshot
+            rpool/hyprdebian@hd-up-<date>_<time> and upgrade
+
+Run it as the user, who must be allowed to use sudo, or as root. The snapshot lets an upgrade
+that went wrong be undone with zfs rollback.
+"""
+
+import argparse
+import datetime
+import os
+import subprocess
+import sys
+
+DATASET = "rpool/hyprdebian"
+
+
+def run(*command, check=True, capture=False):
+    """Runs a command as root, with sudo when this is not root."""
+    if os.geteuid() != 0:
+        command = ("sudo",) + command
+    return subprocess.run(command, check=check, capture_output=capture, text=True)
+
+
+def upgradable():
+    """Returns the lines of apt list --upgradable, one per package."""
+    result = run("apt", "list", "--upgradable", capture=True)
+    return [line for line in result.stdout.splitlines()
+            if line and not line.startswith("Listing...")]
+
+
+def main():
+    argparse.ArgumentParser(
+        description=f"Upgrade the system with apt, after a ZFS snapshot of {DATASET}.").parse_args()
+
+    print("--- 1. Syncing Repositories ---", flush=True)
+    run("apt", "update")
+
+    packages = upgradable()
+    if not packages:
+        print("Everything is current. Exiting.")
+        return
+
+    print(f"\n--- 2. Pending Upgrades ({len(packages)} packages) ---")
+    print("\n".join(packages))
+
+    try:
+        answer = input("\nProceed with Snapshot and Upgrade? (y/N): ")
+    except EOFError:
+        answer = ""
+    if not answer.lower().startswith("y"):
+        print("Upgrade cancelled by user.")
+        return
+
+    snapshot = f"{DATASET}@hd-up-{datetime.datetime.now():%Y-%m-%d_%H%M%S}"
+    print("\n--- 3. Creating ZFS Snapshot ---", flush=True)
+    if run("zfs", "snapshot", snapshot, check=False).returncode != 0:
+        print("Error: Could not create snapshot. Upgrade cancelled.", file=sys.stderr)
+        sys.exit(1)
+    print(f"Snapshot created: {snapshot}")
+
+    # full-upgrade, so packages that need new or removed dependencies are not held back.
+    print("\n--- 4. Executing Upgrade ---", flush=True)
+    sys.exit(run("apt", "full-upgrade", "-y", check=False).returncode)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except subprocess.CalledProcessError as e:
+        sys.exit(e.returncode)
+    except KeyboardInterrupt:
+        sys.exit(130)

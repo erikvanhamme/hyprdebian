@@ -3,7 +3,9 @@ The package `hd-network` renders the systemd-networkd files in `/etc/systemd/net
 
 Installing the package configures nothing: it does not set the key, and it does not run `hd-network-render`.
 
-The package also installs `/usr/lib/systemd/network/10-ethernet.link` and `20-wifi.link`, which name ethernet and wifi interfaces by their path, such as `enp3s0` and `wlp2s0`, and give them a persistent MAC address. A file with the same name in `/etc/systemd/network` takes their place.
+The package also installs `/usr/lib/systemd/network/10-ethernet.link` and `20-wifi.link`, which name ethernet and wifi interfaces by their path, such as `enp3s0` and `wlp2s0`, and give them a persistent MAC address. They come before `99-default.link` of systemd, so its naming policy (onboard, slot, then path names) is not used for these interfaces. A file with the same name in `/etc/systemd/network` takes their place.
+
+The initramfs holds a copy of the `.link` files, so the interfaces get the same names from the start of the boot. Installing or upgrading the package activates the `update-initramfs` trigger of initramfs-tools, which rebuilds it once dpkg is done; this changes no settings.
 
 The package comes with four man pages: `man hd-network` describes the settings, `man hd-network-iface` and `man hd-network-bridge` the commands that change them, and `man hd-network-render` the command that applies them.
 
@@ -28,6 +30,7 @@ hd-network/hd-network-iface
 hd-network/hd-network-bridge
 hd-network/lib/hd_network.py
 hd-network/deb/control
+hd-network/deb/triggers
 hd-network/templates/header.j2
 hd-network/templates/bridge.netdev.j2
 hd-network/templates/interface.network.j2

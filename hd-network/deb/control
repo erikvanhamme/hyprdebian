@@ -15,5 +15,6 @@ Description: HyprDebian network configuration
  hd-network-iface and hd-network-bridge add, change and remove interfaces
  and bridges in the settings, which they write with hd-config-update.
  hd-network-render writes the files and reloads systemd-networkd. The
- package also names ethernet and wifi interfaces by their path, with a
- persistent MAC address. Installing it configures nothing.
+ package also names ethernet and wifi interfaces by their path, such as
+ enp3s0, with a persistent MAC address, also in the initramfs. Installing it
+ configures nothing.

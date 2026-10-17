@@ -1,0 +1,113 @@
+#!/usr/bin/python3
+"""postinst of hd-base: masks the units that HyprDebian does not use, points /etc/resolv.conf at
+the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, and
+writes the login banner in /etc/issue.
+
+The units are masked on the first installation only, or on an upgrade from a version before
+MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
+upgrades. deb-systemd-helper remembers that it masked them, so the postrm of a purge
+can unmask them again.
+
+The resolved config of hd-base turns off the stub resolver on 127.0.0.53, which the link that
+systemd-resolved makes points at. The link is replaced with one to the file with the name servers
+themselves. An /etc/resolv.conf that is not that link is left alone.
+
+The message after a login is /etc/motd followed by the output of the scripts in
+/etc/update-motd.d. 00-hyprdebian of hd-base shows the banner and the state of the system, so
+/etc/motd is emptied, on the first installation like the masks, and 10-uname of base-files, which
+prints the kernel again, is diverted to a name with a dot, which run-parts skips. base-files only
+writes /etc/motd when it is missing. The postrm of a removal puts 10-uname back.
+
+/etc/issue of base-files is diverted to /etc/issue.debian, and hd-issue writes the HyprDebian
+banner in its place, on every installation and upgrade, so it shows the version that is installed.
+The postrm of a removal removes it and puts the one of base-files back.
+"""
+
+import os
+import subprocess
+import sys
+
+# The units that HyprDebian masks: the first boot setup, the presets, which would enable every
+# service, the commit of the machine-id, which is rotated on every shutdown, and rpcbind, which
+# nfs-common pulls in but which is not used.
+MASKED = [
+    "systemd-firstboot.service",
+    "systemd-preset-all.service",
+    "systemd-machine-id-commit.service",
+    "rpcbind.socket",
+    "rpcbind.service",
+]
+
+# The first version of hd-base that masks the units.
+MASKED_SINCE = "0.2"
+
+MOTD = "/etc/motd"
+UNAME = "/etc/update-motd.d/10-uname"
+UNAME_DIVERTED = UNAME + ".base-files"
+ISSUE = "/etc/issue"
+ISSUE_DIVERTED = "/etc/issue.debian"
+
+RESOLV_CONF = "/etc/resolv.conf"
+STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]
+SERVERS_LINK = "../run/systemd/resolve/resolv.conf"
+
+
+def mask_units():
+    for unit in MASKED:
+        subprocess.run(["deb-systemd-helper", "mask", unit], check=True)
+        print(f"Masked {unit}.")
+
+
+def divert(path, diverted):
+    """Diverts a file of another package to another name, unless hd-base already did."""
+    owner = subprocess.run(["dpkg-divert", "--listpackage", path], capture_output=True,
+                           text=True, check=True).stdout.strip()
+    if owner == "hd-base":
+        return
+    subprocess.run(["dpkg-divert", "--package", "hd-base", "--add", "--rename", "--divert",
+                    diverted, path], check=True)
+
+
+def empty_motd():
+    with open(MOTD, "w", encoding="utf-8"):
+        pass
+    print(f"Emptied {MOTD}.")
+
+
+def older_than(version, than):
+    """True if the package version is older than the other one."""
+    return subprocess.run(["dpkg", "--compare-versions", version, "lt", than]).returncode == 0
+
+
+def link_resolv_conf():
+    if not os.path.islink(RESOLV_CONF):
+        return
+    if os.readlink(RESOLV_CONF) not in STUB_LINKS:
+        return
+    tmp = RESOLV_CONF + ".hd-base"
+    if os.path.lexists(tmp):
+        os.remove(tmp)
+    os.symlink(SERVERS_LINK, tmp)
+    os.replace(tmp, RESOLV_CONF)
+    print(f"Pointed {RESOLV_CONF} at {SERVERS_LINK}.")
+
+
+def main():
+    # configure is the only action that installs the package; the abort-* actions undo a
+    # failed upgrade or removal.
+    if len(sys.argv) < 2 or sys.argv[1] != "configure":
+        return
+
+    # The version that was configured before, empty on the first installation.
+    previous = sys.argv[2] if len(sys.argv) > 2 else ""
+    if previous == "" or older_than(previous, MASKED_SINCE):
+        mask_units()
+        empty_motd()
+    link_resolv_conf()
+    divert(UNAME, UNAME_DIVERTED)
+    divert(ISSUE, ISSUE_DIVERTED)
+    subprocess.run(["/usr/sbin/hd-issue"], check=True)
+
+
+if __name__ == "__main__":
+    main()

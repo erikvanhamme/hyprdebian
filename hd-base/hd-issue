@@ -1,0 +1,79 @@
+#!/usr/bin/python3
+"""Writes the login banner in /etc/issue, which the console shows above the login prompt.
+
+The package hd-base installs this as /usr/sbin/hd-issue. Its postinst runs it on every installation
+and upgrade, and the installer once more after it saved the type of the installation.
+
+    hd-issue   write /etc/issue
+
+The banner is "HyprDebian <version> · <type> · <suite> · <tty>": the version of HyprDebian from
+/etc/hyprdebian/version.json, the type of the installation from the key hd-installer of
+/etc/hyprdebian/config.json, the suite of the HyprDebian packages from their apt source, and the
+console. agetty replaces \\e{...} with a color and \\l with the name of the console. A value that
+cannot be found shows as unknown. Run it as root, after a change of the type or the suite.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+ISSUE = "/etc/issue"
+VERSION = "/etc/hyprdebian/version.json"
+CONFIG = "/etc/hyprdebian/config.json"
+SOURCES = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+UNKNOWN = "unknown"
+
+
+def version():
+    """The version of HyprDebian, <major>.<minor>, which hd-base installs."""
+    try:
+        with open(VERSION, encoding="utf-8") as f:
+            v = json.load(f)
+        return f"{int(v['major'])}.{int(v['minor'])}"
+    except (OSError, ValueError, KeyError, TypeError):
+        return UNKNOWN
+
+
+def install_type():
+    try:
+        with open(CONFIG, encoding="utf-8") as f:
+            value = json.load(f)["hd-installer"]["type"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return UNKNOWN
+    return str(value) or UNKNOWN
+
+
+def suite():
+    try:
+        with open(SOURCES, encoding="utf-8") as f:
+            for line in f:
+                match = re.match(r"Suites:\s*(\S+)", line)
+                if match:
+                    return match.group(1)
+    except OSError:
+        pass
+    return UNKNOWN
+
+
+def main():
+    argparse.ArgumentParser(
+        description=f"Write the login banner in {ISSUE}: the version of HyprDebian, the type "
+        "of the installation and the suite.").parse_args()
+    if os.geteuid() != 0:
+        print("Error: This script must be run as root.", file=sys.stderr)
+        sys.exit(1)
+
+    banner = (f"\\e{{brown}}HyprDebian\\e{{reset}} {version()} · {install_type()} · "
+              f"{suite()} · \\l\n\n")
+
+    tmp = ISSUE + ".hd-issue"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(banner)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, ISSUE)
+
+
+if __name__ == "__main__":
+    main()

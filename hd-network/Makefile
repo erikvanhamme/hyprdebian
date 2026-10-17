@@ -25,8 +25,11 @@
 #                 /usr/share/man/man8/hd-network-iface.8.gz
 #                 /usr/share/man/man8/hd-network-bridge.8.gz
 #                                             the man pages in man/
-#               with the control file deb/control. Raise the version in
-#               version.json for every package that is handed out.
+#               with the control file deb/control and deb/triggers, which
+#               has initramfs-tools rebuild the initramfs, so the .link files
+#               name the interfaces from the start of the boot. Raise the
+#               version in version.json for every package that is handed
+#               out.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -61,7 +64,7 @@ $(BUILD):
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): version.json $(SCRIPTS) lib/hd_network.py deb/control $(TEMPLATES) $(LINKS) \
+$(DEB): version.json $(SCRIPTS) lib/hd_network.py deb/control deb/triggers $(TEMPLATES) $(LINKS) \
 		$(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/sbin $(STAGE)$(LIB_DIR) $(STAGE)$(TEMPLATE_DIR) \
@@ -79,6 +82,7 @@ $(DEB): version.json $(SCRIPTS) lib/hd_network.py deb/control $(TEMPLATES) $(LIN
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
+	install -m 0644 deb/triggers $(STAGE)/DEBIAN/
 	dpkg-deb --root-owner-group --build $(STAGE) $@
 
 clean:

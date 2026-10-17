@@ -15,10 +15,12 @@ The project owner (Erik Van Hamme) has final say on all changes. Agents are help
 - **Report what changed.** When a task is done, list the files that were changed and give a short summary, so the owner can review the diff.
 - Read-only git commands (`git status`, `git diff`, `git log`, `git show`, `git blame`) are always allowed.
 
-## Installer version
+## Versions
 
-The installer version is in `version.sh` (`INSTALLER_VERSION="v0.NNN"`). `install.sh` sources that file and shows the version in its start banner.
+The version of HyprDebian is in `version.json` in the root of the repository (`{"major": 1, "minor": N}`). It is also the version of the package `hd-base`, which installs a copy as `/etc/hyprdebian/version.json`; the login banner and the message after a login show it. It replaces `version.sh` of the old installer.
 
-- **Bump it when a change affects the installer or the systems it installs.** That covers `install.sh`, `version.sh`, `scripts/`, `templates/`, `deploy/`, `render.py`, `kernels.py` and anything else the installer runs or copies into the target system.
-- **Bump it once per set of working changes, not once per edit.** Before finishing a task, run `git diff HEAD -- version.sh`. If it already shows an uncommitted bump, leave it; otherwise bump. Never assume from earlier in the session: the owner may have committed in the meantime.
-- **Only increment the minor number** (e.g. `v0.129` → `v0.130`). Never change the major number; the decision to go to `v1.0` belongs to the owner.
+- **Bump it when a change affects a package or the installer.** That covers every `hd-*` package folder, `hd-installer/` among them, and anything else that ends up in a package or on an installed system.
+- **Bump it once per set of working changes, not once per edit.** Before finishing a task, run `git diff HEAD -- version.json`. If it already shows an uncommitted bump, or the file is not committed yet, leave it; otherwise bump. Never assume from earlier in the session: the owner may have committed in the meantime.
+- **Only increment the minor number** (e.g. `1.4` → `1.5`). Never change the major number; that decision belongs to the owner.
+
+Every other `hd-*` package also has a `version.json` of its own, in its folder, with the version of that package. Bump its minor number when that package changes, once per set of working changes, in the same way. `hd-base` has none: its version is the one in the root.
