@@ -121,6 +121,12 @@ the name servers themselves, in place of the stub resolver, when it is the
 link that
 .B systemd-resolved
 made.
+When that file is missing, because
+.B systemd-resolved
+does not run, as in the chroot of the installer, it is made with the name
+servers of the old link, so names keep resolving until
+.B systemd-resolved
+starts.
 It empties
 .IR /etc/motd ,
 on the first installation like the masks, and diverts
