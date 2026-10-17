@@ -1,0 +1,198 @@
+.TH HD-BOOTLOADER 7 "October 2026" "hd-bootloader" "HyprDebian"
+.SH NAME
+hd-bootloader \- the hyprdebian EFI bootloader
+.SH DESCRIPTION
+The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the
+unified kernel images (UKIs) of the four most recent kernels, each in a
+normal and a ZFS recovery profile, and boots the chosen one.
+It comes in two packages, of which only one can be installed:
+.TP
+.B hd-bootloader-gfx
+the graphical frontend: the menu on the wallpaper of
+.BR hd-art ,
+in the JetBrains Mono Nerd Font of
+.BR hd-fonts ;
+.TP
+.B hd-bootloader-txt
+the text frontend: the menu on the text console of the firmware.
+.PP
+.BR hd-bootloader-update (8)
+builds the UKIs and writes them, the bootloader and
+.I assets.efi
+to an EFI system partition (ESP).
+.I assets.efi
+holds the settings, the menu and the DKMS MOK, which the bootloader hands to
+the kernel so that it loads the DKMS-built ZFS module under Secure Boot.
+.PP
+.I /usr/lib/hd-bootloader/update-esps
+runs
+.B hd-bootloader-update
+for
+.I /boot/efi
+and, when it exists,
+.IR /boot/efi2 .
+The kernel and initramfs hooks of the package run it when a kernel or an
+initrd is installed or removed.
+All ESPs are checked before any is written; a missing one makes the hook,
+and with it the kernel package or apt, fail.
+.SH INSTALLATION
+The postinst stores the default settings of the package in the key
+.B hd-bootloader
+of
+.IR /etc/hyprdebian/config.json ,
+with
+.BR hd-config-update (8):
+.IP \(bu 2
+when there are no settings yet, the defaults of the package;
+.IP \(bu 2
+when the settings are those of the other frontend, as when switching from
+.B hd-bootloader-gfx
+to
+.BR hd-bootloader-txt ,
+the defaults of the package, keeping
+.BR timeout ,
+.B banner_text
+and
+.BR cmdline ;
+.IP \(bu 2
+otherwise, the settings are left as they are.
+.PP
+The postinst does not write the ESPs.
+That happens with the next kernel or initrd, or by running:
+.PP
+.RS
+/usr/lib/hd-bootloader/update-esps
+.RE
+.SH SETTINGS
+The key
+.B hd-bootloader
+holds a JSON object.
+All its fields are optional; a missing field gets its default.
+A field of the other frontend is an error.
+.PP
+The fields of both frontends:
+.TP
+.B frontend
+.B graphical
+or
+.BR text ,
+the frontend of the installed package.
+.TP
+.B timeout
+Seconds before the default entry boots; 5 by default.
+.TP
+.B banner_text
+The text above the menu;
+.B HyprDebian Bootloader
+by default.
+.TP
+.B cmdline
+The kernel command line of the UKIs, an object with
+.B root
+(the value of
+.BR root= ,
+.B ZFS=rpool/hyprdebian
+by default),
+.B quiet
+and
+.B splash
+.RB ( true
+by default), and
+.BR extra ,
+a list of more arguments.
+.PP
+The fields of the graphical frontend:
+.TP
+.B wallpaper
+The wallpaper, a PNG or other image;
+.I /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
+by default.
+A relative path is relative to
+.IR /etc/hyprdebian .
+.TP
+.BR res_x ", " res_y
+The display resolution of the bootloader; 1920 by 1080 by default.
+.TP
+.B font
+The fontconfig name or file of the font;
+.B JetBrainsMono Nerd Font Mono
+by default.
+.TP
+.BR color ", " selected_color
+The colour of the menu labels, and of the selected label and the border of
+the menu box;
+.B #0066cc
+and
+.B #ff6600
+by default.
+.TP
+.B border_width
+The width of the border of the menu box in pixels; 5 by default.
+.TP
+.B work_area_size
+The width and height of the menu box in percent of the screen; 80 by
+default.
+The texts scale with it.
+.TP
+.BR x_center ", " y_center
+The centre of the menu box in percent of the screen; 50 by default.
+.SH CHANGING THE SETTINGS
+Write the whole key with
+.BR hd-config-update (8),
+then update the ESPs:
+.PP
+.RS
+.nf
+hd-config-update hd-bootloader < bootloader.json
+/usr/lib/hd-bootloader/update-esps
+.fi
+.RE
+.SH SECURE BOOT
+The packages do not depend on
+.BR hd-secboot (7).
+When its keys are in
+.IR /etc/hyprdebian/secboot ,
+.B hd-bootloader-update
+signs the bootloader,
+.I assets.efi
+and the UKIs with the db key, using
+.BR sbsign (1);
+otherwise it writes them unsigned, and says so.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration, with the settings under the key
+.BR hd-bootloader .
+.TP
+.I /usr/share/hd-bootloader/defaults.json
+The default settings of the installed package.
+.TP
+.I /usr/lib/hd-bootloader
+The bootloader, the assets stub and the scripts.
+.TP
+.I /usr/lib/hd-bootloader/update-esps
+Updates every ESP.
+.TP
+.I /etc/kernel/postinst.d/zz\-hd\-bootloader
+.TQ
+.I /etc/kernel/postrm.d/zz\-hd\-bootloader
+.TQ
+.I /etc/initramfs/post\-update.d/zz\-hd\-bootloader
+The hooks that run
+.I update-esps
+when a kernel or initrd changes.
+.TP
+.I /var/lib/dkms/mok.pub
+The DKMS MOK.
+.TP
+.I /etc/hyprdebian/secboot/db.key
+.TQ
+.I /etc/hyprdebian/secboot/db.crt
+The Secure Boot db key and its certificate, when they are there.
+.SH SEE ALSO
+.BR hd-bootloader-update (8),
+.BR hd-config (7),
+.BR hd-secboot (7),
+.BR ukify (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

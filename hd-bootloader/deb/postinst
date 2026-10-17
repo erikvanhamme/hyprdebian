@@ -1,0 +1,70 @@
+#!/usr/bin/python3
+"""postinst of hd-bootloader-gfx and hd-bootloader-txt: stores the default settings of the
+bootloader in the key hd-bootloader of /etc/hyprdebian/config.json with hd-config-update.
+
+    no settings yet             the defaults of this package are stored
+    settings of the other one   the defaults of this package are stored, keeping the settings
+                                that both frontends have: timeout, banner_text and cmdline
+    settings of this one        they are left as they are
+
+The ESPs are not updated: that happens with the next kernel or initrd, or by running
+/usr/lib/hd-bootloader/update-esps.
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-bootloader"
+CONFIG_UPDATE = "/usr/sbin/hd-config-update"
+DEFAULTS_FILE = "/usr/share/hd-bootloader/defaults.json"
+UPDATE_ESPS = "/usr/lib/hd-bootloader/update-esps"
+# The frontend of a config without the key frontend, as in update-bootloader.py.
+DEFAULT_FRONTEND = "graphical"
+# The settings of every frontend.
+COMMON_KEYS = ["timeout", "banner_text", "cmdline"]
+
+
+def current_settings():
+    if not os.path.exists(CONFIG_FILE):
+        return None
+    with open(CONFIG_FILE, encoding="utf-8") as f:
+        config = json.load(f)
+    if not isinstance(config, dict):
+        return None
+    return config.get(CONFIG_KEY)
+
+
+def main():
+    # configure is the only action that installs the package; the abort-* actions undo a
+    # failed upgrade or removal.
+    if len(sys.argv) < 2 or sys.argv[1] != "configure":
+        return
+
+    with open(DEFAULTS_FILE, encoding="utf-8") as f:
+        defaults = json.load(f)
+    current = current_settings()
+
+    if not isinstance(current, dict):
+        print(f"Storing the default bootloader settings in {CONFIG_FILE}.")
+        settings = defaults
+    elif current.get("frontend", DEFAULT_FRONTEND) != defaults["frontend"]:
+        print(f"Storing the bootloader settings of the {defaults['frontend']} frontend in "
+              f"{CONFIG_FILE}, keeping {', '.join(COMMON_KEYS)}.")
+        settings = dict(defaults)
+        for key in COMMON_KEYS:
+            if key in current:
+                settings[key] = current[key]
+    else:
+        print(f"Keeping the bootloader settings in {CONFIG_FILE}.")
+        settings = None
+
+    if settings is not None:
+        subprocess.run([CONFIG_UPDATE, CONFIG_KEY, json.dumps(settings)], check=True)
+    print(f"The EFI system partitions are not updated now; run {UPDATE_ESPS} to update them.")
+
+
+if __name__ == "__main__":
+    main()

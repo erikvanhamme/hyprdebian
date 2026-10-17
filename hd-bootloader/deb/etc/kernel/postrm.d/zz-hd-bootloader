@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Rebuilds the hyprdebian bootloader UKIs on every ESP after a kernel is
+# removed, so the menu no longer offers it. The zz- prefix runs this after
+# the other hooks, initramfs-tools among them, which removes the initrd.
+set -euo pipefail
+
+HELPER=/usr/lib/hd-bootloader/update-esps
+
+# Left behind when the package is removed but not purged.
+if [[ ! -x "${HELPER}" ]]; then
+    exit 0
+fi
+
+# Kernel packages run this on every postrm; only remove removes the kernel,
+# purge comes after it. Without DEB_MAINT_PARAMS this runs outside of a
+# kernel package.
+if [[ -n "${DEB_MAINT_PARAMS:-}" ]]; then
+    eval set -- "${DEB_MAINT_PARAMS}"
+    if [[ "${1:-}" != "remove" ]]; then
+        exit 0
+    fi
+fi
+
+exec "${HELPER}"

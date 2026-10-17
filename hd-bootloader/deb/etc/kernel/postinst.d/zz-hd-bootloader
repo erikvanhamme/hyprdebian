@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Rebuilds the hyprdebian bootloader UKIs on every ESP after a kernel is
+# installed. The zz- prefix runs this after the other hooks, dkms and
+# initramfs-tools among them.
+set -euo pipefail
+
+HELPER=/usr/lib/hd-bootloader/update-esps
+
+# Left behind when the package is removed but not purged.
+if [[ ! -x "${HELPER}" ]]; then
+    exit 0
+fi
+
+# Kernel packages run this on every postinst; only configure installs the
+# kernel. Without DEB_MAINT_PARAMS this runs outside of a kernel package.
+if [[ -n "${DEB_MAINT_PARAMS:-}" ]]; then
+    eval set -- "${DEB_MAINT_PARAMS}"
+    if [[ "${1:-}" != "configure" ]]; then
+        exit 0
+    fi
+fi
+
+# initramfs-tools builds the initrd of the new kernel in its own hook, and
+# update-initramfs then runs /etc/initramfs/post-update.d/zz-hd-bootloader,
+# which already rebuilt the UKIs.
+if [[ "${INITRD:-}" != "No" ]] && command -v update-initramfs >/dev/null \
+    && [[ "$(update-initramfs --version | cut -d ' ' -f 1)" == "initramfs-tools" ]]; then
+    exit 0
+fi
+
+exec "${HELPER}"

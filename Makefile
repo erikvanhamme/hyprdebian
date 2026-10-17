@@ -2,17 +2,18 @@
 # server checks out this repository and runs make all.
 #
 #   make all        build every package in PACKAGES
-#   make <package>  build one package: make deb in its directory, then copy
-#                   the package to packages/, in place of older versions of
-#                   that package
+#   make <package>  build one package directory: make deb in it, then copy
+#                   the packages it built to packages/, each in place of
+#                   older versions of that package
 #   make clean      remove packages/ and run make clean in every package
 #                   directory
 #
 # Each package is a directory with a Makefile that has the targets deb,
-# deb-path, which prints the path of the package that deb builds, and clean.
-# Add every new package directory to PACKAGES.
+# deb-path, which prints the paths of the packages that deb builds, one or
+# more named <name>_<version>_<arch>.deb, and clean. Add every new package
+# directory to PACKAGES.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader
 OUT := packages
 
 .PHONY: all clean $(PACKAGES)
@@ -24,8 +25,11 @@ $(OUT):
 
 $(PACKAGES): | $(OUT)
 	$(MAKE) -C $@ deb
-	rm -f $(OUT)/$@_*.deb
-	install -m 0644 $@/$$($(MAKE) -s --no-print-directory -C $@ deb-path) $(OUT)/
+	for deb in $$($(MAKE) -s --no-print-directory -C $@ deb-path); do \
+		name=$$(basename $$deb); \
+		rm -f $(OUT)/$${name%%_*}_*.deb; \
+		install -m 0644 $@/$$deb $(OUT)/; \
+	done
 
 clean:
 	rm -rf $(OUT)

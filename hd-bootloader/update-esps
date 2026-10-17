@@ -1,0 +1,64 @@
+#!/usr/bin/python3
+"""Runs hd-bootloader-update for every EFI system partition of the system, so that each holds
+the UKIs of the kernels now in /boot. The kernel and initramfs hooks of the hd-bootloader
+packages run this after a kernel or initrd is installed or removed.
+
+The ESPs are /boot/efi and, on systems with mirrored drives, /boot/efi2 when it exists. Both may
+be automounted. All ESPs are checked before any is written, and a missing one fails this
+script, which makes the kernel package or apt fail: a system with a missing drive should not be
+upgraded.
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+
+UPDATE = "/usr/sbin/hd-bootloader-update"
+ESP = "/boot/efi"
+ESP2 = "/boot/efi2"
+
+
+def fail(message):
+    print(f"hd-bootloader: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def check(esp):
+    # Listing the ESP mounts it when it is automounted. With its drive missing, that fails once
+    # the mount unit times out.
+    try:
+        os.listdir(esp)
+    except OSError:
+        fail(f"{esp}: the EFI system partition cannot be read")
+    if not os.path.ismount(esp):
+        fail(f"{esp}: the EFI system partition is not mounted")
+    # An automount point is a mount point of its own, of type autofs, until the ESP is mounted
+    # over it.
+    fstype = subprocess.run(["stat", "-f", "-c", "%T", f"{esp}/."], capture_output=True,
+                            text=True).stdout.strip()
+    if fstype == "autofs":
+        fail(f"{esp}: the EFI system partition is not mounted")
+
+
+def main():
+    argparse.ArgumentParser(
+        description=f"Run {UPDATE} for {ESP} and, when it exists, {ESP2}.").parse_args()
+    if os.geteuid() != 0:
+        fail("must be run as root")
+
+    esps = [ESP]
+    if os.path.isdir(ESP2):
+        esps.append(ESP2)
+
+    for esp in esps:
+        check(esp)
+    for esp in esps:
+        print(f"hd-bootloader: updating {esp}", file=sys.stderr, flush=True)
+        result = subprocess.run([UPDATE, "--esp", esp])
+        if result.returncode != 0:
+            sys.exit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()

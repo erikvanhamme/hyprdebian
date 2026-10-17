@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Rebuilds the hyprdebian bootloader UKIs on every ESP after update-initramfs
+# wrote an initrd, as each UKI holds a copy of its initrd. update-initramfs
+# runs this with the kernel version and the initrd as arguments; all UKIs are
+# rebuilt, and those that would not change are left alone.
+set -euo pipefail
+
+HELPER=/usr/lib/hd-bootloader/update-esps
+
+# Left behind when the package is removed but not purged.
+if [[ ! -x "${HELPER}" ]]; then
+    exit 0
+fi
+
+exec "${HELPER}"

@@ -1,0 +1,113 @@
+.TH HD-BOOTLOADER-UPDATE 8 "October 2026" "hd-bootloader" "HyprDebian"
+.SH NAME
+hd-bootloader-update \- write the hyprdebian bootloader and its UKIs to an EFI system partition
+.SH SYNOPSIS
+.B hd-bootloader-update
+.B \-\-esp
+.I dir
+.RI [ options ]
+.SH DESCRIPTION
+.B hd-bootloader-update
+reads the settings from the key
+.B hd-bootloader
+in
+.I /etc/hyprdebian/config.json
+and writes, below the EFI system partition
+.IR dir :
+.TP
+.I EFI/BOOT/BOOTX64.EFI
+the bootloader of the frontend of the installed package;
+.TP
+.I EFI/BOOT/assets.efi
+the settings, the menu rows, the DKMS MOK and the assets of the frontend,
+as sections of a PE image that the bootloader loads with LoadImage, so the
+firmware checks its signature under Secure Boot;
+.TP
+.I EFI/Linux/HyprDebian\-Kernel\-x.y.z.efi
+multi-profile UKIs of the four most recent kernels in
+.IR /boot ,
+with a normal and a ZFS recovery profile.
+.PP
+See
+.BR hd-bootloader (7)
+for the settings.
+Usually it is not run by hand, but by
+.I /usr/lib/hd-bootloader/update-esps
+for every ESP.
+.PP
+The files are written in an order that leaves a bootable ESP when it is
+interrupted: first the UKIs, then
+.I assets.efi
+and
+.IR BOOTX64.EFI ,
+and only then are the UKIs of older kernels removed.
+A file whose contents would not change is not rewritten.
+.PP
+When the Secure Boot keys of
+.BR hd-secboot (7)
+are in
+.IR /etc/hyprdebian/secboot ,
+the files are signed with the db key before they replace those on the ESP;
+a file that would not change is signed again when it does not verify with
+the db certificate.
+Without the keys, the files are written unsigned, with a message saying so.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BI \-\-esp " dir"
+The root of the EFI system partition to write to. Required.
+.TP
+.BI \-\-config " file"
+Read the settings from the JSON object in
+.I file
+instead of the key
+.B hd-bootloader
+in
+.IR /etc/hyprdebian/config.json .
+.TP
+.BI \-\-boot\-dir " dir"
+Where the kernels are;
+.I /boot
+by default.
+.TP
+.BI \-\-mok " file"
+The certificate of the DKMS MOK, DER or PEM;
+.I /var/lib/dkms/mok.pub
+by default.
+It is needed to boot with the ZFS module.
+.TP
+.BI \-\-db\-key " file"
+.TQ
+.BI \-\-db\-cert " file"
+The Secure Boot db key and its PEM certificate;
+.I /etc/hyprdebian/secboot/db.key
+and
+.I db.crt
+by default.
+.TP
+.BI \-\-bootloader\-dir " dir"
+.TQ
+.BI \-\-assets\-stub " file"
+Where the compiled bootloaders and the assets stub are;
+.I /usr/lib/hd-bootloader
+by default.
+.TP
+.BR \-h ", " \-\-help
+Show the help and exit.
+.SH EXIT STATUS
+0 when the ESP was written, not 0 on an error.
+.SH EXAMPLES
+Update the ESP in
+.IR /boot/efi :
+.PP
+.RS
+hd-bootloader-update \-\-esp /boot/efi
+.RE
+.SH SEE ALSO
+.BR hd-bootloader (7),
+.BR hd-secboot (7),
+.BR ukify (1),
+.BR sbsign (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
