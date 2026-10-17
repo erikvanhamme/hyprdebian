@@ -11,6 +11,9 @@
 #                                             the man page in man/
 #               with the control file deb/control. Raise the version in
 #               version.json for every package that is handed out.
+#   make deb-path
+#               print the path of the package that make deb builds,
+#               relative to this directory, for the Makefile in the root
 #   make clean  remove build/
 
 BUILD := build
@@ -26,9 +29,12 @@ WALLPAPERS := $(wildcard wallpapers/*.png)
 # The man pages, named <page>.<section>.
 MANPAGES := man/hd-art.7
 
-.PHONY: deb clean
+.PHONY: deb deb-path clean
 
 deb: $(DEB)
+
+deb-path:
+	@echo $(DEB)
 
 $(BUILD):
 	mkdir -p $@

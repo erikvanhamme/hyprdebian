@@ -21,6 +21,9 @@
 #               signs the first indices and enables the nginx site in place
 #               of the default one. Raise the version in version.json for
 #               every package that is handed out.
+#   make deb-path
+#               print the path of the package that make deb builds,
+#               relative to this directory, for the Makefile in the root
 #   make clean  remove build/
 
 BUILD := build
@@ -34,9 +37,12 @@ SITE := /etc/nginx/sites-available/hd-repo
 # The man pages, named <page>.<section>.
 MANPAGES := man/hd-repo.7 man/hd-repo-update.1
 
-.PHONY: deb clean
+.PHONY: deb deb-path clean
 
 deb: $(DEB)
+
+deb-path:
+	@echo $(DEB)
 
 $(BUILD):
 	mkdir -p $@

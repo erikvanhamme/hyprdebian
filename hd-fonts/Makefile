@@ -22,6 +22,9 @@
 #               cache through its own dpkg trigger on /usr/share/fonts.
 #               Raise the version in version.json for every package that is
 #               handed out.
+#   make deb-path
+#               print the path of the package that make deb builds,
+#               relative to this directory, for the Makefile in the root
 #   make clean  remove build/, also the downloaded zip
 
 BUILD := build
@@ -46,9 +49,12 @@ ZIP := $(BUILD)/JetBrainsMono-$(NERD_FONTS_VERSION).zip
 # styles. The pattern of the first does not match the files of the second.
 FONT_FILES := 'JetBrainsMonoNerdFont-*.ttf' 'JetBrainsMonoNerdFontMono-*.ttf'
 
-.PHONY: deb clean
+.PHONY: deb deb-path clean
 
 deb: $(DEB)
+
+deb-path:
+	@echo $(DEB)
 
 $(BUILD):
 	mkdir -p $@
