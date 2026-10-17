@@ -49,10 +49,6 @@ source scripts/questions.sh
 source scripts/base.sh
 source scripts/optional.sh
 
-# The deb phase builds the packages that are in no repo, like the bootloader, so that upg_packages
-# can install new ones and newer builds of installed ones.
-source scripts/deb.sh
-
 # Load the phases with the tasks that the queuing tasks attach to their hooks. Only these tasks
 # run, see upg_hooks.
 source scripts/packages.sh
@@ -60,22 +56,13 @@ source scripts/services.sh
 source scripts/user.sh
 
 # Tasks that only make sense during an installation. The suite of an installed system is kept.
-mark_done "q_suite"
-mark_done "q_disk"
-mark_done "q_password"
 mark_done "q_kernel"
 
 add_dependencies "upgrade" \
     "q_main" \
     "b_files" \
-    "b_templates" \
-    "b_bootloader" \
-    "b_secureboot" \
     "b_systemd" \
-    "b_utilities" \
-    "b_network" \
     "o_main" \
-    "deb_main" \
 
 # Load the upgrade phase.
 source scripts/upgrade.sh

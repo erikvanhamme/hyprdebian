@@ -18,12 +18,6 @@ svc_enable() {
     done
 }
 
-svc_systemd() {
-    ln -sf /run/systemd/resolve/resolv.conf ${TARGET_DIR}/etc/resolv.conf || return 1
-
-    in_target systemctl mask systemd-firstboot.service systemd-preset-all.service systemd-machine-id-commit.service rpcbind.socket rpcbind.service 
-}
-
 svc_qemu_kvm() {
 
     # Ensure these are disabled to not force TCP or TLS listening
@@ -38,6 +32,5 @@ svc_backuptools() {
 
 add_dependencies "svc_main" \
     "svc_enable" \
-    "svc_systemd" \
 
 add_dependencies "install" "svc_pre" "svc_main" "svc_post"

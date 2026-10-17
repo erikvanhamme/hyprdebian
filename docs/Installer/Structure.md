@@ -1,5 +1,7 @@
 ## Introduction
-This part of the documentation describes how the hyprdebian installer is built. It is meant for anyone who wants to change or extend the installer.
+This part of the documentation describes how the old HyprDebian installer is built. It is meant for anyone who wants to change or extend the installer.
+
+The parts that `hd-installer` already does, such as the disks, the base system, the bootloader, the network and the user account, have been removed from it, with their files in `deploy/` and `templates/`. What is left still has to be ported. See [hd-installer](../packages/hd-installer.md).
 
 The installer documentation is split into these documents:
 - **Structure** (this document): the layout of the repo and what happens when the installer starts.
@@ -61,7 +63,7 @@ The script runs with `set -eo pipefail`, so the installer stops at the first fai
 ## Running commands in the target
 Commands that must run inside the target system use `in_target`:
 ```
-in_target apt install -y build-essential
+in_target apt install -y docker.io
 ```
 
-This runs the command in a `chroot` of `/mnt`, with a clean environment that only has `HOME`, `TERM` and `PATH`. The base phase bind mounts `/dev`, `/proc` and `/sys` into the target first (`b_mount`), so tasks that use `in_target` must run after it.
+This runs the command in a `chroot` of `/mnt`, with a clean environment that only has `HOME`, `TERM` and `PATH`. `/dev`, `/proc` and `/sys` must be bind mounted into the target first.

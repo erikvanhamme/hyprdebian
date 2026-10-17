@@ -7,27 +7,20 @@ scripts/questions.sh
 ```
 
 ## Asking questions
-Every answer is stored in a variable with the `Q_` prefix (`Q_TYPE`, `Q_HOSTNAME`, `Q_ENCRYPT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
+Every answer is stored in a variable with the `Q_` prefix (`Q_DESKTOP`, `Q_DOCKER`, `Q_REPORT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
 
 | Function | Purpose |
 | --- | --- |
 | `ask var prompt [default]` | Asks for a free text value. |
-| `ask_options var prompt default option...` | Asks to pick one of a numbered list of options. |
 | `ask_yes_no var prompt [default]` | Asks a yes/no question. Stores `true` or `false`, and succeeds on yes, so it can be used in an `if`. |
-| `ask_password var prompt` | Asks for a password twice. The password is never saved. |
 
-Each answer (except the password) is saved in the configuration file immediately. See [Idempotency](Idempotency.md).
+Each answer is saved in the configuration file immediately. See [Idempotency](Idempotency.md).
 
-Which questions are asked depends on earlier answers. For example, `q_wifi` only asks for the wifi interface when wifi is enabled.
+Which questions are asked depends on earlier answers. For example, `q_report` only asks for the URL of the dashboard when status reports are enabled.
 
-`Q_SUITE` is the Debian suite that is installed. It is only asked for a server or a vm, which can be installed with `unstable`, `forky` (testing) or `trixie` (stable), the `SUITES` in `scripts/defaults.sh`. A desktop or laptop always gets `unstable`, the suite hyprdebian is based on, unless a saved value exists.
-
-On a suite other than `unstable`, these questions are not asked, and are answered with no:
+The machine type `Q_TYPE`, the suite `Q_SUITE` and the questions about the disks, the user, the host and the network are asked by `hd-installer` (see [hd-installer](../packages/hd-installer.md)). On a suite other than `unstable`, these questions are not asked, and are answered with no:
 - `Q_SPECIFIC_KERNEL`: the kernel is `latest`, the kernel of the suite. The ZFS module of the suite may not build for a kernel from elsewhere.
 - `Q_DESKTOP`: the desktop needs packages that are only in `unstable`.
-- `Q_REPO_ENABLED`: the packages in the hyprdebian repo are built for `unstable`.
-
-On a suite other than `unstable`, `debian.sources` also has the `-updates` and `-security` suites.
 
 ## Machine type defaults
 The defaults for the questions depend on the machine type (`desktop`, `laptop`, `server` or `vm`). They are defined in:

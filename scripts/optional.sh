@@ -12,24 +12,7 @@ o_post() {
     return 0
 }
 
-o_wifi() {
-    add_packages iwd firmware-iwlwifi
-
-    add_services iwd
-
-    add_template templates/etc/systemd/network/60-wlanx.network.j2
-
-    add_files deploy/etc/systemd/network/20-wifi.link
-
-    # Do not block the boot if no network comes online during boot.
-    in_target systemctl mask systemd-networkd-wait-online.service
-}
-
 o_firewall() {
-    add_packages ufw
-
-    add_dependencies "pkg_post" "pkg_enable_firewall"
-
     if [[ "${Q_QEMU_KVM}" == "true" ]]; then
         add_files \
             "deploy/etc/modules-load.d/br_netfilter.conf" \
@@ -42,16 +25,6 @@ o_firewall() {
             deploy/etc/ufw/after.rules \
             
     fi
-}
-
-# The art package with the wallpapers is built by the deb phase, see deb_art.
-o_art() {
-    add_packages hyprdebian-art
-}
-
-# The font package is built by the deb phase, see deb_font.
-o_font() {
-    add_packages fontconfig fonts-jetbrainsmono-nerd
 }
 
 o_greetd() {
@@ -95,8 +68,6 @@ o_hyprland() {
             deploy/usr/local/bin/hd-mode-select \
             deploy/usr/local/bin/hd-mount \
             deploy/usr/local/bin/hd-mount-helper \
-            deploy/usr/local/bin/hd-poweroff \
-            deploy/usr/local/bin/hd-reboot \
             deploy/usr/local/bin/hd-unmount \
             deploy/usr/local/bin/hd-volume-down \
             deploy/usr/local/bin/hd-volume-mute \
@@ -250,10 +221,6 @@ o_syscargo_permissions() {
     in_target chmod -R g+w /usr/local
 }
 
-o_openssh() {
-    add_packages openssh-server kitty-terminfo
-}
-
 o_report() {
     # Keep an existing token, so a rerun or an upgrade does not lock the system out of the
     # dashboard, which only accepts the first token it sees for a host name.
@@ -275,10 +242,11 @@ o_report() {
 }
 
 add_dependencies "o_desktop" \
-    "o_art" \
-    "o_font" \
     "o_greetd" \
     "o_hyprland" \
     "o_theme" \
+
+# The firewall is always on, so its rules for the optional components are always queued.
+add_dependencies "o_main" "o_firewall"
 
 add_dependencies "install" "o_pre" "o_main" "o_post"

@@ -42,10 +42,10 @@ Some things to keep in mind:
 ## Static and dynamic dependencies
 Dependencies can be added in two ways:
 - **Statically**, in the body of a phase script. These are registered every time the script is sourced.
-- **Dynamically**, from within a task, usually in response to an answer of the user. For example, when the user answers yes to "Install firewall", `q_firewall` adds `o_firewall` to `o_main`:
+- **Dynamically**, from within a task, usually in response to an answer of the user. For example, when the user answers yes to "Enable docker", `q_docker` adds `o_docker` to `o_main`:
   ```
-  if ask_yes_no Q_FIREWALL "Install firewall" "${default}"; then
-      add_dependencies "o_main" "o_firewall"
+  if ask_yes_no Q_DOCKER "Enable docker" "${default}"; then
+      add_dependencies "o_main" "o_docker"
   fi
   ```
 

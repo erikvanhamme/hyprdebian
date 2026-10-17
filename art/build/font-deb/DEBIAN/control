@@ -1,0 +1,10 @@
+Package: fonts-jetbrainsmono-nerd
+Version: 3.4.0
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: 227855
+Section: fonts
+Priority: optional
+Description: JetBrains Mono Nerd Font
+ The JetBrains Mono font patched with the Nerd Fonts glyphs, release
+ v3.4.0, in /usr/local/share/fonts.

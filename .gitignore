@@ -6,6 +6,4 @@ __pycache__/
 .coverage
 .coverage.*
 htmlcov/
-bootloader/build
-art/build
 /packages/

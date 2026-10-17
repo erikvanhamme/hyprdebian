@@ -86,104 +86,6 @@ ask() {
     save_config "$var_name" "$input"
 }
 
-# Asks for a password twice without echoing it. The password is never saved to the config.
-ask_password() {
-    local var_name="$1"
-    local prompt="$2"
-    local pw1 pw2
-
-    while true; do
-        read -rsp "$prompt: " pw1
-        echo
-        read -rsp "Repeat ${prompt,}: " pw2
-        echo
-
-        # ZFS requires passphrases of at least 8 characters.
-        if [[ "$pw1" != "$pw2" ]]; then
-            echo "Passwords do not match." >&2
-        elif (( ${#pw1} < 8 )); then
-            echo "Password must be at least 8 characters." >&2
-        else
-            break
-        fi
-    done
-
-    printf -v "$var_name" "%s" "$pw1"
-    export -n "$var_name" # Keep it out of the environment of child processes.
-}
-
-# Asks to pick one of the options. The optional default is the text of one of the options,
-# pass "" for none. A value already set for the variable wins over the default.
-# With a default, the question is not asked when accept_default says so.
-# Usage: ask_options <var> <prompt> <default> <option>...
-ask_options() {
-    local var_name="$1"
-    local prompt="$2"
-    local default="$3"
-    shift 3
-
-    # Collect remaining arguments as options array
-    local options=("$@")
-    local total_options=${#options[@]}
-
-    if (( total_options == 0 )); then
-        echo "Error: No options provided to ask_options" >&2
-        return 1
-    fi
-
-    local current="${!var_name:-}"
-    local current_idx="" default_idx=""
-    local i
-
-    # Look up the indexes of the current value and the default.
-    for (( i=0; i<total_options; i++ )); do
-        [[ -n "$current" && "${options[i]}" == "$current" ]] && current_idx=$((i + 1))
-        [[ -n "$default" && "${options[i]}" == "$default" ]] && default_idx=$((i + 1))
-    done
-
-    if [[ -n "$default" && -z "$default_idx" ]]; then
-        echo "Error: Default '$default' is not one of the options of ask_options" >&2
-        return 2
-    fi
-
-    # Prefer the current value, then the default, then option 1.
-    default_idx="${current_idx:-${default_idx:-1}}"
-
-    local choice_prompt="$prompt [$default_idx]: "
-    local input choice_idx
-
-    if accept_default "$var_name" "$default"; then
-        choice_idx=$((default_idx - 1))
-        echo "$prompt: ${options[choice_idx]}"
-    else
-        # Display numbered options.
-        for (( i=0; i<total_options; i++ )); do
-            printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
-        done
-
-        while true; do
-            read -rp "$choice_prompt" input
-            input="${input:-$default_idx}"
-
-            # Validate numeric input within valid bounds
-            if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= total_options )); then
-                choice_idx=$((input - 1))
-                break
-            fi
-
-            echo "Invalid choice. Please enter a number between 1 and $total_options." >&2
-        done
-    fi
-
-    local selected_option="${options[choice_idx]}"
-
-    # Assign result back to target variable name
-    printf -v "$var_name" "%s" "$selected_option"
-
-    # Save to configuration
-    save_config "$var_name" "$selected_option"
-}
-
 # Asks a yes/no question. The optional default ("y" or "n") is used when the answer is empty.
 # A value already set for the variable ("true" or "false") wins over the default.
 # With a default, the question is not asked when accept_default says so.
@@ -359,33 +261,6 @@ repo_key_download() {
     rm -f "${TARGET_DIR}${tmp}"
 }
 
-# Shows network interfaces.
-show_ifaces() {
-    printf '%-12s %-12s %-12s %s\n' "INTERFACE" "TYPE" "PATH NAME" "IP ADDRESS"
-    printf '%-12s %-12s %-12s %s\n' "---------" "----" "---------" "----------"
-
-    for iface in /sys/class/net/*; do
-        name=$(basename "$iface")
-
-        path_name=$(udevadm info --query=property --path="/sys/class/net/$name" 2>/dev/null | sed -n 's/^ID_NET_NAME_PATH=//p')
-
-        if [ -d "$iface/wireless" ]; then
-            type="wifi"
-        elif [ -e "$iface/device" ]; then
-            type="wired"
-        else
-            type="virtual"
-        fi
-
-        ip_addr=$(ip -4 -o addr show dev "$name" 2>/dev/null |
-            awk '{print $4}' |
-            cut -d/ -f1 |
-            paste -sd, -)
-
-        printf '%-12s %-12s %-12s %s\n' "$name" "$type" "${path_name:--}" "${ip_addr:--}"
-    done
-}
-
 template_dst() {
     local src="$1"
     local prefix="$2"
@@ -420,15 +295,6 @@ template_render_queue() {
 
         template_render $src $mode || return 1
     done
-}
-
-trim() {
-    local var="$*"
-    # Remove leading whitespace
-    var="${var#"${var%%[![:space:]]*}"}"
-    # Remove trailing whitespace
-    var="${var%"${var##*[![:space:]]}"}"
-    printf '%s' "$var"
 }
 
 write_file() {

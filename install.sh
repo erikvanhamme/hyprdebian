@@ -31,10 +31,6 @@ install() {
 # Load tasks/deps for all the phases, in order.
 source scripts/questions.sh
 source scripts/prereqs.sh
-source scripts/deb.sh
-source scripts/disk.sh
-source scripts/partition.sh
-source scripts/filesystem.sh
 source scripts/base.sh
 source scripts/optional.sh
 source scripts/packages.sh

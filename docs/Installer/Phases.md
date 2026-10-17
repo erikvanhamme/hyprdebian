@@ -3,20 +3,18 @@ The installer is split into phases. Each phase has its own script in the `script
 
 | # | Phase | Script | Prefix | What it does |
 | --- | --- | --- | --- | --- |
-| 1 | Questions | `questions.sh` | `q_` | Asks the user for the main inputs, and adds the dependencies and queue entries that follow from the answers. See [Questions](Questions.md). |
+| 1 | Questions | `questions.sh` | `q_` | Asks the user for the optional components, and adds the dependencies and queue entries that follow from the answers. See [Questions](Questions.md). |
 | 2 | Prerequisites | `prereqs.sh` | `pr_` | Installs the tools the installer needs on the live system. Skipped on the hyprdebian live cd. |
-| 3 | Debs | `deb.sh` | `deb_` | Builds the bootloader, art and font packages in the checkout the installer runs from, as the owner of the checkout, and collects the `.deb` files in `/tmp/hyprdebian`. |
-| 4 | Disk | `disk.sh` | `d_` | Stops swap and raid arrays, then wipes and discards the target disks. |
-| 5 | Partitions | `partition.sh` | `p_` | Creates the EFI, swap, boot pool and root pool partitions. |
-| 6 | Filesystems | `filesystem.sh` | `f_` | Creates the EFI filesystems, swap, the ZFS pools and the ZFS datasets. |
-| 7 | Base | `base.sh` | `b_` | Bootstraps Debian, sets up apt, the kernel, ZFS support and GRUB, and makes the system bootable. Also queues the packages, files and services every installation needs. |
-| 8 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, wifi, firewall, docker, ...). |
-| 9 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
-| 10 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
-| 11 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
-| 12 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
-| 13 | User | `user.sh` | `u_` | Creates the home dataset and the account of the main user, and adds the user to the queued groups. Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
-| 14 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system), takes the `@install` snapshots, unmounts the target and exports the ZFS pools. |
+| 3 | Base | `base.sh` | `b_` | Installs a specific kernel, when one was downloaded. Also queues the files and services for the rotation of the machine id and the journal. |
+| 4 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, docker, Qemu/KVM, ...). |
+| 5 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
+| 6 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
+| 7 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
+| 8 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
+| 9 | User | `user.sh` | `u_` | Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
+| 10 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system). |
+
+The disks, the base system, the bootloader, the network, the firewall, the user account and the snapshot are done by `hd-installer` (see [hd-installer](../packages/hd-installer.md)).
 
 Because packages are installed before files and templates are written, the files from `deploy/` and `templates/` overwrite the default configuration files that come with the packages. See [Queues](Queues.md).
 
@@ -25,7 +23,7 @@ Each phase has three empty tasks, `<prefix>_pre`, `<prefix>_main` and `<prefix>_
 - `<prefix>_main` holds the normal work of the phase.
 - `<prefix>_pre` and `<prefix>_post` hold work that must run just before or just after it.
 
-Tasks from one phase often attach work to the hooks of a later phase. For example, `o_firewall` adds `pkg_enable_firewall` to `pkg_post`, so the firewall is enabled right after its package is installed, and `o_desktop` adds tasks to `u_post` that need the user account to exist.
+Tasks from one phase often attach work to the hooks of a later phase. For example, `o_qemu_kvm` adds `pkg_qemu_kvm` to `pkg_post`, so it runs right after the packages are installed, and `o_desktop` adds tasks to `u_post` that need the user account to exist.
 
 ## Phase script template
 A new phase script looks like this (with `x` replaced by the prefix of the phase):
@@ -59,10 +57,6 @@ The last line hooks the phase into the root task. The phase script must also be 
 # Load tasks/deps for all the phases, in order.
 source scripts/questions.sh
 source scripts/prereqs.sh
-source scripts/deb.sh
-source scripts/disk.sh
-source scripts/partition.sh
-source scripts/filesystem.sh
 source scripts/base.sh
 source scripts/optional.sh
 source scripts/packages.sh

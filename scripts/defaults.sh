@@ -3,7 +3,7 @@
 # Defaults for the installer questions, per machine type.
 #
 # Every machine type has its own table, named DEFAULTS_<type>. The keys are
-# the names of the question variables (Q_SWAP, Q_HOSTNAME, ...), the values
+# the names of the question variables (Q_DESKTOP, Q_DOCKER, ...), the values
 # are the defaults to pass to the ask functions. Yes/no questions use "y" and
 # "n", the defaults ask_yes_no takes.
 #
@@ -21,83 +21,48 @@
 # Known machine types. The order is the order in which they are offered.
 MACHINE_TYPES=(desktop laptop server vm)
 
-# Debian suites a server or vm can be installed with. Desktops and laptops always use unstable.
-# Testing and stable are named by their codenames (forky and trixie), so an installed system stays
-# on its release when Debian releases the next one. Update them after every Debian release.
-SUITES=(unstable forky trixie)
-
 # Questions that are always asked, even when the machine type defaults are used.
 DEFAULTS_ALWAYS_ASK=(
-    Q_TYPE
-    Q_SUITE
     Q_DEFAULTS
-    Q_REDUNDANT
-    Q_HOSTNAME
 )
 
 # Defaults shared by all machine types.
 declare -gA DEFAULTS_common=(
-    [Q_TYPE]="desktop"
-    [Q_SUITE]="unstable"
     [Q_DEFAULTS]="y"
-    [Q_SWAP]="2"
-    [Q_USER]="rsq"
-    [Q_FULLNAME]="Erik Van Hamme"
-    [Q_HOSTNAME]="hyprdebian"
     [Q_KERNEL_REPO]="stable"
-    [Q_REPO]="http://repo.rsq-online.ddns.net/"
     [Q_SPECIFIC_KERNEL]="n"
-    [Q_FIREWALL]="y"
     [Q_CUPS]="n"
     [Q_RUST]="n"
-    [Q_OPENSSH]="y"
     [Q_REPORT]="y"
     [Q_REPORT_URL]="http://dash.rsq-online.ddns.net/"
 )
 
 declare -gA DEFAULTS_desktop=(
-    [Q_REDUNDANT]="n"
-    [Q_WIFI]="n"
     [Q_DESKTOP]="y"
-    [Q_ENCRYPT]="y"
     [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="y"
-    [Q_REPO_ENABLED]="y"
 )
 
 declare -gA DEFAULTS_laptop=(
-    [Q_REDUNDANT]="n"
-    [Q_WIFI]="y"
     [Q_DESKTOP]="y"
-    [Q_ENCRYPT]="y"
     [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="y"
-    [Q_REPO_ENABLED]="y"
 )
 
 declare -gA DEFAULTS_server=(
-    [Q_REDUNDANT]="y"
-    [Q_WIFI]="n"
     [Q_DESKTOP]="n"
-    [Q_ENCRYPT]="y"
     [Q_DOCKER]="y"
     [Q_QEMU_KVM]="y"
     [Q_BACKUPTOOLS]="y"
-    [Q_REPO_ENABLED]="n"
 )
 
 declare -gA DEFAULTS_vm=(
-    [Q_REDUNDANT]="n"
-    [Q_IFACE]="enp1s0"
-    [Q_WIFI]="n"
     [Q_DESKTOP]="n"
-    [Q_ENCRYPT]="n"
     [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="n"
-    [Q_REPO_ENABLED]="n"
 )
 
 # Prints the default for a question on a machine type.

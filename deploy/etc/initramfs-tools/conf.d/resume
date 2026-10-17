@@ -1,3 +1,0 @@
-# HyprDebian does not support hibernation. Without this, the initramfs picks a swap partition to
-# resume from, and waits for it on every boot.
-RESUME=none

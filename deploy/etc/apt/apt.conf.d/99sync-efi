@@ -1,4 +1,0 @@
-// Synchronize secondary EFI partition after boot/kernel updates
-DPkg::Post-Invoke {
-    "if [ -x /usr/local/bin/hd-sync-efi ]; then /usr/local/bin/hd-sync-efi; fi";
-};

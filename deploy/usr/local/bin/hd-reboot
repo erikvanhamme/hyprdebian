@@ -1,3 +1,0 @@
-#!/bin/bash
-
-hyprshutdown -t "Rebooting" --post-cmd 'systemctl reboot'

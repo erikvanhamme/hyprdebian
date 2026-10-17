@@ -1,3 +1,0 @@
-Package: turnstile turnstile* ifupdown os-prober
-Pin: release *
-Pin-Priority: -1

@@ -16,10 +16,7 @@ c_save_config() {
     # upgrade.sh reads the answers back from this copy. install.sh defines the root task install,
     # so command runs /usr/bin/install instead of that function.
     save_config INSTALLED_VERSION "${INSTALLER_VERSION}"
-    command install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}" || return 1
-
-    # The console shows the installed version above the login prompt.
-    write_issue
+    command install -D -m 0600 "$CONFIG_FILE" "${TARGET_DIR}${INSTALLED_CONFIG_FILE}"
 }
 
 c_save_migrations() {
@@ -35,21 +32,8 @@ c_save_migrations() {
     done > "${TARGET_DIR}${MIGRATIONS_FILE}"
 }
 
-c_snapshots() {
-    in_target zfs snapshot bpool/hyprdebian@install || return 1
-    in_target zfs snapshot rpool/hyprdebian@install
-}
-
-c_unmount() {
-    umount /mnt/run/systemd/journal/dev-log
-    mount | grep -v zfs | tac | awk '/\/mnt/ {print $3}' | xargs -i{} umount -lf {}
-    zpool export -a || true
-}
-
 add_dependencies "c_main" \
     "c_save_config" \
     "c_save_migrations" \
-    "c_snapshots" \
-    "c_unmount" \
 
 add_dependencies "install" "c_pre" "c_main" "c_post"

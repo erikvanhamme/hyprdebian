@@ -16,7 +16,7 @@ Values are written to the configuration file with `save_config var value`, and t
 Only values that are explicitly saved survive a restart. A variable that a task sets without `save_config` is gone when the installer is started again and that task is skipped. When a later task needs such a value, save it with `save_config`, or have the later task work it out again.
 
 ## Tasks that always run
-A few tasks use `always_run` to run on every start. For example, `q_password` must run every time because the password is never saved.
+A task that must run on every start, such as one that asks for a value that is never saved, is marked with `always_run`.
 
 ## Starting over
 To start a completely fresh installation, remove the state directory:
