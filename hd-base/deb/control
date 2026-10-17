@@ -1,0 +1,25 @@
+Package: hd-base
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: hd-network,
+ openssh-server, kitty-terminfo, ufw,
+ zfs-dkms, zfsutils-linux, zfs-initramfs, build-essential, initramfs-tools,
+ firmware-linux, firmware-qlogic, efibootmgr,
+ locales, keyboard-configuration, console-setup, ca-certificates,
+ systemd-resolved, rsyslog,
+ eza, fzf, nfs-common, psmisc, net-tools, pciutils, usbutils, acpi,
+ bash-completion, git, git-delta, ack, command-not-found, man-db, apt-file,
+ zram-tools
+Section: metapackages
+Priority: optional
+Description: HyprDebian base system
+ Depends on the packages that every hyprdebian system has, so that they are
+ installed with it and stay installed: the network configuration of
+ hd-network, the SSH server and the firewall, ZFS with the tools to build its
+ module, the firmware, the console, name resolution and logging, and the
+ command line tools.
+ .
+ It installs no files of its own besides its man page, and configures
+ nothing.

@@ -1,0 +1,84 @@
+.TH HD-BASE 7 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-base \- the hyprdebian base system
+.SH DESCRIPTION
+The meta package
+.B hd-base
+depends on the packages that every hyprdebian system has, so that they are
+installed with it and stay installed.
+It installs no files of its own besides this man page, and configures
+nothing: a package it pulls in is set up the way that package does it.
+.SH PACKAGES
+.TP
+.B hyprdebian
+.BR hd-network ,
+the network configuration; see
+.BR hd-network (7).
+.TP
+.B Remote access and firewall
+.B openssh-server
+and
+.BR kitty-terminfo ,
+so that the kitty terminal works over ssh;
+.BR ufw ,
+the firewall.
+.TP
+.B ZFS
+.BR zfs-dkms ,
+.B zfsutils-linux
+and
+.BR zfs-initramfs ;
+.B build-essential
+and
+.B initramfs-tools
+to build the ZFS module and the initrd.
+.TP
+.B Firmware and boot
+.B firmware-linux
+and
+.BR firmware-qlogic ;
+.B efibootmgr
+for the boot entries of the firmware.
+.TP
+.B Console
+.BR locales ,
+.BR keyboard-configuration ,
+.B console-setup
+and
+.BR ca-certificates .
+.TP
+.B System services
+.BR systemd-resolved ,
+name resolution, and
+.BR rsyslog ,
+logging.
+.TP
+.B Command line tools
+.BR eza ,
+.BR fzf ,
+.BR nfs-common ,
+.BR psmisc ,
+.BR net-tools ,
+.BR pciutils ,
+.BR usbutils ,
+.BR acpi ,
+.BR bash-completion ,
+.BR git ,
+.BR git-delta ,
+.BR ack ,
+.BR command-not-found ,
+.BR man-db ,
+.B apt-file
+and
+.BR zram-tools .
+.PP
+.B firmware-linux
+and
+.B firmware-qlogic
+are in the
+.B non-free-firmware
+component of Debian, which the apt sources must include.
+.SH SEE ALSO
+.BR hd-network (7)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
