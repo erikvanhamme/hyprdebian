@@ -1,0 +1,84 @@
+.TH HD-CONFIG 7 "October 2026" "hd-config" "HyprDebian"
+.SH NAME
+hd-config \- the hyprdebian configuration database
+.SH DESCRIPTION
+The package
+.B hd-config
+keeps the configuration of hyprdebian in one file,
+.IR /etc/hyprdebian/config.json .
+It holds a JSON object.
+Each hyprdebian package that has settings keeps them under a key of its
+own in that object, usually its package name:
+.PP
+.RS
+.nf
+{
+    "hd-example": {
+        "enabled": true,
+        "port": 8080
+    }
+}
+.fi
+.RE
+.PP
+The file is changed with two commands, both run as root:
+.TP
+.BR hd-config-update (8)
+adds a key, or replaces its value.
+.TP
+.BR hd-config-remove (8)
+removes keys.
+.PP
+Both write the file as a whole to a temporary file next to it and move that
+into place, so the file is never seen half written.
+They hold a lock on
+.I /etc/hyprdebian
+while they change it, so two changes at the same time do not lose each
+other's work.
+The file is made by the first
+.BR hd-config-update ;
+the package itself installs no configuration.
+.SH USING IT FROM A PACKAGE
+A package that keeps its settings in the configuration depends on
+.B hd-config
+and sets its key in its postinst:
+.PP
+.RS
+.nf
+hd-config-update hd-example '{"enabled": true, "port": 8080}'
+.fi
+.RE
+.PP
+It removes the key in its postrm on a purge.
+By then
+.B hd-config
+may already be removed, so it checks first:
+.PP
+.RS
+.nf
+if [ "$1" = "purge" ] && [ \-x /usr/sbin/hd-config-remove ]; then
+    hd-config-remove hd-example
+fi
+.fi
+.RE
+.PP
+To read a setting, load the file with any JSON parser, for example with
+.BR python3 (1):
+.PP
+.RS
+.nf
+python3 \-c 'import json; print(json.load(open("/etc/hyprdebian/config.json"))["hd-example"]["port"])'
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration, a JSON object, readable for everyone.
+It is not a conffile: removing or purging
+.B hd-config
+keeps it.
+.SH SEE ALSO
+.BR hd-config-update (8),
+.BR hd-config-remove (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

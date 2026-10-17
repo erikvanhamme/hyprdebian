@@ -1,0 +1,15 @@
+Package: hd-config
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3
+Section: admin
+Priority: optional
+Description: HyprDebian configuration database
+ Keeps the hyprdebian configuration in the JSON object in
+ /etc/hyprdebian/config.json. Other hyprdebian packages write their
+ settings there under a key of their own.
+ .
+ hd-config-update adds a key or replaces its value, hd-config-remove removes
+ keys. Both are run as root.

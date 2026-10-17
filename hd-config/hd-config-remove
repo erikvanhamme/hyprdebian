@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+"""Removes keys from the hyprdebian configuration.
+
+The package hd-config installs this as /usr/bin/hd-config-remove.
+
+    hd-config-remove <key>...   remove these keys and their values
+
+The configuration is the JSON object in /etc/hyprdebian/config.json. Only keys of that object
+are removed. A key that is not there, or a configuration that does not exist, is not an error,
+so a package can remove its keys whether or not it ever set them. Run it as root.
+"""
+
+import argparse
+import fcntl
+import json
+import os
+import sys
+
+CONFIG_DIR = "/etc/hyprdebian"
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def load():
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, ValueError) as e:
+        fail(f"Cannot read {CONFIG_FILE}: {e}")
+    if not isinstance(config, dict):
+        fail(f"{CONFIG_FILE} does not hold a JSON object.")
+    return config
+
+
+# Writes a temporary file next to the configuration and moves it into place, so the file is
+# never seen half written.
+def save(config):
+    tmp = CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, CONFIG_FILE)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Remove keys from the hyprdebian configuration in {CONFIG_FILE}.")
+    parser.add_argument("keys", nargs="+", metavar="key", help="a key to remove")
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        fail("This script must be run as root.")
+
+    if not os.path.exists(CONFIG_FILE):
+        return
+    # Holding a lock on the directory keeps two changes from losing each other's work.
+    lock = os.open(CONFIG_DIR, os.O_RDONLY)
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    config = load()
+    removed = False
+    for key in args.keys:
+        if key in config:
+            del config[key]
+            removed = True
+    if removed:
+        save(config)
+    os.close(lock)
+
+
+if __name__ == "__main__":
+    main()

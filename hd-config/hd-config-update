@@ -1,0 +1,89 @@
+#!/usr/bin/python3
+"""Adds a key to the hyprdebian configuration, or replaces its value.
+
+The package hd-config installs this as /usr/bin/hd-config-update.
+
+    hd-config-update <key> <json>   set <key> to the JSON value <json>
+    hd-config-update <key>          set <key> to the JSON value read from stdin
+
+The configuration is the JSON object in /etc/hyprdebian/config.json. The key is a key of that
+object; its old value, if any, is replaced as a whole. The file is made when it does not exist
+yet. Run it as root.
+"""
+
+import argparse
+import fcntl
+import json
+import os
+import sys
+
+CONFIG_DIR = "/etc/hyprdebian"
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def load():
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, ValueError) as e:
+        fail(f"Cannot read {CONFIG_FILE}: {e}")
+    if not isinstance(config, dict):
+        fail(f"{CONFIG_FILE} does not hold a JSON object.")
+    return config
+
+
+# Writes a temporary file next to the configuration and moves it into place, so the file is
+# never seen half written.
+def save(config):
+    tmp = CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, CONFIG_FILE)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Add a key to the hyprdebian configuration in {CONFIG_FILE}, or replace "
+        "its value.")
+    parser.add_argument("key", help="the key in the configuration, usually a package name")
+    parser.add_argument("json", nargs="?",
+                        help="the value as JSON text; read from stdin when left out")
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        fail("This script must be run as root.")
+
+    key = args.key
+    if key == "":
+        fail("The key is empty.")
+    if args.json is not None:
+        text = args.json
+    else:
+        text = sys.stdin.read()
+    try:
+        value = json.loads(text)
+    except ValueError as e:
+        fail(f"The value for {key} is not valid JSON: {e}")
+
+    os.makedirs(CONFIG_DIR, mode=0o755, exist_ok=True)
+    # Holding a lock on the directory keeps two changes from losing each other's work.
+    lock = os.open(CONFIG_DIR, os.O_RDONLY)
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    config = load()
+    config[key] = value
+    save(config)
+    os.close(lock)
+
+
+if __name__ == "__main__":
+    main()

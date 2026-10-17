@@ -1,0 +1,80 @@
+.TH HD-CONFIG-UPDATE 8 "October 2026" "hd-config" "HyprDebian"
+.SH NAME
+hd-config-update \- add a key to the hyprdebian configuration or replace its value
+.SH SYNOPSIS
+.B hd-config-update
+.I key
+.RI [ json ]
+.SH DESCRIPTION
+.B hd-config-update
+sets
+.I key
+in the JSON object in
+.I /etc/hyprdebian/config.json
+to the JSON value
+.IR json .
+When the key is not there yet, it is added; when it is, its old value is
+replaced as a whole.
+The other keys stay as they are.
+See
+.BR hd-config (7)
+for how the configuration is used.
+.PP
+Without
+.IR json ,
+the value is read from standard input.
+.PP
+When
+.I /etc/hyprdebian/config.json
+does not exist yet, it is made, and
+.I /etc/hyprdebian
+with it.
+The file is written with mode 0644.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.I key
+The key in the configuration, usually the name of the package whose settings
+it holds. It may not be empty.
+.TP
+.I json
+The value, as JSON text: an object, an array, a string in double quotes, a
+number,
+.BR true ,
+.B false
+or
+.BR null .
+.SH EXIT STATUS
+0 when the configuration was written, 1 on an error, 2 on wrong arguments.
+On an error the file is left as it was.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration.
+.SH EXAMPLES
+Set the settings of hd-example:
+.PP
+.RS
+hd-config-update hd-example '{"enabled": true, "port": 8080}'
+.RE
+.PP
+Set a string; the double quotes are part of the JSON:
+.PP
+.RS
+hd-config-update hostname '"repo.example"'
+.RE
+.PP
+Read the value from a file:
+.PP
+.RS
+hd-config-update hd-example < settings.json
+.RE
+.SH SEE ALSO
+.BR hd-config (7),
+.BR hd-config-remove (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

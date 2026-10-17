@@ -1,0 +1,54 @@
+.TH HD-CONFIG-REMOVE 8 "October 2026" "hd-config" "HyprDebian"
+.SH NAME
+hd-config-remove \- remove keys from the hyprdebian configuration
+.SH SYNOPSIS
+.B hd-config-remove
+.I key
+.RI [ key ...]
+.SH DESCRIPTION
+.B hd-config-remove
+removes each
+.I key
+and its value from the JSON object in
+.IR /etc/hyprdebian/config.json .
+Only keys of that object itself are removed; it does not reach into the
+values.
+The other keys stay as they are.
+See
+.BR hd-config (7)
+for how the configuration is used.
+.PP
+A key that is not in the configuration is skipped, and when
+.I /etc/hyprdebian/config.json
+does not exist, nothing is done.
+Neither is an error, so a package can remove its keys whether or not it ever
+set them.
+When none of the keys is there, the file is not written.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.I key
+A key to remove. May be given more than once.
+.SH EXIT STATUS
+0 when the keys are no longer in the configuration, 1 on an error, 2 on
+wrong arguments.
+On an error the file is left as it was.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration.
+.SH EXAMPLES
+Remove the settings of hd-example:
+.PP
+.RS
+hd-config-remove hd-example
+.RE
+.SH SEE ALSO
+.BR hd-config (7),
+.BR hd-config-update (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
