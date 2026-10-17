@@ -12,7 +12,7 @@
 # deb-path, which prints the path of the package that deb builds, and clean.
 # Add every new package directory to PACKAGES.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot
 OUT := packages
 
 .PHONY: all clean $(PACKAGES)

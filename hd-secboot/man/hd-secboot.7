@@ -1,0 +1,117 @@
+.TH HD-SECBOOT 7 "October 2026" "hd-secboot" "HyprDebian"
+.SH NAME
+hd-secboot \- the hyprdebian Secure Boot keys
+.SH DESCRIPTION
+The package
+.B hd-secboot
+lets a hyprdebian system boot under Secure Boot with keys of its owner,
+instead of, or next to, the keys of Microsoft that most firmware ships with.
+.BR hd-secboot-enroll (8)
+enrolls the keys in the firmware.
+.PP
+It depends on the tools that make and use the keys, so they are installed
+with it and stay installed:
+.TP
+.BR openssl (1)
+makes the keys and their certificates;
+.TP
+.B efitools
+turns the certificates into EFI signature lists and signed updates, and
+enrolls them with
+.BR efi-updatevar (1);
+.TP
+.B sbsigntool
+signs EFI files with
+.BR sbsign (1)
+and checks them with
+.BR sbverify (1).
+.PP
+On its first installation, it generates the keys in
+.IR /etc/hyprdebian/secboot .
+When that directory already exists, on an upgrade, a reinstall or when the
+keys were put there by hand, the keys are kept: keys that are enrolled in
+the firmware are never replaced.
+Removing or purging the package keeps the keys as well.
+.SH THE KEYS
+There are three keys, all with the same owner GUID, a random UUID in
+.IR GUID.txt :
+.TP
+.B PK
+the platform key, which owns the firmware and signs updates of KEK;
+.TP
+.B KEK
+the key exchange key, which signs updates of db;
+.TP
+.B db
+the signature database key, which signs the EFI files that may boot.
+.PP
+Each key is RSA 2048, the size that the UEFI specification requires every
+firmware to support, with a self-signed certificate that is valid for ten
+years and named
+.IR "HyprDebian <hostname> Secure Boot <key>" .
+For each key
+.IR <key> ,
+the directory holds:
+.TP
+.I <key>.key
+the private key;
+.TP
+.I <key>.crt
+the certificate as PEM, for
+.BR sbsign ;
+.TP
+.I <key>.cer
+the certificate as DER, for the key menus of firmware setups;
+.TP
+.I <key>.esl
+the certificate as EFI signature list;
+.TP
+.I <key>.auth
+the signature list as signed update, for
+.B efi-updatevar
+or KeyTool: PK signs its own and that of KEK, KEK signs that of db.
+.PP
+The directory and the files are only readable by root.
+The keys are generated in
+.I /etc/hyprdebian/secboot.tmp
+and moved into place when they are all there, so a failed installation never
+leaves half a set behind.
+.SH ENROLLING THE KEYS
+Put the firmware in setup mode, which removes its platform key, in its
+setup menu, then run
+.BR hd-secboot-enroll (8).
+It adds db and KEK to the entries the firmware already has, and sets PK
+last, since that ends setup mode.
+.PP
+Some firmware does not let the system write the keys; enroll the
+.I .auth
+or
+.I .cer
+files from its setup menu instead.
+.PP
+Sign the EFI files that are to boot with the db key before Secure Boot is
+turned on:
+.PP
+.RS
+.nf
+sbsign \-\-key db.key \-\-cert db.crt \-\-output signed.efi unsigned.efi
+.fi
+.RE
+.SH BACKUP
+Back up
+.I /etc/hyprdebian/secboot
+somewhere safe.
+Without the private keys, no new EFI file can be signed for a firmware that
+has the keys enrolled; with them, anyone can.
+.SH FILES
+.TP
+.I /etc/hyprdebian/secboot
+The keys.
+.SH SEE ALSO
+.BR hd-secboot-enroll (8),
+.BR efi-updatevar (1),
+.BR sbsign (1),
+.BR sbverify (1),
+.BR openssl-req (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

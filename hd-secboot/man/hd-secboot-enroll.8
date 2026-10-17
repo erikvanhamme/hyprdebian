@@ -1,0 +1,96 @@
+.TH HD-SECBOOT-ENROLL 8 "October 2026" "hd-secboot" "HyprDebian"
+.SH NAME
+hd-secboot-enroll \- enroll the hyprdebian Secure Boot keys in the firmware
+.SH SYNOPSIS
+.B hd-secboot-enroll
+.RB [ \-\-replace ]
+.RB [ \-n ]
+.SH DESCRIPTION
+.B hd-secboot-enroll
+enrolls the Secure Boot keys in
+.I /etc/hyprdebian/secboot
+in the firmware.
+See
+.BR hd-secboot (7)
+for the keys.
+.PP
+The firmware must be in setup mode: without a platform key.
+Most firmware has an entry in its setup menu, under Secure Boot, to delete
+the platform key, to clear all keys, or to reset to setup mode.
+.PP
+Run it as root.
+.SH OPERATION
+.IP 1. 4
+It checks that the signed updates
+.IR db.auth ,
+.I KEK.auth
+and
+.I PK.auth
+exist, that the system was booted with UEFI, and that the firmware is in
+setup mode.
+Otherwise it stops before it changes anything.
+.IP 2. 4
+It writes db, then KEK, with
+.BR efi-updatevar (1).
+By default it adds the keys to the entries the firmware already has in
+those variables, such as the certificates of Microsoft, which some
+graphics cards and other devices need to load their firmware.
+With
+.BR \-\-replace ,
+only the hyprdebian keys are left.
+.IP 3. 4
+It writes PK last, since setting the platform key ends setup mode.
+There is only one platform key, so PK is always replaced.
+.IP 4. 4
+It checks that the firmware has left setup mode.
+.PP
+Before each write, it clears the immutable flag that the kernel puts on the
+variables in
+.IR /sys/firmware/efi/efivars .
+When a write fails, the firmware may not let the system write its keys;
+enroll the
+.I .auth
+or
+.I .cer
+files from its setup menu instead.
+.PP
+Secure Boot itself is turned on in the setup menu of the firmware, after
+the EFI files that are to boot are signed with the db key.
+Until then, the system boots as before.
+.SH OPTIONS
+.TP
+.B \-\-replace
+Replace the entries in db and KEK instead of adding to them.
+Only use this when every device in the system boots without the
+certificates of Microsoft.
+.TP
+.BR \-n ", " \-\-dry\-run
+Show the commands that would be run, and change nothing.
+The checks of step 1 still run.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when the keys were enrolled, 1 on an error, 2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/secboot
+The keys.
+.TP
+.I /sys/firmware/efi/efivars
+The EFI variables, among them SetupMode, PK, KEK and db.
+.SH EXAMPLES
+See what would be done, then enroll the keys:
+.PP
+.RS
+.nf
+hd-secboot-enroll \-\-dry\-run
+hd-secboot-enroll
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-secboot (7),
+.BR efi-updatevar (1),
+.BR sbsign (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
