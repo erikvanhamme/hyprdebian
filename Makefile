@@ -12,6 +12,11 @@
 #                   ask for the name, zvol, cpus, memory and bridge of a vm,
 #                   then define it in libvirt and start it from the live cd
 #                   (vm/provision-vm.py); make the zvol first
+#   make update-repo
+#                   build every package, then ask for the host name of a
+#                   HyprDebian repository and upload the packages in
+#                   packages/ to it for trixie and unstable
+#                   (update-repo/update-repo.py)
 #
 # Each package is a directory with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
@@ -24,7 +29,7 @@ PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloade
 TESTS := hd-dashboard hd-report
 OUT := packages
 
-.PHONY: all test clean provision-vm $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean provision-vm update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -50,3 +55,6 @@ clean:
 
 provision-vm:
 	python3 vm/provision-vm.py
+
+update-repo: all
+	python3 update-repo/update-repo.py

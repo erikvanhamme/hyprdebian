@@ -57,6 +57,16 @@ The inboxes are `inbox/trixie` and `inbox/unstable` in the home directory of `re
 
 `hd-repo-update` checks every package in the inboxes, moves them into the pool of their suite, replacing older versions of the same package, and makes and signs the indices. A package that is not valid, or not for amd64 or all, stops the update before anything changes.
 
+### The HyprDebian packages
+From the root of this repository:
+```
+make update-repo
+```
+
+This builds every package into `packages/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages and asks for a go-ahead. It then copies the packages to both inboxes, `inbox/trixie` and `inbox/unstable`, and runs `hd-repo-update trixie unstable` there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`. The HyprDebian packages fit both suites.
+
+`python3 update-repo/update-repo.py --dry-run` only prints the commands.
+
 ## hd-repo-update
 ```
 hd-repo-update [suite...]
