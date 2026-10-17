@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """postinst of hd-desktop: diverts /etc/greetd/config.toml of greetd, writes the greetd config of
-HyprDebian in its place with hd-desktop-render, and compiles the dconf database of the dark theme.
+HyprDebian in its place with hd-desktop-render, compiles the dconf database of the dark theme, and
+copies /etc/skel to the home directory of the user.
 
 greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
@@ -10,14 +11,26 @@ removes it and puts the one of greetd back.
 greetd enables greetd.service on its own installation. When the installer runs, the user does not
 exist yet; hd-desktop-render then writes a config that logs nobody in, and writes it again with
 the user at the first boot, before greetd starts.
+
+The user who is logged in to Hyprland, as hd-desktop-render --print-user finds them, gets the
+files of /etc/skel that are missing from their home directory, among them the configs of the
+desktop. Files that the user has are kept. This is done on the first installation only, or on an
+upgrade from a version before SKEL_SINCE, which did not do it, so a file that the user removed
+does not come back on later upgrades. It runs as the user, so the files belong to them. When the
+installer runs, the user does not exist yet, and the installer copies /etc/skel itself.
 """
 
 import os
+import pwd
 import subprocess
 import sys
 
 GREETD_CONFIG = "/etc/greetd/config.toml"
 GREETD_CONFIG_DIVERTED = "/etc/greetd/config.toml.greetd"
+SKEL_DIR = "/etc/skel"
+
+# The first version of hd-desktop that copies /etc/skel to the home directory of the user.
+SKEL_SINCE = "0.3"
 
 
 def divert(path, diverted):
@@ -30,17 +43,42 @@ def divert(path, diverted):
                     diverted, path], check=True)
 
 
+def older_than(version, than):
+    """True if the package version is older than the other one."""
+    return subprocess.run(["dpkg", "--compare-versions", version, "lt", than]).returncode == 0
+
+
+def copy_skel():
+    user = subprocess.run(["/usr/sbin/hd-desktop-render", "--print-user"], capture_output=True,
+                          text=True, check=True).stdout.strip()
+    if user == "":
+        print(f"No user to copy {SKEL_DIR} to.")
+        return
+    home = pwd.getpwnam(user).pw_dir
+    if not os.path.isdir(home):
+        print(f"The home directory {home} of {user} does not exist; not copying {SKEL_DIR}.")
+        return
+    subprocess.run(["runuser", "-u", user, "--", "cp", "-a", "--update=none", SKEL_DIR + "/.",
+                    home + "/"], check=True)
+    print(f"Copied the files of {SKEL_DIR} that {user} did not have to {home}.")
+
+
 def main():
     # configure is the only action that installs the package; the abort-* actions undo a
     # failed upgrade or removal.
     if len(sys.argv) < 2 or sys.argv[1] != "configure":
         return
 
+    # The version that was configured before, empty on the first installation.
+    previous = sys.argv[2] if len(sys.argv) > 2 else ""
+
     divert(GREETD_CONFIG, GREETD_CONFIG_DIVERTED)
     subprocess.run(["/usr/sbin/hd-desktop-render"], check=True)
     # The system database local of /etc/dconf/profile/user holds the dark theme of
     # /etc/dconf/db/local.d.
     subprocess.run(["dconf", "update"], check=True)
+    if previous == "" or older_than(previous, SKEL_SINCE):
+        copy_skel()
     if not os.path.isdir("/run/systemd/system"):
         return
     subprocess.run(["systemctl", "daemon-reload"], check=True)

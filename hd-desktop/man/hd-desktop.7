@@ -51,8 +51,17 @@ nwg-look and VSCodium, and the directories
 .I ~/.icons
 and
 .IR ~/Pictures/Screenshots .
-Existing users keep their files; copy the ones they want from
-.IR /etc/skel .
+The installation of the package copies the files of
+.I /etc/skel
+that are missing from the home directory of the user who is logged in to
+Hyprland, as that user; files that the user has are kept.
+It does so on the first installation, and on an upgrade from a version
+before 0.3, not on later upgrades.
+Other users copy the files they are missing with:
+.PP
+.RS
+cp \-a \-\-update=none /etc/skel/. ~/
+.RE
 .SH COMMANDS
 The key bindings of Hyprland run these commands, in
 .IR /usr/bin :

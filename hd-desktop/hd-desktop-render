@@ -4,8 +4,9 @@
 The package hd-desktop installs this as /usr/sbin/hd-desktop-render, and greetd.service runs it
 before every start, with the drop-in hd-desktop.conf.
 
-    hd-desktop-render             write /etc/greetd/config.toml
-    hd-desktop-render --dry-run   show what would change, change nothing
+    hd-desktop-render              write /etc/greetd/config.toml
+    hd-desktop-render --dry-run    show what would change, change nothing
+    hd-desktop-render --print-user print the user that would be logged in, nothing when nobody
 
 The user is the setting user of the key hd-desktop in /etc/hyprdebian/config.json. Without it, it
 is the user account with the lowest UID from UID_MIN to UID_MAX of /etc/login.defs, the first
@@ -137,14 +138,21 @@ def main():
     parser = argparse.ArgumentParser(
         description=f"Write {GREETD_CONFIG}, which logs a user in to Hyprland at the boot, from "
         f"the key {CONFIG_KEY} in {CONFIG_FILE}.")
-    parser.add_argument("-n", "--dry-run", action="store_true",
-                        help="show what would change, change nothing")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("-n", "--dry-run", action="store_true",
+                         help="show what would change, change nothing")
+    actions.add_argument("--print-user", action="store_true",
+                         help="print the user that would be logged in, nothing when nobody")
     args = parser.parse_args()
-    if not args.dry_run and os.geteuid() != 0:
+    if not args.dry_run and not args.print_user and os.geteuid() != 0:
         fail("Run hd-desktop-render as root.")
 
     account = find_user(load_settings())
     user = account.pw_name if account is not None else None
+    if args.print_user:
+        if user is not None:
+            print(user)
+        return
     text = TEMPLATES.get_template("greetd.toml.j2").render(user=user, log=LOG_FILE)
     changed = read_file(GREETD_CONFIG) != text
 

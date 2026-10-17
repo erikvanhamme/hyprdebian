@@ -59,7 +59,7 @@ sudo hd-config-update hd-desktop '{"user": "alice"}'
 sudo hd-desktop-render
 ```
 
-`sudo hd-desktop-render --dry-run` shows the user and the config without writing it.
+`sudo hd-desktop-render --dry-run` shows the user and the config without writing it, and `hd-desktop-render --print-user` only prints the user.
 
 ## Files for new users
 New users get these files in their home directory, from `/etc/skel`:
@@ -75,7 +75,12 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/VSCodium` | The settings of VSCodium. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
-Existing users keep their own files; copy the ones they want from `/etc/skel`.
+The installation of the package also gives these files to the user who is logged in to Hyprland, the one that `hd-desktop-render --print-user` prints, when that user exists: it copies the files of `/etc/skel` that are missing from their home directory, as that user, with `cp -a --update=none`. Files that the user has are kept. This is done on the first installation, and on an upgrade from a version before 0.3, which did not do it; later upgrades do not copy again, so a file that the user removed stays away. When the installer runs, the user does not exist yet, and the installer copies `/etc/skel` itself.
+
+Other users keep their own files. To copy the files they are missing:
+```
+cp -a --update=none /etc/skel/. ~/
+```
 
 ## Commands
 The key bindings run these commands, in `/usr/bin`:

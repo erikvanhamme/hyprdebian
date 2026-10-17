@@ -3,7 +3,7 @@
 hd-desktop-render \- write the greetd config that boots into Hyprland
 .SH SYNOPSIS
 .B hd-desktop-render
-.RB [ \-n | \-\-dry\-run ]
+.RB [ \-n | \-\-dry\-run | \-\-print\-user ]
 .SH DESCRIPTION
 .B hd-desktop-render
 writes
@@ -34,6 +34,14 @@ Show a short help and exit.
 .BR \-n ,\  \-\-dry\-run
 Show which user would be logged in and the config that would be written,
 change nothing.
+.TP
+.B \-\-print\-user
+Print the user that would be logged in, and nothing when nobody would be.
+The installation of
+.BR hd-desktop (7)
+uses it to find the user who gets the files of
+.IR /etc/skel .
+It also works as a normal user.
 .SH SETTINGS
 The settings are the key
 .B hd-desktop
