@@ -17,9 +17,8 @@ import unittest
 
 from unittest import mock
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-HD_BACKUP = os.path.join(REPO, 'deploy', 'usr', 'local', 'bin', 'hd-backup')
-BLOCKWRITE_SOURCE = os.path.join(REPO, 'src', 'blockwrite.c')
+PACKAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+HD_BACKUP = os.path.join(PACKAGE, 'hd-backup')
 
 _module = None
 
