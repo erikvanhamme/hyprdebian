@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Installer/Phases.md",
+                "file": "packages/hd-repo.md",
                 "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Phases"
+              "title": "hd-repo"
             }
           }
         ],
@@ -205,6 +205,10 @@
   },
   "active": "b665cb09c3898fee",
   "lastOpenFiles": [
+    "packages/hd-art.md",
+    "packages/hd-art.md.tmp.5488.02e0f18cdbc4",
+    "packages/hd-repo.md.tmp.5488.d531751b5482",
+    "Installer/Phases.md",
     "Livecd/Overview.md",
     "Local repository/Overview.md",
     "HyprDebian/Backup tool.md",
@@ -216,17 +220,14 @@
     "Installer/Structure.md.tmp.36501.2425ebaab8ae",
     "Installer/Upgrade.md.tmp.36501.09f3e7dff899",
     "Installer/Upgrade.md.tmp.36501.69f249bcf303",
-    "Installer/Upgrade.md.tmp.36501.f4b9461ba68a",
     "Installer/Upgrade.md",
     "HyprDebian/About.md",
-    "Installer/Extending.md.tmp.410160.1a9b4ddf7869",
     "HyprDebian/Key Bindings.md",
     "Installer/Defaults.md",
     "Installer/Extending.md",
     "Installer/Files and templates.md",
     "Installer/Queues.md",
     "Installer/Questions.md",
-    "Installer/Phases.md",
     "Installer/Idempotency.md",
     "Installer/Dependencies.md",
     "Installer/Structure.md",
