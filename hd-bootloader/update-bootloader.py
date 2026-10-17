@@ -3,7 +3,7 @@
 
 Reads the settings from the key hd-bootloader in the hyprdebian configuration,
 /etc/hyprdebian/config.json, or from the JSON file given with --config, and
-writes, below the directory given with --esp:
+writes, below the directory given with --esp (default: /boot/efi):
 
     EFI/BOOT/BOOTX64.EFI      the compiled bootloader of the frontend,
                               bootx64-<frontend>.efi in --bootloader-dir,
@@ -99,7 +99,7 @@ source tree, make esp passes the files in build/ and the defaults of a
 package in deb/ instead.
 
 Example:
-    hd-bootloader-update --esp /boot/efi
+    hd-bootloader-update
 """
 
 import argparse
@@ -314,6 +314,11 @@ def sign(path, signing):
         signed.unlink(missing_ok=True)
 
 
+def written(signing):
+    """What a file written with signing is, for the messages: signed or unsigned."""
+    return "unsigned" if signing is None else "signed"
+
+
 def build_ukis(config, esp, kernels, signing):
     """Writes the UKIs of the kernels that changed, signed if signing. Returns their file names, newest first."""
     linux = esp / "EFI" / "Linux"
@@ -346,7 +351,7 @@ def build_ukis(config, esp, kernels, signing):
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
-        print(f"Wrote {target}", flush=True)
+        print(f"Wrote {written(signing)} {target}", flush=True)
     return names
 
 
@@ -447,12 +452,17 @@ def build_efi(stub, target, sbat, sections, signing):
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
-    print(f"Wrote {target}", flush=True)
+    print(f"Wrote {written(signing)} {target}", flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--esp", type=Path, required=True, help="root of the EFI system partition to write to")
+    parser.add_argument(
+        "--esp",
+        type=Path,
+        default=Path("/boot/efi"),
+        help="root of the EFI system partition to write to (default: /boot/efi)",
+    )
     parser.add_argument(
         "--config",
         type=Path,

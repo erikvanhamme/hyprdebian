@@ -3,8 +3,6 @@
 hd-bootloader-update \- write the hyprdebian bootloader and its UKIs to an EFI system partition
 .SH SYNOPSIS
 .B hd-bootloader-update
-.B \-\-esp
-.I dir
 .RI [ options ]
 .SH DESCRIPTION
 .B hd-bootloader-update
@@ -12,8 +10,10 @@ reads the settings from the key
 .B hd-bootloader
 in
 .I /etc/hyprdebian/config.json
-and writes, below the EFI system partition
-.IR dir :
+and writes, below the EFI system partition given with
+.B \-\-esp
+.RI ( /boot/efi
+by default):
 .TP
 .I EFI/BOOT/BOOTX64.EFI
 the bootloader of the frontend of the installed package;
@@ -51,12 +51,15 @@ the files are signed with the db key before they replace those on the ESP;
 a file that would not change is signed again when it does not verify with
 the db certificate.
 Without the keys, the files are written unsigned, with a message saying so.
+The message of each file written says whether it is signed or unsigned.
 .PP
 Run it as root.
 .SH OPTIONS
 .TP
 .BI \-\-esp " dir"
-The root of the EFI system partition to write to. Required.
+The root of the EFI system partition to write to;
+.I /boot/efi
+by default.
 .TP
 .BI \-\-config " file"
 Read the settings from the JSON object in
@@ -102,7 +105,14 @@ Update the ESP in
 .IR /boot/efi :
 .PP
 .RS
-hd-bootloader-update \-\-esp /boot/efi
+hd-bootloader-update
+.RE
+.PP
+Update the ESP in
+.IR /boot/efi2 :
+.PP
+.RS
+hd-bootloader-update \-\-esp /boot/efi2
 .RE
 .SH SEE ALSO
 .BR hd-bootloader (7),

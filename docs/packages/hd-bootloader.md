@@ -128,10 +128,10 @@ sudo /usr/lib/hd-bootloader/update-esps
 
 ## hd-bootloader-update
 ```
-hd-bootloader-update --esp <dir> [options]
+hd-bootloader-update [options]
 ```
 
-`hd-bootloader-update` reads the settings and writes, below the ESP `dir`:
+`hd-bootloader-update` reads the settings and writes, below the ESP given with `--esp` (`/boot/efi` by default):
 
 | File | Content |
 | --- | --- |
@@ -143,7 +143,7 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 
 | Option | Meaning |
 | --- | --- |
-| `--esp <dir>` | The root of the ESP to write to. Required. |
+| `--esp <dir>` | The root of the ESP to write to; `/boot/efi` by default. |
 | `--config <file>` | Read the settings from the JSON object in the file instead of the key `hd-bootloader`. |
 | `--boot-dir <dir>` | Where the kernels are; `/boot` by default. |
 | `--mok <file>` | The certificate of the DKMS MOK, DER or PEM; `/var/lib/dkms/mok.pub` by default. It is needed to boot with the ZFS module. |
@@ -153,7 +153,7 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 Run it as root.
 
 ## Secure Boot
-The packages do not depend on `hd-secboot` (see [hd-secboot](hd-secboot.md)). When its keys are in `/etc/hyprdebian/secboot`, `hd-bootloader-update` signs the bootloader, `assets.efi` and the UKIs with the db key, using `sbsign`; a file that would not change is signed again when it does not verify with the db certificate, as after the keys were generated. Without the keys, the files are written unsigned, with a message saying so.
+The packages do not depend on `hd-secboot` (see [hd-secboot](hd-secboot.md)). When its keys are in `/etc/hyprdebian/secboot`, `hd-bootloader-update` signs the bootloader, `assets.efi` and the UKIs with the db key, using `sbsign`; a file that would not change is signed again when it does not verify with the db certificate, as after the keys were generated. Without the keys, the files are written unsigned, with a message saying so. The message of each file written says whether it is signed or unsigned.
 
 ## Files
 | Path | Purpose |
