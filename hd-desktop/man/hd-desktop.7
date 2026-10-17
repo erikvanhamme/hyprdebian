@@ -1,0 +1,123 @@
+.TH HD-DESKTOP 7 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-desktop \- the HyprDebian desktop
+.SH DESCRIPTION
+The package
+.B hd-desktop
+depends on the packages of the HyprDebian desktop, so that they are installed
+with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle and
+hyprlock, greetd, kitty, wofi, mako, PipeWire with wiremix, the screenshot
+tools grim, slurp and swappy, nwg-look with the GTK and Qt themes, the
+wallpapers of
+.BR hd-art (7),
+the fonts of
+.BR hd-fonts (7),
+yazi, and the applications audacious, mpv, imv, firefox and meld.
+.SH BOOTING INTO HYPRLAND
+greetd runs on tty7 and logs a user in to Hyprland at the boot, without a
+password, with
+.BR "uwsm start hyprland.desktop" .
+The output of Hyprland goes to
+.IR /var/log/hyprland.log .
+greetd does this once per boot: after a logout, it switches to the console
+on tty1 and stops.
+.PP
+The config of greetd,
+.IR /etc/greetd/config.toml ,
+is written by
+.BR hd-desktop-render (8),
+on the installation and before every start of greetd.
+The one of the package greetd is diverted to
+.IR /etc/greetd/config.toml.greetd .
+The user is the setting
+.B user
+of the key
+.B hd-desktop
+of
+.IR /etc/hyprdebian/config.json ;
+without it, the first user that was made.
+.SH FILES FOR NEW USERS
+The package installs the files that new users get in their home directory,
+in
+.IR /etc/skel :
+the configs of Hyprland
+.RI ( ~/.config/hypr/hyprland.lua ),
+hypridle, hyprlock, hyprpaper, kitty, mako, wofi, mpv, alsa, PipeWire,
+nwg-look and VSCodium, the text of the screensaver in
+.IR ~/.config/hyprdebian/screensaver.txt ,
+and the directories
+.I ~/.icons
+and
+.IR ~/Pictures/Screenshots .
+Existing users keep their files; copy the ones they want from
+.IR /etc/skel .
+.SH COMMANDS
+The key bindings of Hyprland and hypridle run these commands, in
+.IR /usr/bin :
+.TP
+.BR hd-ask-reboot ,\  hd-ask-poweroff
+Ask with wofi whether to reboot or power off, then run
+.B hd-reboot
+or
+.B hd-poweroff
+of
+.BR hd-base (7).
+.TP
+.BR hd-launch-screensaver ,\  hd-cmd-screensaver ,\  hd-kill-screensaver
+Start the screensaver of terminal text effects on every monitor, run it in
+one kitty window, and stop it.
+.TP
+.B hd-mode-select
+Choose the resolution and refresh rate of a monitor with wofi.
+.TP
+.BR hd-mount ,\  hd-unmount
+Mount a drive or an
+.I /etc/fstab
+entry, on
+.IR /mnt/<user>/<n> ,
+and unmount it again, with wofi.
+They run
+.I /usr/libexec/hd-desktop/hd-mount-helper
+with sudo; the users in the group
+.B sudo
+may do so without a password, by
+.IR /etc/sudoers.d/hd-desktop .
+.TP
+.BR hd-volume-up ,\  hd-volume-down ,\  hd-volume-mute
+Change the volume of the default output and show it in a notification.
+.SH DARK THEME
+.I /etc/dconf/db/local.d/00-dark-theme
+asks GTK applications for the dark Adwaita theme.
+.I /etc/dconf/profile/user
+adds that system database to the one of the user, and the installation
+compiles it with
+.BR "dconf update" .
+.SH REMOVAL
+Removing the package puts back the config of the package greetd, which
+logs nobody in.
+The files in
+.I /etc/skel
+and the sudoers rule stay until the package is purged.
+.SH FILES
+.TP
+.I /etc/greetd/config.toml
+The greetd config, written by
+.BR hd-desktop-render (8).
+.TP
+.I /etc/hyprdebian/config.json
+The settings, in the key
+.BR hd-desktop .
+.TP
+.I /var/log/hyprland.log
+The output of Hyprland.
+.TP
+.I /usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
+Runs
+.B hd-desktop-render
+before greetd starts.
+.SH SEE ALSO
+.BR hd-desktop-render (8),
+.BR hd-base (7),
+.BR hd-config (7),
+.BR greetd (1),
+.BR Hyprland (1)

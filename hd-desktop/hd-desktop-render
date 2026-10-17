@@ -1,0 +1,175 @@
+#!/usr/bin/python3
+"""Writes the greetd config of the HyprDebian desktop, which logs a user in to Hyprland at the boot.
+
+The package hd-desktop installs this as /usr/sbin/hd-desktop-render, and greetd.service runs it
+before every start, with the drop-in hd-desktop.conf.
+
+    hd-desktop-render             write /etc/greetd/config.toml
+    hd-desktop-render --dry-run   show what would change, change nothing
+
+The user is the setting user of the key hd-desktop in /etc/hyprdebian/config.json. Without it, it
+is the user account with the lowest UID from UID_MIN to UID_MAX of /etc/login.defs, the first
+user that was made. Without such an account, or when the user of the setting does not exist,
+greetd logs nobody in: it switches to the console on tty1 and stops.
+
+The config is made from the jinja2 template greetd.toml.j2 in /usr/share/hd-desktop/templates.
+The output of Hyprland goes to /var/log/hyprland.log, which is given to the user. Run it as root.
+"""
+
+import argparse
+import json
+import os
+import pwd
+import re
+import sys
+
+import jinja2
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-desktop"
+TEMPLATE_DIR = "/usr/share/hd-desktop/templates"
+GREETD_CONFIG = "/etc/greetd/config.toml"
+LOG_FILE = "/var/log/hyprland.log"
+LOGIN_DEFS = "/etc/login.defs"
+
+# The defaults of useradd when /etc/login.defs does not set them.
+UID_MIN = 1000
+UID_MAX = 60000
+
+# A user name as useradd accepts it by default.
+VALID_USER = re.compile(r"^[a-z_][-a-z0-9_]{0,31}$")
+
+TEMPLATES = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+                               undefined=jinja2.StrictUndefined, keep_trailing_newline=True,
+                               trim_blocks=True, lstrip_blocks=True)
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def load_settings():
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, ValueError) as e:
+        fail(f"Cannot read {CONFIG_FILE}: {e}")
+    if not isinstance(config, dict):
+        fail(f"{CONFIG_FILE} does not hold a JSON object.")
+    settings = config.get(CONFIG_KEY, {})
+    if not isinstance(settings, dict):
+        fail(f"The key {CONFIG_KEY} of {CONFIG_FILE} is not a JSON object.")
+    return settings
+
+
+def uid_range():
+    """The range of the UIDs of user accounts, from /etc/login.defs."""
+    values = {"UID_MIN": UID_MIN, "UID_MAX": UID_MAX}
+    try:
+        with open(LOGIN_DEFS, encoding="utf-8") as f:
+            for line in f:
+                fields = line.split()
+                if len(fields) == 2 and fields[0] in values and fields[1].isdigit():
+                    values[fields[0]] = int(fields[1])
+    except FileNotFoundError:
+        pass
+    return values["UID_MIN"], values["UID_MAX"]
+
+
+def first_user():
+    """The user account with the lowest UID, or None when there is none."""
+    low, high = uid_range()
+    accounts = sorted((p for p in pwd.getpwall() if low <= p.pw_uid <= high),
+                      key=lambda p: p.pw_uid)
+    if not accounts:
+        return None
+    return accounts[0]
+
+
+def find_user(settings):
+    """The account of the user to log in, or None to log nobody in."""
+    name = settings.get("user")
+    if name is None:
+        return first_user()
+    if not isinstance(name, str) or not VALID_USER.match(name):
+        fail(f"The user {name!r} in the key {CONFIG_KEY} of {CONFIG_FILE} is not a valid user "
+             "name.")
+    try:
+        return pwd.getpwnam(name)
+    except KeyError:
+        print(f"Warning: the user {name} in the key {CONFIG_KEY} of {CONFIG_FILE} does not "
+              "exist; nobody is logged in.", file=sys.stderr)
+        return None
+
+
+def read_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+
+def write_file(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+# Hyprland runs as the user and writes its output to the log, so the user must own it.
+def give_log(account):
+    if not os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "a", encoding="utf-8"):
+            pass
+        os.chmod(LOG_FILE, 0o644)
+    status = os.stat(LOG_FILE)
+    if (status.st_uid, status.st_gid) != (account.pw_uid, account.pw_gid):
+        os.chown(LOG_FILE, account.pw_uid, account.pw_gid)
+        print(f"Gave {LOG_FILE} to {account.pw_name}.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Write {GREETD_CONFIG}, which logs a user in to Hyprland at the boot, from "
+        f"the key {CONFIG_KEY} in {CONFIG_FILE}.")
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        help="show what would change, change nothing")
+    args = parser.parse_args()
+    if not args.dry_run and os.geteuid() != 0:
+        fail("Run hd-desktop-render as root.")
+
+    account = find_user(load_settings())
+    user = account.pw_name if account is not None else None
+    text = TEMPLATES.get_template("greetd.toml.j2").render(user=user, log=LOG_FILE)
+    changed = read_file(GREETD_CONFIG) != text
+
+    if args.dry_run:
+        if user is None:
+            print("Would log nobody in.")
+        else:
+            print(f"Would log {user} in to Hyprland.")
+        if changed:
+            print(f"Would write {GREETD_CONFIG}:")
+            print(text, end="")
+        else:
+            print(f"{GREETD_CONFIG} is up to date.")
+        return
+
+    if changed:
+        os.makedirs(os.path.dirname(GREETD_CONFIG), mode=0o755, exist_ok=True)
+        write_file(GREETD_CONFIG, text)
+        if user is None:
+            print(f"Wrote {GREETD_CONFIG}, which logs nobody in.")
+        else:
+            print(f"Wrote {GREETD_CONFIG}, which logs {user} in to Hyprland.")
+    if account is not None:
+        give_log(account)
+
+
+if __name__ == "__main__":
+    main()

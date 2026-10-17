@@ -1,0 +1,72 @@
+.TH HD-DESKTOP-RENDER 8 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-desktop-render \- write the greetd config that boots into Hyprland
+.SH SYNOPSIS
+.B hd-desktop-render
+.RB [ \-n | \-\-dry\-run ]
+.SH DESCRIPTION
+.B hd-desktop-render
+writes
+.IR /etc/greetd/config.toml ,
+with which greetd logs a user in to Hyprland on tty7 at the boot, from the
+template
+.IR /usr/share/hd-desktop/templates/greetd.toml.j2 .
+It gives
+.IR /var/log/hyprland.log ,
+where the output of Hyprland goes, to that user.
+.PP
+The installation of
+.BR hd-desktop (7)
+runs it, and
+.B greetd.service
+runs it before every start, by the drop-in
+.IR /usr/lib/systemd/system/greetd.service.d/hd-desktop.conf .
+A user that is made after the installation, as by the installer, is thus
+logged in from the next boot on.
+When it fails, greetd starts with the config it has.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.BR \-n ,\  \-\-dry\-run
+Show which user would be logged in and the config that would be written,
+change nothing.
+.SH SETTINGS
+The settings are the key
+.B hd-desktop
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+.TP
+.B user
+The user to log in.
+Without it, the user account with the lowest UID from
+.B UID_MIN
+to
+.B UID_MAX
+of
+.IR /etc/login.defs ,
+the first user that was made.
+.PP
+Without such an account, or when the user of the setting does not exist,
+greetd logs nobody in: it switches to the console on tty1 and stops.
+For example:
+.PP
+.RS
+sudo hd-config-update hd-desktop '{"user": "alice"}'
+.br
+sudo hd-desktop-render
+.RE
+.PP
+The change takes effect at the next boot.
+.SH EXIT STATUS
+0 when the config was written or is up to date, 1 on an error and 2 on wrong
+arguments.
+.SH SEE ALSO
+.BR hd-desktop (7),
+.BR hd-config (7),
+.BR greetd (1)

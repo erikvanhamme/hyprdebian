@@ -1,0 +1,29 @@
+#!/bin/sh
+# postrm of hd-desktop: a removal removes the greetd config that hd-desktop-render wrote and puts
+# back the one of greetd, which the postinst diverted. A purge also removes the compiled dconf
+# database of the dark theme when its source in /etc/dconf/db/local.d is gone. Written for sh, as
+# python3 may be gone by then.
+set -e
+
+GREETD_CONFIG=/etc/greetd/config.toml
+DCONF_DB=/etc/dconf/db/local
+DCONF_SOURCE=/etc/dconf/db/local.d
+
+if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; then
+    if [ "$(dpkg-divert --listpackage "$GREETD_CONFIG")" = "hd-desktop" ]; then
+        rm -f "$GREETD_CONFIG"
+        dpkg-divert --package hd-desktop --remove --rename --divert "$GREETD_CONFIG.greetd" \
+            "$GREETD_CONFIG"
+    fi
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+    fi
+fi
+
+if [ "$1" != "purge" ]; then
+    exit 0
+fi
+
+if [ -z "$(ls -A "$DCONF_SOURCE" 2> /dev/null)" ]; then
+    rm -f "$DCONF_DB"
+fi

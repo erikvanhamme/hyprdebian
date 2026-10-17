@@ -1,0 +1,17 @@
+# Written by hd-desktop-render, before every start of greetd, from the key hd-desktop of
+# /etc/hyprdebian/config.json. Changes made here are lost; see hd-desktop-render(8).
+[terminal]
+vt = 7
+
+[general]
+runfile=/run/greetd.runfile
+{% if user %}
+
+[initial_session]
+command = "uwsm start hyprland.desktop > {{ log }} 2>&1"
+user = "{{ user }}"
+{% endif %}
+
+[default_session]
+command = "sh -c 'rm /run/greetd.runfile; chvt 1; systemctl stop greetd.service'"
+user = "root"

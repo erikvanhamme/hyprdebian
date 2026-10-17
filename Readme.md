@@ -16,7 +16,7 @@ Feel free to experiment with it.
 3.  Support for wired networks and (optional) wifi networks.
 4.  Uses yazi as file manager.
 5.  No pointy-clicky GUI's for any configuration. Nano is your configuration tool.
-6.  Automatic login to graphical session.
+6.  Automatic login to graphical session. See [hd-desktop](docs/packages/hd-desktop.md).
 7.  Keyboard shortcuts for the commonly used tools.
 8.  Wofi launcher for the other tools.
 9.  Basic notification system using mako.
@@ -132,4 +132,5 @@ The `docs` folder has more documentation:
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
+- [Desktop](docs/packages/hd-desktop.md): the Hyprland desktop and the login with greetd.
 - [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.

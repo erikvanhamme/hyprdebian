@@ -1,0 +1,50 @@
+#!/usr/bin/python3
+"""postinst of hd-desktop: diverts /etc/greetd/config.toml of greetd, writes the greetd config of
+HyprDebian in its place with hd-desktop-render, and compiles the dconf database of the dark theme.
+
+greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
+so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
+on every installation and upgrade, and before every start of greetd. The postrm of a removal
+removes it and puts the one of greetd back.
+
+greetd enables greetd.service on its own installation. When the installer runs, the user does not
+exist yet; hd-desktop-render then writes a config that logs nobody in, and writes it again with
+the user at the first boot, before greetd starts.
+"""
+
+import os
+import subprocess
+import sys
+
+GREETD_CONFIG = "/etc/greetd/config.toml"
+GREETD_CONFIG_DIVERTED = "/etc/greetd/config.toml.greetd"
+
+
+def divert(path, diverted):
+    """Diverts a file of another package to another name, unless hd-desktop already did."""
+    owner = subprocess.run(["dpkg-divert", "--listpackage", path], capture_output=True,
+                           text=True, check=True).stdout.strip()
+    if owner == "hd-desktop":
+        return
+    subprocess.run(["dpkg-divert", "--package", "hd-desktop", "--add", "--rename", "--divert",
+                    diverted, path], check=True)
+
+
+def main():
+    # configure is the only action that installs the package; the abort-* actions undo a
+    # failed upgrade or removal.
+    if len(sys.argv) < 2 or sys.argv[1] != "configure":
+        return
+
+    divert(GREETD_CONFIG, GREETD_CONFIG_DIVERTED)
+    subprocess.run(["/usr/sbin/hd-desktop-render"], check=True)
+    # The system database local of /etc/dconf/profile/user holds the dark theme of
+    # /etc/dconf/db/local.d.
+    subprocess.run(["dconf", "update"], check=True)
+    if not os.path.isdir("/run/systemd/system"):
+        return
+    subprocess.run(["systemctl", "daemon-reload"], check=True)
+
+
+if __name__ == "__main__":
+    main()
