@@ -57,9 +57,8 @@ USR := $(shell find usr -type f)
 # sudo only reads the files in /etc/sudoers.d with this mode.
 SUDOERS := etc/sudoers.d/hd-desktop
 # The commands, installed in /usr/bin.
-COMMANDS := hd-ask-poweroff hd-ask-reboot hd-cmd-screensaver hd-kill-screensaver \
-	hd-launch-screensaver hd-mode-select hd-mount hd-unmount hd-volume-down hd-volume-mute \
-	hd-volume-up
+COMMANDS := hd-ask-poweroff hd-ask-reboot hd-mode-select hd-mount hd-unmount hd-volume-down \
+	hd-volume-mute hd-volume-up
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-desktop-render
 TEMPLATES := $(wildcard templates/*)

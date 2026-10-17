@@ -13,6 +13,10 @@ wallpapers of
 the fonts of
 .BR hd-fonts (7),
 yazi, and the applications audacious, mpv, imv, firefox and meld.
+It recommends the screensaver of
+.BR hd-screensaver (7),
+which hypridle starts after 2 minutes; without it, hypridle only locks the
+screen.
 .SH BOOTING INTO HYPRLAND
 greetd runs on tty7 and logs a user in to Hyprland at the boot, without a
 password, with
@@ -43,16 +47,14 @@ in
 the configs of Hyprland
 .RI ( ~/.config/hypr/hyprland.lua ),
 hypridle, hyprlock, hyprpaper, kitty, mako, wofi, mpv, alsa, PipeWire,
-nwg-look and VSCodium, the text of the screensaver in
-.IR ~/.config/hyprdebian/screensaver.txt ,
-and the directories
+nwg-look and VSCodium, and the directories
 .I ~/.icons
 and
 .IR ~/Pictures/Screenshots .
 Existing users keep their files; copy the ones they want from
 .IR /etc/skel .
 .SH COMMANDS
-The key bindings of Hyprland and hypridle run these commands, in
+The key bindings of Hyprland run these commands, in
 .IR /usr/bin :
 .TP
 .BR hd-ask-reboot ,\  hd-ask-poweroff
@@ -62,10 +64,6 @@ or
 .B hd-poweroff
 of
 .BR hd-base (7).
-.TP
-.BR hd-launch-screensaver ,\  hd-cmd-screensaver ,\  hd-kill-screensaver
-Start the screensaver of terminal text effects on every monitor, run it in
-one kitty window, and stop it.
 .TP
 .B hd-mode-select
 Choose the resolution and refresh rate of a monitor with wofi.
@@ -117,6 +115,7 @@ Runs
 before greetd starts.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
+.BR hd-screensaver (7),
 .BR hd-base (7),
 .BR hd-config (7),
 .BR greetd (1),

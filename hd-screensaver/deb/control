@@ -1,0 +1,19 @@
+Package: hd-screensaver
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: hyprland, kitty, python3-terminaltexteffects, jq, procps
+Enhances: hd-desktop
+Replaces: hd-desktop (<< 0.2)
+Breaks: hd-desktop (<< 0.2)
+Section: x11
+Priority: optional
+Description: HyprDebian screensaver
+ The screensaver of the HyprDebian desktop: a full screen kitty window on
+ every monitor that shows a text with random effects of terminal text
+ effects, and stops on a key press or when it loses the focus. hypridle of
+ hd-desktop starts it after 2 minutes and stops it when the screen locks.
+ .
+ The text is ~/.config/hyprdebian/screensaver.txt of the user, or
+ /usr/share/hd-screensaver/screensaver.txt when the user has none.

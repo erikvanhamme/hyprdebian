@@ -6,6 +6,8 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - nwg-look with the GTK and Qt themes, the wallpapers of [hd-art](hd-art.md) and the fonts of [hd-fonts](hd-fonts.md);
 - yazi, and the applications audacious, mpv, imv, firefox and meld.
 
+It recommends the screensaver of [hd-screensaver](hd-screensaver.md), which hypridle starts after 2 minutes. Without it, hypridle only locks the screen and turns the monitors off: the command line that starts the screensaver ends in `|| true`, so hypridle logs no failed command.
+
 It also installs the files that new users get in their home directory, the commands that the key bindings run, the dark theme for GTK applications and the sudoers rule of the mount menus.
 
 The package comes with the man pages `man 7 hd-desktop` and `man hd-desktop-render`.
@@ -31,9 +33,8 @@ hd-desktop/deb/postinst
 hd-desktop/deb/postrm
 hd-desktop/hd-desktop-render
 hd-desktop/templates/greetd.toml.j2
-hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-cmd-screensaver, hd-kill-screensaver,
-hd-launch-screensaver, hd-mode-select, hd-mount, hd-mount-helper, hd-unmount,
-hd-volume-down, hd-volume-mute, hd-volume-up
+hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd-mount-helper,
+hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
 hd-desktop/etc/...
 hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
 hd-desktop/man/hd-desktop.7
@@ -66,24 +67,22 @@ New users get these files in their home directory, from `/etc/skel`:
 | Path | |
 | --- | --- |
 | `~/.config/hypr/hyprland.lua` | The config of Hyprland, with the [key bindings](../HyprDebian/Key%20Bindings.md). |
-| `~/.config/hypr/hypridle.conf` | The screensaver after 2 minutes, hyprlock after 4, and the monitors off after that. |
+| `~/.config/hypr/hypridle.conf` | The screensaver of [hd-screensaver](hd-screensaver.md) after 2 minutes, hyprlock after 4, and the monitors off after that. |
 | `~/.config/hypr/hyprlock.conf`, `hyprpaper.conf` | The lock screen and the wallpaper. |
 | `~/.config/kitty`, `mako`, `wofi`, `mpv` | The terminal, the notifications, the launcher and the media player. |
 | `~/.config/alsa`, `pipewire` | The sound. |
 | `~/.config/nwg-look`, `~/.local/share/nwg-look` | The GTK theme and font, applied by `nwg-look -a` when Hyprland starts. |
 | `~/.config/VSCodium` | The settings of VSCodium. |
-| `~/.config/hyprdebian/screensaver.txt` | The text of the screensaver. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
 Existing users keep their own files; copy the ones they want from `/etc/skel`.
 
 ## Commands
-The key bindings and hypridle run these commands, in `/usr/bin`:
+The key bindings run these commands, in `/usr/bin`:
 
 | Command | |
 | --- | --- |
 | `hd-ask-reboot`, `hd-ask-poweroff` | Ask with wofi whether to reboot or power off, then run `hd-reboot` or `hd-poweroff` of [hd-base](hd-base.md). |
-| `hd-launch-screensaver`, `hd-cmd-screensaver`, `hd-kill-screensaver` | Start the screensaver of terminal text effects on every monitor, run it in one kitty window, and stop it. |
 | `hd-mode-select` | Choose the resolution and refresh rate of a monitor with wofi. |
 | `hd-mount`, `hd-unmount` | Mount a drive or an `/etc/fstab` entry, a drive on `/mnt/<user>/<n>`, and unmount it again, with wofi. |
 | `hd-volume-up`, `hd-volume-down`, `hd-volume-mute` | Change the volume of the default output and show it in a notification. |
