@@ -1,0 +1,15 @@
+# Serves the hyprdebian package repository in /srv/hd-repo, which hd-repo-update maintains.
+# It is the default server on port 80. For HTTPS, add a server block that listens on 443 with
+# the certificate and the same root; apt then only needs https:// in its sources.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /srv/hd-repo;
+    autoindex on;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

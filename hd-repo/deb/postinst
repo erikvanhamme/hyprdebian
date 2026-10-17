@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# postinst of hd-repo: sets up the user repo, its inboxes, the repository in /srv/hd-repo and
+# the signing key, makes and signs the first indices, and lets nginx serve the repository.
+# Running it again, on an upgrade or a reinstall, keeps the key and the packages.
+set -euo pipefail
+
+REPO_USER="repo"
+REPO_HOME="/var/lib/hd-repo"
+INBOX_DIR="${REPO_HOME}/inbox"
+SUITES=(trixie unstable)
+REPO_DIR="/srv/hd-repo"
+CONF_DIR="/etc/hyprdebian/hd-repo"
+GNUPGHOME="${CONF_DIR}/gnupg"
+SITE="hd-repo"
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [[ "${1:-}" != "configure" ]]; then
+    exit 0
+fi
+
+# No previous version: a new installation, not an upgrade or a reinstall after a removal.
+FRESH_INSTALL="false"
+if [[ -z "${2:-}" ]]; then
+    FRESH_INSTALL="true"
+fi
+
+# repo logs in with ssh to upload packages and to run hd-repo-update, so it has a shell.
+if ! id -u "${REPO_USER}" > /dev/null 2>&1; then
+    echo "Creating the user ${REPO_USER}..."
+    useradd --system --user-group --home-dir "${REPO_HOME}" --shell /bin/bash \
+        --comment "hyprdebian package repository" "${REPO_USER}"
+fi
+
+# A purge removes the user but keeps the repository and the key, so a new user takes them over.
+install -d -o "${REPO_USER}" -g "${REPO_USER}" -m 0755 "${REPO_HOME}" "${INBOX_DIR}"
+for suite in "${SUITES[@]}"; do
+    install -d -o "${REPO_USER}" -g "${REPO_USER}" -m 0755 "${INBOX_DIR}/${suite}"
+done
+install -d -o "${REPO_USER}" -g "${REPO_USER}" -m 0700 "${REPO_HOME}/.ssh"
+install -d -o "${REPO_USER}" -g "${REPO_USER}" -m 0755 "${REPO_DIR}"
+chown -R "${REPO_USER}:${REPO_USER}" "${REPO_DIR}"
+install -d -m 0755 "${CONF_DIR}"
+install -d -o "${REPO_USER}" -g "${REPO_USER}" -m 0700 "${GNUPGHOME}"
+chown -R "${REPO_USER}:${REPO_USER}" "${GNUPGHOME}"
+
+# The key has no passphrase, so the updates can sign without asking for one.
+if runuser -u "${REPO_USER}" -- gpg --homedir "${GNUPGHOME}" --batch --list-secret-keys --with-colons 2>/dev/null | grep -q '^sec'; then
+    echo "Keeping the signing key in ${GNUPGHOME}."
+else
+    echo "Generating the signing key in ${GNUPGHOME}..."
+    host=$(hostname -f 2>/dev/null || hostname)
+    runuser -u "${REPO_USER}" -- gpg --homedir "${GNUPGHOME}" --batch --passphrase '' \
+        --quick-gen-key "HyprDebian Repository <hd-repo@${host}>" ed25519 sign never
+fi
+
+# Lets repo snapshot the repository when it is a ZFS dataset; ZFS needs mount next to snapshot.
+mount=$(findmnt -n -o FSTYPE,SOURCE --mountpoint "${REPO_DIR}" || true)
+read -r fstype dataset <<< "${mount}"
+if [[ "${fstype}" == "zfs" ]]; then
+    echo "Allowing ${REPO_USER} to snapshot ${dataset}..."
+    /usr/sbin/zfs allow -u "${REPO_USER}" snapshot,mount "${dataset}"
+fi
+
+echo "Making and signing the indices..."
+(cd "${REPO_HOME}" && runuser -u "${REPO_USER}" -- /usr/bin/hd-repo-update)
+
+# gpg started an agent for the key, which would otherwise keep running.
+runuser -u "${REPO_USER}" -- gpgconf --homedir "${GNUPGHOME}" --kill gpg-agent || true
+
+# The repository takes over port 80 from the default site of nginx, which also claims to be
+# the default server. Only on a new installation: after that, the sites are the admin's.
+if [[ "${FRESH_INSTALL}" == "true" ]]; then
+    ln -sfn "../sites-available/${SITE}" "/etc/nginx/sites-enabled/${SITE}"
+    if [[ -L /etc/nginx/sites-enabled/default ]]; then
+        echo "Disabling the default nginx site..."
+        rm -f /etc/nginx/sites-enabled/default
+    fi
+fi
+
+nginx -t
+if [[ -d /run/systemd/system ]]; then
+    systemctl reload-or-restart nginx.service
+fi

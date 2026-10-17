@@ -1,0 +1,18 @@
+Package: hd-repo
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: nginx, gnupg, apt-utils, passwd
+Recommends: openssh-server
+Section: admin
+Priority: optional
+Description: HyprDebian package repository
+ Hosts the signed hyprdebian package repository for the suites trixie and
+ unstable, and serves it over HTTP with nginx from /srv/hd-repo.
+ .
+ The user repo uploads packages with scp to /var/lib/hd-repo/inbox/<suite>
+ and runs hd-repo-update, which moves them into the pool, makes the indices
+ and signs them with the key in /etc/hyprdebian/hd-repo/gnupg. The key is
+ generated on the first installation. When /srv/hd-repo is a ZFS dataset,
+ every update that adds packages takes a snapshot first.

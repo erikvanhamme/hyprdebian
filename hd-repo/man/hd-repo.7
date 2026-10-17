@@ -1,0 +1,229 @@
+.TH HD-REPO 7 "October 2026" "hd-repo" "HyprDebian"
+.SH NAME
+hd-repo \- the hyprdebian package repository
+.SH DESCRIPTION
+The package
+.B hd-repo
+turns a Debian or hyprdebian system into the hyprdebian package repository.
+It holds packages that are not in Debian, for the suites
+.B trixie
+and
+.BR unstable ,
+signs them, and serves them over HTTP with
+.BR nginx (8).
+It only hosts packages; they are built elsewhere.
+.PP
+Installing the package sets everything up:
+.IP \(bu 2
+the user
+.BR repo ,
+which uploads packages and maintains the repository;
+.IP \(bu 2
+an inbox per suite in
+.IR /var/lib/hd-repo/inbox ;
+.IP \(bu 2
+the repository in
+.IR /srv/hd-repo ;
+.IP \(bu 2
+the signing key in
+.IR /etc/hyprdebian/hd-repo/gnupg ,
+generated on the first installation when there is none;
+.IP \(bu 2
+the nginx site
+.IR /etc/nginx/sites-available/hd-repo ,
+which serves
+.I /srv/hd-repo
+on port 80 in place of the default site of nginx.
+.PP
+The first, empty indices of both suites are made and signed during the
+installation, so the repository works as soon as the installation is done.
+.SH SETTING UP
+.B repo
+logs in with
+.BR ssh (1)
+using a key; it has no password.
+Add the public keys of the people who may upload packages to
+.IR /var/lib/hd-repo/.ssh/authorized_keys ,
+owned by
+.B repo
+with mode 0600:
+.PP
+.RS
+.nf
+sudo install \-o repo \-g repo \-m 0600 id_ed25519.pub \e
+    /var/lib/hd-repo/.ssh/authorized_keys
+.fi
+.RE
+.PP
+The SSH server is recommended, not required, by
+.BR hd-repo ;
+install
+.B openssh-server
+when it is missing.
+.SH ADDING PACKAGES
+Copy the packages to the inbox of their suite, then run
+.BR hd-repo-update (1)
+as
+.BR repo :
+.PP
+.RS
+.nf
+scp foo_1.0_amd64.deb repo@repo.example:inbox/unstable/
+ssh repo@repo.example hd-repo-update
+.fi
+.RE
+.PP
+The inboxes are
+.I inbox/trixie
+and
+.I inbox/unstable
+in the home directory of
+.BR repo .
+A package built for trixie goes in the first, one built for unstable in the
+second; a package that fits both is copied to both.
+.PP
+.B hd-repo-update
+checks every package in the inboxes, moves them into the pool of their suite,
+replacing older versions of the same package, and makes and signs the indices.
+A package that is not valid, or not for amd64 or all, stops the update before
+anything changes.
+.SH USING THE REPOSITORY
+A client needs the public key and an apt source.
+Download the key from the repository:
+.PP
+.RS
+.nf
+sudo /usr/lib/apt/apt\-helper download\-file \e
+    http://repo.example/hyprdebian\-archive\-keyring.pgp \e
+    /usr/share/keyrings/hyprdebian\-archive\-keyring.pgp
+.fi
+.RE
+.PP
+and add
+.IR /etc/apt/sources.list.d/hyprdebian.local.sources :
+.PP
+.RS
+.nf
+Types: deb
+URIs: http://repo.example/
+Suites: unstable
+Components: main
+Signed\-By: /usr/share/keyrings/hyprdebian\-archive\-keyring.pgp
+Architectures: amd64
+.fi
+.RE
+.PP
+For trixie, set
+.B Suites
+to
+.BR trixie .
+The hyprdebian installer sets this up itself when the repository is enabled.
+.PP
+The key is downloaded over the same connection as the packages, so it does
+not protect against someone who can change that traffic.
+It makes sure that every client keeps getting its packages from the
+repository it was set up with.
+.SH LAYOUT
+.RS
+.nf
+/srv/hd\-repo/
+  hyprdebian\-archive\-keyring.pgp    the public key
+  pool/trixie/main/                 the packages of trixie
+  pool/unstable/main/               the packages of unstable
+  dists/trixie/                     the indices of trixie
+  dists/sid/                        the indices of unstable
+  dists/stable \-> trixie
+  dists/unstable \-> sid
+.fi
+.RE
+.PP
+Each directory in
+.I dists
+holds
+.IR Release ,
+its signatures
+.I InRelease
+and
+.IR Release.gpg ,
+and
+.IR main/binary\-amd64/Packages(.gz) .
+.PP
+The suites have their own pools, so a package built for one suite never
+replaces the one built for the other.
+Clients may ask for trixie by its codename or as
+.BR stable ,
+and for unstable by its name or as
+.BR sid .
+.SH ZFS
+When
+.I /srv/hd-repo
+is a ZFS dataset of its own,
+.B hd-repo-update
+takes a snapshot of it before it adds packages, so an update can be undone
+with
+.BR "zfs rollback" .
+The installation lets
+.B repo
+take those snapshots when the dataset already exists.
+When the dataset is made later, allow it by hand:
+.PP
+.RS
+.nf
+sudo zfs allow \-u repo snapshot,mount rpool/hd\-repo
+.fi
+.RE
+.SH THE SIGNING KEY
+Every client trusts the key in
+.IR /etc/hyprdebian/hd-repo/gnupg .
+It has no passphrase, so updates can sign without asking for one.
+Back it up: with a new key,
+.B apt update
+fails on every client until the new public key is downloaded on it, as in
+.BR "USING THE REPOSITORY" .
+.PP
+Removing the package keeps everything.
+Purging it removes the user
+.BR repo ,
+its home directory with the inboxes, and the nginx site, but keeps
+.I /srv/hd-repo
+and the key, so a new installation takes them over.
+.SH HTTPS
+The repository is served over HTTP.
+To serve it over HTTPS as well, add a
+.B server
+block that listens on port 443 with the certificate and
+.B root /srv/hd-repo
+to
+.IR /etc/nginx/sites-available/hd-repo ,
+and change
+.B http://
+to
+.B https://
+in the sources of the clients.
+.SH FILES
+.TP
+.I /srv/hd-repo
+The repository, served by nginx.
+.TP
+.I /var/lib/hd-repo
+The home directory of
+.BR repo .
+.TP
+.I /var/lib/hd-repo/inbox/trixie
+.TQ
+.I /var/lib/hd-repo/inbox/unstable
+The inboxes.
+.TP
+.I /etc/hyprdebian/hd-repo/gnupg
+The signing key.
+.TP
+.I /etc/nginx/sites-available/hd-repo
+The nginx site, a conffile.
+.SH SEE ALSO
+.BR hd-repo-update (1),
+.BR apt-ftparchive (1),
+.BR sources.list (5),
+.BR nginx (8),
+.BR zfs-allow (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

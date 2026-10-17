@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# postrm of hd-repo: a purge stops nginx from serving the repository and removes the user repo
+# with its home and inboxes. The repository in /srv/hd-repo and the signing key in
+# /etc/hyprdebian/hd-repo stay: every client trusts that key, and a reinstall takes both over.
+set -euo pipefail
+
+REPO_USER="repo"
+REPO_HOME="/var/lib/hd-repo"
+SITE="hd-repo"
+
+if [[ "${1:-}" != "purge" ]]; then
+    exit 0
+fi
+
+rm -f "/etc/nginx/sites-enabled/${SITE}"
+if [[ -d /run/systemd/system ]] && systemctl is-active --quiet nginx.service; then
+    systemctl reload nginx.service || true
+fi
+
+if id -u "${REPO_USER}" > /dev/null 2>&1; then
+    echo "Removing the user ${REPO_USER}..."
+    userdel "${REPO_USER}" || true
+fi
+rm -rf "${REPO_HOME}"

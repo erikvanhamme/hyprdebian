@@ -1,0 +1,120 @@
+.TH HD-REPO-UPDATE 1 "October 2026" "hd-repo" "HyprDebian"
+.SH NAME
+hd-repo-update \- add uploaded packages to the hyprdebian package repository
+.SH SYNOPSIS
+.B hd-repo-update
+.RI [ suite ...]
+.SH DESCRIPTION
+.B hd-repo-update
+adds the packages in the inboxes to the hyprdebian package repository in
+.IR /srv/hd-repo ,
+then makes the indices of every suite and signs them.
+See
+.BR hd-repo (7)
+for how the repository is set up and used.
+.PP
+Without arguments, it takes the packages from the inboxes of all suites,
+.I /var/lib/hd-repo/inbox/trixie
+and
+.IR /var/lib/hd-repo/inbox/unstable .
+With arguments, only from the inboxes of the suites named,
+.B trixie
+or
+.BR unstable .
+The indices of all suites are made and signed again either way.
+.PP
+Run it as the user
+.BR repo ,
+without
+.BR sudo (8):
+the repository and the key belong to that user.
+It is usually run over ssh, after uploading the packages with scp:
+.PP
+.RS
+.nf
+scp foo_1.0_amd64.deb repo@repo.example:inbox/unstable/
+ssh repo@repo.example hd-repo-update
+.fi
+.RE
+.SH OPERATION
+.IP 1. 4
+Every package in the inboxes is checked first.
+A file that is not a package, or a package that is not for amd64 or all,
+stops the update, and the repository and the inboxes stay as they were.
+.IP 2. 4
+When there are packages and
+.I /srv/hd-repo
+is a ZFS dataset of its own, a snapshot
+.IR <dataset>@hd-repo-update-<date>-<time>
+is taken, so the update can be undone with
+.BR "zfs rollback" .
+When the snapshot fails, the update stops before it changes anything.
+.IP 3. 4
+Each package is moved from its inbox to the pool of its suite,
+.IR /srv/hd-repo/pool/<suite>/main .
+Older versions of the same package in that pool are removed.
+.IP 4. 4
+For every suite, the
+.I Packages
+index is made with
+.BR apt-ftparchive (1),
+then the
+.I Release
+file with its hashes, which is signed into
+.I InRelease
+and
+.IR Release.gpg .
+They are made in a temporary directory and moved into place together, so
+clients never see indices without the signed Release that matches them.
+.IP 5. 4
+The public key is exported to
+.IR /srv/hd-repo/hyprdebian-archive-keyring.pgp .
+.PP
+Without new packages, nothing is snapshotted or moved; the repository is
+only signed again.
+Only one
+.B hd-repo-update
+runs at a time; a second one stops with an error.
+.SH OPTIONS
+.TP
+.I suite
+Take packages only from the inbox of this suite:
+.B trixie
+or
+.BR unstable .
+May be given more than once.
+.SH EXIT STATUS
+0 when the repository was updated and signed, 1 when the update stopped on an
+error.
+.SH FILES
+.TP
+.I /var/lib/hd-repo/inbox/<suite>
+The inboxes, emptied by a successful update.
+.TP
+.I /srv/hd-repo
+The repository.
+.TP
+.I /etc/hyprdebian/hd-repo/gnupg
+The signing key.
+.TP
+.I /var/lib/hd-repo/update.lock
+Keeps two updates from running at the same time.
+.SH EXAMPLES
+Add the packages uploaded for both suites:
+.PP
+.RS
+hd-repo-update
+.RE
+.PP
+Add only the packages uploaded for unstable:
+.PP
+.RS
+hd-repo-update unstable
+.RE
+.SH SEE ALSO
+.BR hd-repo (7),
+.BR apt-ftparchive (1),
+.BR gpg (1),
+.BR zfs-snapshot (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

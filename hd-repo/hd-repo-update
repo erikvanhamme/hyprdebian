@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Adds the packages in the inboxes to the hyprdebian package repository, makes the indices of
+# every suite and signs them. The package hd-repo installs this as /usr/bin/hd-repo-update.
+#
+#   hd-repo-update               process the inboxes of all suites
+#   hd-repo-update unstable ...  process only the inboxes of these suites
+#
+# Run it as the user repo, without sudo: the key and the repository belong to that user.
+# Upload packages first with scp, e.g. scp foo.deb repo@<host>:inbox/unstable/.
+#
+# A package replaces the older versions of the same package in the pool of its suite. When
+# /srv/hd-repo is a ZFS dataset, it is snapshotted before any package is added, so an update
+# can be undone with zfs rollback. Every run signs all suites again, also without packages.
+
+REPO_USER="repo"
+REPO_DIR="/srv/hd-repo"
+INBOX_DIR="/var/lib/hd-repo/inbox"
+LOCK_FILE="/var/lib/hd-repo/update.lock"
+GNUPGHOME="/etc/hyprdebian/hd-repo/gnupg"
+KEY_FILE="${REPO_DIR}/hyprdebian-archive-keyring.pgp"
+ZFS="/usr/sbin/zfs"
+GPG=(gpg --homedir "${GNUPGHOME}" --batch --yes)
+
+# The suites, by the name of their inbox. Each has its own pool, pool/<suite>/main, and its
+# indices in dists/<codename>. The Release file names the codename and the suite name, and
+# dists/<suite name> links to dists/<codename>, so clients can ask for either.
+SUITES=(trixie unstable)
+declare -A CODENAME=([trixie]="trixie" [unstable]="sid")
+declare -A SUITE_NAME=([trixie]="stable" [unstable]="unstable")
+
+ORIGIN="HyprDebian Repository"
+ARCHITECTURES="amd64"
+
+# The pool, the indices and the key must be readable for nginx.
+umask 022
+
+if [[ "$(id -un)" != "${REPO_USER}" ]]; then
+    echo "Error: This script must be run as ${REPO_USER}, without sudo." >&2
+    exit 1
+fi
+
+if [[ ! -d "${REPO_DIR}" || ! -d "${GNUPGHOME}" ]]; then
+    echo "Error: ${REPO_DIR} or ${GNUPGHOME} does not exist, reinstall the package hd-repo." >&2
+    exit 1
+fi
+
+# The suites to take packages from: the arguments, or all of them.
+if [[ $# -gt 0 ]]; then
+    SELECTED=("$@")
+else
+    SELECTED=("${SUITES[@]}")
+fi
+for suite in "${SELECTED[@]}"; do
+    if [[ -z "${CODENAME[${suite}]:-}" ]]; then
+        echo "Error: Unknown suite ${suite}, the suites are: ${SUITES[*]}" >&2
+        exit 1
+    fi
+done
+
+# Two updates at the same time would mix up the pool and the indices.
+exec 9> "${LOCK_FILE}"
+if ! flock -n 9; then
+    echo "Error: Another hd-repo-update is running." >&2
+    exit 1
+fi
+
+# Collects the packages of the selected inboxes, and checks all of them before anything
+# changes, so a bad upload leaves the repository as it was.
+shopt -s nullglob
+NEW_DEBS=()
+NEW_SUITES=()
+for suite in "${SELECTED[@]}"; do
+    for deb in "${INBOX_DIR}/${suite}"/*.deb; do
+        if ! arch=$(dpkg-deb -f "${deb}" Architecture 2>/dev/null); then
+            echo "Error: ${deb} is not a valid package." >&2
+            exit 1
+        fi
+        if [[ "${arch}" != "all" && " ${ARCHITECTURES} " != *" ${arch} "* ]]; then
+            echo "Error: ${deb} is for ${arch}, the repository holds ${ARCHITECTURES} and all." >&2
+            exit 1
+        fi
+        NEW_DEBS+=("${deb}")
+        NEW_SUITES+=("${suite}")
+    done
+done
+shopt -u nullglob
+
+if [[ ${#NEW_DEBS[@]} -gt 0 ]]; then
+    # Only new packages change the repository, a run without them only signs it again.
+    mount=$(findmnt -n -o FSTYPE,SOURCE --mountpoint "${REPO_DIR}" || true)
+    read -r fstype dataset <<< "${mount}"
+    if [[ "${fstype}" == "zfs" ]]; then
+        snapshot="${dataset}@hd-repo-update-$(date +%Y%m%d-%H%M%S)"
+        echo "==> Taking snapshot ${snapshot}..."
+        if ! "${ZFS}" snapshot "${snapshot}"; then
+            echo "Error: Could not snapshot ${dataset}. Let ${REPO_USER} snapshot it with:" >&2
+            echo "  sudo zfs allow -u ${REPO_USER} snapshot,mount ${dataset}" >&2
+            exit 1
+        fi
+    fi
+
+    for i in "${!NEW_DEBS[@]}"; do
+        deb="${NEW_DEBS[$i]}"
+        pool="${REPO_DIR}/pool/${NEW_SUITES[$i]}/main"
+        package=$(dpkg-deb -f "${deb}" Package)
+
+        echo "==> Adding $(basename "${deb}") to ${pool}..."
+        mkdir -p "${pool}"
+        rm -f "${pool}/${package}_"*.deb
+        # scp keeps the mode of the source file, install makes it readable for nginx.
+        install -m 0644 "${deb}" "${pool}/"
+        rm -f "${deb}"
+    done
+else
+    echo "==> No new packages in the inboxes, signing the repository again..."
+fi
+
+# The indices and the Release file of a suite are made and signed in a temporary directory,
+# then moved into place together. The Release file then only lists the new indices, and
+# clients never see indices without the signed Release that matches them.
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "${TMP_DIR}"' EXIT
+cd "${REPO_DIR}"
+
+for suite in "${SUITES[@]}"; do
+    codename="${CODENAME[${suite}]}"
+    pool="pool/${suite}/main"
+    dist="dists/${codename}"
+    tmp="${TMP_DIR}/${codename}"
+
+    echo "==> Making and signing the indices of ${suite} in ${dist}..."
+    mkdir -p "${pool}" "${dist}" "${tmp}/main/binary-amd64"
+
+    apt-ftparchive packages "${pool}" > "${tmp}/main/binary-amd64/Packages"
+    gzip -k -f "${tmp}/main/binary-amd64/Packages"
+
+    # The Release file lists the hashes of the indices, the signature on it covers the packages.
+    apt-ftparchive \
+        -o APT::FTPArchive::Release::Origin="${ORIGIN}" \
+        -o APT::FTPArchive::Release::Label="${ORIGIN}" \
+        -o APT::FTPArchive::Release::Suite="${SUITE_NAME[${suite}]}" \
+        -o APT::FTPArchive::Release::Codename="${codename}" \
+        -o APT::FTPArchive::Release::Architectures="${ARCHITECTURES}" \
+        -o APT::FTPArchive::Release::Components="main" \
+        release "${tmp}" > "${TMP_DIR}/Release"
+    "${GPG[@]}" --clearsign -o "${TMP_DIR}/InRelease" "${TMP_DIR}/Release"
+    "${GPG[@]}" --armor --detach-sign -o "${TMP_DIR}/Release.gpg" "${TMP_DIR}/Release"
+
+    mkdir -p "${dist}/main/binary-amd64"
+    mv "${tmp}/main/binary-amd64/Packages" "${tmp}/main/binary-amd64/Packages.gz" "${dist}/main/binary-amd64/"
+    mv "${TMP_DIR}/Release" "${TMP_DIR}/Release.gpg" "${TMP_DIR}/InRelease" "${dist}/"
+
+    ln -sfn "${codename}" "dists/${SUITE_NAME[${suite}]}"
+done
+
+# The installer downloads the public key from here.
+echo "==> Exporting the public key to ${KEY_FILE}..."
+"${GPG[@]}" --export -o "${KEY_FILE}"
+
+echo "==> The repository is up to date."
