@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 """Provisions a HyprDebian vm in libvirt on this computer, to install with the live cd.
 
-It asks for the name, the zvol, the number of cpus, the memory and the bridge of the vm, renders
+It asks for the name, the zvol, the number of cpus, the memory, the bridge and the GPU of the vm,
+renders
 domain.xml.j2 next to it, defines the vm in qemu:///system and starts it from the live ISO. The
 zvol must exist; make it first, for example with zfs create -V 64G rpool/vmdk/<name>.
 
@@ -24,6 +25,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = "domain.xml.j2"
 ISO = os.path.join(os.path.dirname(HERE), "livecd", "out", "hyprdebian-live-amd64.iso")
 ZVOL_DIR = "/dev/zvol"
+# The render nodes of the GPUs, by PCI path, and the cards and their connectors in sysfs.
+DRI_BY_PATH = "/dev/dri/by-path"
+DRM_CLASS = "/sys/class/drm"
 # The memory of the vm, in GiB: the powers of two from 4 to 32.
 MEMORY_GIB = [4, 8, 16, 32]
 DEFAULT_CPUS = 2
@@ -164,6 +168,53 @@ def ask_bridge():
         print(f"{bridge} is not a network bridge of this computer.")
 
 
+def gpus():
+    """The GPUs of this computer, as a list of (render node by PCI path, whether a monitor is
+    connected to it)."""
+    if not os.path.isdir(DRI_BY_PATH):
+        return []
+
+    found = []
+    for entry in sorted(os.listdir(DRI_BY_PATH)):
+        if not entry.endswith("-render"):
+            continue
+        card_link = os.path.join(DRI_BY_PATH, entry[:-len("render")] + "card")
+        connected = False
+        if os.path.exists(card_link):
+            card = os.path.basename(os.path.realpath(card_link))
+            for connector in os.listdir(DRM_CLASS):
+                if not connector.startswith(card + "-"):
+                    continue
+                with open(os.path.join(DRM_CLASS, connector, "status")) as f:
+                    if f.read().strip() == "connected":
+                        connected = True
+        found.append((os.path.join(DRI_BY_PATH, entry), connected))
+    return found
+
+
+def ask_gpu(found):
+    """Asks for the GPU that renders the 3D graphics of the vm, and returns its render node.
+
+    qemu renders with it (egl-headless), so it must be the GPU that shows the console on this
+    computer: a GPU that drives no monitor hands its frames to another and the console of the vm
+    is scrambled. A monitor connected to it
+    makes it the default.
+    """
+    if not found:
+        raise ProvisionError(f"there is no GPU with a render node in {DRI_BY_PATH}")
+    if len(found) == 1:
+        return found[0][0]
+
+    options = []
+    default = 0
+    for index, (node, connected) in enumerate(found):
+        options.append((f"{node}{' (monitor connected)' if connected else ''}", None))
+        if connected and not found[default][1]:
+            default = index
+
+    return found[choose("GPU that renders the vm (the one of the monitor):", options, default)][0]
+
+
 def render(settings):
     """Renders the domain XML of the vm. Autoescape keeps paths with quotes or & valid XML."""
     environment = jinja2.Environment(loader=jinja2.FileSystemLoader(HERE), autoescape=True,
@@ -179,6 +230,7 @@ def confirm(settings):
     print(f"  Cpus:    {settings['cpus']}")
     print(f"  Memory:  {settings['memory']} GiB")
     print(f"  Bridge:  {settings['bridge']}")
+    print(f"  GPU:     {settings['rendernode']}")
     print(f"  Live cd: {settings['iso']}")
     return ask("\nDefine and start it? (y/N)").lower() in ("y", "yes")
 
@@ -211,6 +263,7 @@ def main():
             "cpus": ask_cpus(),
             "memory": ask_memory(),
             "bridge": ask_bridge(),
+            "rendernode": ask_gpu(gpus()),
             "iso": ISO,
         }
         xml = render(settings)

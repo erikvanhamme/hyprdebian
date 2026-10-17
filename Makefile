@@ -9,8 +9,8 @@
 #   make clean      remove packages/ and run make clean in every package
 #                   directory
 #   make provision-vm
-#                   ask for the name, zvol, cpus, memory and bridge of a vm,
-#                   then define it in libvirt and start it from the live cd
+#                   ask for the name, zvol, cpus, memory, bridge and GPU of a
+#                   vm, then define it in libvirt and start it from the live cd
 #                   (vm/provision-vm.py); make the zvol first
 #   make update-repo
 #                   build every package, then ask for the host name of a

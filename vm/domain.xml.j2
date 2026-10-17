@@ -1,7 +1,13 @@
 <!-- The libvirt domain of a HyprDebian vm, rendered by provision-vm.py. UEFI with secure boot
      enabled and no keys enrolled, so the firmware starts in setup mode; libvirt picks the firmware
      and makes the nvram, the uuid and the MAC address. It boots from the zvol, and from the live
-     ISO while the zvol is still empty. -->
+     ISO while the zvol is still empty. The virtio gpu has 3D acceleration (virgl on
+     virtio-vga-gl; libvirt keeps a virtio device it once picked, so it is named here), which
+     programs that draw with the GPU, such as hyprpaper, need. qemu renders it with egl-headless
+     on the GPU that shows the console, as frames handed from one GPU to another come out
+     scrambled, and hands spice plain frames: spice with OpenGL stalls the virtio gpu until the
+     client has drawn each frame. It has no serial console, as a console on a serial port keeps
+     the boot splash from showing. -->
 <domain type='kvm'>
   <name>{{ name }}</name>
   <memory unit='GiB'>{{ memory }}</memory>
@@ -55,14 +61,6 @@
       <source bridge='{{ bridge }}'/>
       <model type='virtio'/>
     </interface>
-    <serial type='pty'>
-      <target type='isa-serial' port='0'>
-        <model name='isa-serial'/>
-      </target>
-    </serial>
-    <console type='pty'>
-      <target type='serial' port='0'/>
-    </console>
     <channel type='unix'>
       <target type='virtio' name='org.qemu.guest_agent.0'/>
     </channel>
@@ -74,8 +72,13 @@
       <listen type='address'/>
       <image compression='off'/>
     </graphics>
+    <graphics type='egl-headless'>
+      <gl rendernode='{{ rendernode }}'/>
+    </graphics>
     <video>
-      <model type='virtio' heads='1' primary='yes'/>
+      <model type='virtio' heads='1' primary='yes' device='virtio-vga-gl'>
+        <acceleration accel3d='yes'/>
+      </model>
     </video>
     <watchdog model='itco' action='reset'/>
     <memballoon model='virtio'/>
