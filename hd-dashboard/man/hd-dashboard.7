@@ -152,7 +152,9 @@ array, and a failed last run of the service of a timer.
 .PP
 Warnings: a pool that is 80% full or more, a system that is starting or
 stopping, a pending reboot, no upgrade for 14 days or never, and a HyprDebian
-version older than the newest among the systems.
+version older than the one on the system of the dashboard, from
+.IR /etc/hyprdebian/version.json .
+A newer version gets no warning; without that file, versions are not judged.
 .PP
 Notes: upgradable packages.
 Notes do not change the color of the card.
@@ -177,6 +179,10 @@ The default settings.
 .I /etc/hyprdebian/config.json
 The settings, in the key
 .BR hd-dashboard .
+.TP
+.I /etc/hyprdebian/version.json
+The version of HyprDebian on this system, installed by hd-base.
+Hosts with an older version get a warning.
 .TP
 .I /var/lib/hd-dashboard/dashboard.db
 The SQLite database, kept by systemd in

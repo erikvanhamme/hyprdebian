@@ -9,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import unittest.mock
 import urllib.error
 import urllib.request
 
@@ -33,7 +34,7 @@ dash = load_hd_dashboard()
 DEFAULTS = {"listen": "0.0.0.0", "port": 80, "stale_minutes": 45, "history_days": 30}
 
 
-def healthy(host="box", version="v0.200"):
+def healthy(host="box", version="1.3"):
     """A report of a host without issues."""
     return {
         "format": 1,
@@ -109,14 +110,14 @@ class TestAccept(unittest.TestCase):
 
 
 class TestAssess(unittest.TestCase):
-    def messages(self, report, last_seen=NOW, newest="v0.200"):
-        return dash.assess(report, last_seen, NOW, 45, newest)
+    def messages(self, report, last_seen=NOW, dashboard_version="1.3"):
+        return dash.assess(report, last_seen, NOW, 45, dashboard_version)
 
     def test_a_healthy_host_has_no_issues(self):
         self.assertEqual(self.messages(healthy()), [])
 
     def test_problems_are_found(self):
-        report = healthy(version="v0.190")
+        report = healthy(version="1.2")
         report["units"] = {"state": "degraded", "failed": ["zfs-zed.service"]}
         report["pools"][0].update(health="DEGRADED", capacity=92)
         report["arrays"] = [{"name": "swap", "state": "clean", "degraded": 1}]
@@ -134,11 +135,47 @@ class TestAssess(unittest.TestCase):
             ("warn", "Reboot pending"),
             ("warn", "Last upgrade 20 days ago"),
             ("info", "3 upgradable packages"),
-            ("warn", "HyprDebian v0.190, newest is v0.200"),
+            ("warn", "HyprDebian 1.2, dashboard is 1.3"),
         ])
 
     def test_versions_compare_by_number(self):
         self.assertLess(dash.version_key("v0.99"), dash.version_key("v0.100"))
+        self.assertLess(dash.version_key("1.9"), dash.version_key("1.10"))
+
+    def test_a_host_newer_than_the_dashboard_is_not_outdated(self):
+        self.assertEqual(self.messages(healthy(version="1.4")), [])
+
+    def test_a_host_without_a_version_is_outdated(self):
+        report = healthy()
+        del report["hyprdebian"]["version"]
+        self.assertEqual(self.messages(report), [("warn", "HyprDebian unknown, dashboard is 1.3")])
+
+    def test_no_version_of_the_dashboard_judges_no_versions(self):
+        self.assertEqual(self.messages(healthy(version="1.2"), dashboard_version=None), [])
+
+    def test_hosts_are_compared_to_the_dashboard_not_to_each_other(self):
+        db = dash.connect(":memory:")
+        post(db, healthy("alpha", version="1.2"))
+        post(db, healthy("beta", version="1.3"), token="b" * 32)
+        post(db, healthy("gamma", version="1.4"), token="c" * 32)
+
+        with unittest.mock.patch.object(dash, "hyprdebian_version", return_value="1.3"):
+            issues = {host["name"]: host["issues"] for host in dash.load_hosts(db, NOW, 45)}
+
+        self.assertEqual(issues, {"alpha": [("warn", "HyprDebian 1.2, dashboard is 1.3")], "beta": [], "gamma": []})
+
+    def test_version_of_the_dashboard(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "version.json")
+            self.assertIsNone(dash.hyprdebian_version(path))
+
+            with open(path, "w") as f:
+                f.write("not json")
+            self.assertIsNone(dash.hyprdebian_version(path))
+
+            with open(path, "w") as f:
+                json.dump({"major": 1, "minor": 3}, f)
+            self.assertEqual(dash.hyprdebian_version(path), "1.3")
 
     def test_notes_leave_a_host_good(self):
         self.assertEqual(dash.level_of([("info", "3 upgradable packages")]), "ok")
@@ -152,7 +189,8 @@ class TestAssess(unittest.TestCase):
         failing["units"]["failed"] = ["x.service"]
         post(db, failing, token="b" * 32)
 
-        self.assertEqual([host["name"] for host in dash.load_hosts(db, NOW, 45)], ["beta", "alpha"])
+        with unittest.mock.patch.object(dash, "hyprdebian_version", return_value="1.3"):
+            self.assertEqual([host["name"] for host in dash.load_hosts(db, NOW, 45)], ["beta", "alpha"])
 
 
 class TestPages(unittest.TestCase):

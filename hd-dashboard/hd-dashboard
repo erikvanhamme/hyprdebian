@@ -29,6 +29,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 CONFIG_KEY = "hd-dashboard"
 DEFAULTS_FILE = "/usr/share/hd-dashboard/defaults.json"
+# The version of HyprDebian on the system of the dashboard, installed by hd-base. Hosts with an
+# older version are outdated.
+VERSION_FILE = "/etc/hyprdebian/version.json"
 # The state directory of hd-dashboard.service.
 DATABASE = "/var/lib/hd-dashboard/dashboard.db"
 
@@ -118,6 +121,15 @@ def load_config(path):
         raise ConfigError(f"no defaults in {defaults_file()}")
 
     return parse_config(load_json(path), defaults)
+
+
+def hyprdebian_version(path=VERSION_FILE):
+    """The version of HyprDebian on this system, <major>.<minor>, or None when it is unknown."""
+    try:
+        version = load_json(path)
+        return f"{int(version['major'])}.{int(version['minor'])}"
+    except (ConfigError, KeyError, TypeError, ValueError):
+        return None
 
 
 def connect(path):
@@ -240,8 +252,9 @@ def age(seconds):
     return f"{round(seconds / 86400)} days"
 
 
-def assess(report, last_seen, now, stale_minutes, newest_version):
-    """Returns the issues of a host, as (level, message) pairs."""
+def assess(report, last_seen, now, stale_minutes, dashboard_version):
+    """Returns the issues of a host, as (level, message) pairs. A host with a HyprDebian version
+    older than dashboard_version, the version of the dashboard, is outdated."""
     issues = []
 
     def add(level, message):
@@ -291,8 +304,8 @@ def assess(report, last_seen, now, stale_minutes, newest_version):
         add("info", f"{upgradable} upgradable packages")
 
     version = (report.get("hyprdebian") or {}).get("version")
-    if newest_version and version_key(version) < version_key(newest_version):
-        add("warn", f"HyprDebian {version or 'unknown'}, newest is {newest_version}")
+    if dashboard_version and version_key(version) < version_key(dashboard_version):
+        add("warn", f"HyprDebian {version or 'unknown'}, dashboard is {dashboard_version}")
 
     return issues
 
@@ -311,6 +324,8 @@ def level_of(issues):
 def load_hosts(db, now, stale_minutes):
     """Returns the hosts with their report, history and issues, the worst first."""
     hosts = []
+    # Read for every page, so an upgrade of the dashboard's system shows without a restart.
+    dashboard_version = hyprdebian_version()
 
     for row in db.execute("SELECT name, first_seen, last_seen, address, report FROM hosts"):
         try:
@@ -326,12 +341,8 @@ def load_hosts(db, now, stale_minutes):
             "report": report,
         })
 
-    versions = [(host["report"].get("hyprdebian") or {}).get("version") for host in hosts]
-    versions = [version for version in versions if version]
-    newest = max(versions, key=version_key) if versions else None
-
     for host in hosts:
-        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, newest)
+        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, dashboard_version)
         host["level"] = level_of(host["issues"])
 
     hosts.sort(key=lambda host: (-LEVELS.index(host["level"]), host["name"]))

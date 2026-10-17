@@ -132,7 +132,7 @@ Each system is judged on its last report. The card gets the color of its worst i
 | Warning | The system is starting or stopping. |
 | Warning | A reboot is pending: `reboot_required`, or a newer kernel than the running one. |
 | Warning | No upgrade for 14 days, or never. |
-| Warning | A HyprDebian version older than the newest version among the systems. |
+| Warning | A HyprDebian version older than the version on the system of the dashboard, from `/etc/hyprdebian/version.json`. A system with a newer version, like a test machine, gets no warning; without that file no versions are judged. |
 | Note | Upgradable packages. Notes do not change the color of the card: on unstable there almost always are some. |
 
 ## hd-dashboard
