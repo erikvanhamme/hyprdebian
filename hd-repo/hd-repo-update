@@ -155,7 +155,7 @@ for suite in "${SUITES[@]}"; do
     ln -sfn "${codename}" "dists/${SUITE_NAME[${suite}]}"
 done
 
-# The installer downloads the public key from here.
+# Clients download the public key from here.
 echo "==> Exporting the public key to ${KEY_FILE}..."
 "${GPG[@]}" --export -o "${KEY_FILE}"
 
