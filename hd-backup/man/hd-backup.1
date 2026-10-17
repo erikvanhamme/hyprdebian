@@ -1,0 +1,106 @@
+.TH HD-BACKUP 1 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-backup \- back up filesets to hard drives and tape
+.SH SYNOPSIS
+.B hd-backup
+.I command
+.RI [ args ...]
+.SH DESCRIPTION
+.B hd-backup
+writes backups of filesets as tarballs in pax format, to mounted hard drives
+or to LTO tape.
+It keeps track of every file it protects in a SQLite database: the first write
+of a backup is a full backup, every following write only holds what is not on
+the backup yet.
+When a carrier, a drive or a tape, runs full, the backup continues on the next
+carrier.
+.PP
+A fileset is a named set of paths to protect, with exclusions.
+A backup is a named backup of one fileset, with one or more carriers, used one
+after the other.
+Every write adds one tarball to a carrier, with a delete list: a Python
+script in
+.I tmp/
+of the tarball that removes the paths deleted since they were written.
+.SH COMMANDS
+.TP
+.BI add\-fileset " fileset path" ...
+Add a fileset and scan it.
+A path that starts with
+.B ^
+is an exclusion.
+.TP
+.BI add\-paths " fileset path" ...
+Add paths and exclusions to a fileset and scan it.
+.TP
+.BI update\-filesets " fileset" ...
+Scan filesets again, for new, changed and removed files.
+Run it before every write.
+.TP
+.BI add\-backup " backup fileset"
+Add a backup of a fileset.
+.TP
+.BI rename\-backup " old new"
+Rename a backup.
+.TP
+.BI add\-carrier " backup label" ...
+Add carriers to a backup.
+A write goes to the first carrier that is not full, by label in alphabetical
+order.
+.TP
+.BI write " backup mountpoint"
+Write a tarball of the backup to a mounted drive, as
+.IR mountpoint /backup\- N .tar.
+.TP
+.BI write\-tape " backup device"
+Write a tarball of the backup to a tape drive, through
+.BR mbuffer (1)
+and
+.BR blockwrite (1),
+on the non-rewinding device, like
+.IR /dev/nst0 .
+The tape must be rewound; it is rewound again at the end.
+.TP
+.BR summary " [\fIbackup\fR...]"
+Show the state of the backups; the names can hold
+.B *
+as a wildcard.
+.TP
+.B list\-filesets
+.TQ
+.B list\-backups
+.TQ
+.B list\-carrier
+.TQ
+.B list\-tarballs
+List the filesets, backups, carriers or tarballs.
+.TP
+.BI manifest " label"
+List the tarballs on a carrier and every file and symlink in them.
+.TP
+.BI remove\-carrier " label" ...
+.TQ
+.BI remove\-backups " backup" ...
+Remove carriers or backups, with what belongs to them, from the database.
+The files on the carriers are left alone.
+.SH EXIT STATUS
+0 on success; 1 when a command fails, or reports an error and goes on with
+the rest of its work; 2 on wrong arguments.
+.SH FILES
+.TP
+.I ~/.local/share/hyprdebian/hd\-backup.db
+The database, one per user.
+A command run with
+.B sudo
+uses the one of root.
+It is the only record of what is on which carrier: keep a copy of it
+elsewhere.
+.SH NOTES
+Writing to tape needs
+.BR mt\-st (1)
+and
+.BR mbuffer (1).
+.SH SEE ALSO
+.BR blockwrite (1),
+.BR hd\-backup\-vm (8),
+.BR tar (1)

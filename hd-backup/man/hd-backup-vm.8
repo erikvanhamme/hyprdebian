@@ -1,0 +1,77 @@
+.TH HD-BACKUP-VM 8 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-backup-vm \- back up a virtual machine on ZFS volumes
+.SH SYNOPSIS
+.B hd-backup-vm
+.I vm dir owner
+.SH DESCRIPTION
+.B hd-backup-vm
+backs up the libvirt virtual machine
+.I vm
+to the folder
+.IR dir / vm .
+All disks of the VM must be ZFS volumes; a VM with other disks, like image
+files, is refused.
+CD-ROM and floppy drives are left out.
+Run it as root.
+.PP
+A run:
+.IP 1. 4
+dumps the XML of the VM and copies its NVRAM when it boots with UEFI;
+.IP 2. 4
+freezes the filesystems of a running guest with the QEMU guest agent;
+without the agent, the snapshot is crash-consistent.
+A VM that is shut off is not frozen: its disks are consistent as they are.
+A VM in another state, like paused, is not frozen either, and its snapshot
+is crash-consistent;
+.IP 3. 4
+takes a snapshot
+.BI backup\- YYYYMMDD_HHMMSS
+of every disk, atomically per pool, and thaws a frozen guest;
+.IP 4. 4
+writes a ZFS stream of every disk through
+.BR zstd (1):
+a full stream for a disk without earlier streams, otherwise an incremental
+one from the snapshot of the last backup;
+.IP 5. 4
+records the next sequence number and the new snapshot, destroys the older
+backup snapshots, and gives all files of the backup to
+.IR owner .
+.PP
+When a run does not finish, the guest is thawed, and the snapshots and files
+of the run are removed again, so the next run continues from the last backup
+that did finish.
+Only one backup of a VM runs at a time.
+.PP
+When the snapshot of the last backup is gone, the backup cannot be continued:
+move the backup folder away, and the next run starts again with full
+streams.
+.SH FILES
+In
+.IR dir / vm :
+.TP
+.IB vm .xml
+The XML of the VM at the last finished backup.
+.TP
+.IB vm _VARS.fd
+Its NVRAM, for a VM that boots with UEFI.
+.TP
+.IB dataset . NNNN .zst
+The streams of a disk, with the slashes of the dataset replaced by
+underscores, numbered from 0000.
+Restore them in order, see
+.BR hd\-restore\-vm (8).
+.TP
+.IB vm .sequence
+The next sequence number and the snapshot of the last backup.
+.PP
+.TP
+.IR /run/lock/hd\-backup\-vm\- vm .lock
+The lock of a running backup.
+.SH EXIT STATUS
+0 when the backup finished, 1 on an error, 2 on wrong arguments.
+.SH SEE ALSO
+.BR hd\-backup\-vms (8),
+.BR hd\-restore\-vm (8),
+.BR virsh (1),
+.BR zfs (8)

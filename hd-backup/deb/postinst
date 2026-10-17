@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# postinst of hd-backup: stores an empty list of VMs to back up in the key hd-backup of
+# /etc/hyprdebian/config.json when there is none, and installs hd-backup-vms.timer without enabling
+# it.
+set -euo pipefail
+
+CONFIG_FILE="/etc/hyprdebian/config.json"
+CONFIG_KEY="hd-backup"
+UNIT="hd-backup-vms.timer"
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [[ "${1:-}" != "configure" ]]; then
+    exit 0
+fi
+
+has_settings() {
+    python3 - "${CONFIG_FILE}" "${CONFIG_KEY}" <<'PYTHON'
+import json, os, sys
+config_file, config_key = sys.argv[1:]
+config = json.load(open(config_file)) if os.path.exists(config_file) else {}
+sys.exit(0 if isinstance(config, dict) and config_key in config else 1)
+PYTHON
+}
+
+if has_settings; then
+    echo "Keeping the list of VMs to back up in ${CONFIG_FILE}."
+else
+    echo "Storing an empty list of VMs to back up in ${CONFIG_FILE}."
+    hd-config-update "${CONFIG_KEY}" '[]'
+fi
+
+# The same steps as the ones debhelper adds for a unit that is not enabled on its installation:
+# the timer keeps the enabled state the admin gave it over upgrades and removals. The unmask undoes
+# the mask of a removal, see the postrm.
+if deb-systemd-helper debian-installed "${UNIT}"; then
+    deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+    if deb-systemd-helper --quiet was-enabled "${UNIT}"; then
+        deb-systemd-helper enable "${UNIT}" > /dev/null || true
+    fi
+fi
+deb-systemd-helper update-state "${UNIT}" > /dev/null || true
+
+# A timer the admin enabled picks up the new units.
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    systemctl --system daemon-reload
+    deb-systemd-invoke try-restart "${UNIT}"
+fi

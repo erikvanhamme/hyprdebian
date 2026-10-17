@@ -1,0 +1,103 @@
+#!/usr/bin/python3
+"""Backs up every virtual machine in the key hd-backup of the hyprdebian configuration, see
+hd-backup-vms(8).
+
+The package hd-backup installs this as /usr/sbin/hd-backup-vms, and hd-backup-vms.timer runs it as
+root every night at 3:30, once the admin enables the timer. The key hd-backup of
+/etc/hyprdebian/config.json holds a JSON array with an object per VM:
+
+    {"vm": "git", "dir": "/dpool/backups/vm", "owner": "rsq"}
+
+and each runs `hd-backup-vm <vm> <dir> <owner>`. A failing VM does not stop the backups of the
+others; the command fails at the end when one did.
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-backup"
+BACKUP_VM = "/usr/sbin/hd-backup-vm"
+FIELDS = ("vm", "dir", "owner")
+
+
+class ConfigError(Exception):
+    pass
+
+
+def load_entries(path):
+    """Returns the list of VMs to back up, from the key hd-backup of the configuration."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, ValueError) as error:
+        raise ConfigError(f"Cannot read {path}: {error}")
+
+    if not isinstance(config, dict) or CONFIG_KEY not in config:
+        raise ConfigError(f"{path} has no key {CONFIG_KEY}.")
+
+    entries = config[CONFIG_KEY]
+    if not isinstance(entries, list):
+        raise ConfigError(f"The key {CONFIG_KEY} in {path} is not a JSON array.")
+
+    return entries
+
+
+def is_valid(entry):
+    """An entry is an object with a non-empty string for each field."""
+    if not isinstance(entry, dict):
+        return False
+
+    return all(isinstance(entry.get(field), str) and entry[field] for field in FIELDS)
+
+
+def backup_all(entries):
+    """Backs up the VMs, and returns the VMs or entries that failed."""
+    failed = []
+
+    for entry in entries:
+        if not is_valid(entry):
+            print(f"Invalid entry in the key {CONFIG_KEY} of {CONFIG_FILE}: {json.dumps(entry)}",
+                  file=sys.stderr)
+            failed.append(json.dumps(entry))
+            continue
+
+        vm = entry["vm"]
+        print(f"Running backup for VM: {vm}", flush=True)
+        # The backup must not read from the stdin of this command.
+        result = subprocess.run([BACKUP_VM, vm, entry["dir"], entry["owner"]],
+                                stdin=subprocess.DEVNULL)
+        if result.returncode != 0:
+            print(f"Backup failed for VM: {vm}", file=sys.stderr, flush=True)
+            failed.append(vm)
+
+    return failed
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description=f"Back up every virtual machine in the key {CONFIG_KEY} of {CONFIG_FILE}.")
+    parser.parse_args(argv)
+
+    try:
+        entries = load_entries(CONFIG_FILE)
+    except ConfigError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    if not entries:
+        print(f"No VMs to back up in the key {CONFIG_KEY} of {CONFIG_FILE}.")
+        return 0
+
+    failed = backup_all(entries)
+    if failed:
+        print(f"Backups failed for: {' '.join(failed)}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

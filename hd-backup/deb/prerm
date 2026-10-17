@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# prerm of hd-backup: stops hd-backup-vms.timer when the package is removed. A backup that is
+# running is left to finish.
+set -euo pipefail
+
+if [[ "${1:-}" != "remove" ]]; then
+    exit 0
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    deb-systemd-invoke stop hd-backup-vms.timer > /dev/null || true
+fi

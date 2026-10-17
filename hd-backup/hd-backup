@@ -1,0 +1,1462 @@
+#!/usr/bin/python3
+
+# Copyright 2018-2026 Erik Van Hamme (erik.vanhamme@gmail.com)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may NOT use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import argparse
+import datetime
+import functools
+import grp
+import hashlib
+import os
+import pwd
+import re
+import shlex
+import sqlite3
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+
+from collections import namedtuple
+
+import colorama
+import tabulate
+
+from colorama import Fore
+
+TOOL_VERSION = 13
+DB_VERSION = 8
+DB_PATH = '~/.local/share/hyprdebian/hd-backup.db'
+
+# tar writes records of 8192 blocks of 512 bytes: 4 MiB. On tape, every record is one block of the drive.
+TAR_BLOCKING_FACTOR = 8192
+TAPE_BLOCK_SIZE = TAR_BLOCKING_FACTOR * 512
+
+#----------------------------------------------------------------------------------------------------------------------
+# Helpers
+#----------------------------------------------------------------------------------------------------------------------
+
+# Set when a command reported an error but went on, so the tool exits with a failure status at the end.
+had_errors = False
+
+
+def printc(text, color):
+    print(f'{color}{text}')
+
+
+def error(text):
+    global had_errors
+    had_errors = True
+    printc(text, Fore.RED)
+
+
+def fail(text):
+    printc(text, Fore.RED)
+    sys.exit(1)
+
+
+def print_table(rows):
+    print(tabulate.tabulate(rows, headers="keys", tablefmt="github"))
+
+
+def format_time(timestamp):
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
+
+
+def file_sha1(path):
+    # The SHA-1 of a regular file, or '' for anything else, like a directory.
+    if not os.path.isfile(path):
+        return ''
+
+    digest = hashlib.sha1()
+    with open(path, 'rb') as file:
+        while True:
+            block = file.read(4096)
+            if not block:
+                break
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def is_excluded(path, excludes):
+    for exclude in excludes:
+        if path.startswith(exclude):
+            return True
+    return False
+
+
+def tar_blocks(size):
+    # Size rounded up to whole 512 byte tar blocks.
+    return (size + 511) // 512 * 512
+
+
+# Limits of the ustar header. A value over its limit goes in a record of the pax extended header.
+USTAR_NAME_SIZE = 100
+USTAR_MAX_SIZE = 0o77777777777
+USTAR_MAX_ID = 0o7777777
+USTAR_OWNER_NAME_SIZE = 32
+
+
+def pax_record_size(key, value_size):
+    # A pax record is "<length> <key>=<value>\n". The length counts the whole record, its own digits too.
+    rest = len(key) + value_size + 3
+    digits = 1
+    while len(str(rest + digits)) != digits:
+        digits += 1
+    return rest + digits
+
+
+def pax_time_size(key, time_ns):
+    # tar writes a time as seconds with up to 9 decimals, without trailing zeros. atime and ctime can change between
+    # this estimate and the moment tar reads them, so the longest form is counted: all 9 decimals.
+    seconds = len(str(abs(time_ns) // 1000000000))
+    if time_ns < 0:
+        seconds += 1
+    return pax_record_size(key, seconds + 1 + 9)
+
+
+def owner_name_size(name):
+    # The size of a pax record for a user or group name, when it does not fit in the ustar header.
+    if name is None or (len(name) < USTAR_OWNER_NAME_SIZE and name.isascii()):
+        return 0
+    return pax_record_size('uname', len(name.encode()))
+
+
+@functools.cache
+def user_name(uid):
+    try:
+        return pwd.getpwuid(uid).pw_name
+    except KeyError:
+        return None
+
+
+@functools.cache
+def group_name(gid):
+    try:
+        return grp.getgrgid(gid).gr_name
+    except KeyError:
+        return None
+
+
+def pax_data_size(path, status, size, target=''):
+    # The data of the pax extended header that tar writes for an item, with the options of write_tar. tar always
+    # writes atime and ctime, and mtime when it is not a whole second; it is counted always. The other records are
+    # only there when a value does not fit in the ustar header.
+    data = pax_time_size('mtime', status.st_mtime_ns)
+    data += pax_time_size('atime', status.st_atime_ns)
+    data += pax_time_size('ctime', status.st_ctime_ns)
+
+    # The name in the tarball is relative to /. A directory has a / at the end.
+    name = path.lstrip('/')
+    if stat.S_ISDIR(status.st_mode):
+        name += '/'
+    if len(name.encode()) > USTAR_NAME_SIZE or not name.isascii():
+        data += pax_record_size('path', len(name.encode()))
+
+    if len(target.encode()) > USTAR_NAME_SIZE or not target.isascii():
+        data += pax_record_size('linkpath', len(target.encode()))
+
+    if size > USTAR_MAX_SIZE:
+        data += pax_record_size('size', len(str(size)))
+
+    if status.st_uid > USTAR_MAX_ID:
+        data += pax_record_size('uid', len(str(status.st_uid)))
+    if status.st_gid > USTAR_MAX_ID:
+        data += pax_record_size('gid', len(str(status.st_gid)))
+
+    data += owner_name_size(user_name(status.st_uid))
+    data += owner_name_size(group_name(status.st_gid))
+
+    return data
+
+
+def tar_item_size(path, status, size, target=''):
+    # The bytes tar writes for an item: the extended header (a header block and its data), the ustar header block and
+    # the contents. status is the lstat of the item, size the size of its contents, target the target of a symlink.
+    return 512 + tar_blocks(pax_data_size(path, status, size, target)) + 512 + tar_blocks(size)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Database
+#----------------------------------------------------------------------------------------------------------------------
+
+class Kind:
+    # Files (directories included) and symlinks are kept in tables of the same shape: a table of records, a table that
+    # links them to filesets and a table that links them to tarballs.
+    def __init__(self, name):
+        self.name = name                                # file or symlink
+        self.table = f'{name}s'                         # files or symlinks
+        self.number = f'{name}_number'                  # The column with the record number in the link tables.
+        self.fileset_links = f'{name}_fileset_links'
+        self.tarball_links = f'{name}_tarball_links'
+
+
+FILE = Kind('file')
+SYMLINK = Kind('symlink')
+KINDS = (FILE, SYMLINK)
+
+
+def kind_of(is_symlink):
+    if is_symlink:
+        return SYMLINK
+    else:
+        return FILE
+
+
+SCHEMA = '''
+    CREATE TABLE files(
+        number INTEGER PRIMARY KEY,
+        path TEXT NOT NULL,
+        sha1 TEXT NOT NULL,
+        mtime INTEGER NOT NULL,
+        size INTEGER NOT NULL,
+        on_disk INTEGER NOT NULL
+    );
+
+    CREATE TABLE symlinks(
+        number INTEGER PRIMARY KEY,
+        path TEXT NOT NULL,
+        target TEXT NOT NULL,
+        on_disk INTEGER NOT NULL
+    );
+
+    CREATE TABLE filesets(
+        number INTEGER PRIMARY KEY,
+        name TEXT NOT NULL
+    );
+
+    CREATE TABLE file_fileset_links(
+        file_number INTEGER NOT NULL,
+        fileset_number INTEGER NOT NULL
+    );
+
+    CREATE TABLE symlink_fileset_links(
+        symlink_number INTEGER NOT NULL,
+        fileset_number INTEGER NOT NULL
+    );
+
+    CREATE TABLE backups(
+        number INTEGER PRIMARY KEY,
+        fileset_number INTEGER NOT NULL,
+        name TEXT NOT NULL
+    );
+
+    CREATE TABLE paths(
+        number INTEGER PRIMARY KEY,
+        fileset_number INTEGER NOT NULL,
+        path TEXT NOT NULL
+    );
+
+    CREATE TABLE carrier(
+        number INTEGER PRIMARY KEY,
+        backup_number INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        full INTEGER NOT NULL,
+        idx INTEGER NOT NULL
+    );
+
+    CREATE TABLE tarballs(
+        number INTEGER PRIMARY KEY,
+        carrier_number INTEGER NOT NULL,
+        idx INTEGER NOT NULL,
+        size INTEGER NOT NULL,
+        files INTEGER NOT NULL,
+        symlinks INTEGER NOT NULL,
+        overhead INTEGER NOT NULL,
+        written INTEGER NOT NULL
+    );
+
+    CREATE TABLE version(
+        version INTEGER NOT NULL
+    );
+
+    CREATE TABLE file_tarball_links(
+        file_number INTEGER NOT NULL,
+        tarball_number INTEGER NOT NULL
+    );
+
+    CREATE TABLE symlink_tarball_links(
+        symlink_number INTEGER NOT NULL,
+        tarball_number INTEGER NOT NULL
+    );
+'''
+
+
+def create_db(db, version):
+    db.executescript(SCHEMA)
+    db.execute('INSERT INTO version(version) VALUES(?)', (version,))
+    db.commit()
+
+
+def open_db(path):
+    # Opens the database, and creates it when it is new. Rows can be read by column name.
+    db = sqlite3.connect(path)
+    db.row_factory = sqlite3.Row
+
+    has_version = get_first_value(db, '''
+        SELECT COUNT(*)
+        FROM sqlite_master
+        WHERE type='table' AND name='version'
+    ''')
+
+    if has_version == 0:
+        create_db(db, DB_VERSION)
+        printc('New database created.', Fore.YELLOW)
+    elif get_first_value(db, 'SELECT version FROM version') != DB_VERSION:
+        db.close()
+        fail('Incompatible database version')
+
+    return db
+
+
+def get_first_value(db, query, params=(), default=None):
+    result = db.execute(query, params).fetchone()
+    if result is None:
+        return default
+    else:
+        return result[0]
+
+
+def get_first_row(db, query, params=()):
+    return db.execute(query, params).fetchone()
+
+
+def find_fileset(db, name):
+    # The number of the fileset, or None.
+    return get_first_value(db, 'SELECT number FROM filesets WHERE name=?', (name,))
+
+
+def find_backup(db, name):
+    # The number and fileset number of the backup, or None.
+    return get_first_row(db, 'SELECT number, fileset_number FROM backups WHERE name=?', (name,))
+
+
+def find_carrier(db, label):
+    # The number of the carrier, or None.
+    return get_first_value(db, 'SELECT number FROM carrier WHERE label=?', (label,))
+
+
+def backup_items_sql(kind):
+    # A subquery for the numbers of the records of a kind that are in a tarball of a backup. The backup number is its
+    # parameter.
+    return f'''
+        SELECT {kind.tarball_links}.{kind.number}
+        FROM {kind.tarball_links}
+            JOIN tarballs ON tarballs.number={kind.tarball_links}.tarball_number
+            JOIN carrier ON carrier.number=tarballs.carrier_number
+        WHERE carrier.backup_number=?
+    '''
+
+
+def items_not_in_backup(db, kind, columns, fileset_number, backup_number):
+    # The records of a fileset that are on disk, but not in a tarball of the backup yet, sorted by path.
+    return db.execute(f'''
+        SELECT {columns}
+        FROM {kind.table}
+            JOIN {kind.fileset_links} ON {kind.fileset_links}.{kind.number}={kind.table}.number
+        WHERE {kind.fileset_links}.fileset_number=?
+        AND {kind.table}.on_disk=1
+        AND {kind.table}.number NOT IN ({backup_items_sql(kind)})
+        ORDER BY {kind.table}.path ASC
+    ''', (fileset_number, backup_number)).fetchall()
+
+#----------------------------------------------------------------------------------------------------------------------
+# Scanning filesets
+#----------------------------------------------------------------------------------------------------------------------
+
+# What a scan needs to know about an item on disk. Only one of is_symlink and unsupported_type is set.
+Attributes = namedtuple('Attributes', 'is_symlink target size mtime possible_hardlink unsupported_type')
+
+
+def get_attributes(path):
+    status = os.lstat(path)
+    if stat.S_ISLNK(status.st_mode):
+        return Attributes(True, os.readlink(path), None, None, None, None)
+    elif stat.S_ISDIR(status.st_mode):
+        return Attributes(False, None, 0, int(status.st_mtime), None, None)
+    elif stat.S_ISREG(status.st_mode):
+        return Attributes(False, None, status.st_size, int(status.st_mtime), status.st_nlink > 1, None)
+    elif stat.S_ISFIFO(status.st_mode):
+        return Attributes(None, None, None, None, None, 'FIFO')
+    elif stat.S_ISSOCK(status.st_mode):
+        return Attributes(None, None, None, None, None, 'socket')
+    else:
+        return Attributes(None, None, None, None, None, 'device file')
+
+
+def load_records(db, path, fileset_number):
+    # The records of all items under a path, by kind and by path, and the numbers of the records that are linked to
+    # the fileset. A scan matches most items on disk against these, without a query for every item.
+    records = {FILE: {}, SYMLINK: {}}
+
+    for row in db.execute('SELECT number, path, size, mtime, on_disk FROM files WHERE path LIKE ?', (path + '%',)):
+        records[FILE].setdefault(row['path'], []).append(dict(row))
+
+    for row in db.execute('SELECT number, path, target, on_disk FROM symlinks WHERE path LIKE ?', (path + '%',)):
+        records[SYMLINK].setdefault(row['path'], []).append(dict(row))
+
+    linked = {}
+    for kind in KINDS:
+        rows = db.execute(f'SELECT {kind.number} FROM {kind.fileset_links} WHERE fileset_number=?', (fileset_number,))
+        linked[kind] = {row[0] for row in rows}
+
+    return records, linked
+
+
+def find_match(records, path, attributes):
+    # The number of the record that describes the item on disk as it is now: a symlink with the same target, or a
+    # file with the same size and mtime. None when there is none.
+    for record in records[kind_of(attributes.is_symlink)].get(path, []):
+        if attributes.is_symlink:
+            if record['target'] == attributes.target:
+                return record['number']
+        else:
+            if record['size'] == attributes.size and record['mtime'] == attributes.mtime:
+                return record['number']
+
+    return None
+
+
+def find_unwritten_record(db, kind, path):
+    # A record of the path that is in no tarball. It holds a state of the item that was never written, so it can be
+    # updated to the state on disk, instead of adding a record.
+    return get_first_value(db, f'''
+        SELECT number
+        FROM {kind.table}
+            LEFT JOIN {kind.tarball_links} ON {kind.number}=number
+        WHERE path=? AND tarball_number IS NULL
+    ''', (path,))
+
+
+def add_record(db, kind, path, attributes):
+    if kind is SYMLINK:
+        cursor = db.execute('INSERT INTO symlinks(path, target, on_disk) VALUES(?, ?, 1)', (path, attributes.target))
+    else:
+        cursor = db.execute('INSERT INTO files(path, sha1, mtime, size, on_disk) VALUES(?, ?, ?, ?, 1)',
+                            (path, file_sha1(path), attributes.mtime, attributes.size))
+
+    printc(f'      Added {kind.name} {path} to database.', Fore.BLUE)
+
+    return cursor.lastrowid
+
+
+def update_record(db, kind, number, path, attributes):
+    if kind is SYMLINK:
+        db.execute('UPDATE symlinks SET target=?, on_disk=1 WHERE number=?', (attributes.target, number))
+    else:
+        db.execute('UPDATE files SET sha1=?, mtime=?, size=?, on_disk=1 WHERE number=?',
+                   (file_sha1(path), attributes.mtime, attributes.size, number))
+
+    printc(f'      Updated {kind.name} {path} in database.', Fore.BLUE)
+
+
+def mark_on_disk(db, kind, number):
+    db.execute(f'UPDATE {kind.table} SET on_disk=1 WHERE number=?', (number,))
+
+
+def mark_other_records_off_disk(db, kind, number, path, records):
+    # Only one record of a path is on disk: the one that describes the item found on disk now. Older versions of a
+    # file, and records of the other kind (a file that was replaced by a symlink, or the other way around), are not.
+    for other_kind in KINDS:
+        for record in records[other_kind].get(path, []):
+            if other_kind is kind and record['number'] == number:
+                continue
+
+            if record['on_disk'] != 0:
+                db.execute(f'UPDATE {other_kind.table} SET on_disk=0 WHERE number=?', (record['number'],))
+                record['on_disk'] = 0
+
+
+def link_to_fileset(db, kind, number, path, fileset_number, fileset_name):
+    db.execute(f'INSERT INTO {kind.fileset_links}({kind.number}, fileset_number) VALUES(?, ?)',
+               (number, fileset_number))
+
+    printc(f'      Added {kind.name} {path} to fileset {fileset_name}.', Fore.BLUE)
+
+
+def scan_item(db, path, fileset_number, fileset_name, records, linked):
+    attributes = get_attributes(path)
+
+    if attributes.possible_hardlink:
+        printc(f'        WARNING: Found possible hardlink {path}.', Fore.RED)
+
+    if attributes.unsupported_type is not None:
+        printc(f'        WARNING: Found {attributes.unsupported_type} {path}. It is not backed up.', Fore.RED)
+        return
+
+    kind = kind_of(attributes.is_symlink)
+
+    number = find_match(records, path, attributes)
+    if number is None:
+        number = find_unwritten_record(db, kind, path)
+        if number is None:
+            number = add_record(db, kind, path, attributes)
+        else:
+            update_record(db, kind, number, path, attributes)
+    else:
+        mark_on_disk(db, kind, number)
+
+    mark_other_records_off_disk(db, kind, number, path, records)
+
+    if number not in linked[kind]:
+        link_to_fileset(db, kind, number, path, fileset_number, fileset_name)
+        linked[kind].add(number)
+
+
+def scan_path(db, path, fileset_number, fileset_name, excludes):
+    printc(f'    Scanning file system path {path}.', Fore.MAGENTA)
+
+    records, linked = load_records(db, path, fileset_number)
+
+    def walk_error(e):
+        error(f'        WARNING: Could not read directory {e.filename}: {e.strerror}. Its contents are not backed up.')
+
+    count = 0
+    for root, dirs, files in os.walk(path, onerror=walk_error):
+        # Do not descend into excluded directories.
+        included_dirs = []
+        for dirname in dirs:
+            dir_path = os.path.join(root, dirname)
+            if is_excluded(dir_path, excludes):
+                printc(f"      Directory {dir_path} is excluded.", Fore.CYAN)
+            else:
+                included_dirs.append(dirname)
+        dirs[:] = included_dirs
+
+        for name in files + dirs:
+            item_path = os.path.join(root, name)
+            if is_excluded(item_path, excludes):
+                printc(f"      File {item_path} is excluded.", Fore.CYAN)
+                continue
+
+            try:
+                scan_item(db, item_path, fileset_number, fileset_name, records, linked)
+            except OSError as e:
+                error(f'        WARNING: Could not read {item_path}: {e.strerror}. It is not backed up.')
+                continue
+            except UnicodeEncodeError:
+                printable_path = os.fsencode(item_path).decode(errors='replace')
+                error(f'        WARNING: The name of {printable_path} is not valid UTF-8. It is not backed up.')
+                continue
+
+            count += 1
+            if count >= 100:
+                db.commit()
+                count = 0
+
+    db.commit()
+
+    printc(f'    File system path {path} scanned.', Fore.GREEN)
+
+
+def item_exists(kind, path):
+    if kind is SYMLINK:
+        return os.path.islink(path)
+    else:
+        return not os.path.islink(path) and (os.path.isfile(path) or os.path.isdir(path))
+
+
+def remove_missing_items(db, kind, fileset_number, fileset_name):
+    # Items of the fileset that are gone from disk. An item that is in no tarball of a backup of the fileset leaves
+    # the fileset. An item that is in no tarball at all leaves the database. The others stay, marked as not on disk,
+    # so a write can put them in its delete list.
+    printc(f'    Updating database for removed {kind.name}s.', Fore.MAGENTA)
+
+    items = db.execute(f'''
+        SELECT number, path, on_disk
+        FROM {kind.table}
+            JOIN {kind.fileset_links} ON {kind.fileset_links}.{kind.number}={kind.table}.number
+        WHERE fileset_number=?
+    ''', (fileset_number,)).fetchall()
+
+    for number, path, on_disk in items:
+        if item_exists(kind, path):
+            continue
+
+        in_fileset_tarballs = get_first_value(db, f'''
+            SELECT COUNT(*)
+            FROM {kind.tarball_links}
+                JOIN tarballs ON tarballs.number={kind.tarball_links}.tarball_number
+                JOIN carrier ON carrier.number=tarballs.carrier_number
+                JOIN backups ON backups.number=carrier.backup_number
+            WHERE {kind.tarball_links}.{kind.number}=? AND backups.fileset_number=?
+        ''', (number, fileset_number))
+
+        if in_fileset_tarballs == 0:
+            db.execute(f'DELETE FROM {kind.fileset_links} WHERE {kind.number}=? AND fileset_number=?',
+                       (number, fileset_number))
+
+            printc(f'      Removed {kind.name} {path} from fileset {fileset_name}.', Fore.BLUE)
+
+        in_tarballs = get_first_value(db, f'SELECT COUNT(*) FROM {kind.tarball_links} WHERE {kind.number}=?',
+                                      (number,))
+
+        if in_tarballs == 0:
+            # Also remove the links of other filesets, so they do not point to a removed item.
+            db.execute(f'DELETE FROM {kind.fileset_links} WHERE {kind.number}=?', (number,))
+            db.execute(f'DELETE FROM {kind.table} WHERE number=?', (number,))
+
+            printc(f'      Removed {kind.name} {path} from database.', Fore.BLUE)
+        elif on_disk != 0:
+            db.execute(f'UPDATE {kind.table} SET on_disk=0 WHERE number=?', (number,))
+
+            printc(f'      Marked {kind.name} {path} as not on disk.', Fore.BLUE)
+
+    db.commit()
+
+    printc('    Database updated.', Fore.GREEN)
+
+
+def update_fileset_path(db, fileset_number, fileset_name, path, excludes):
+    printc(f'  Updating path {path} in file set {fileset_name}.', Fore.MAGENTA)
+
+    relevant_excludes = []
+    for exclude in excludes:
+        if exclude.startswith(path):
+            relevant_excludes.append(exclude)
+
+    if is_excluded(path, relevant_excludes):
+        printc(f'    File system path {path} is excluded.', Fore.CYAN)
+    else:
+        scan_path(db, path, fileset_number, fileset_name, relevant_excludes)
+
+    for kind in KINDS:
+        remove_missing_items(db, kind, fileset_number, fileset_name)
+
+    printc(f'  Fileset path {path} updated for file set {fileset_name}.', Fore.GREEN)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Writing
+#----------------------------------------------------------------------------------------------------------------------
+
+# The delete list in every tarball. {paths} is replaced by the paths, one per line.
+DELETELIST_TEMPLATE = '''#!/usr/bin/python
+
+# Removes what was deleted after it was backed up. The paths are relative to the parent of the
+# directory of this script, which is the directory the backup was restored into.
+
+import os
+
+root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+paths = [
+{paths}]
+
+for path in paths:
+    full_path = root + path
+    try:
+        if os.path.isdir(full_path) and not os.path.islink(full_path):
+            os.rmdir(full_path)
+        elif os.path.lexists(full_path):
+            os.remove(full_path)
+    except OSError as e:
+        print(f'Could not remove {{full_path}}: {{e.strerror}}')
+'''
+
+# An item to write: its record number, its path, the size of its contents and the bytes it takes in the tarball.
+WriteItem = namedtuple('WriteItem', 'number path size tar_size')
+
+# How tar, or the tape pipeline, ended.
+TarResult = namedtuple('TarResult', 'bytes_written full changed failed')
+
+
+def write_prepare(db, backup_name, target):
+    # The backup, its fileset, the carrier to write to and the index of the new tarball on it.
+    if not os.path.exists(target):
+        fail(f'The target {target} does not exist.')
+
+    backup = find_backup(db, backup_name)
+    if backup is None:
+        fail(f'There is no backup with name {backup_name} in the database.')
+
+    carrier_number = get_first_value(db, '''
+        SELECT number
+        FROM carrier
+        WHERE backup_number=? AND full=0
+        ORDER BY label ASC
+    ''', (backup['number'],))
+
+    if carrier_number is None:
+        fail(f'There are no carrier available in backup set {backup_name}.')
+
+    last_index = get_first_value(db, 'SELECT MAX(idx) FROM tarballs WHERE carrier_number=?', (carrier_number,))
+    if last_index is None:
+        tarball_index = 0
+    else:
+        tarball_index = last_index + 1
+
+    return backup['number'], backup['fileset_number'], carrier_number, tarball_index
+
+
+def write_create_deletelist(db, fileset_number, backup_number):
+    # A path is deleted when none of its records is on disk. Only the paths of the fileset that are in a tarball of
+    # this backup are listed, because only those are restored from it.
+    deleted_paths = set()
+    for kind in KINDS:
+        rows = db.execute(f'''
+            SELECT {kind.table}.path
+            FROM {kind.table}
+                JOIN {kind.fileset_links} ON {kind.fileset_links}.{kind.number}={kind.table}.number
+            WHERE {kind.fileset_links}.fileset_number=?
+            AND {kind.table}.on_disk=0
+            AND {kind.table}.path NOT IN (
+                SELECT path FROM files WHERE on_disk=1
+                UNION
+                SELECT path FROM symlinks WHERE on_disk=1
+            )
+            AND {kind.table}.number IN ({backup_items_sql(kind)})
+        ''', (fileset_number, backup_number))
+
+        for row in rows:
+            deleted_paths.add(row['path'])
+
+    # In reverse order, the contents of a directory come before the directory itself.
+    path_lines = ''.join(f'    {path!r},\n' for path in sorted(deleted_paths, reverse=True))
+
+    # Every write has a delete list of its own. The name starts with the time, so the delete lists of a restore sort
+    # in the order they were written. It is always in /tmp: the delete list finds the restore directory as the parent
+    # of the directory it is in.
+    descriptor, deletelist_name = tempfile.mkstemp(prefix=f"deletes_{time.strftime('%Y-%m-%d_%H:%M:%S')}_",
+                                                   suffix='.py', dir='/tmp')
+    with os.fdopen(descriptor, 'w') as deletelist:
+        deletelist.write(DELETELIST_TEMPLATE.format(paths=path_lines))
+
+    os.chmod(deletelist_name, 0o755)
+
+    return deletelist_name, os.path.getsize(deletelist_name)
+
+
+def lstat_or_none(path):
+    try:
+        return os.lstat(path)
+    except FileNotFoundError:
+        return None
+
+
+def write_create_filelist(db, fileset_number, backup_number, deletelist_name):
+    # The items to write: the files and symlinks of the fileset that are not in a tarball of this backup yet. They are
+    # listed in the file list for tar, after the delete list.
+    files_to_write = []
+    for number, path, size in items_not_in_backup(db, FILE, 'files.number, files.path, files.size',
+                                                  fileset_number, backup_number):
+        status = lstat_or_none(path)
+        if status is None or stat.S_ISLNK(status.st_mode):
+            fail('There are files labeled as on disk that do not exist. Update the fileset first.')
+
+        # tar writes the size the file has when it reads it. When the file grew since the fileset was updated, the
+        # size on disk is used to work out what fits on a full carrier.
+        if stat.S_ISREG(status.st_mode):
+            size = max(size, status.st_size)
+
+        files_to_write.append(WriteItem(number, path, size, tar_item_size(path, status, size)))
+
+    symlinks_to_write = []
+    for number, path in items_not_in_backup(db, SYMLINK, 'symlinks.number, symlinks.path',
+                                            fileset_number, backup_number):
+        status = lstat_or_none(path)
+        if status is None or not stat.S_ISLNK(status.st_mode):
+            fail('There are symlinks labeled as on disk that do not exist. Update the fileset first.')
+
+        # tar writes the target the symlink has now.
+        symlinks_to_write.append(WriteItem(number, path, 0, tar_item_size(path, status, 0, os.readlink(path))))
+
+    # tar writes the items in this order. The names are separated by null characters, so that any character can be in
+    # a name, and are relative to /. Every write has a file list of its own, removed after the write.
+    names = [deletelist_name] + [item.path for item in symlinks_to_write] + [item.path for item in files_to_write]
+    descriptor, filelist_name = tempfile.mkstemp(prefix='hd-backup-filelist-', suffix='.txt')
+    with os.fdopen(descriptor, 'w') as filelist:
+        for name in names:
+            filelist.write(f'{name.lstrip('/')}\0')
+
+    return filelist_name, symlinks_to_write, files_to_write
+
+
+def run_mt(target, args, description):
+    result = subprocess.run(['mt-st', '-f', target] + args, capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f'Could not {description}: mt-st error: {result.stderr}')
+
+
+def write_begin_tape(target, tarball_index):
+    run_mt(target, ['setblk', str(TAPE_BLOCK_SIZE)], 'set blocksize')
+    run_mt(target, ['compression', '1'], 'enable compression')
+
+    printc(f'Started tape activity at {datetime.datetime.now().isoformat()}.', Fore.MAGENTA)
+
+    # Skip the tarballs that are on the tape already. Every tarball is one file on the tape.
+    if tarball_index > 0:
+        run_mt(target, ['fsf', str(tarball_index)], 'advance tape to correct file record')
+
+
+def write_finalize_tape(target):
+    # Wait 5 seconds to assure all buffers are emptied.
+    time.sleep(5)
+
+    result = subprocess.run(['mt-st', '-f', target, 'rewind'], capture_output=True, text=True)
+    if result.returncode != 0:
+        error(f'Could not rewind tape: mt-st error: {result.stderr}')
+
+    printc(f'Finished tape activity at {datetime.datetime.now().isoformat()}.', Fore.MAGENTA)
+
+
+def parse_tar_output(lines, returncode):
+    bytes_written = 0
+    full = False
+    problems = []
+    changed = []
+    broken_pipes = []
+
+    for line in lines:
+        if 'Total bytes written' in line:
+            match = re.search(r"[0-9]+", line)
+            if match:
+                bytes_written = int(match.group())
+        elif 'No space left on device' in line:
+            full = True
+        elif re.search(r'Wrote only [0-9]+ of [0-9]+ bytes', line):
+            # A file system that runs full takes part of a record, and only refuses the next write. tar stops at the
+            # short write, without a "No space left on device".
+            full = True
+        elif 'Broken pipe' in line:
+            broken_pipes.append(line)
+        elif 'file changed as we read it' in line:
+            changed.append(line)
+        elif 'Error is not recoverable' in line or 'Exiting with failure status' in line:
+            # The closing words of tar after an error. The error itself is on another line.
+            pass
+        elif line.strip() != '':
+            problems.append(line)
+
+    if full:
+        # When the carrier runs full, the programs in the tape pipeline stop on a broken pipe, and all of them exit
+        # with a failure status.
+        failed = len(problems) > 0
+    elif len(changed) > 0:
+        # tar exits with status 1 when a file changed while it was read. The file is in the tarball, so that is a
+        # warning.
+        failed = len(problems) > 0 or len(broken_pipes) > 0 or returncode not in (0, 1)
+    else:
+        failed = len(problems) > 0 or len(broken_pipes) > 0 or returncode != 0
+
+    return TarResult(bytes_written, full, changed, failed)
+
+
+def write_tar(filelist_name, target, tarball_index, is_tape):
+    tar = (f'tar --no-recursion --hard-dereference -H pax -b {TAR_BLOCKING_FACTOR} --null --verbatim-files-from '
+           f'-C / -T {shlex.quote(filelist_name)}')
+    mbuffer_log_name = None
+    if is_tape:
+        # Every write has an mbuffer log of its own. It is removed after a write that worked.
+        descriptor, mbuffer_log_name = tempfile.mkstemp(prefix='hd-backup-mbuffer-', suffix='.log')
+        os.close(descriptor)
+
+        # blockwrite reports the bytes that are on the tape. The totals of tar would also count what is still in the
+        # buffer of mbuffer when the tape runs full.
+        command = (f'{tar} -cf - '
+                   f'| mbuffer -m 8G -P 50 -q -l {shlex.quote(mbuffer_log_name)} '
+                   f'| blockwrite {shlex.quote(target)}')
+    else:
+        filename = f'{target}/backup-{tarball_index}.tar'
+        command = f'{tar} -cf {shlex.quote(filename)} --totals'
+
+    # With pipefail, a failure anywhere in the tape pipeline shows in the exit status.
+    process = subprocess.run(['bash', '-o', 'pipefail', '-c', command], capture_output=True, text=True)
+    lines = process.stdout.split('\n') + process.stderr.split('\n')
+
+    result = parse_tar_output(lines, process.returncode)
+
+    # On a hard drive, the size of the tarball is what is on the carrier. The totals of tar leave out a record that
+    # was only written in part when the drive ran full.
+    if not is_tape and os.path.exists(filename):
+        result = result._replace(bytes_written=os.path.getsize(filename))
+
+    if result.failed:
+        for line in lines:
+            printc(line, Fore.RED)
+        if mbuffer_log_name is not None:
+            printc(f'The log of mbuffer is in {mbuffer_log_name}.', Fore.RED)
+        fail(f'Writing the tarball failed (exit status {process.returncode}). The database is not changed.')
+
+    if mbuffer_log_name is not None:
+        os.remove(mbuffer_log_name)
+
+    for line in lines:
+        if 'Total bytes written' in line:
+            printc(line, Fore.GREEN)
+        elif result.full and ('No space left on device' in line or 'Wrote only' in line):
+            # Why the carrier counts as full.
+            printc(line, Fore.YELLOW)
+
+    for line in result.changed:
+        printc(f'WARNING: {line}', Fore.YELLOW)
+
+    printc(f'bw = {result.bytes_written} f = {result.full}', Fore.CYAN)
+
+    return result.bytes_written, result.full
+
+
+def write_determine_written(bytes_written, full, symlinks_to_write, files_to_write, deletelist_tar_size):
+    if full:
+        # An item is on the carrier when it ends within the bytes that were written. tar writes the items in the order
+        # of the file list: the delete list, the symlinks, then the files.
+        symlinks_written = []
+        files_written = []
+        position = deletelist_tar_size
+
+        for item in symlinks_to_write:
+            position += item.tar_size
+            if position > bytes_written:
+                break
+            symlinks_written.append(item)
+
+        if len(symlinks_written) == len(symlinks_to_write):
+            for item in files_to_write:
+                position += item.tar_size
+                if position > bytes_written:
+                    break
+                files_written.append(item)
+    else:
+        symlinks_written = symlinks_to_write
+        files_written = files_to_write
+
+    total_size = sum(item.size for item in files_written)
+
+    overhead = bytes_written - total_size
+
+    printc(f'overhead = {overhead}, total size = {total_size}', Fore.CYAN)
+
+    if overhead < 0:
+        printc("BUG: Negative overhead detected. This should not happen.", Fore.RED)
+
+    return symlinks_written, files_written, overhead, total_size
+
+
+def write_update_db(db, carrier_number, tarball_index, total_size, overhead, symlinks_written, files_written, full):
+    cursor = db.execute('''
+        INSERT INTO tarballs(carrier_number, idx, size, files, symlinks, overhead, written)
+        VALUES(?, ?, ?, ?, ?, ?, ?)
+    ''', (carrier_number, tarball_index, total_size, len(files_written), len(symlinks_written), overhead,
+          int(time.time())))
+
+    tarball_number = cursor.lastrowid
+
+    for kind, items in ((SYMLINK, symlinks_written), (FILE, files_written)):
+        for item in items:
+            db.execute(f'INSERT INTO {kind.tarball_links}({kind.number}, tarball_number) VALUES(?, ?)',
+                       (item.number, tarball_number))
+
+    if full:
+        db.execute('UPDATE carrier SET full=1 WHERE number=?', (carrier_number,))
+
+    db.commit()
+
+
+def write_target(db, backup_name, target, is_tape):
+    printc(f'Started write at {datetime.datetime.now().isoformat()}.', Fore.MAGENTA)
+
+    backup_number, fileset_number, carrier_number, tarball_index = write_prepare(db, backup_name, target)
+
+    # The delete list and the file list are only needed while tar runs. They are removed in any case.
+    temp_files = []
+    try:
+        deletelist_name, deletelist_size = write_create_deletelist(db, fileset_number, backup_number)
+        temp_files.append(deletelist_name)
+        deletelist_tar_size = tar_item_size(deletelist_name, os.lstat(deletelist_name), deletelist_size)
+
+        filelist_name, symlinks_to_write, files_to_write = write_create_filelist(db, fileset_number, backup_number,
+                                                                                 deletelist_name)
+        temp_files.append(filelist_name)
+
+        # On tape, set the blocksize and compression and skip to the end of the last tarball first, and rewind the
+        # tape afterwards, also when the write failed.
+        if is_tape:
+            write_begin_tape(target, tarball_index)
+            try:
+                bytes_written, full = write_tar(filelist_name, target, tarball_index, is_tape)
+            finally:
+                write_finalize_tape(target)
+        else:
+            bytes_written, full = write_tar(filelist_name, target, tarball_index, is_tape)
+    finally:
+        for name in temp_files:
+            os.remove(name)
+
+    symlinks_written, files_written, overhead, total_size = write_determine_written(
+        bytes_written, full, symlinks_to_write, files_to_write, deletelist_tar_size)
+
+    write_update_db(db, carrier_number, tarball_index, total_size, overhead, symlinks_written, files_written, full)
+
+    printc(f'Finished write at {datetime.datetime.now().isoformat()}.', Fore.MAGENTA)
+    printc(f'Tarball written. {len(symlinks_written)} symlinks and {len(files_written)} files backed up.', Fore.GREEN)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Commands
+#----------------------------------------------------------------------------------------------------------------------
+
+def add_fileset(db, fileset_name, paths):
+    for path in paths:
+        if not os.path.isdir(path.removeprefix('^')):
+            fail(f"Given path {path} is not an existing directory.")
+
+    if find_fileset(db, fileset_name) is not None:
+        fail(f"Fileset with name {fileset_name} is already in the database.")
+
+    db.execute('INSERT INTO filesets(name) VALUES(?)', (fileset_name,))
+    db.commit()
+
+    printc(f'Fileset with name {fileset_name} added.', Fore.GREEN)
+
+    add_paths(db, fileset_name, paths)
+
+
+def add_paths(db, fileset_name, paths):
+    fileset_number = find_fileset(db, fileset_name)
+    if fileset_number is None:
+        fail(f'Fileset with name {fileset_name} is not in the database.')
+
+    for path in paths:
+        if not os.path.isdir(path.removeprefix('^')):
+            fail(f'Given path {path} is not an existing directory.')
+
+    # Paths are stored absolute. An exclusion keeps its ^ in front.
+    for path in paths:
+        absolute_path = os.path.abspath(path.removeprefix('^'))
+        if path.startswith('^'):
+            absolute_path = '^' + absolute_path
+
+        db.execute('INSERT INTO paths(fileset_number, path) VALUES(?, ?)', (fileset_number, absolute_path))
+        db.commit()
+
+        printc(f'Path {path} ({absolute_path}) added to fileset {fileset_name}.', Fore.GREEN)
+
+    update_filesets(db, [fileset_name])
+
+
+def update_filesets(db, fileset_names):
+    for fileset_name in fileset_names:
+        fileset_number = find_fileset(db, fileset_name)
+        if fileset_number is None:
+            error(f'Fileset with name {fileset_name} is not in the database.')
+            continue
+
+        printc(f"Updating fileset {fileset_name}.", Fore.MAGENTA)
+
+        scan = []
+        excludes = []
+        for row in db.execute('SELECT path FROM paths WHERE fileset_number=?', (fileset_number,)).fetchall():
+            if row['path'].startswith('^'):
+                excludes.append(row['path'].removeprefix('^'))
+            else:
+                scan.append(row['path'])
+
+        for path in scan:
+            update_fileset_path(db, fileset_number, fileset_name, path, excludes)
+
+        printc(f"Fileset {fileset_name} updated.", Fore.GREEN)
+
+
+def add_backup(db, backup_name, fileset_name):
+    fileset_number = find_fileset(db, fileset_name)
+    if fileset_number is None:
+        fail(f"Fileset with name {fileset_name} is not in the database.")
+
+    if find_backup(db, backup_name) is not None:
+        fail(f"Backup with name {backup_name} is already in the database.")
+
+    db.execute('INSERT INTO backups(name, fileset_number) VALUES(?, ?)', (backup_name, fileset_number))
+    db.commit()
+
+    printc('Backup added.', Fore.GREEN)
+
+
+def rename_backup(db, old_name, new_name):
+    backup = find_backup(db, old_name)
+    if backup is None:
+        fail(f'Backup with name {old_name} is not in the database.')
+
+    if find_backup(db, new_name) is not None:
+        fail(f'Backup with name {new_name} is already in the database.')
+
+    db.execute('UPDATE backups SET name=? WHERE number=?', (new_name, backup['number']))
+    db.commit()
+
+    printc('Backup name updated.', Fore.GREEN)
+
+
+def add_carrier(db, backup_name, carrier_labels):
+    backup = find_backup(db, backup_name)
+    if backup is None:
+        fail(f"Backup with name {backup_name} is not in the database.")
+
+    # Carriers are numbered in the order they are added.
+    last_index = get_first_value(db, 'SELECT MAX(idx) FROM carrier WHERE backup_number=?', (backup['number'],))
+    if last_index is None:
+        carrier_index = 0
+    else:
+        carrier_index = last_index + 1
+
+    added = 0
+    for label in carrier_labels:
+        if find_carrier(db, label) is not None:
+            error(f"carrier with label {label} is already in the database.")
+            continue
+
+        db.execute('INSERT INTO carrier(backup_number, label, full, idx) VALUES(?, ?, 0, ?)',
+                   (backup['number'], label, carrier_index))
+        db.commit()
+
+        carrier_index += 1
+        added += 1
+
+    printc(f"Added {added} carrier to backup set {backup_name}.", Fore.GREEN)
+
+
+def write(db, backup_name, mountpoint):
+    write_target(db, backup_name, mountpoint, False)
+
+
+def write_tape(db, backup_name, device):
+    write_target(db, backup_name, device, True)
+
+
+def wildcard_regex(pattern):
+    # Only * is a wildcard, the rest of the pattern is matched literally.
+    return '.*'.join(re.escape(part) for part in pattern.split('*'))
+
+
+def print_backup_summary(db, backup):
+    number, fileset_number, name = backup
+
+    printc(f"Backup set {name}:", Fore.BLUE)
+
+    fileset_sizes = db.execute('''
+        SELECT size
+        FROM files
+            JOIN file_fileset_links ON file_fileset_links.file_number=files.number
+        WHERE fileset_number=? AND on_disk=1
+    ''', (fileset_number,)).fetchall()
+
+    files_not_written = items_not_in_backup(db, FILE, 'files.size', fileset_number, number)
+    if len(files_not_written) == 0:
+        printc("  Status: All files of the fileset are on carrier in the backup set.", Fore.GREEN)
+    else:
+        unwritten_size = sum(row['size'] for row in files_not_written)
+        printc(f"  Status: There are {len(files_not_written)} files not on carrier in the backup set for a size "
+               f"of {unwritten_size} bytes.", Fore.RED)
+
+    symlinks_not_written = len(items_not_in_backup(db, SYMLINK, 'symlinks.number', fileset_number, number))
+    if symlinks_not_written == 0:
+        printc("  Status: All symlinks of the fileset are on carrier in the backup set.", Fore.GREEN)
+    else:
+        printc(f"  Status: There are {symlinks_not_written} symlinks not on carrier in the backup set.", Fore.RED)
+
+    fileset_name = get_first_value(db, 'SELECT name FROM filesets WHERE number=?', (fileset_number,))
+    fileset_size = sum(row['size'] for row in fileset_sizes)
+    printc(f"  Fileset {fileset_name} stores {len(fileset_sizes)} files for a total size of {fileset_size} bytes:",
+           Fore.CYAN)
+
+    for row in db.execute('SELECT path FROM paths WHERE fileset_number=?', (fileset_number,)):
+        printc(f"    Path {row['path']}", Fore.CYAN)
+
+    carriers = db.execute('SELECT number, label, full, idx FROM carrier WHERE backup_number=? ORDER BY idx ASC',
+                          (number,)).fetchall()
+
+    for carrier_number, label, full, index in carriers:
+        printc(f"  carrier {index} labeled {label} [{'FULL' if full == 1 else 'NOT FULL'}]:", Fore.MAGENTA)
+
+        tarballs = db.execute('''
+            SELECT idx, size, files, symlinks, overhead, written
+            FROM tarballs
+            WHERE carrier_number=?
+            ORDER BY idx ASC
+        ''', (carrier_number,))
+
+        for tarball_index, size, files, symlinks, overhead, written in tarballs:
+            printc(f"    Tarball {tarball_index} stores {files} files and {symlinks} symlinks in {size} bytes with "
+                   f"{overhead} bytes of overhead. (Written {format_time(written)})", Fore.YELLOW)
+
+
+def summary(db, backup_names):
+    # Without names, all backups. A name can contain * as a wildcard.
+    patterns = [wildcard_regex(name) for name in backup_names]
+
+    backups = db.execute('SELECT number, fileset_number, name FROM backups ORDER BY name ASC').fetchall()
+    for backup in backups:
+        if len(patterns) == 0 or any(re.fullmatch(pattern, backup['name']) for pattern in patterns):
+            print_backup_summary(db, backup)
+
+
+def list_filesets(db):
+    printc("List of filesets:", Fore.YELLOW)
+
+    rows = db.execute('SELECT number, name FROM filesets ORDER BY name ASC')
+    print_table([{"number": row['number'], "fileset_name": row['name']} for row in rows])
+
+
+def list_backups(db):
+    printc("List of backups:", Fore.YELLOW)
+
+    rows = db.execute('''
+        SELECT backups.number, backups.name AS backup_name, filesets.name AS fileset_name
+        FROM backups
+            LEFT JOIN filesets ON filesets.number=backups.fileset_number
+        ORDER BY backups.name ASC
+    ''')
+    print_table([dict(row) for row in rows])
+
+
+def list_carrier(db):
+    printc("List of carrier:", Fore.YELLOW)
+
+    rows = db.execute('''
+        SELECT carrier.number, label, full, name AS backup_name, idx
+        FROM carrier
+            LEFT JOIN backups ON backups.number=carrier.backup_number
+        ORDER BY name, idx ASC
+    ''')
+    print_table([dict(row) for row in rows])
+
+
+def list_tarballs(db):
+    printc("List of tarballs:", Fore.YELLOW)
+
+    rows = db.execute('''
+        SELECT tarballs.number, tarballs.size, files, symlinks, overhead, written, backups.name AS backup,
+            carrier.label AS carrier, tarballs.idx
+        FROM tarballs
+            LEFT JOIN carrier ON carrier.number=tarballs.carrier_number
+            LEFT JOIN backups ON backups.number=carrier.backup_number
+        ORDER BY backups.name, label, tarballs.idx ASC
+    ''')
+    print_table([dict(row, written=format_time(row['written'])) for row in rows])
+
+
+def manifest(db, carrier_label):
+    carrier = get_first_row(db, '''
+        SELECT carrier.number, carrier.label, carrier.full, carrier.idx, backups.name AS backup_name
+        FROM carrier
+            LEFT JOIN backups ON backups.number=carrier.backup_number
+        WHERE label=?
+    ''', (carrier_label,))
+
+    if carrier is None:
+        fail(f"carrier with label {carrier_label} is not in the database.")
+
+    tarballs = db.execute('''
+        SELECT number, idx, size, files, symlinks, overhead, written
+        FROM tarballs
+        WHERE carrier_number=?
+        ORDER BY idx ASC
+    ''', (carrier['number'],)).fetchall()
+
+    count = len(tarballs)
+    printc(f"Begin carrier {carrier['label']} manifest:", Fore.BLUE)
+    printc(f"    carrier has index {carrier['idx']} in backup set {carrier['backup_name']}.", Fore.BLUE)
+    printc(f"    carrier is {'not ' if carrier['full'] == 0 else ''}full.", Fore.BLUE)
+    printc(f"    There {'is' if count == 1 else 'are'} {count} tarball{'s' if count != 1 else ''} on the carrier.",
+           Fore.BLUE)
+
+    total_size = 0
+    for tarball in tarballs:
+        printc(f"Tarball {tarball['idx']} written at {datetime.datetime.fromtimestamp(tarball['written'])} contains "
+               f"{tarball['files']} files and {tarball['symlinks']} symlinks.", Fore.MAGENTA)
+        printc(f"Tarball has a total size of {tarball['size']} bytes with an observed overhead of "
+               f"{tarball['overhead']} bytes.", Fore.MAGENTA)
+        printc("File list:", Fore.MAGENTA)
+
+        files = db.execute('''
+            SELECT path, size, sha1
+            FROM files
+                JOIN file_tarball_links ON file_tarball_links.file_number=files.number
+            WHERE tarball_number=?
+            ORDER BY path ASC
+        ''', (tarball['number'],))
+
+        for path, size, sha1 in files:
+            # Directories are stored as files without a hash.
+            file_type = ' [Directory]' if sha1 == '' else ''
+            printc(f'    {path}{file_type} ({size} bytes)', Fore.CYAN)
+
+        symlinks = db.execute('''
+            SELECT path
+            FROM symlinks
+                JOIN symlink_tarball_links ON symlink_tarball_links.symlink_number=symlinks.number
+            WHERE tarball_number=?
+            ORDER BY path ASC
+        ''', (tarball['number'],))
+
+        for row in symlinks:
+            printc(f"    {row['path']} [Symlink] (0 bytes)", Fore.CYAN)
+
+        total_size += tarball['size']
+
+    printc(f'Total data size on carrier is {total_size} bytes.', Fore.BLUE)
+    printc(f"End carrier {carrier['label']} manifest.", Fore.BLUE)
+
+
+def remove_carrier(db, carrier_labels):
+    # Removes carriers with their tarballs from the database. The files on the carriers are not touched.
+    for label in carrier_labels:
+        carrier_number = find_carrier(db, label)
+        if carrier_number is None:
+            error(f'carrier with label {label} is not in the database.')
+            continue
+
+        tarballs = db.execute('SELECT number FROM tarballs WHERE carrier_number=?', (carrier_number,)).fetchall()
+        for tarball in tarballs:
+            for kind in KINDS:
+                db.execute(f'DELETE FROM {kind.tarball_links} WHERE tarball_number=?', (tarball['number'],))
+            db.execute('DELETE FROM tarballs WHERE number=?', (tarball['number'],))
+
+        db.execute('DELETE FROM carrier WHERE number=?', (carrier_number,))
+        db.commit()
+
+        printc(f'carrier with label {label} has been deleted from database.', Fore.BLUE)
+
+
+def remove_backups(db, backup_names):
+    # Removes backups with their carriers and tarballs from the database. The fileset stays.
+    for backup_name in backup_names:
+        backup = find_backup(db, backup_name)
+        if backup is None:
+            error(f'Backup with name {backup_name} is not in the database.')
+            continue
+
+        labels = db.execute('SELECT label FROM carrier WHERE backup_number=?', (backup['number'],)).fetchall()
+        remove_carrier(db, [row['label'] for row in labels])
+
+        db.execute('DELETE FROM backups WHERE number=?', (backup['number'],))
+        db.commit()
+
+        printc(f'Backup with name {backup_name} has been deleted from database.', Fore.BLUE)
+
+#----------------------------------------------------------------------------------------------------------------------
+# Main
+#----------------------------------------------------------------------------------------------------------------------
+
+# An argument of a command: its name, how many values it takes (as nargs of argparse, None for one) and its help.
+Argument = namedtuple('Argument', 'name nargs help')
+
+# The commands: name, the function that runs it, its help and its arguments. The function is called with the
+# database and the values of the arguments, in this order.
+Command = namedtuple('Command', 'name function help arguments')
+
+COMMANDS = [
+    Command('add-backup', add_backup, 'Adds a new backup', [
+        Argument('backup_name', None, 'Backup name'),
+        Argument('fileset_name', None, 'Fileset name'),
+    ]),
+    Command('add-fileset', add_fileset, 'Adds a new fileset', [
+        Argument('fileset_name', None, 'Fileset name'),
+        Argument('paths', '+', 'Paths to include, ^PATH to exclude'),
+    ]),
+    Command('add-paths', add_paths, 'Adds paths to a fileset', [
+        Argument('fileset_name', None, 'Fileset name'),
+        Argument('paths', '+', 'Paths to include, ^PATH to exclude'),
+    ]),
+    Command('add-carrier', add_carrier, 'Adds carrier to a backup', [
+        Argument('backup_name', None, 'Backup name'),
+        Argument('carrier_labels', '+', 'carrier labels to add'),
+    ]),
+    Command('list-backups', list_backups, 'Lists the backups', []),
+    Command('list-filesets', list_filesets, 'Lists the filesets', []),
+    Command('list-carrier', list_carrier, 'Lists the carrier', []),
+    Command('list-tarballs', list_tarballs, 'Lists the tarballs', []),
+    Command('manifest', manifest, 'Lists the contents of a carrier', [
+        Argument('carrier_label', None, 'carrier label'),
+    ]),
+    Command('remove-backups', remove_backups, 'Removes backups', [
+        Argument('backup_names', '+', 'Backup names to remove'),
+    ]),
+    Command('remove-carrier', remove_carrier, 'Removes carrier', [
+        Argument('carrier_labels', '+', 'carrier labels to remove'),
+    ]),
+    Command('summary', summary, 'Displays summary of current backup state', [
+        Argument('backup_names', '*', 'Backup names to show, * is a wildcard'),
+    ]),
+    Command('update-filesets', update_filesets, 'Updates the filesets', [
+        Argument('fileset_names', '+', 'Fileset names to update'),
+    ]),
+    Command('write', write, 'Writes a backup to a block device mount point', [
+        Argument('backup_name', None, 'Backup name'),
+        Argument('mountpoint', None, 'Mount point'),
+    ]),
+    Command('write-tape', write_tape, 'Writes a backup to a tape streamer', [
+        Argument('backup_name', None, 'Backup name'),
+        Argument('device', None, 'Device name'),
+    ]),
+    Command('rename-backup', rename_backup, 'Renames a backup', [
+        Argument('old_name', None, 'Backup old name'),
+        Argument('new_name', None, 'Backup new name'),
+    ]),
+]
+
+
+def generate_usage_text(commands):
+    lines = [f"{sys.argv[0]} command <args...>\n\nCommands:"]
+    for command in commands:
+        line = f"  {command.name}"
+        for argument in command.arguments:
+            if argument.nargs is None:
+                line += f" {argument.name}"
+            else:
+                line += f" <{argument.name}...>"
+        line += f"\n    - {command.help}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def build_parser(commands):
+    parser = argparse.ArgumentParser(description="Backup Management CLI", usage=generate_usage_text(commands))
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    for command in commands:
+        subparser = subparsers.add_parser(command.name, help=command.help)
+        for argument in command.arguments:
+            subparser.add_argument(argument.name, help=argument.help, nargs=argument.nargs)
+        subparser.set_defaults(command_info=command)
+
+    return parser
+
+
+def main():
+    colorama.init(autoreset=True)
+
+    printc(f"Backuptool [tool V{TOOL_VERSION}, database V{DB_VERSION}]", Fore.CYAN)
+    printc("  Copyright 2018-2026 Erik Van Hamme (erik.vanhamme@gmail.com)", Fore.CYAN)
+
+    args = build_parser(COMMANDS).parse_args()
+    command = args.command_info
+
+    db_path = os.path.expanduser(DB_PATH)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    db = None
+    try:
+        db = open_db(db_path)
+        command.function(db, *[getattr(args, argument.name) for argument in command.arguments])
+    except sqlite3.Error as e:
+        fail(f"SQL exception: {e}")
+    finally:
+        if db is not None:
+            db.close()
+
+    # A command that reported an error, but went on with the rest of its work, still fails.
+    if had_errors:
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

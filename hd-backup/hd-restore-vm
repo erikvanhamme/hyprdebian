@@ -1,0 +1,255 @@
+#!/usr/bin/python3
+"""Restores a virtual machine from a backup of hd-backup-vm, see hd-restore-vm(8).
+
+The package hd-backup installs this as /usr/sbin/hd-restore-vm. Run it as root.
+
+    hd-restore-vm <backup_dir> [<new_name>]
+
+<backup_dir> is the backup folder of a VM, <dir>/<vm> of hd-backup-vm; its name is the name of the
+VM. The streams of every disk in the XML of the backup are received in order into a ZFS dataset,
+the one of the original VM or another one, asked for each disk. The VM is then defined in libvirt,
+under <new_name> when given, with its NVRAM. It asks whether the network interfaces get new MAC
+addresses.
+"""
+
+import argparse
+import io
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+ZVOL_PREFIX = "/dev/zvol/"
+# The stream files: <dataset with underscores>.<sequence of 4 digits>.zst.
+STREAM = re.compile(r"^(?P<name>.+)\.(?P<seq>[0-9]{4})\.zst$")
+
+
+class RestoreError(Exception):
+    pass
+
+
+def parse_xml(path):
+    """Parses the XML of a VM. The namespaces in it, like the one of qemu:commandline, are
+    registered, so the XML that is written keeps their prefixes."""
+    with open(path, "rb") as f:
+        data = f.read()
+
+    for _, (prefix, uri) in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
+        ET.register_namespace(prefix, uri)
+
+    return ET.ElementTree(ET.fromstring(data))
+
+
+def zvol_sources(root):
+    """Returns the source elements of the disks of a VM that are ZFS volumes. CD-ROM and floppy
+    drives hold no VM data; a disk without a device attribute is a disk."""
+    sources = []
+
+    for disk in root.findall("./devices/disk"):
+        if disk.get("type") != "block" or disk.get("device", "disk") != "disk":
+            continue
+
+        source = disk.find("source")
+        if source is not None and source.get("dev", "").startswith(ZVOL_PREFIX):
+            sources.append(source)
+
+    return sources
+
+
+def clean_name(dataset):
+    return dataset.replace("/", "_")
+
+
+def find_streams(backup_dir):
+    """Returns the stream files in the backup folder per cleaned dataset name, in sequence order."""
+    streams = {}
+
+    for entry in os.listdir(backup_dir):
+        match = STREAM.match(entry)
+        if match:
+            streams.setdefault(match.group("name"), []).append((int(match.group("seq")), entry))
+
+    return {name: [os.path.join(backup_dir, entry) for _, entry in sorted(files)]
+            for name, files in streams.items()}
+
+
+def ask(prompt, default=""):
+    answer = input(prompt).strip()
+
+    return answer or default
+
+
+def receive_stream(stream, dataset):
+    """Receives one zstd compressed stream into a dataset."""
+    zstd = subprocess.Popen(["zstd", "-q", "-dc", stream], stdout=subprocess.PIPE)
+    receive = subprocess.Popen(["zfs", "receive", "-F", dataset], stdin=zstd.stdout)
+    # Only zfs receive reads the stream, so zstd stops when zfs receive fails.
+    zstd.stdout.close()
+    receive_status = receive.wait()
+    zstd_status = zstd.wait()
+
+    if receive_status != 0 or zstd_status != 0:
+        raise RestoreError(f"receiving {stream} into {dataset} failed.")
+
+
+def rename_vm(root, new_name):
+    """Gives the VM a new name. The UUID is removed, so libvirt generates a new one, and the NVRAM
+    gets its own file, otherwise the restore would overwrite the one of the original VM and both
+    would share it."""
+    root.find("name").text = new_name
+
+    uuid = root.find("uuid")
+    if uuid is not None:
+        root.remove(uuid)
+
+    nvram = root.find("./os/nvram")
+    if nvram is not None and nvram.text and nvram.text.strip():
+        nvram.text = os.path.join(os.path.dirname(nvram.text.strip()), f"{new_name}_VARS.fd")
+
+
+def remove_macs(root):
+    """Removes the MAC addresses, so libvirt generates new ones."""
+    for interface in root.findall("./devices/interface"):
+        for mac in interface.findall("mac"):
+            interface.remove(mac)
+
+
+def restore(backup_dir, new_name):
+    backup_dir = os.path.normpath(backup_dir)
+    old_name = os.path.basename(backup_dir)
+    new_name = new_name or old_name
+
+    xml_src = os.path.join(backup_dir, f"{old_name}.xml")
+    vars_src = os.path.join(backup_dir, f"{old_name}_VARS.fd")
+
+    if not os.path.isfile(xml_src):
+        raise RestoreError(f"XML config file not found at {xml_src}")
+
+    print("==========================================")
+    print(f" Starting Restore for: {old_name}")
+    print(f" Target VM Name:      {new_name}")
+    print("==========================================")
+
+    # 1. The datasets to restore are the disks in the XML of the last finished backup.
+    tree = parse_xml(xml_src)
+    root = tree.getroot()
+    sources = zvol_sources(root)
+    if not sources:
+        raise RestoreError(f"No ZFS volumes found in {xml_src}")
+
+    datasets = [source.get("dev")[len(ZVOL_PREFIX):] for source in sources]
+    streams = find_streams(backup_dir)
+
+    for dataset in datasets:
+        if clean_name(dataset) not in streams:
+            raise RestoreError(f"No stream files found for {dataset} in {backup_dir}")
+
+    # Streams of disks that were removed from the VM are left alone.
+    for name in sorted(set(streams) - {clean_name(dataset) for dataset in datasets}):
+        print(f"Skipping {name}: it is not a disk of {old_name} in {xml_src}.")
+
+    # 2. The dataset to restore each disk into.
+    print("")
+    print("--- ZVOL Path Remapping ---")
+    print("Configure destination ZFS dataset paths for each ZVOL.")
+
+    targets = {}
+    for dataset in datasets:
+        targets[dataset] = ask(f"Target dataset for [{dataset}] (Default: {dataset}): ", dataset)
+
+    # 3. New MAC addresses keep a copy from clashing on the network with the original VM, but the
+    # guest then sees new network cards. The choice is left to the user; the default keeps them.
+    new_macs = False
+    if root.findall("./devices/interface/mac"):
+        print("")
+        print("--- Network MAC Addresses ---")
+        answer = ask("Give the network interfaces new MAC addresses? [y/N]: ")
+        new_macs = answer.lower().startswith("y")
+
+    # 4. The streams of each disk, in order.
+    print("")
+    print("--- Replaying Snapshot Streams ---")
+
+    for dataset in datasets:
+        target = targets[dataset]
+        print(f"Restoring to target dataset: {target}")
+
+        for stream in streams[clean_name(dataset)]:
+            seq = STREAM.match(os.path.basename(stream)).group("seq")
+            print(f"  -> Applying stream chunk #{seq} ({stream})...", flush=True)
+            receive_stream(stream, target)
+
+        print(f"Successfully restored {target}")
+
+    # 5. The XML of the restored VM.
+    if new_name != old_name:
+        rename_vm(root, new_name)
+
+    if new_macs:
+        remove_macs(root)
+
+    for source in sources:
+        old_dev = source.get("dev")
+        new_dev = ZVOL_PREFIX + targets[old_dev[len(ZVOL_PREFIX):]]
+        if old_dev != new_dev:
+            print(f"Remapping XML device path: {old_dev} -> {new_dev}")
+            source.set("dev", new_dev)
+
+    # 6. The NVRAM of a VM that boots with UEFI.
+    nvram = root.find("./os/nvram")
+    nvram_target = nvram.text.strip() if nvram is not None and nvram.text else ""
+    if os.path.isfile(vars_src) and nvram_target:
+        print(f"Restoring UEFI NVRAM VARS file to {nvram_target}...")
+        os.makedirs(os.path.dirname(nvram_target), exist_ok=True)
+        shutil.copyfile(vars_src, nvram_target)
+
+    # 7. The VM in libvirt.
+    print("Registering VM definition with libvirt...")
+    fd, xml_tmp = tempfile.mkstemp(prefix="hd-restore-vm-", suffix=".xml")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            tree.write(f, encoding="unicode")
+            f.write("\n")
+
+        subprocess.run(["virsh", "define", xml_tmp], check=True)
+    finally:
+        os.remove(xml_tmp)
+
+    print("==========================================")
+    print(f" Restore completed successfully for {new_name}")
+    print("==========================================")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Restore a virtual machine from a backup of hd-backup-vm.")
+    parser.add_argument("backup_dir", help="the backup folder of the VM, <dir>/<vm> of hd-backup-vm")
+    parser.add_argument("new_name", nargs="?",
+                        help="the name of the restored VM; the default is the name of the backup "
+                        "folder")
+    args = parser.parse_args(argv)
+
+    try:
+        restore(args.backup_dir, args.new_name)
+    except RestoreError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as error:
+        print(f"Error: {' '.join(error.cmd)} failed with status {error.returncode}.",
+              file=sys.stderr)
+        return 1
+    except (OSError, ET.ParseError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except (KeyboardInterrupt, EOFError):
+        print("", file=sys.stderr)
+        return 130
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

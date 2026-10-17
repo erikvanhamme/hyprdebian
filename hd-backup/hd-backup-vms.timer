@@ -1,0 +1,10 @@
+[Unit]
+Description=Back Up the Virtual Machines Every Night at 3:30
+Documentation=man:hd-backup-vms(8)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

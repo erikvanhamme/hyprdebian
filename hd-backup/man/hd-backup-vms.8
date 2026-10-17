@@ -1,0 +1,79 @@
+.TH HD-BACKUP-VMS 8 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-backup-vms \- back up the virtual machines in the configuration
+.SH SYNOPSIS
+.B hd-backup-vms
+.SH DESCRIPTION
+.B hd-backup-vms
+backs up every virtual machine in the key
+.B hd-backup
+of
+.IR /etc/hyprdebian/config.json ,
+one after the other, with
+.BR hd\-backup\-vm (8).
+A VM whose backup fails does not stop the backups of the others; the command
+fails at the end when one failed, or when an entry is invalid.
+Run it as root.
+.PP
+.B hd-backup-vms.timer
+runs it through
+.B hd-backup-vms.service
+every night at 3:30; a run that was missed while the system was off runs at
+the next boot.
+The package does not enable the timer.
+Enable it with:
+.PP
+.RS
+sudo systemctl enable \-\-now hd-backup-vms.timer
+.RE
+.PP
+The output of the backups is in the journal:
+.PP
+.RS
+journalctl \-u hd-backup-vms.service
+.RE
+.SH SETTINGS
+The key
+.B hd-backup
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd\-config (7),
+holds a JSON array with an object per VM, with the arguments of
+.BR hd\-backup\-vm :
+.TP
+.B vm
+The name of the VM in libvirt.
+.TP
+.B dir
+The folder that holds the backup folder of the VM; the backup goes to
+.IR dir / vm .
+.TP
+.B owner
+The user who gets the files of the backup.
+.PP
+The installation stores an empty array when the key is missing.
+For example:
+.PP
+.RS
+.nf
+sudo hd-config-update hd-backup \e
+    '[{"vm": "git", "dir": "/dpool/backups/vm", "owner": "erik"}]'
+.fi
+.RE
+.SH EXIT STATUS
+0 when every backup finished, also when there are none; 1 on an error.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The VMs to back up, in the key
+.BR hd-backup .
+.TP
+.I /usr/lib/systemd/system/hd-backup-vms.timer
+.TQ
+.I /usr/lib/systemd/system/hd-backup-vms.service
+Run hd-backup-vms every night at 3:30.
+.SH SEE ALSO
+.BR hd\-backup\-vm (8),
+.BR hd\-restore\-vm (8),
+.BR hd\-config\-update (8)

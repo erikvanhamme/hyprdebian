@@ -1,0 +1,45 @@
+.TH BLOCKWRITE 1 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+blockwrite \- write a stream to a tape drive in blocks of 4 MiB
+.SH SYNOPSIS
+.B blockwrite
+.I device
+.SH DESCRIPTION
+.B blockwrite
+reads a stream from its standard input and writes it to
+.I device
+in blocks of exactly 4 MiB, one
+.BR write (2)
+per block, with
+.BR O_DIRECT .
+On tape, every block becomes one record of the drive.
+The last block is filled up with zeros.
+.PP
+.BR hd\-backup (1)
+writes its tarballs to tape through
+.BR mbuffer (1)
+and
+.BR blockwrite .
+.PP
+A short write is an error and is never continued, as the rest of the block
+would start on an address that is not aligned.
+When the tape runs full, the write fails with
+.BR "No space left on device" .
+.PP
+Closing a tape device writes the filemark, so a failure to close the device
+is an error too.
+.SH DIAGNOSTICS
+At the end, also on an error, it prints the bytes it wrote to the device in
+full blocks on standard error:
+.PP
+.RS
+Total bytes written: \fIN\fR
+.RE
+.PP
+.B hd-backup
+reads this to know how much of the tarball is on the tape when it runs full.
+.SH EXIT STATUS
+0 when the whole stream was written, 1 on an error.
+.SH SEE ALSO
+.BR hd\-backup (1),
+.BR mt\-st (1)

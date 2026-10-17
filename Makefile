@@ -24,9 +24,9 @@
 # directory to PACKAGES, and to TESTS when its Makefile also has the target
 # test, which runs the tests of the package.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-dashboard hd-report hd-base hd-installer
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-dashboard hd-report hd-backup hd-base hd-installer
 # The package directories with tests.
-TESTS := hd-dashboard hd-report
+TESTS := hd-dashboard hd-report hd-backup
 OUT := packages
 
 .PHONY: all test clean provision-vm update-repo $(PACKAGES) $(addprefix test-,$(TESTS))

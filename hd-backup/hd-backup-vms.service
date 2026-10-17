@@ -1,0 +1,12 @@
+[Unit]
+Description=Back Up the Virtual Machines
+Documentation=man:hd-backup-vms(8)
+After=network.target
+
+# Runs as root: the backups take ZFS snapshots, freeze the guests and give the files to their
+# owners.
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/hd-backup-vms
+Nice=10
+IOSchedulingClass=idle

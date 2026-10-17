@@ -1,0 +1,390 @@
+#!/usr/bin/python3
+"""Backs up a virtual machine of libvirt whose disks are ZFS volumes, see hd-backup-vm(8).
+
+The package hd-backup installs this as /usr/sbin/hd-backup-vm. Run it as root.
+
+    hd-backup-vm <vm> <dir> <owner>
+
+The backup goes to <dir>/<vm>: the XML of the VM, its NVRAM when it boots with UEFI, and one zstd
+compressed ZFS stream per disk and run, <dataset>.<sequence>.zst, with the slashes of the dataset
+replaced by underscores. The first run of a disk writes a full stream, every following run an
+incremental one from the snapshot of the run before. <vm>.sequence holds the next sequence number
+and that snapshot. The files are given to the user <owner>.
+"""
+
+import argparse
+import fcntl
+import os
+import pwd
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import xml.etree.ElementTree as ET
+
+LOCK_DIR = "/run/lock"
+# The snapshots of the backups are named backup-<timestamp>.
+SNAP_PREFIX = "backup-"
+ZVOL_PREFIX = "/dev/zvol/"
+# The stream files: <dataset with underscores>.<sequence of 4 digits>.zst.
+STREAM = re.compile(r"^(?P<name>.+)\.(?P<seq>[0-9]{4})\.zst$")
+
+
+class BackupError(Exception):
+    pass
+
+
+def run(*args, check=True, capture=False):
+    """Runs a command; with capture, returns what it prints."""
+    result = subprocess.run(args, check=check, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+    if capture:
+        return result.stdout
+
+    return result
+
+
+def is_vm_disk(disk):
+    """CD-ROM and floppy drives hold no VM data; a disk without a device attribute is a disk."""
+    return disk.get("device", "disk") == "disk"
+
+
+def vm_datasets(xml):
+    """Returns the ZFS datasets of the disks in the XML of a VM. Only ZFS volumes can be backed up,
+    so other disks, like image files, are refused rather than left out."""
+    root = ET.fromstring(xml)
+    datasets = []
+
+    for disk in root.findall("./devices/disk"):
+        if not is_vm_disk(disk):
+            continue
+
+        source = disk.find("source")
+        dev = source.get("dev", "") if source is not None else ""
+        if disk.get("type") != "block" or not dev.startswith(ZVOL_PREFIX):
+            raise BackupError("the VM has disks that are not ZFS volumes and cannot be backed up.")
+
+        datasets.append(dev[len(ZVOL_PREFIX):])
+
+    if not datasets:
+        raise BackupError("the VM has no disks.")
+
+    return datasets
+
+
+def nvram_path(xml):
+    """Returns the NVRAM file of a VM that boots with UEFI, or an empty string."""
+    nvram = ET.fromstring(xml).find("./os/nvram")
+    if nvram is None or not nvram.text:
+        return ""
+
+    return nvram.text.strip()
+
+
+def clean_name(dataset):
+    return dataset.replace("/", "_")
+
+
+def read_sequence(path):
+    """Returns the next sequence number and the snapshot the last backup ended at. Sequence files
+    from before that snapshot was recorded only hold the number."""
+    try:
+        with open(path) as f:
+            fields = f.read().split()
+    except FileNotFoundError:
+        return 0, ""
+
+    if not fields:
+        return 0, ""
+
+    return int(fields[0]), fields[1] if len(fields) > 1 else ""
+
+
+def has_earlier_streams(backup_dir, name, next_seq):
+    """Returns whether the backup folder holds streams of the dataset from before this run."""
+    for entry in os.listdir(backup_dir):
+        match = STREAM.match(entry)
+        if match and match.group("name") == name and int(match.group("seq")) < next_seq:
+            return True
+
+    return False
+
+
+def pool_snapshots(datasets, snap):
+    """Groups the snapshots to take per pool: ZFS only takes snapshots atomically within one pool."""
+    pools = {}
+    for dataset in datasets:
+        pools.setdefault(dataset.split("/")[0], []).append(f"{dataset}@{snap}")
+
+    return pools
+
+
+def backup_snapshots(dataset):
+    """Returns the backup snapshots of a dataset, the oldest first, as names without the dataset."""
+    output = run("zfs", "list", "-H", "-t", "snapshot", "-o", "name", "-s", "creation", dataset,
+                 capture=True)
+    names = [line.split("@", 1)[1] for line in output.splitlines() if "@" in line]
+
+    return [name for name in names if name.startswith(SNAP_PREFIX)]
+
+
+def snapshot_exists(snapshot):
+    result = subprocess.run(["zfs", "list", "-H", "-o", "name", snapshot],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    return result.returncode == 0
+
+
+def send_stream(send_args, out_file):
+    """Writes a ZFS stream through zstd to a file, and flushes it to disk."""
+    with open(out_file, "wb") as out:
+        send = subprocess.Popen(send_args, stdout=subprocess.PIPE)
+        zstd = subprocess.Popen(["zstd", "-q", "-T0"], stdin=send.stdout, stdout=out)
+        # Only zstd reads the stream, so zfs send stops when zstd fails.
+        send.stdout.close()
+        zstd_status = zstd.wait()
+        send_status = send.wait()
+
+        if send_status != 0 or zstd_status != 0:
+            raise BackupError(f"writing {out_file} failed.")
+
+        out.flush()
+        os.fsync(out.fileno())
+
+
+def fsync_dir(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def thaw_guest(vm):
+    run("virsh", "qemu-agent-command", vm, '{"execute":"guest-fsfreeze-thaw"}', check=False)
+
+
+def chown_tree(path, owner):
+    shutil.chown(path, user=owner)
+    for root, dirs, files in os.walk(path):
+        for name in dirs + files:
+            shutil.chown(os.path.join(root, name), user=owner, follow_symlinks=False)
+
+
+def lock(vm):
+    """Only one backup of a VM may run at a time, e.g. a manual run during the one of the timer.
+    They would write the same stream files and destroy each other's snapshots. The lock is held
+    until the process ends."""
+    lock_file = open(os.path.join(LOCK_DIR, f"hd-backup-vm-{vm}.lock"), "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise BackupError(f"a backup of {vm} is already running.")
+
+    return lock_file
+
+
+class Run:
+    """The state of a run, for the cleanup when it does not finish."""
+
+    def __init__(self, vm):
+        self.vm = vm
+        self.frozen = False
+        self.finished = False
+        self.snapshots = []
+        self.out_files = []
+
+    def cleanup(self):
+        """Never leaves the guest frozen. When the backup did not finish, the snapshots and files
+        of this run are removed again, so the next run continues from the last backup that did
+        finish."""
+        if self.frozen:
+            print("Thawing guest filesystem...")
+            thaw_guest(self.vm)
+            self.frozen = False
+
+        if not self.finished:
+            for snapshot in self.snapshots:
+                run("zfs", "destroy", snapshot, check=False)
+
+            for path in self.out_files:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
+
+
+def backup(vm, backup_root, owner, state):
+    try:
+        pwd.getpwnam(owner)
+    except KeyError:
+        raise BackupError(f"the user {owner} does not exist.")
+
+    backup_dir = os.path.join(backup_root, vm)
+    seq_file = os.path.join(backup_dir, f"{vm}.sequence")
+    snap = SNAP_PREFIX + time.strftime("%Y%m%d_%H%M%S")
+
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # 1. The XML of the VM. It replaces the one in the backup folder only when the backup
+    # finishes, so the folder never holds an XML with disks that have no streams.
+    xml_path = os.path.join(backup_dir, f"{vm}.xml")
+    xml = run("virsh", "dumpxml", "--migratable", vm, capture=True)
+    datasets = vm_datasets(xml)
+
+    fd, xml_tmp = tempfile.mkstemp(dir=backup_dir, prefix=f"{vm}.xml.")
+    state.out_files.append(xml_tmp)
+    with os.fdopen(fd, "w") as f:
+        f.write(xml)
+
+    # 2. The NVRAM of a VM that boots with UEFI. It also replaces the one in the backup folder only
+    # at the end.
+    vars_path = os.path.join(backup_dir, f"{vm}_VARS.fd")
+    vars_tmp = None
+    nvram = nvram_path(run("virsh", "dumpxml", vm, capture=True))
+    if nvram and os.path.isfile(nvram):
+        fd, vars_tmp = tempfile.mkstemp(dir=backup_dir, prefix=f"{vm}_VARS.fd.")
+        os.close(fd)
+        state.out_files.append(vars_tmp)
+        shutil.copyfile(nvram, vars_tmp)
+
+    next_seq, base_snap = read_sequence(seq_file)
+    seq = f"{next_seq:04d}"
+
+    print(f"Starting backup sequence #{seq} for {vm}...")
+
+    # 3. Quiesce the filesystems of a running guest with the guest agent. A VM that is shut off
+    # has nothing to quiesce: its disks are consistent as they are. In the other states, like
+    # paused or crashed, the guest agent cannot answer.
+    vm_state = run("virsh", "domstate", vm, capture=True).strip()
+    if vm_state == "running":
+        print("Freezing guest filesystem...")
+        state.frozen = True
+        freeze = run("virsh", "qemu-agent-command", vm, '{"execute":"guest-fsfreeze-freeze"}',
+                     "--timeout", "5", check=False)
+        if freeze.returncode != 0:
+            print("Warning: fsfreeze failed, taking crash-consistent snapshot.")
+    elif vm_state == "shut off":
+        print(f"{vm} is shut off, its disks are consistent.")
+    else:
+        print(f"Warning: {vm} is {vm_state}, taking crash-consistent snapshot.")
+
+    # 4. The snapshots of all disks, atomically per pool.
+    print(f"Creating ZFS snapshot: {snap}...")
+    for snapshots in pool_snapshots(datasets, snap).values():
+        run("zfs", "snapshot", *snapshots)
+        state.snapshots.extend(snapshots)
+
+    # 5. Thaw the guest right away.
+    if state.frozen:
+        print("Thawing guest filesystem...")
+        thaw_guest(vm)
+        state.frozen = False
+
+    # 6. A stream per disk, full or incremental.
+    for dataset in datasets:
+        name = clean_name(dataset)
+        out_file = os.path.join(backup_dir, f"{name}.{seq}.zst")
+        state.out_files.append(out_file)
+
+        # A dataset without earlier streams starts with a full backup, e.g. a disk added to the VM.
+        if not has_earlier_streams(backup_dir, name, next_seq):
+            print(f"Performing FULL backup ({seq}) for {dataset}@{snap} -> {out_file}")
+            send_stream(["zfs", "send", f"{dataset}@{snap}"], out_file)
+            continue
+
+        # Older sequence files do not record the base, then it is the newest earlier backup
+        # snapshot.
+        prev_snap = base_snap
+        if not prev_snap:
+            earlier = [other for other in backup_snapshots(dataset) if other != snap]
+            prev_snap = earlier[-1] if earlier else ""
+
+        if not prev_snap or not snapshot_exists(f"{dataset}@{prev_snap}"):
+            raise BackupError(f"the base snapshot of {dataset} is gone, so the backups in "
+                              f"{backup_dir} cannot be continued. Move that folder away to start a "
+                              "new backup with a full stream.")
+
+        print(f"Performing INCREMENTAL backup ({seq}) from @{prev_snap} to @{snap} -> {out_file}")
+        send_stream(["zfs", "send", "-i", f"@{prev_snap}", f"{dataset}@{snap}"], out_file)
+
+    # 7. The XML and NVRAM of this run go in place.
+    os.chmod(xml_tmp, 0o644)
+    os.replace(xml_tmp, xml_path)
+    if vars_tmp is not None:
+        os.chmod(vars_tmp, 0o644)
+        os.replace(vars_tmp, vars_path)
+
+    # 8. The next sequence number and the new base snapshot are recorded in one step, so they
+    # always match. The streams are already on disk, so a power cut cannot leave a sequence file
+    # that counts a truncated stream. The sequence file is on disk before the old base snapshots
+    # are destroyed.
+    fsync_dir(backup_dir)
+    fd, seq_tmp = tempfile.mkstemp(dir=backup_dir, prefix=f"{vm}.sequence.")
+    state.out_files.append(seq_tmp)
+    with os.fdopen(fd, "w") as f:
+        f.write(f"{next_seq + 1} {snap}\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(seq_tmp, 0o644)
+    os.replace(seq_tmp, seq_file)
+    fsync_dir(backup_dir)
+    state.finished = True
+
+    # 9. The current snapshot is the new base; the older backup snapshots are not needed anymore.
+    for dataset in datasets:
+        for other in backup_snapshots(dataset):
+            if other != snap:
+                run("zfs", "destroy", f"{dataset}@{other}", check=False)
+
+    # 10. The files of the backup belong to the owner.
+    chown_tree(backup_dir, owner)
+
+    print(f"Backup #{seq} complete for {vm}.")
+
+
+def terminate(signum, frame):
+    # The cleanup runs on the way out.
+    sys.exit(1)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Back up a virtual machine of libvirt whose disks are ZFS volumes, to <dir>/<vm>.")
+    parser.add_argument("vm", help="the name of the VM in libvirt")
+    parser.add_argument("dir", help="the folder that holds the backup folder of the VM")
+    parser.add_argument("owner", help="the user who gets the files of the backup")
+    args = parser.parse_args(argv)
+
+    signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGHUP, terminate)
+
+    state = Run(args.vm)
+    try:
+        lock_file = lock(args.vm)
+        try:
+            backup(args.vm, args.dir, args.owner, state)
+        finally:
+            state.cleanup()
+            lock_file.close()
+    except BackupError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as error:
+        print(f"Error: {' '.join(error.cmd)} failed with status {error.returncode}.",
+              file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,45 @@
+.TH HD-RESTORE-VM 8 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-restore-vm \- restore a virtual machine from a backup of hd-backup-vm
+.SH SYNOPSIS
+.B hd-restore-vm
+.I backup_dir
+.RI [ new_name ]
+.SH DESCRIPTION
+.B hd-restore-vm
+restores a virtual machine from its backup folder
+.IR backup_dir ,
+the folder
+.IR dir / vm
+of
+.BR hd\-backup\-vm (8).
+The name of the folder is the name of the VM in the backup.
+Run it as root.
+.PP
+It restores the disks in the XML of the last finished backup; streams of
+disks that were removed from the VM are left alone.
+For each disk, it asks for the ZFS dataset to restore into; the default is
+the dataset of the original VM.
+Each stream of the disk is received in order with
+.BR "zfs receive \-F" ,
+which overwrites a dataset that already exists.
+.PP
+It asks whether the network interfaces get new MAC addresses, so a copy does
+not clash with the original VM on the network; the default keeps them.
+.PP
+The VM is defined in libvirt with the XML of the backup, with the disks
+pointing at the datasets they were restored into, and the NVRAM of the backup
+copied in place.
+With
+.IR new_name ,
+the VM gets that name, a new UUID, and an NVRAM file of its own,
+.IB new_name _VARS.fd
+next to the one of the original VM.
+The VM is not started.
+.SH EXIT STATUS
+0 when the VM was restored, 1 on an error, 2 on wrong arguments, 130 when it
+was interrupted.
+.SH SEE ALSO
+.BR hd\-backup\-vm (8),
+.BR virsh (1),
+.BR zfs (8)

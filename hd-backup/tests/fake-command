@@ -1,0 +1,65 @@
+#!/usr/bin/python3
+"""A fake of virsh, zfs and zstd for the tests, called through symlinks with those names. It logs
+every call to $FAKE_STATE/log and keeps the snapshots in $FAKE_STATE/snapshots. The VM is
+running, unless $FAKE_STATE/domstate holds another state. A file
+$FAKE_STATE/fail-<command>-<subcommand> makes that call fail."""
+
+import json
+import os
+import shutil
+import sys
+
+state = os.environ["FAKE_STATE"]
+command = os.path.basename(sys.argv[0])
+args = sys.argv[1:]
+snapshots_file = os.path.join(state, "snapshots")
+
+with open(os.path.join(state, "log"), "a") as f:
+    f.write(json.dumps([command] + args) + "\n")
+
+if args and os.path.exists(os.path.join(state, f"fail-{command}-{args[0]}")):
+    sys.exit(1)
+
+
+def snapshots():
+    if not os.path.exists(snapshots_file):
+        return []
+    with open(snapshots_file) as f:
+        return f.read().split()
+
+
+def save(names):
+    with open(snapshots_file, "w") as f:
+        f.write("".join(name + "\n" for name in names))
+
+
+if command == "virsh":
+    if args[0] == "domstate":
+        path = os.path.join(state, "domstate")
+        print(open(path).read() if os.path.exists(path) else "running")
+    elif args[0] == "dumpxml":
+        with open(os.path.join(state, "vm.xml")) as f:
+            sys.stdout.write(f.read())
+    elif args[0] == "define":
+        shutil.copyfile(args[1], os.path.join(state, "defined.xml"))
+elif command == "zfs":
+    if args[0] == "snapshot":
+        save(snapshots() + args[1:])
+    elif args[0] == "destroy":
+        save([name for name in snapshots() if name != args[1]])
+    elif args[0] == "list" and "snapshot" in args:
+        dataset = args[-1]
+        print("\n".join(name for name in snapshots() if name.startswith(dataset + "@")))
+    elif args[0] == "list":
+        sys.exit(0 if args[-1] in snapshots() else 1)
+    elif args[0] == "send":
+        sys.stdout.write(" ".join(args) + "\n")
+    elif args[0] == "receive":
+        with open(os.path.join(state, "received-" + args[-1].replace("/", "_")), "a") as f:
+            f.write(sys.stdin.read())
+elif command == "zstd":
+    if "-dc" in args:
+        with open(args[-1]) as f:
+            sys.stdout.write(f.read())
+    else:
+        sys.stdout.write(sys.stdin.read())
