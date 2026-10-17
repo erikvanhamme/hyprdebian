@@ -27,86 +27,6 @@ o_firewall() {
     fi
 }
 
-o_greetd() {
-    add_packages greetd
-
-    add_services greetd
-
-    add_template templates/etc/greetd/config.toml.j2
-}
-
-o_hyprland() {
-    add_packages uwsm kitty desktop-base dbus-user-session hyprland hyprland-qtutils \
-        wofi hyprpaper libglib2.0-bin hypridle python3-terminaltexteffects hyprlock \
-        libnotify-bin mako-notifier audacious mpv imv firefox pipewire wireplumber \
-        pulseaudio-utils grim slurp swappy wl-clipboard playerctl brightnessctl \
-        hyprshutdown meld jq
-
-        add_files \
-            deploy/etc/dconf/db/local.d/00-dark-theme \
-            deploy/etc/skel/.config/alsa/asoundrc \
-            deploy/etc/skel/.config/hyprdebian/screensaver.txt \
-            deploy/etc/skel/.config/hypr/hypridle.conf \
-            deploy/etc/skel/.config/hypr/hyprland.lua \
-            deploy/etc/skel/.config/hypr/hyprlock.conf \
-            deploy/etc/skel/.config/hypr/hyprpaper.conf \
-            deploy/etc/skel/.config/kitty/kitty.conf \
-            deploy/etc/skel/.config/mako/config \
-            deploy/etc/skel/.config/mpv/input.conf \
-            deploy/etc/skel/.config/nwg-look/config \
-            deploy/etc/skel/.config/pam.d/hyprlock \
-            deploy/etc/skel/.config/pipewire/pipewire.conf.d/10-samplerate.conf \
-            deploy/etc/skel/.config/VSCodium/User/settings.json \
-            deploy/etc/skel/.config/wofi/config \
-            deploy/etc/skel/.config/wofi/style.css \
-            deploy/etc/skel/.local/share/nwg-look/gsettings \
-            deploy/usr/local/bin/hd-ask-poweroff \
-            deploy/usr/local/bin/hd-ask-reboot \
-            deploy/usr/local/bin/hd-cmd-screensaver \
-            deploy/usr/local/bin/hd-kill-screensaver \
-            deploy/usr/local/bin/hd-launch-screensaver \
-            deploy/usr/local/bin/hd-mode-select \
-            deploy/usr/local/bin/hd-mount \
-            deploy/usr/local/bin/hd-mount-helper \
-            deploy/usr/local/bin/hd-unmount \
-            deploy/usr/local/bin/hd-volume-down \
-            deploy/usr/local/bin/hd-volume-mute \
-            deploy/usr/local/bin/hd-volume-up \
-
-    add_template templates/etc/sudoers.d/99-mount-menu.j2 0440
-
-    if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
-        add_packages wiremix yazi
-    fi
-}
-
-o_theme() {
-    add_packages nwg-look qt5-gtk-platformtheme qt6-gtk-platformtheme
-}
-
-o_user_log() {
-    touch ${TARGET_DIR}/var/log/hyprland.log || return 1
-    in_target chown ${Q_USER}:${Q_USER} /var/log/hyprland.log
-}
-
-o_user_icons() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USER}/.icons || return 1
-    in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/.icons
-}
-
-o_sniptool() {
-    mkdir -p ${TARGET_DIR}/home/${Q_USER}/Pictures/Screenshots || return 1
-    in_target chown ${Q_USER}:${Q_USER} /home/${Q_USER}/Pictures/Screenshots
-}
-
-o_desktop() {
-    add_dependencies "u_post" \
-        "o_user_log" \
-        "o_user_icons" \
-        "o_sniptool" \
-
-}
-
 o_docker() {
     add_packages docker.io docker-compose
 
@@ -236,11 +156,6 @@ o_report() {
 
     add_services hd-report.timer
 }
-
-add_dependencies "o_desktop" \
-    "o_greetd" \
-    "o_hyprland" \
-    "o_theme" \
 
 # The firewall is always on, so its rules for the optional components are always queued.
 add_dependencies "o_main" "o_firewall"

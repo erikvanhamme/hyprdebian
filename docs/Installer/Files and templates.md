@@ -12,7 +12,7 @@ Use `add_files` to queue a file, or `file_deploy` to copy it right away. Missing
 ## Templates
 The `templates` directory also mirrors the root of the target system. Templates are Jinja2 files with a `.j2` extension. They are rendered by `render.py` to the same path under `/mnt`, with the `templates/` prefix and the `.j2` extension removed:
 ```
-templates/etc/greetd/config.toml.j2  ->  /mnt/etc/greetd/config.toml
+templates/etc/hyprdebian/report.conf.j2  ->  /mnt/etc/hyprdebian/report.conf
 ```
 
 Use `add_template` to queue a template, or `template_render` to render it right away. Both take an optional file mode (default `0644`).

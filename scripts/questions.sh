@@ -54,9 +54,11 @@ q_desktop() {
         return 0
     fi
 
+    # ask_yes_no saves the answer, which o_qemu_kvm uses for virt-manager. The desktop itself is
+    # the package hd-desktop. A no is not an error here.
     local default="$(get_default Q_DESKTOP "${Q_TYPE:-}")"
     if ask_yes_no Q_DESKTOP "Install hyprland desktop environment" "${default}"; then
-        add_dependencies "o_main" "o_desktop"
+        :
     fi
 }
 

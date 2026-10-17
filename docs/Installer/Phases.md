@@ -23,7 +23,7 @@ Each phase has three empty tasks, `<prefix>_pre`, `<prefix>_main` and `<prefix>_
 - `<prefix>_main` holds the normal work of the phase.
 - `<prefix>_pre` and `<prefix>_post` hold work that must run just before or just after it.
 
-Tasks from one phase often attach work to the hooks of a later phase. For example, `o_qemu_kvm` adds `pkg_qemu_kvm` to `pkg_post`, so it runs right after the packages are installed, and `o_desktop` adds tasks to `u_post` that need the user account to exist.
+Tasks from one phase often attach work to the hooks of a later phase. For example, `o_qemu_kvm` adds `pkg_qemu_kvm` to `pkg_post`, so it runs right after the packages are installed, and `o_rust` adds tasks to `u_post` that need the user account to exist.
 
 ## Phase script template
 A new phase script looks like this (with `x` replaced by the prefix of the phase):

@@ -1,7 +1,7 @@
 ## Introduction
 The key bindings are defined in the Hyprland config:
 ```
-deploy/etc/skel/.config/hypr/hyprland.lua
+hd-desktop/etc/skel/.config/hypr/hyprland.lua
 ```
 
 `SUPER` is the Windows key.
