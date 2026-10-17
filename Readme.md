@@ -25,7 +25,7 @@ Feel free to experiment with it.
 12. Optional docker support.
 13. Optional QEMU/KVM support.
 14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md).
-15. Optional status reports to a dashboard that shows all hyprdebian systems on one page. See [Dashboard](docs/Dashboard/Overview.md).
+15. Optional status reports to a dashboard that shows all hyprdebian systems on one page. See [hd-dashboard](docs/packages/hd-dashboard.md) and [hd-report](docs/packages/hd-report.md).
 
 ## System overview
 
@@ -132,4 +132,4 @@ The `docs` folder has more documentation:
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
-- [Dashboard](docs/Dashboard/Overview.md): the status reports of the systems, and the dashboard that shows them.
+- [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.

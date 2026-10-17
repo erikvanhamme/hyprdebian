@@ -40,6 +40,3 @@ Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c
 `helpers.py` imports `hd-backup` as a module for the tests. The script has no `.py` extension, so the helper gives the loader explicitly. Importing it runs no command: that only happens when it runs as a program.
 
 The tape tests take about 5 seconds each, because a tape write waits 5 seconds before it rewinds.
-
-## hd-dash
-Tests for the dashboard `dashboard/hd-dash`, in `test_dash.py`: accepting and refusing reports and tokens, the history, judging the systems, escaping report values in the pages, the server on a free local port, and `hd-dash forget`. They need nothing beyond Python.
