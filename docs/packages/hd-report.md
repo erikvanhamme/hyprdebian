@@ -17,7 +17,7 @@ cd hd-report
 make deb
 ```
 
-This builds `build/hd-report_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`, and suggests `hd-dashboard`. Install it with:
+This builds `build/hd-report_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`, and suggests `hd-dashboard`. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-report.timer` by hand after installing it: `sudo systemctl enable --now hd-report.timer`. Install it with:
 ```
 sudo apt install ./build/hd-report_<version>_all.deb
 ```
@@ -39,7 +39,7 @@ hd-report/tests/test_report.py
 ```
 
 ## The timer
-`hd-report.timer` runs `hd-report.service` 2 minutes after the boot and then every 15 minutes, with up to a minute of random delay. The service runs `hd-report` as root. The timer is enabled on the first installation; after that, it stays as the admin left it, also over upgrades. To stop sending reports:
+`hd-report.timer` runs `hd-report.service` 2 minutes after the boot and then every 15 minutes, with up to a minute of random delay. The service runs `hd-report` as root. The timer is enabled on the first installation, as Debian enables services, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it, also over upgrades. To stop sending reports:
 ```
 sudo systemctl disable --now hd-report.timer
 ```

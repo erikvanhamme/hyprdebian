@@ -27,8 +27,7 @@
 #                                             same path: the Num Lock
 #                                             drop-in of getty, the zram
 #                                             swap, the sysctls for it,
-#                                             the resolved config and the
-#                                             presets
+#                                             and the resolved config
 #                 /usr/share/man/man7/hd-base.7.gz
 #                 /usr/share/man/man1/hd-up.1.gz
 #                 /usr/share/man/man1/hd-reboot.1.gz

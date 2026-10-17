@@ -37,7 +37,6 @@ hd-base/usr/lib/systemd/system/getty@.service.d/numlock.conf
 hd-base/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf
 hd-base/usr/lib/sysctl.d/50-zram.conf
 hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
-hd-base/usr/lib/systemd/system-preset/00-ignore-all.preset
 hd-base/deb/postinst
 hd-base/deb/postrm
 hd-base/deb/control
@@ -126,15 +125,17 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | A swap in compressed RAM, `/dev/zram0`, of a quarter of the RAM, compressed with zstd, with priority 16384, so it is used before the swap on disk. |
 | `/usr/lib/sysctl.d/50-zram.conf` | `vm.swappiness` 180, as swapping to zram is cheaper than dropping the page cache, and `vm.page-cluster` 0, as reading ahead does not help with zram. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | systemd-resolved passes the queries straight to the name servers of the network: no stub resolver on 127.0.0.53, no cache, no LLMNR, no multicast DNS and no fallback servers. |
-| `/usr/lib/systemd/system-preset/00-ignore-all.preset` | Ignores every preset, so no service is enabled because a preset says so. |
 
 The files below `/usr/lib` are the defaults of the package: to change one, add a file of the same name, or a later one, in the same folder below `/etc`.
 
 The postinst of the package:
-- masks `systemd-firstboot.service`, the setup of the first boot, `systemd-preset-all.service`, which would enable every service by its preset, `systemd-machine-id-commit.service`, and `rpcbind.socket` and `rpcbind.service`, which `nfs-common` pulls in but HyprDebian does not use. It does this on the first installation, and on an upgrade from a version before 0.2, so a unit that the admin unmasks again stays unmasked on upgrades. A purge unmasks them;
+- masks `systemd-firstboot.service`, the setup of the first boot, and `rpcbind.socket` and `rpcbind.service`, which `nfs-common` pulls in but HyprDebian does not use. It does this on the first installation, and on an upgrade from a version before 0.2, so a unit that the admin unmasks again stays unmasked on upgrades. A purge unmasks them. An upgrade from a version before 1.1 unmasks `systemd-preset-all.service` and `systemd-machine-id-commit.service`, which those versions masked as well;
 - points `/etc/resolv.conf` at `/run/systemd/resolve/resolv.conf`, the name servers themselves, in place of `stub-resolv.conf`, as there is no stub resolver. It only replaces the link that systemd-resolved made;
 - diverts `/etc/issue` of base-files to `/etc/issue.debian` and runs `hd-issue`, see below, on every installation and upgrade. A removal of the package removes the banner of `hd-issue` and puts the one of base-files back;
 - empties `/etc/motd`, on the first installation like the masks, and diverts `/etc/update-motd.d/10-uname` of base-files to `10-uname.base-files`, which run-parts skips, as the banner already shows the kernel. A removal of the package puts it back. base-files only writes `/etc/motd` when it is missing.
+
+## Services
+Services are enabled on their installation as on Debian: a package that comes with a service enables it, unless a preset in `/usr/lib/systemd/system-preset` or `/etc/systemd/system-preset` says otherwise, see `man systemd.preset`. To keep a service from being enabled when its package is installed, add `disable <unit>` to a preset file below `/etc/systemd/system-preset`.
 
 ## Files
 | Path | Purpose |
@@ -152,5 +153,4 @@ The postinst of the package:
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |
 | `/usr/lib/sysctl.d/50-zram.conf` | The sysctls for the zram swap. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
-| `/usr/lib/systemd/system-preset/00-ignore-all.preset` | No presets. |
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man8/hd-issue.8.gz` | The man pages. |

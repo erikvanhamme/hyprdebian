@@ -6,7 +6,8 @@ writes the login banner in /etc/issue.
 The units are masked on the first installation only, or on an upgrade from a version before
 MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
 upgrades. deb-systemd-helper remembers that it masked them, so the postrm of a purge
-can unmask them again.
+can unmask them again. Versions before UNMASKED_SINCE also masked the units in UNMASKED; an
+upgrade from such a version unmasks them.
 
 The resolved config of hd-base turns off the stub resolver on 127.0.0.53, which the link that
 systemd-resolved makes points at. The link is replaced with one to the file with the name servers
@@ -27,19 +28,25 @@ import os
 import subprocess
 import sys
 
-# The units that HyprDebian masks: the first boot setup, the presets, which would enable every
-# service, the commit of the machine-id, which is rotated on every shutdown, and rpcbind, which
-# nfs-common pulls in but which is not used.
+# The units that HyprDebian masks: the first boot setup, and rpcbind, which nfs-common pulls in
+# but which is not used.
 MASKED = [
     "systemd-firstboot.service",
-    "systemd-preset-all.service",
-    "systemd-machine-id-commit.service",
     "rpcbind.socket",
     "rpcbind.service",
 ]
 
 # The first version of hd-base that masks the units.
 MASKED_SINCE = "0.2"
+
+# The units that versions before UNMASKED_SINCE masked as well: systemd-preset-all.service, which
+# systemd does not have, and the commit of the machine ID, with which systemd keeps
+# /etc/machine-id.
+UNMASKED = [
+    "systemd-preset-all.service",
+    "systemd-machine-id-commit.service",
+]
+UNMASKED_SINCE = "1.1"
 
 MOTD = "/etc/motd"
 UNAME = "/etc/update-motd.d/10-uname"
@@ -56,6 +63,12 @@ def mask_units():
     for unit in MASKED:
         subprocess.run(["deb-systemd-helper", "mask", unit], check=True)
         print(f"Masked {unit}.")
+
+
+def unmask_units():
+    for unit in UNMASKED:
+        subprocess.run(["deb-systemd-helper", "unmask", unit], check=True)
+        print(f"Unmasked {unit}.")
 
 
 def divert(path, diverted):
@@ -103,6 +116,8 @@ def main():
     if previous == "" or older_than(previous, MASKED_SINCE):
         mask_units()
         empty_motd()
+    if previous != "" and older_than(previous, UNMASKED_SINCE):
+        unmask_units()
     link_resolv_conf()
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)

@@ -28,8 +28,8 @@ Description: HyprDebian base system
  and fzf, a git config with delta, and a nano config. It adds ~/.local/bin to
  the PATH, keeps ifupdown, os-prober and turnstile from being installed, and
  turns Num Lock on at the console login. It sets up the zram swap, the
- resolver without a stub, and no presets, masks the units HyprDebian does not
- use, and points /etc/resolv.conf at the name servers of systemd-resolved.
+ resolver without a stub, masks the units HyprDebian does not use, and
+ points /etc/resolv.conf at the name servers of systemd-resolved.
  After a login it shows the HyprDebian banner and the state of the system:
  the pools, the RAID arrays and the failed units. Above the login prompt it
  shows the version, the type of the installation and the suite, written in

@@ -18,7 +18,7 @@ cd hd-dashboard
 make deb
 ```
 
-This builds `build/hd-dashboard_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`; the dashboard needs nothing beyond Python itself. Install it with:
+This builds `build/hd-dashboard_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`; the dashboard needs nothing beyond Python itself. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-dashboard.service` by hand after installing it: `sudo systemctl enable --now hd-dashboard.service`. Install it with:
 ```
 sudo apt install ./build/hd-dashboard_<version>_all.deb
 ```
@@ -42,7 +42,7 @@ hd-dashboard/tests/test_dashboard.py
 ## The service
 `hd-dashboard.service` runs `hd-dashboard serve`. It runs as a user that systemd makes up (`DynamicUser`), which may bind to port 80 without being root, and may only write its state directory, `/var/lib/hd-dashboard`. systemd keeps that directory in `/var/lib/private/hd-dashboard`, which only root can open.
 
-The service is enabled on the first installation; after that, it stays as the admin left it, also over upgrades. An upgrade restarts it when it is enabled. Its log is in the journal; only refused reports and errors get a line there:
+The service is enabled on the first installation, as Debian enables services, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it, also over upgrades. An upgrade restarts it when it is enabled. Its log is in the journal; only refused reports and errors get a line there:
 ```
 journalctl -u hd-dashboard.service
 ```

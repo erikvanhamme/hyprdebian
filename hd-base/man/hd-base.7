@@ -96,19 +96,23 @@ Has
 pass the queries straight to the name servers of the network: no stub
 resolver on 127.0.0.53, no cache, no LLMNR, no multicast DNS and no fallback
 servers.
-.TP
-.I /usr/lib/systemd/system\-preset/00\-ignore\-all.preset
-Ignores every preset, so no service is enabled because a preset says so.
+.PP
+Services are enabled on their installation as on Debian, by their presets,
+see
+.BR systemd.preset (5).
 .PP
 The postinst masks
 .BR systemd-firstboot.service ,
-.BR systemd-preset-all.service ,
-.BR systemd-machine-id-commit.service ,
 .B rpcbind.socket
 and
 .B rpcbind.service
 on the first installation; a unit that the admin unmasks again stays
 unmasked on upgrades, and a purge unmasks them.
+An upgrade from a version before 1.1 unmasks
+.B systemd-preset-all.service
+and
+.BR systemd-machine-id-commit.service ,
+which those versions masked as well.
 It also points
 .I /etc/resolv.conf
 at
@@ -272,9 +276,6 @@ The sysctls for the zram swap.
 .TP
 .I /usr/lib/systemd/resolved.conf.d/00\-direct\-uplink.conf
 The config of systemd-resolved.
-.TP
-.I /usr/lib/systemd/system\-preset/00\-ignore\-all.preset
-No presets.
 .SH SEE ALSO
 .BR hd-up (1),
 .BR hd-reboot (1),
