@@ -1,0 +1,116 @@
+#!/usr/bin/python3
+"""Adds, changes and removes wired and wifi interfaces in the hyprdebian network settings.
+
+The package hd-network installs this as /usr/sbin/hd-network-iface.
+
+    hd-network-iface list                     list the interfaces
+    hd-network-iface show <name>              show the settings of an interface
+    hd-network-iface set <name> [options]     add an interface or change its settings
+    hd-network-iface remove <name>            remove an interface
+
+The settings are the key hd-network in /etc/hyprdebian/config.json. This reads all of them,
+changes the interface, checks the result and writes it with hd-config-update. It does not
+change the network itself: run hd-network-render for that. set and remove are run as root.
+"""
+
+import argparse
+import json
+import sys
+
+LIB_DIR = "/usr/lib/hd-network"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_network as hn
+
+UNSET_FIELDS = ["addresses", "bridge", "dhcp", "dns", "gateway", "metric"]
+
+
+def cmd_list(settings, args):
+    checked = hn.check_settings(settings)
+    rows = []
+    for name, interface in checked["interfaces"].items():
+        if interface["bridge"] is not None:
+            rows.append((name, f"port of {interface['bridge']}"))
+        else:
+            rows.append((name, hn.describe_addressing(interface)))
+    hn.print_table(rows)
+
+
+def cmd_show(settings, args):
+    interfaces = settings.get("interfaces", {})
+    if args.name not in interfaces:
+        hn.fail(f"{args.name} is not in {hn.CONFIG_KEY}.interfaces.")
+    print(json.dumps(interfaces[args.name], indent=4))
+
+
+def cmd_set(settings, args):
+    hn.require_root()
+    if args.bridge is not None and hn.address_options_given(args):
+        hn.fail("--bridge cannot be combined with address options: a port has no addresses.")
+
+    interfaces = settings.setdefault("interfaces", {})
+    entry = dict(interfaces.get(args.name, {}))
+    for field in args.unset or []:
+        entry.pop(field, None)
+    if args.bridge is not None:
+        entry = {"bridge": args.bridge}
+    elif hn.address_options_given(args):
+        if "bridge" in entry:
+            hn.fail(f"{args.name} is a port of {entry['bridge']}; add --unset bridge to give "
+                    "it addresses of its own.")
+        hn.apply_address_options(entry, args)
+
+    if interfaces.get(args.name) == entry:
+        print(f"{args.name} is unchanged.")
+        return
+    interfaces[args.name] = entry
+    hn.check_settings(settings)
+    hn.save_settings(settings)
+    print(f"{args.name} is set. Run hd-network-render to apply it.")
+
+
+def cmd_remove(settings, args):
+    hn.require_root()
+    interfaces = settings.get("interfaces", {})
+    if args.name not in interfaces:
+        hn.fail(f"{args.name} is not in {hn.CONFIG_KEY}.interfaces.")
+    del interfaces[args.name]
+    hn.check_settings(settings)
+    hn.save_settings(settings)
+    print(f"{args.name} is removed. Run hd-network-render to apply it.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Add, change and remove wired and wifi interfaces in the key "
+        f"{hn.CONFIG_KEY} in {hn.CONFIG_FILE}. Run hd-network-render to apply the changes.")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    commands.add_parser("list", help="list the interfaces")
+
+    show = commands.add_parser("show", help="show the settings of an interface")
+    show.add_argument("name", help="the interface name or glob")
+
+    set_ = commands.add_parser(
+        "set", help="add an interface or change its settings",
+        description="Add an interface or change its settings. Settings that are not given "
+        "stay as they are; a new interface without options uses DHCP.")
+    set_.add_argument("name", help="the interface name, as in enp3s0, or a glob, as in en*")
+    set_.add_argument("--bridge", metavar="BRIDGE",
+                      help="make the interface a port of this bridge, without addresses")
+    hn.add_address_options(set_)
+    set_.add_argument("--unset", action="append", choices=UNSET_FIELDS,
+                      help="return a setting to its default before the other options are "
+                      "applied; may be given more than once")
+
+    remove = commands.add_parser("remove", help="remove an interface")
+    remove.add_argument("name", help="the interface name or glob")
+
+    args = parser.parse_args()
+    settings = hn.load_settings()
+    {"list": cmd_list, "show": cmd_show, "set": cmd_set, "remove": cmd_remove}[args.command](
+        settings, args)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,149 @@
+#!/usr/bin/python3
+"""Renders the systemd-networkd files from the hyprdebian configuration.
+
+The package hd-network installs this as /usr/sbin/hd-network-render.
+
+    hd-network-render             write the files and reload systemd-networkd
+    hd-network-render --dry-run   show what would change, change nothing
+
+The settings are the key hd-network in /etc/hyprdebian/config.json. The files are made from the
+jinja2 templates in /usr/share/hd-network/templates and written to /etc/systemd/network. Every
+file starts with the template header.j2; a file with that header that the settings no longer ask
+for is removed. Other files in /etc/systemd/network are left alone. Run it as root.
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+
+import jinja2
+
+LIB_DIR = "/usr/lib/hd-network"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_network as hn
+
+TEMPLATE_DIR = "/usr/share/hd-network/templates"
+NETWORK_DIR = "/etc/systemd/network"
+WAIT_ONLINE = "systemd-networkd-wait-online.service"
+WAIT_ONLINE_MASK = os.path.join("/etc/systemd/system", WAIT_ONLINE)
+
+TEMPLATES = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+                               undefined=jinja2.StrictUndefined, keep_trailing_newline=True,
+                               trim_blocks=True, lstrip_blocks=True)
+
+
+def template(file, **values):
+    return TEMPLATES.get_template(file).render(**values)
+
+
+# Returns the files to write, by name.
+def render(checked):
+    files = {}
+    for name, bridge in checked["bridges"].items():
+        files[f"30-{name}.netdev"] = template("bridge.netdev.j2", name=name, mac=bridge["mac"])
+        addressing = {k: v for k, v in bridge.items() if k != "mac"}
+        files[f"40-{name}.network"] = template("interface.network.j2", name=name, bridge=None,
+                                               **addressing)
+    for name, interface in checked["interfaces"].items():
+        files[hn.interface_file(name)] = template("interface.network.j2", name=name,
+                                                  **interface)
+    return files
+
+
+def generated_files(header):
+    found = set()
+    for name in os.listdir(NETWORK_DIR):
+        path = os.path.join(NETWORK_DIR, name)
+        if not os.path.isfile(path) or os.path.islink(path):
+            continue
+        with open(path, encoding="utf-8", errors="replace") as f:
+            if f.read(len(header)) == header:
+                found.add(name)
+    return found
+
+
+def read_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+
+def write_file(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def wait_online_masked():
+    return os.path.islink(WAIT_ONLINE_MASK) and os.readlink(WAIT_ONLINE_MASK) == "/dev/null"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Render the systemd-networkd files in {NETWORK_DIR} from the key "
+        f"{hn.CONFIG_KEY} in {hn.CONFIG_FILE}.")
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        help="show what would change, change nothing")
+    args = parser.parse_args()
+    hn.require_root()
+
+    settings = hn.load_settings()
+    checked = hn.check_settings(settings)
+    # The MAC address of a bridge is kept in the settings, so it never changes, also not with
+    # the machine-id. hd-network-bridge sets it; a bridge added by hand gets one here.
+    new_mac = False
+    for name, bridge in checked["bridges"].items():
+        if bridge["mac"] is None:
+            bridge["mac"] = hn.random_mac()
+            settings["bridges"][name]["mac"] = bridge["mac"]
+            new_mac = True
+
+    files = render(checked)
+    os.makedirs(NETWORK_DIR, mode=0o755, exist_ok=True)
+    stale = sorted(generated_files(template("header.j2")) - set(files))
+    changed = sorted(n for n, t in files.items()
+                     if read_file(os.path.join(NETWORK_DIR, n)) != t)
+    wait_online = checked["wait_online"]
+    toggle_wait_online = wait_online is not None and wait_online == wait_online_masked()
+
+    if args.dry_run:
+        if new_mac:
+            print(f"Would store new bridge MAC addresses in {hn.CONFIG_FILE}.")
+        for name in changed:
+            print(f"Would write {os.path.join(NETWORK_DIR, name)}:")
+            print(files[name])
+        for name in stale:
+            print(f"Would remove {os.path.join(NETWORK_DIR, name)}.")
+        if toggle_wait_online:
+            action = "unmask" if wait_online else "mask"
+            print(f"Would {action} {WAIT_ONLINE}.")
+        return
+
+    # The new MAC addresses are stored before they are used, so they survive a failure below.
+    if new_mac:
+        hn.save_settings(settings)
+    for name in changed:
+        print(f"Writing {os.path.join(NETWORK_DIR, name)}", flush=True)
+        write_file(os.path.join(NETWORK_DIR, name), files[name])
+    for name in stale:
+        print(f"Removing {os.path.join(NETWORK_DIR, name)}", flush=True)
+        os.remove(os.path.join(NETWORK_DIR, name))
+    if toggle_wait_online:
+        action = "unmask" if wait_online else "mask"
+        subprocess.run(["systemctl", action, WAIT_ONLINE], check=True)
+
+    # When networkd does not run, as in a chroot, it reads the files when it starts.
+    if changed or stale:
+        running = subprocess.run(["systemctl", "is-active", "--quiet", "systemd-networkd"])
+        if running.returncode == 0:
+            subprocess.run(["networkctl", "reload"], check=True)
+
+
+if __name__ == "__main__":
+    main()

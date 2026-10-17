@@ -1,0 +1,121 @@
+.TH HD-NETWORK-RENDER 8 "October 2026" "hd-network" "HyprDebian"
+.SH NAME
+hd-network-render \- render the systemd-networkd files from the hyprdebian configuration
+.SH SYNOPSIS
+.B hd-network-render
+.RB [ \-n ]
+.SH DESCRIPTION
+.B hd-network-render
+reads the key
+.B hd-network
+in
+.I /etc/hyprdebian/config.json
+and renders the
+.BR systemd-networkd (8)
+files in
+.I /etc/systemd/network
+from the jinja2 templates in
+.IR /usr/share/hd-network/templates .
+See
+.BR hd-network (7)
+for the settings.
+.PP
+Run it as root, after changing the settings with
+.BR hd-network-iface (8)
+or
+.BR hd-network-bridge (8).
+.SH OPERATION
+.IP 1. 4
+The settings are checked first.
+An error stops the run before anything changes.
+.IP 2. 4
+A bridge without a MAC address gets a random one, which is stored in the
+settings with
+.BR hd-config-update (8).
+.IP 3. 4
+The files are written:
+.RS
+.TP
+.I 30-<bridge>.netdev
+makes the bridge, with its MAC address;
+.TP
+.I 40-<bridge>.network
+the addresses of the bridge;
+.TP
+.I 50-<interface>.network
+an interface with an exact name: its addresses, or the bridge it is a
+port of;
+.TP
+.I 59-<glob>.network
+an interface named by a glob, with the characters other than letters,
+digits,
+.BR . ,
+.B _
+and
+.B \-
+replaced by
+.BR _ .
+.RE
+.IP
+Only files whose content changes are written.
+.IP 4. 4
+Every file starts with a header that says it was generated.
+A file in
+.I /etc/systemd/network
+with that header that the settings no longer ask for is removed.
+Files without the header are left alone.
+.IP 5. 4
+When
+.B wait_online
+is set,
+.B systemd-networkd-wait-online.service
+is masked or unmasked to match.
+.IP 6. 4
+When files changed and systemd-networkd runs, it is reloaded with
+.BR "networkctl reload" .
+.PP
+A reload applies new and changed
+.I .network
+files, but does not change a bridge that already exists, such as its MAC
+address; that takes a reboot, or
+.B networkctl delete
+of the bridge followed by another reload.
+.SH OPTIONS
+.TP
+.BR \-n ", " \-\-dry\-run
+Show the files that would be written and removed, and what would happen to
+the wait-online service, and change nothing.
+A bridge without a MAC address shows a random one that is not stored.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when the files were rendered, 1 on an error, 2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration.
+.TP
+.I /etc/systemd/network
+Where the files are rendered.
+.TP
+.I /usr/share/hd-network/templates
+The jinja2 templates.
+.SH EXAMPLES
+See what a change of the settings would do, then apply it:
+.PP
+.RS
+.nf
+hd-network-render \-\-dry\-run
+hd-network-render
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-network (7),
+.BR hd-network-iface (8),
+.BR hd-network-bridge (8),
+.BR hd-config-update (8),
+.BR networkctl (1),
+.BR systemd.network (5)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

@@ -1,0 +1,203 @@
+.TH HD-NETWORK 7 "October 2026" "hd-network" "HyprDebian"
+.SH NAME
+hd-network \- the hyprdebian network configuration
+.SH DESCRIPTION
+The package
+.B hd-network
+renders the
+.BR systemd-networkd (8)
+files in
+.I /etc/systemd/network
+from the key
+.B hd-network
+in the hyprdebian configuration,
+.IR /etc/hyprdebian/config.json ,
+with
+.BR hd-network-render (8).
+The settings are changed with
+.BR hd-network-iface (8)
+for wired and wifi interfaces and
+.BR hd-network-bridge (8)
+for bridges.
+They read the settings, check the change and write the result with
+.BR hd-config-update (8);
+see
+.BR hd-config (7).
+.PP
+Installing the package configures nothing: it does not set the key, and it
+does not run
+.BR hd-network-render .
+.PP
+The package also installs
+.I /usr/lib/systemd/network/10-ethernet.link
+and
+.IR 20-wifi.link ,
+which name ethernet and wifi interfaces by their path, such as
+.B enp3s0
+and
+.BR wlp2s0 ,
+and give them a persistent MAC address.
+A file with the same name in
+.I /etc/systemd/network
+takes their place.
+.SH SETTINGS
+The key
+.B hd-network
+holds a JSON object with these fields, all optional:
+.TP
+.B interfaces
+An object that maps interface names to their settings.
+The name may be a glob, such as
+.BR en* ;
+an interface whose exact name is listed uses its own settings, not those
+of a glob.
+Interfaces that are not listed are left alone by systemd-networkd.
+.TP
+.B bridges
+An object that maps bridge names to their settings.
+.TP
+.B wait_online
+.B false
+masks
+.BR systemd-networkd-wait-online.service ,
+so the boot does not wait for the network;
+.B true
+unmasks it.
+Left out, the service is left as it is.
+.PP
+An interface with the field
+.B bridge
+is a port of that bridge, which must be in
+.BR bridges .
+It has no other fields and no addresses of its own.
+A wifi interface, one whose name starts with
+.BR wl ,
+cannot be a port.
+.PP
+Every other interface, and every bridge, has these fields, all optional:
+.TP
+.B dhcp
+.B true
+(the default) gets addresses with DHCPv4 and with IPv6 router
+advertisements and DHCPv6, and uses the search domains they hand out.
+.B false
+turns all three off.
+.TP
+.B addresses
+Static addresses with their prefix length, IPv4 and IPv6 mixed, such as
+.BR 192.168.1.10/24 .
+A string or a list.
+They may be combined with DHCP.
+.TP
+.B gateway
+The default gateway, or a list with one for IPv4 and one for IPv6.
+.TP
+.B dns
+DNS servers, a string or a list.
+.TP
+.B metric
+The metric of the routes, from DHCP and to the gateways.
+The default is 100; the route with the lowest metric wins, so give wifi a
+higher one than ethernet.
+.PP
+A bridge also has the field
+.BR mac ,
+its MAC address.
+.B hd-network-bridge
+gives a new bridge a random, locally administered address, and
+.B hd-network-render
+does the same for a bridge without one.
+The address is stored in the settings, so it never changes, also not when
+the machine-id changes.
+.PP
+Unknown fields are errors, so typing mistakes are caught.
+.SH EXAMPLES
+DHCP on every ethernet interface, and on the wifi interface with a higher
+metric:
+.PP
+.RS
+.nf
+hd-network-iface set 'en*'
+hd-network-iface set wlp2s0 \-\-metric 200
+hd-network-render
+.fi
+.RE
+.PP
+This gives these settings:
+.PP
+.RS
+.nf
+{
+    "interfaces": {
+        "en*": {},
+        "wlp2s0": { "metric": 200 }
+    }
+}
+.fi
+.RE
+.PP
+A bridge for virtual machines, with enp3s0 as its port and DHCP on the
+bridge:
+.PP
+.RS
+.nf
+hd-network-bridge set br0
+hd-network-iface set enp3s0 \-\-bridge br0
+.fi
+.RE
+.PP
+which gives:
+.PP
+.RS
+.nf
+{
+    "interfaces": {
+        "enp3s0": { "bridge": "br0" }
+    },
+    "bridges": {
+        "br0": { "mac": "52:54:00:3a:1f:c2" }
+    }
+}
+.fi
+.RE
+.PP
+A static address:
+.PP
+.RS
+.nf
+hd-network-iface set enp3s0 \-\-no\-dhcp \e
+    \-\-address 192.168.1.10/24 \-\-address fd00::10/64 \e
+    \-\-gateway 192.168.1.1 \-\-gateway fd00::1 \-\-dns 192.168.1.1
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The configuration, with the settings under the key
+.BR hd-network .
+.TP
+.I /etc/systemd/network
+Where the files are rendered.
+.TP
+.I /usr/share/hd-network/templates
+The jinja2 templates the files are made from.
+.TP
+.I /usr/lib/hd-network/hd_network.py
+The code that hd-network-render, hd-network-iface and hd-network-bridge
+share: reading, checking and writing the settings.
+.TP
+.I /usr/lib/systemd/network/10-ethernet.link
+.TQ
+.I /usr/lib/systemd/network/20-wifi.link
+Name ethernet and wifi interfaces by their path.
+.SH SEE ALSO
+.BR hd-network-iface (8),
+.BR hd-network-bridge (8),
+.BR hd-network-render (8),
+.BR hd-config (7),
+.BR hd-config-update (8),
+.BR systemd.network (5),
+.BR systemd.netdev (5),
+.BR systemd.link (5)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

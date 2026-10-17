@@ -1,0 +1,36 @@
+{% include "header.j2" %}
+[Match]
+Name={{ name }}
+
+[Network]
+{% if bridge %}
+Bridge={{ bridge }}
+{% else %}
+DHCP={{ "yes" if dhcp else "no" }}
+IPv6AcceptRA={{ "yes" if dhcp else "no" }}
+{% for address in addresses %}
+Address={{ address }}
+{% endfor %}
+{% for server in dns %}
+DNS={{ server }}
+{% endfor %}
+{% if dhcp %}
+
+[DHCPv4]
+RouteMetric={{ metric }}
+UseDomains=true
+
+[DHCPv6]
+UseDomains=true
+
+[IPv6AcceptRA]
+RouteMetric={{ metric }}
+UseDomains=true
+{% endif %}
+{% for gateway in gateways %}
+
+[Route]
+Gateway={{ gateway }}
+Metric={{ metric }}
+{% endfor %}
+{% endif %}

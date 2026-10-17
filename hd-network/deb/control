@@ -1,0 +1,19 @@
+Package: hd-network
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, python3-jinja2, systemd, hd-config
+Section: admin
+Priority: optional
+Description: HyprDebian network configuration
+ Renders the systemd-networkd files in /etc/systemd/network from the key
+ hd-network in the hyprdebian configuration, /etc/hyprdebian/config.json:
+ interfaces with DHCP or static addresses, bridges with a fixed MAC address
+ and their ports, and whether the boot waits for the network.
+ .
+ hd-network-iface and hd-network-bridge add, change and remove interfaces
+ and bridges in the settings, which they write with hd-config-update.
+ hd-network-render writes the files and reloads systemd-networkd. The
+ package also names ethernet and wifi interfaces by their path, with a
+ persistent MAC address. Installing it configures nothing.

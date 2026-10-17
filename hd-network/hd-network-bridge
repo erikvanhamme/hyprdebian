@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+"""Adds, changes and removes bridges in the hyprdebian network settings.
+
+The package hd-network installs this as /usr/sbin/hd-network-bridge.
+
+    hd-network-bridge list                    list the bridges
+    hd-network-bridge show <name>             show the settings of a bridge
+    hd-network-bridge set <name> [options]    add a bridge or change its settings
+    hd-network-bridge remove <name>           remove a bridge without ports
+
+The settings are the key hd-network in /etc/hyprdebian/config.json. This reads all of them,
+changes the bridge, checks the result and writes it with hd-config-update. A new bridge gets a
+random MAC address, kept in the settings. Ports are added with hd-network-iface set <interface>
+--bridge <name>. It does not change the network itself: run hd-network-render for that. set
+and remove are run as root.
+"""
+
+import argparse
+import json
+import sys
+
+LIB_DIR = "/usr/lib/hd-network"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_network as hn
+
+UNSET_FIELDS = ["addresses", "dhcp", "dns", "gateway", "metric"]
+
+
+def ports(settings, bridge):
+    return [name for name, entry in settings.get("interfaces", {}).items()
+            if entry.get("bridge") == bridge]
+
+
+def cmd_list(settings, args):
+    checked = hn.check_settings(settings)
+    rows = []
+    for name, bridge in checked["bridges"].items():
+        addressing = {k: v for k, v in bridge.items() if k != "mac"}
+        text = f"mac {bridge['mac'] or 'not set yet'}; ports "
+        text += ", ".join(ports(settings, name)) or "none"
+        rows.append((name, f"{text}; {hn.describe_addressing(addressing)}"))
+    hn.print_table(rows)
+
+
+def cmd_show(settings, args):
+    bridges = settings.get("bridges", {})
+    if args.name not in bridges:
+        hn.fail(f"{args.name} is not in {hn.CONFIG_KEY}.bridges.")
+    print(json.dumps(bridges[args.name], indent=4))
+
+
+def cmd_set(settings, args):
+    hn.require_root()
+    bridges = settings.setdefault("bridges", {})
+    entry = dict(bridges.get(args.name, {}))
+    for field in args.unset or []:
+        entry.pop(field, None)
+    hn.apply_address_options(entry, args)
+    if args.mac is not None:
+        entry["mac"] = args.mac.lower()
+    # The MAC address is fixed when the bridge is added, so it never changes, also not with
+    # the machine-id.
+    if "mac" not in entry:
+        entry["mac"] = hn.random_mac()
+
+    if bridges.get(args.name) == entry:
+        print(f"{args.name} is unchanged.")
+        return
+    bridges[args.name] = entry
+    hn.check_settings(settings)
+    hn.save_settings(settings)
+    print(f"{args.name} is set. Run hd-network-render to apply it.")
+
+
+def cmd_remove(settings, args):
+    hn.require_root()
+    bridges = settings.get("bridges", {})
+    if args.name not in bridges:
+        hn.fail(f"{args.name} is not in {hn.CONFIG_KEY}.bridges.")
+    used_by = ports(settings, args.name)
+    if used_by:
+        hn.fail(f"{args.name} still has the ports {', '.join(used_by)}; remove them or change "
+                "them with hd-network-iface first.")
+    del bridges[args.name]
+    hn.check_settings(settings)
+    hn.save_settings(settings)
+    print(f"{args.name} is removed. Run hd-network-render to apply it.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Add, change and remove bridges in the key {hn.CONFIG_KEY} in "
+        f"{hn.CONFIG_FILE}. Run hd-network-render to apply the changes.")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    commands.add_parser("list", help="list the bridges")
+
+    show = commands.add_parser("show", help="show the settings of a bridge")
+    show.add_argument("name", help="the bridge name")
+
+    set_ = commands.add_parser(
+        "set", help="add a bridge or change its settings",
+        description="Add a bridge or change its settings. Settings that are not given stay as "
+        "they are; a new bridge without options uses DHCP and gets a random MAC address. Add "
+        "ports with hd-network-iface set <interface> --bridge <name>.")
+    set_.add_argument("name", help="the bridge name, as in br0")
+    set_.add_argument("--mac", metavar="MAC",
+                      help="the MAC address of the bridge, as in 52:54:00:12:34:56")
+    hn.add_address_options(set_)
+    set_.add_argument("--unset", action="append", choices=UNSET_FIELDS,
+                      help="return a setting to its default before the other options are "
+                      "applied; may be given more than once")
+
+    remove = commands.add_parser("remove", help="remove a bridge without ports")
+    remove.add_argument("name", help="the bridge name")
+
+    args = parser.parse_args()
+    settings = hn.load_settings()
+    {"list": cmd_list, "show": cmd_show, "set": cmd_set, "remove": cmd_remove}[args.command](
+        settings, args)
+
+
+if __name__ == "__main__":
+    main()

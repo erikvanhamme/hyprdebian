@@ -1,0 +1,6 @@
+[Match]
+Type=wlan
+
+[Link]
+NamePolicy=path
+MACAddressPolicy=persistent
