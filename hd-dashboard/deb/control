@@ -1,0 +1,20 @@
+Package: hd-dashboard
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, systemd, hd-config
+Section: admin
+Priority: optional
+Description: HyprDebian dashboard
+ Shows the state of every hyprdebian system on one page. Each system POSTs a
+ status report over HTTP every 15 minutes; the dashboard keeps the latest
+ report of every system and a history of the load, the memory and the fullest
+ pool, and judges each system on its last report: failed units, full or
+ unhealthy pools, degraded arrays, failed timers, pending reboots and missing
+ upgrades.
+ .
+ hd-dashboard.service runs it on port 80, as a user that systemd makes up,
+ with the database in /var/lib/hd-dashboard. The settings are the key
+ hd-dashboard in /etc/hyprdebian/config.json. Installing the package starts
+ the service; opening its port in the firewall is left to the admin.

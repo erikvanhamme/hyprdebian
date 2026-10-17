@@ -1,0 +1,106 @@
+.TH HD-DASHBOARD 8 "October 2026" "hd-dashboard" "HyprDebian"
+.SH NAME
+hd-dashboard \- run the hyprdebian dashboard, list and forget its hosts
+.SH SYNOPSIS
+.B hd-dashboard
+.RB [ \-\-config
+.IR file ]
+.RB [ \-\-database
+.IR file ]
+.B serve
+.br
+.B hd-dashboard
+.RB [ \-\-config
+.IR file ]
+.RB [ \-\-database
+.IR file ]
+.B hosts
+.br
+.B hd-dashboard
+.RB [ \-\-config
+.IR file ]
+.RB [ \-\-database
+.IR file ]
+.B forget
+.I host
+.SH DESCRIPTION
+.B hd-dashboard
+is the hyprdebian dashboard, see
+.BR hd-dashboard (7).
+.TP
+.B serve
+Runs the dashboard, as
+.B hd-dashboard.service
+does, on the address and port in the settings.
+It makes the database when it does not exist yet.
+.TP
+.B hosts
+Lists the systems with their level, HyprDebian version and address, and when
+they last reported.
+.TP
+.B forget \fIhost\fR
+Removes a system, its token and its history, so that its next report
+registers a new token.
+.PP
+Run
+.B hosts
+and
+.B forget
+as root: the database is in
+.IR /var/lib/private ,
+which only root can open.
+They do not make the database; the service makes it on its first start.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.BI \-\-config\  file
+Read the settings from
+.I file
+in place of
+.IR /etc/hyprdebian/config.json .
+.TP
+.BI \-\-database\  file
+Use the database
+.I file
+in place of
+.IR /var/lib/hd-dashboard/dashboard.db .
+.SH EXIT STATUS
+0 on success, 1 on an error, such as a setting of the wrong type, a missing
+database or an unknown host, 2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The settings, in the key
+.BR hd-dashboard .
+.TP
+.I /usr/share/hd-dashboard/defaults.json
+The default settings.
+.TP
+.I /var/lib/hd-dashboard/dashboard.db
+The database.
+.SH EXAMPLES
+List the systems:
+.PP
+.RS
+sudo hd-dashboard hosts
+.RE
+.PP
+Let a reinstalled system register its new token:
+.PP
+.RS
+sudo hd-dashboard forget box
+.RE
+.PP
+Try the dashboard without installing it:
+.PP
+.RS
+.nf
+echo '{"hd-dashboard": {"listen": "127.0.0.1", "port": 18080}}' > /tmp/dashboard.json
+hd-dashboard \-\-config /tmp/dashboard.json \-\-database /tmp/dashboard.db serve
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-dashboard (7),
+.BR hd-config-update (8)

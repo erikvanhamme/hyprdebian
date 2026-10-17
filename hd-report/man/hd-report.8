@@ -1,0 +1,113 @@
+.TH HD-REPORT 8 "October 2026" "hd-report" "HyprDebian"
+.SH NAME
+hd-report \- send the state of the system to the hyprdebian dashboard
+.SH SYNOPSIS
+.B hd-report
+.RB [ \-\-print ]
+.SH DESCRIPTION
+.B hd-report
+collects the state of the system and POSTs it as a JSON report to the
+hyprdebian dashboard, see
+.BR hd-dashboard (7).
+The system only makes outgoing connections.
+.PP
+.B hd-report.timer
+runs it through
+.B hd-report.service
+2 minutes after the boot and then every 15 minutes, with up to a minute of
+random delay.
+The package enables the timer on its first installation; after that, it stays
+as the admin left it.
+When the dashboard cannot be reached or refuses the report, the service fails
+and the error is in its journal:
+.PP
+.RS
+journalctl \-u hd-report.service
+.RE
+.PP
+Run it as root: the token is only readable by root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.B \-\-print
+Only print the report, without sending it.
+.SH SETTINGS
+The settings are the key
+.B hd-report
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+A setting that is missing has its default value, from
+.IR /usr/share/hd-report/defaults.json .
+.TP
+.B url
+The URL of the dashboard, with
+.B http://
+or
+.BR https:// ;
+the report goes to
+.IR <url>/report .
+The default is
+.BR http://dash.rsq\-online.ddns.net/ .
+.PP
+For example:
+.PP
+.RS
+sudo hd-config-update hd-report '{"url": "http://dash.example/"}'
+.RE
+.SH TOKEN
+The token of the system is in
+.IR /etc/hyprdebian/hd-report/token ,
+mode 0600.
+The installation generates it when there is none, and never replaces it:
+the dashboard accepts the first token it sees for a host name, and only that
+token afterwards.
+A purge of the package keeps it too.
+When the token is lost, as on a reinstalled system, forget the host on the
+dashboard with
+.BR "hd-dashboard forget" ,
+and the next report registers the new token.
+.SH THE REPORT
+The host name, the FQDN, the version of HyprDebian from
+.IR /etc/hyprdebian/version.json ,
+the type of the installation from the key
+.B hd-installer
+of the configuration, the suite of the HyprDebian packages, the Debian
+version, the running and the newest installed kernel, the boot time, the
+load, the CPUs, the memory and the swap, the ZFS pools, the mdadm arrays, the
+state of systemd and the failed units, the upgradable packages from the
+package lists apt has now, the last apt run and the last upgrade, a pending
+reboot, the newest
+.B hd-up
+snapshot of
+.IR rpool/hyprdebian ,
+and the enabled timers in
+.I /etc/systemd/system
+and the
+.B hd-*
+timers of the packages, with the result of their last run.
+.SH EXIT STATUS
+0 when the report was sent or printed, 1 on an error, 2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The settings, in the key
+.BR hd-report .
+.TP
+.I /usr/share/hd-report/defaults.json
+The default settings.
+.TP
+.I /etc/hyprdebian/hd-report/token
+The token of the system.
+.TP
+.I /usr/lib/systemd/system/hd-report.timer
+.TQ
+.I /usr/lib/systemd/system/hd-report.service
+Run hd-report every 15 minutes.
+.SH SEE ALSO
+.BR hd-dashboard (7),
+.BR hd-config-update (8),
+.BR hd-up (1)

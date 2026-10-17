@@ -5,18 +5,22 @@
 #   make <package>  build one package directory: make deb in it, then copy
 #                   the packages it built to packages/, each in place of
 #                   older versions of that package
+#   make test       run make test in every package directory in TESTS
 #   make clean      remove packages/ and run make clean in every package
 #                   directory
 #
 # Each package is a directory with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
 # more named <name>_<version>_<arch>.deb, and clean. Add every new package
-# directory to PACKAGES.
+# directory to PACKAGES, and to TESTS when its Makefile also has the target
+# test, which runs the tests of the package.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-base hd-installer
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-dashboard hd-report hd-base hd-installer
+# The package directories with tests.
+TESTS := hd-dashboard hd-report
 OUT := packages
 
-.PHONY: all clean $(PACKAGES)
+.PHONY: all test clean $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -30,6 +34,11 @@ $(PACKAGES): | $(OUT)
 		rm -f $(OUT)/$${name%%_*}_*.deb; \
 		install -m 0644 $@/$$deb $(OUT)/; \
 	done
+
+test: $(addprefix test-,$(TESTS))
+
+$(addprefix test-,$(TESTS)):
+	$(MAKE) -C $(@:test-%=%) test
 
 clean:
 	rm -rf $(OUT)

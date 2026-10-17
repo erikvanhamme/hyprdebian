@@ -1,0 +1,22 @@
+[Unit]
+Description=HyprDebian Dashboard
+Documentation=man:hd-dashboard(7) man:hd-dashboard(8)
+After=network.target
+
+# hd-dashboard runs as a user of its own that systemd makes up, with the database in its state
+# directory /var/lib/hd-dashboard. It may bind to port 80 without being root.
+[Service]
+ExecStart=/usr/sbin/hd-dashboard serve
+Restart=on-failure
+DynamicUser=yes
+StateDirectory=hd-dashboard
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

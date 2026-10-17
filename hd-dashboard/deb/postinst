@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# postinst of hd-dashboard: stores the default settings in the key hd-dashboard of
+# /etc/hyprdebian/config.json when there are none, and enables and (re)starts
+# hd-dashboard.service. The firewall is left to the admin.
+set -euo pipefail
+
+CONFIG_FILE="/etc/hyprdebian/config.json"
+CONFIG_KEY="hd-dashboard"
+DEFAULTS_FILE="/usr/share/hd-dashboard/defaults.json"
+UNIT="hd-dashboard.service"
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [[ "${1:-}" != "configure" ]]; then
+    exit 0
+fi
+
+# No previous version: a new installation, not an upgrade or a reinstall after a removal.
+FRESH_INSTALL="false"
+if [[ -z "${2:-}" ]]; then
+    FRESH_INSTALL="true"
+fi
+
+has_settings() {
+    python3 - "${CONFIG_FILE}" "${CONFIG_KEY}" <<'PYTHON'
+import json, os, sys
+config_file, config_key = sys.argv[1:]
+config = json.load(open(config_file)) if os.path.exists(config_file) else {}
+sys.exit(0 if isinstance(config, dict) and config_key in config else 1)
+PYTHON
+}
+
+if has_settings; then
+    echo "Keeping the dashboard settings in ${CONFIG_FILE}."
+else
+    echo "Storing the default dashboard settings in ${CONFIG_FILE}."
+    hd-config-update "${CONFIG_KEY}" < "${DEFAULTS_FILE}"
+fi
+
+# The same steps as the ones debhelper adds for a service, which keep the enabled state of the
+# service over upgrades and removals. The unmask undoes the mask of a removal, see the postrm.
+deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+if deb-systemd-helper --quiet was-enabled "${UNIT}"; then
+    deb-systemd-helper enable "${UNIT}" > /dev/null || true
+else
+    deb-systemd-helper update-state "${UNIT}" > /dev/null || true
+fi
+
+# deb-systemd-helper enables a new service with its preset, and hd-base ignores every preset, so
+# the service is enabled here on a new installation. After that, it stays as the admin left it.
+if [[ "${FRESH_INSTALL}" == "true" ]]; then
+    systemctl enable "${UNIT}"
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    systemctl --system daemon-reload
+    deb-systemd-invoke restart "${UNIT}"
+fi

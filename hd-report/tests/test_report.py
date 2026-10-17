@@ -1,4 +1,5 @@
-# Tests for hd-report: parsing what the system tools print, and sending a report.
+# Tests for hd-report, the status reports of the package hd-report: parsing what the system tools
+# print, the settings, and sending a report.
 
 import gzip
 import http.server
@@ -12,7 +13,7 @@ import time
 import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-HD_REPORT = os.path.join(REPO, 'deploy', 'usr', 'local', 'bin', 'hd-report')
+HD_REPORT = os.path.join(REPO, 'hd-report', 'hd-report')
 
 
 def load_hd_report():
@@ -28,11 +29,23 @@ report = load_hd_report()
 
 
 class TestParsing(unittest.TestCase):
-    def test_config_values_are_unquoted_like_bash_quotes_them(self):
-        config = report.parse_config("Q_FULLNAME=Erik\\ Van\\ Hamme\nQ_TYPE=desktop\n"
-                                     "declare -gA TASK_DEPS=([a]=b)\nEMPTY=''\n")
+    def test_version_type_and_suite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            version = os.path.join(tmp, "version.json")
+            with open(version, "w") as f:
+                json.dump({"major": 1, "minor": 1}, f)
+            config = os.path.join(tmp, "config.json")
+            with open(config, "w") as f:
+                json.dump({"hd-installer": {"type": "server"}}, f)
 
-        self.assertEqual(config, {"Q_FULLNAME": "Erik Van Hamme", "Q_TYPE": "desktop", "EMPTY": ""})
+            self.assertEqual(report.hyprdebian_version(version), "1.1")
+            self.assertEqual(report.install_type(config), "server")
+            self.assertEqual(report.hyprdebian_version(os.path.join(tmp, "missing")), "")
+            self.assertEqual(report.install_type(version), "")
+
+        sources = "Types: deb\nURIs: http://repo.example/\nSuites: trixie\nComponents: main\n"
+        self.assertEqual(report.parse_suite(sources), "trixie")
+        self.assertEqual(report.parse_suite(None), "")
 
     def test_meminfo_gives_used_memory_and_swap_in_bytes(self):
         memory, swap = report.parse_meminfo("MemTotal: 1000 kB\nMemAvailable: 400 kB\n"
@@ -94,11 +107,11 @@ class TestParsing(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIsNone(report.newest_kernel(tmp))
 
-    def test_only_snapshots_of_hd_up_and_upgrade_count(self):
+    def test_only_snapshots_of_hd_up_count(self):
         text = ("rpool/hyprdebian@install\t100\nrpool/hyprdebian@hd-up-2026-10-01_100000\t200\n"
-                "rpool/hyprdebian@upgrade-2026-10-02_100000\t300\nrpool/hyprdebian@manual\t400\n")
+                "rpool/hyprdebian@hd-up-2026-10-02_100000\t300\nrpool/hyprdebian@manual\t400\n")
 
-        self.assertEqual(report.parse_snapshots(text), {"name": "upgrade-2026-10-02_100000", "time": 300})
+        self.assertEqual(report.parse_snapshots(text), {"name": "hd-up-2026-10-02_100000", "time": 300})
         self.assertIsNone(report.parse_snapshots(None))
 
     def test_systemd_timestamps(self):
@@ -123,6 +136,23 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(arrays, [{"name": "swap", "state": "clean", "degraded": 1}])
 
 
+class TestSettings(unittest.TestCase):
+    def test_the_url_of_the_settings_overrides_the_default(self):
+        with open(os.path.join(REPO, 'hd-report', 'defaults.json')) as f:
+            defaults = json.load(f)
+
+        self.assertEqual(report.dashboard_url(None, defaults), defaults["url"])
+        self.assertEqual(report.dashboard_url({"hd-report": {"url": "http://dash.example/"}}, defaults),
+                         "http://dash.example/")
+
+    def test_a_wrong_url_is_refused(self):
+        for url in ["", "dash.example", "ftp://dash.example/", 5]:
+            with self.subTest(url=url):
+                self.assertIsNone(report.dashboard_url({"hd-report": {"url": url}}, {}))
+
+        self.assertIsNone(report.dashboard_url(None, None))
+
+
 class TestCollect(unittest.TestCase):
     def test_the_report_of_this_system_is_json(self):
         collected = report.collect()
@@ -130,6 +160,20 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(collected["format"], report.FORMAT)
         self.assertTrue(collected["host"])
         json.dumps(collected)
+
+    def test_hd_dashboard_accepts_the_report(self):
+        loader = importlib.machinery.SourceFileLoader('hd_dashboard', os.path.join(REPO, 'hd-dashboard', 'hd-dashboard'))
+        spec = importlib.util.spec_from_loader('hd_dashboard', loader)
+        dashboard = importlib.util.module_from_spec(spec)
+        loader.exec_module(dashboard)
+
+        collected = report.collect()
+        db = dashboard.connect(":memory:")
+        host = dashboard.accept_report(db, json.dumps(collected).encode(), "Bearer " + "a" * 64,
+                                       "127.0.0.1", int(time.time()), 30)
+
+        self.assertEqual(host, collected["host"])
+        self.assertEqual(report.FORMAT, dashboard.FORMAT)
 
 
 class TestSend(unittest.TestCase):

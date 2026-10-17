@@ -1,0 +1,469 @@
+#!/usr/bin/python3
+"""Sends the state of this system to the hyprdebian dashboard, see hd-dashboard(7).
+
+The package hd-report installs this as /usr/sbin/hd-report, and hd-report.timer runs it as root
+every 15 minutes. The system only makes outgoing connections: it POSTs a JSON report to the URL in
+the key hd-report of /etc/hyprdebian/config.json, with the token of this system from
+/etc/hyprdebian/hd-report/token.
+
+    hd-report           collect and send a report
+    hd-report --print   only print the report, without sending it
+"""
+
+import argparse
+import glob
+import gzip
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-report"
+DEFAULTS_FILE = "/usr/share/hd-report/defaults.json"
+TOKEN_FILE = "/etc/hyprdebian/hd-report/token"
+VERSION_FILE = "/etc/hyprdebian/version.json"
+SOURCES_FILE = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+APT_HISTORY = "/var/log/apt/history.log"
+APT_LISTS = "/var/lib/apt/lists"
+ROOT_DATASET = "rpool/hyprdebian"
+# The timers in the report: those of the admin in /etc, and those of the hyprdebian packages.
+TIMER_GLOBS = ["/etc/systemd/system/*.timer", "/usr/lib/systemd/system/hd-*.timer"]
+# The timer of hd-report itself is left out: when it fails, no report arrives anyway.
+OWN_TIMER = "hd-report.timer"
+
+# The layout of the report, see FORMAT in hd-dashboard. The dashboard refuses reports with a newer
+# format than it knows.
+FORMAT = 1
+
+# apt commands that upgrade the system, as they show up on the Commandline of the apt history.
+UPGRADE_COMMAND = re.compile(r"\b(upgrade|full-upgrade|dist-upgrade)\b")
+
+
+def run(*args, check=True):
+    """Runs a command and returns its output, or None when it cannot run, or fails with check."""
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    if check and result.returncode != 0:
+        return None
+
+    return result.stdout
+
+
+def read_file(path):
+    """Returns the content of a file, or None when it cannot be read."""
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def read_json(path):
+    """Returns the JSON value in a file, or None when it cannot be read."""
+    try:
+        return json.loads(read_file(path) or "null")
+    except ValueError:
+        return None
+
+
+def hyprdebian_version(path=VERSION_FILE):
+    """The version of HyprDebian, <major>.<minor>, from the version.json of hd-base."""
+    version = read_json(path)
+    try:
+        return f"{int(version['major'])}.{int(version['minor'])}"
+    except (KeyError, TypeError, ValueError):
+        return ""
+
+
+def install_type(path=CONFIG_FILE):
+    """The type of the installation, from the key hd-installer of the configuration."""
+    config = read_json(path)
+    try:
+        return str(config["hd-installer"]["type"])
+    except (KeyError, TypeError):
+        return ""
+
+
+def parse_suite(text):
+    """The suite of the HyprDebian packages, from their apt source."""
+    for line in (text or "").splitlines():
+        match = re.match(r"Suites:\s*(\S+)", line)
+        if match:
+            return match.group(1)
+
+    return ""
+
+
+def parse_meminfo(text):
+    """Returns the memory and swap in use and in total, in bytes."""
+    values = {}
+
+    for line in (text or "").splitlines():
+        match = re.match(r"^(\w+):\s+(\d+) kB", line)
+        if match:
+            values[match.group(1)] = int(match.group(2)) * 1024
+
+    memory = {
+        "total": values.get("MemTotal", 0),
+        "used": values.get("MemTotal", 0) - values.get("MemAvailable", 0),
+    }
+    swap = {
+        "total": values.get("SwapTotal", 0),
+        "used": values.get("SwapTotal", 0) - values.get("SwapFree", 0),
+    }
+
+    return memory, swap
+
+
+def parse_pools(listing, status):
+    """Combines `zpool list -Hp` with the scan lines of `zpool status`."""
+    scans = {}
+    pool = None
+
+    for line in (status or "").splitlines():
+        line = line.strip()
+
+        if line.startswith("pool:"):
+            pool = line[5:].strip()
+        elif line.startswith("scan:") and pool:
+            scans[pool] = line[5:].strip()
+
+    pools = []
+
+    for line in (listing or "").splitlines():
+        fields = line.split("\t")
+        if len(fields) != 5:
+            continue
+
+        name, health, size, alloc, capacity = fields
+        pools.append({
+            "name": name,
+            "health": health,
+            "size": int(size),
+            "alloc": int(alloc),
+            "capacity": int(capacity.rstrip("%")),
+            "scan": scans.get(name, ""),
+        })
+
+    return pools
+
+
+def collect_arrays(sys_block="/sys/block", dev_md="/dev/md"):
+    """Returns the mdadm arrays, like the swap array on systems with redundant drives."""
+    names = {}
+    for link in glob.glob(os.path.join(dev_md, "*")):
+        names[os.path.basename(os.path.realpath(link))] = os.path.basename(link)
+
+    arrays = []
+
+    for md in sorted(glob.glob(os.path.join(sys_block, "md*"))):
+        if not os.path.isdir(os.path.join(md, "md")):
+            continue
+
+        device = os.path.basename(md)
+        degraded = (read_file(os.path.join(md, "md", "degraded")) or "0").strip()
+        state = (read_file(os.path.join(md, "md", "array_state")) or "unknown").strip()
+
+        arrays.append({
+            "name": names.get(device, device),
+            "state": state,
+            "degraded": int(degraded) if degraded.isdigit() else 0,
+        })
+
+    return arrays
+
+
+def parse_failed_units(text):
+    """Returns the names of the units in `systemctl list-units --failed --plain --no-legend`."""
+    return [line.split()[0] for line in (text or "").splitlines() if line.strip()]
+
+
+def parse_history(text, upgrades_only):
+    """Returns the time of the last apt run in an apt history log, or the last upgrade."""
+    last = None
+    command = ""
+
+    for line in (text or "").splitlines():
+        if line.startswith("Commandline:"):
+            command = line[12:]
+        elif line.startswith("End-Date:"):
+            if upgrades_only and not UPGRADE_COMMAND.search(command):
+                continue
+
+            try:
+                last = int(time.mktime(time.strptime(" ".join(line[9:].split()), "%Y-%m-%d %H:%M:%S")))
+            except ValueError:
+                pass
+
+    return last
+
+
+def rotation(name):
+    """Returns the number of a rotated log, like 2 for history.log.2.gz."""
+    match = re.search(r"\.(\d+)\.gz$", name)
+
+    return int(match.group(1)) if match else 0
+
+
+def read_history(path):
+    """Returns the apt history logs, the newest first: the log itself, then the rotated ones."""
+    logs = [read_file(path)]
+
+    for name in sorted(glob.glob(path + ".*.gz"), key=rotation):
+        try:
+            with gzip.open(name, "rt") as f:
+                logs.append(f.read())
+        except OSError:
+            pass
+
+    return logs
+
+
+def last_in_history(logs, upgrades_only):
+    for text in logs:
+        last = parse_history(text, upgrades_only)
+        if last is not None:
+            return last
+
+    return None
+
+
+def count_upgradable():
+    """Counts the packages `apt full-upgrade` would upgrade, from the package lists apt has now.
+    The lists are not updated: that is left to apt update and hd-up."""
+    output = run("apt-get", "-s", "-o", "Debug::NoLocking=1", "full-upgrade")
+    if output is None:
+        return None
+
+    return sum(1 for line in output.splitlines() if line.startswith("Inst "))
+
+
+def lists_time(path=APT_LISTS):
+    """Returns when apt last updated its package lists."""
+    newest = None
+
+    for name in glob.glob(os.path.join(path, "*_InRelease")) + glob.glob(os.path.join(path, "*_Release")):
+        mtime = int(os.path.getmtime(name))
+        if newest is None or mtime > newest:
+            newest = mtime
+
+    return newest
+
+
+def version_key(version):
+    return [int(part) if part.isdigit() else part for part in re.split(r"[.+~-]", version)]
+
+
+def newest_kernel(boot="/boot"):
+    """Returns the newest installed kernel, so the dashboard can tell a reboot is due."""
+    versions = [os.path.basename(name)[len("vmlinuz-"):] for name in glob.glob(os.path.join(boot, "vmlinuz-*"))]
+
+    if not versions:
+        return None
+
+    return max(versions, key=version_key)
+
+
+def parse_snapshots(text):
+    """Returns the newest snapshot taken by hd-up, from `zfs list -Hp -o name,creation`."""
+    newest = None
+
+    for line in (text or "").splitlines():
+        fields = line.split("\t")
+        if len(fields) != 2:
+            continue
+
+        name, creation = fields
+        snapshot = name.split("@", 1)[-1]
+        if not snapshot.startswith("hd-up-"):
+            continue
+
+        if newest is None or int(creation) > newest["time"]:
+            newest = {"name": snapshot, "time": int(creation)}
+
+    return newest
+
+
+def parse_properties(text):
+    """Parses the KEY=value lines of `systemctl show`."""
+    properties = {}
+
+    for line in (text or "").splitlines():
+        key, _, value = line.partition("=")
+        properties[key] = value
+
+    return properties
+
+
+def unix_time(value):
+    """Converts a timestamp of `systemctl show --timestamp=unix` (@1792114200) to a number."""
+    if value and value.startswith("@"):
+        return int(value[1:])
+
+    return None
+
+
+def collect_timers(timer_globs=TIMER_GLOBS):
+    """Returns the enabled timers of the admin and of the hyprdebian packages, with the result of the
+    last run of their service."""
+    timers = []
+    names = sorted({os.path.basename(path) for pattern in timer_globs for path in glob.glob(pattern)})
+
+    for timer in names:
+        if timer == OWN_TIMER:
+            continue
+
+        properties = parse_properties(run(
+            "systemctl", "show", "--timestamp=unix", timer,
+            "-p", "UnitFileState,Triggers,LastTriggerUSec,NextElapseUSecRealtime"))
+
+        if properties.get("UnitFileState") != "enabled":
+            continue
+
+        service = properties.get("Triggers", "").split(" ")[0]
+        result = parse_properties(run("systemctl", "show", "--timestamp=unix", service,
+                                      "-p", "Result,ExecMainStatus,ActiveState"))
+
+        timers.append({
+            "unit": timer,
+            "service": service,
+            "last": unix_time(properties.get("LastTriggerUSec")),
+            "next": unix_time(properties.get("NextElapseUSecRealtime")),
+            "result": result.get("Result", ""),
+            "state": result.get("ActiveState", ""),
+        })
+
+    return timers
+
+
+def fqdn():
+    """The fully qualified domain name, or nothing when the system has none."""
+    name = socket.getfqdn()
+    if "." not in name or name.startswith("localhost"):
+        return ""
+
+    return name
+
+
+def collect():
+    """Collects the report."""
+    memory, swap = parse_meminfo(read_file("/proc/meminfo"))
+    uptime = float((read_file("/proc/uptime") or "0").split()[0])
+    history = read_history(APT_HISTORY)
+
+    zpool_list = run("zpool", "list", "-Hp", "-o", "name,health,size,alloc,capacity")
+    zpool_status = run("zpool", "status")
+    snapshots = run("zfs", "list", "-Hp", "-t", "snapshot", "-o", "name,creation", "-d", "1", ROOT_DATASET)
+    # is-system-running fails when the state is not running, but still prints the state.
+    system_state = run("systemctl", "is-system-running", check=False) or ""
+
+    return {
+        "format": FORMAT,
+        "host": socket.gethostname(),
+        "fqdn": fqdn(),
+        "sent_at": int(time.time()),
+        "hyprdebian": {
+            "version": hyprdebian_version(),
+            "type": install_type(),
+            "suite": parse_suite(read_file(SOURCES_FILE)),
+        },
+        "os": {
+            "debian": (read_file("/etc/debian_version") or "").strip(),
+            "kernel": os.uname().release,
+            "kernel_newest": newest_kernel(),
+            "boot_time": int(time.time() - uptime),
+        },
+        "load": [float(value) for value in (read_file("/proc/loadavg") or "0 0 0").split()[:3]],
+        "cpus": os.cpu_count(),
+        "memory": memory,
+        "swap": swap,
+        "pools": parse_pools(zpool_list, zpool_status),
+        "arrays": collect_arrays(),
+        "units": {
+            "state": system_state.strip(),
+            "failed": parse_failed_units(run("systemctl", "list-units", "--failed", "--plain", "--no-legend")),
+        },
+        "updates": {
+            "upgradable": count_upgradable(),
+            "lists_time": lists_time(),
+            "last_apt": last_in_history(history, upgrades_only=False),
+            "last_upgrade": last_in_history(history, upgrades_only=True),
+            "reboot_required": os.path.exists("/run/reboot-required"),
+        },
+        "snapshot": parse_snapshots(snapshots),
+        "timers": collect_timers(),
+    }
+
+
+def dashboard_url(config, defaults):
+    """The URL of the dashboard: the key hd-report of the configuration over the defaults."""
+    settings = dict(defaults) if isinstance(defaults, dict) else {}
+    if isinstance(config, dict) and isinstance(config.get(CONFIG_KEY), dict):
+        settings.update(config[CONFIG_KEY])
+
+    url = settings.get("url")
+    if not isinstance(url, str) or not re.match(r"^https?://\S+$", url):
+        return None
+
+    return url
+
+
+def send(report, url, token):
+    """POSTs the report to the dashboard."""
+    request = urllib.request.Request(
+        url.rstrip("/") + "/report",
+        data=json.dumps(report).encode(),
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + token},
+        method="POST")
+
+    with urllib.request.urlopen(request, timeout=30) as response:
+        response.read()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Send the state of this system to the hyprdebian dashboard.")
+    parser.add_argument("--print", action="store_true",
+                        help="only print the report, without sending it")
+    args = parser.parse_args()
+
+    report = collect()
+
+    if args.print:
+        print(json.dumps(report, indent=2))
+        return 0
+
+    url = dashboard_url(read_json(CONFIG_FILE), read_json(DEFAULTS_FILE))
+    if url is None:
+        print(f"Error: The key {CONFIG_KEY} in {CONFIG_FILE} needs a url, http:// or https://.",
+              file=sys.stderr)
+        return 1
+
+    token = (read_file(TOKEN_FILE) or "").strip()
+    if not token:
+        print(f"Error: Cannot read the token in {TOKEN_FILE}. Run this as root.", file=sys.stderr)
+        return 1
+
+    try:
+        send(report, url, token)
+    except urllib.error.HTTPError as error:
+        print(f"Error: The dashboard at {url} refused the report: {error.code} {error.reason}", file=sys.stderr)
+        return 1
+    except (urllib.error.URLError, OSError) as error:
+        print(f"Error: Unable to reach the dashboard at {url}: {error}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

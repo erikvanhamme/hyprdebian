@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# prerm of hd-report: stops hd-report.timer and a report that is being sent when the package is
+# removed.
+set -euo pipefail
+
+if [[ "${1:-}" != "remove" ]]; then
+    exit 0
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    deb-systemd-invoke stop hd-report.timer hd-report.service > /dev/null || true
+fi

@@ -1,0 +1,20 @@
+Package: hd-report
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, systemd, hd-config
+Suggests: hd-dashboard
+Section: admin
+Priority: optional
+Description: HyprDebian status reports for the dashboard
+ Sends the state of the system to the hyprdebian dashboard of hd-dashboard
+ every 15 minutes: the HyprDebian and Debian versions, the kernel, the load,
+ the memory, the ZFS pools, the mdadm arrays, the failed units, the pending
+ upgrades and reboots, the last snapshot of hd-up and the timers. The system
+ only makes outgoing connections.
+ .
+ The URL of the dashboard is the key hd-report in
+ /etc/hyprdebian/config.json; the token of the system is generated on the
+ first installation in /etc/hyprdebian/hd-report/token. Installing the
+ package enables hd-report.timer.

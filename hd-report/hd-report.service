@@ -1,0 +1,16 @@
+[Unit]
+Description=Send a Status Report to the HyprDebian Dashboard
+Documentation=man:hd-report(8)
+Wants=network-online.target
+After=network-online.target
+
+# Runs as root: the token in /etc/hyprdebian/hd-report is only readable by root, and the report
+# reads the state of ZFS, apt and systemd.
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/hd-report
+Nice=10
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

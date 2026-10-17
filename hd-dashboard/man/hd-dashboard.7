@@ -1,0 +1,190 @@
+.TH HD-DASHBOARD 7 "October 2026" "hd-dashboard" "HyprDebian"
+.SH NAME
+hd-dashboard \- the hyprdebian dashboard
+.SH DESCRIPTION
+The package
+.B hd-dashboard
+turns a hyprdebian system into the hyprdebian dashboard, which shows the state
+of every hyprdebian system on one page.
+Each system with the package
+.B hd-report
+sends a status report to the dashboard every 15 minutes, see
+.BR hd-report (8).
+The systems only make outgoing connections, so no system needs an open port
+for it.
+.PP
+The dashboard keeps the latest report of every system, and a history of the
+load, the memory and the fullest pool.
+It judges each system on its last report and colors its card by its worst
+issue.
+.PP
+Installing the package sets everything up:
+.IP \(bu 2
+the default settings, in the key
+.B hd-dashboard
+of
+.IR /etc/hyprdebian/config.json ,
+when there are none yet;
+.IP \(bu 2
+.BR hd-dashboard.service ,
+which is enabled and started, and makes the database on its first start.
+.PP
+The dashboard listens on port 80 by default.
+The installation does not open that port in the firewall; that is up to the
+admin.
+With
+.BR ufw (8):
+.PP
+.RS
+sudo ufw allow 80/tcp
+.RE
+.PP
+Then the dashboard answers on
+.IR http://<host>/ .
+.SH THE SERVICE
+.B hd-dashboard.service
+runs
+.BR "hd-dashboard serve" ,
+see
+.BR hd-dashboard (8),
+as a user that systemd makes up, which may bind to port 80 without being root
+and may only write
+.IR /var/lib/hd-dashboard .
+It is enabled on the first installation; after that, it stays as the admin
+left it.
+An upgrade restarts it when it is enabled.
+Only refused reports and errors get a line in its journal:
+.PP
+.RS
+journalctl \-u hd-dashboard.service
+.RE
+.PP
+.B hd-repo
+also uses port 80; give the dashboard another port to have both on one system.
+.SH SETTINGS
+The settings are the key
+.B hd-dashboard
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+A setting that is missing has its default value, from
+.IR /usr/share/hd-dashboard/defaults.json .
+Restart the service after a change:
+.PP
+.RS
+.nf
+sudo hd-config-update hd-dashboard \e
+    '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "history_days": 30}'
+sudo systemctl restart hd-dashboard.service
+.fi
+.RE
+.TP
+.B listen
+The address to listen on, default
+.BR 0.0.0.0 .
+.TP
+.B port
+The port to listen on, default 80.
+Allow it in the firewall.
+.TP
+.B stale_minutes
+A system that did not report for this many minutes is an error, default 45.
+.TP
+.B history_days
+How many days the history is kept, default 30.
+.SH PAGES
+.TP
+.B POST /report
+Stores a report.
+.TP
+.B GET /
+The overview: a card per system, the worst first.
+Refreshes every minute.
+.TP
+.B GET /host/<name>
+One system, with the charts of its history and its last report.
+.TP
+.B GET /api/hosts
+The systems, their reports and issues as JSON.
+.PP
+The connection is plain HTTP, meant for the local network.
+.SH REPORTS
+A system POSTs its report to
+.I /report
+as a JSON object, at most 256 KiB, with its token in the header
+.BR "Authorization: Bearer <token>" .
+The token is 16 to 128 letters and digits.
+The report has a
+.B format
+number, now 1; reports with a newer format are refused.
+.B host
+is the host name, by which the dashboard knows the system.
+The other parts are
+.BR fqdn ,
+.BR hyprdebian ,
+.BR os ,
+.BR load ,
+.BR cpus ,
+.BR memory ,
+.BR swap ,
+.BR pools ,
+.BR arrays ,
+.BR units ,
+.BR updates ,
+.B snapshot
+and
+.BR timers ;
+the documentation in the repository describes them.
+.PP
+The first report of a host name registers its token.
+Later reports of that host name must have the same token, otherwise they are
+refused with 403.
+Only a hash of the token is stored.
+A reinstalled system has a new token: forget the old one with
+.BR "hd-dashboard forget" ,
+and the next report registers the new one.
+.SH ISSUES
+Errors: no report for longer than
+.BR stale_minutes ,
+failed units, a pool that is not ONLINE or 90% full or more, a degraded mdadm
+array, and a failed last run of the service of a timer.
+.PP
+Warnings: a pool that is 80% full or more, a system that is starting or
+stopping, a pending reboot, no upgrade for 14 days or never, and a HyprDebian
+version older than the newest among the systems.
+.PP
+Notes: upgradable packages.
+Notes do not change the color of the card.
+.SH REMOVAL
+Removing the package stops the service and keeps the settings and the
+database.
+Purging it also removes the key
+.BR hd-dashboard
+and the database.
+Firewall rules for the dashboard stay; remove them by hand.
+.SH FILES
+.TP
+.I /usr/sbin/hd-dashboard
+The dashboard.
+.TP
+.I /usr/lib/systemd/system/hd-dashboard.service
+Runs the dashboard.
+.TP
+.I /usr/share/hd-dashboard/defaults.json
+The default settings.
+.TP
+.I /etc/hyprdebian/config.json
+The settings, in the key
+.BR hd-dashboard .
+.TP
+.I /var/lib/hd-dashboard/dashboard.db
+The SQLite database, kept by systemd in
+.IR /var/lib/private/hd-dashboard .
+.SH SEE ALSO
+.BR hd-dashboard (8),
+.BR hd-report (8),
+.BR hd-config (7),
+.BR hd-config-update (8),
+.BR ufw (8),
+.BR systemd.exec (5)

@@ -1,6 +1,6 @@
 # Tests
 
-Every directory here is a test suite for one part of hyprdebian. The tests use Python `unittest`, so they need no packages beyond those of the part they test.
+Every directory here is a test suite for one part of hyprdebian. The hd-* packages keep their tests in a `tests` directory of their own, which `make test` runs; see the `Makefile` in the root of this repository. The tests use Python `unittest`, so they need no packages beyond those of the part they test.
 
 Run all suites, or one:
 ```
@@ -40,9 +40,6 @@ Tests for the backup tool `deploy/usr/local/bin/hd-backup` and `src/blockwrite.c
 `helpers.py` imports `hd-backup` as a module for the tests. The script has no `.py` extension, so the helper gives the loader explicitly. Importing it runs no command: that only happens when it runs as a program.
 
 The tape tests take about 5 seconds each, because a tape write waits 5 seconds before it rewinds.
-
-## hd-report
-Tests for the reporter `deploy/usr/local/bin/hd-report`, in `test_report.py`: parsing what the system tools print, the apt history with rotated logs, a report of the system the tests run on, and sending a report to a local test server. They run as a normal user.
 
 ## hd-dash
 Tests for the dashboard `dashboard/hd-dash`, in `test_dash.py`: accepting and refusing reports and tokens, the history, judging the systems, escaping report values in the pages, the server on a free local port, and `hd-dash forget`. They need nothing beyond Python.

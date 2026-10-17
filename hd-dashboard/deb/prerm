@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# prerm of hd-dashboard: stops hd-dashboard.service when the package is removed.
+set -euo pipefail
+
+UNIT="hd-dashboard.service"
+
+if [[ "${1:-}" != "remove" ]]; then
+    exit 0
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    deb-systemd-invoke stop "${UNIT}" > /dev/null || true
+fi

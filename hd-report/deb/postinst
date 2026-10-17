@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# postinst of hd-report: stores the default settings in the key hd-report of
+# /etc/hyprdebian/config.json when there are none, generates the token of this system when there
+# is none, and enables and starts hd-report.timer.
+set -euo pipefail
+
+CONFIG_FILE="/etc/hyprdebian/config.json"
+CONFIG_KEY="hd-report"
+DEFAULTS_FILE="/usr/share/hd-report/defaults.json"
+TOKEN_DIR="/etc/hyprdebian/hd-report"
+TOKEN_FILE="${TOKEN_DIR}/token"
+UNIT="hd-report.timer"
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [[ "${1:-}" != "configure" ]]; then
+    exit 0
+fi
+
+# No previous version: a new installation, not an upgrade or a reinstall after a removal.
+FRESH_INSTALL="false"
+if [[ -z "${2:-}" ]]; then
+    FRESH_INSTALL="true"
+fi
+
+has_settings() {
+    python3 - "${CONFIG_FILE}" "${CONFIG_KEY}" <<'PYTHON'
+import json, os, sys
+config_file, config_key = sys.argv[1:]
+config = json.load(open(config_file)) if os.path.exists(config_file) else {}
+sys.exit(0 if isinstance(config, dict) and config_key in config else 1)
+PYTHON
+}
+
+if has_settings; then
+    echo "Keeping the report settings in ${CONFIG_FILE}."
+else
+    echo "Storing the default report settings in ${CONFIG_FILE}."
+    hd-config-update "${CONFIG_KEY}" < "${DEFAULTS_FILE}"
+fi
+
+# The dashboard only accepts the first token it sees for a host name, so an existing token is
+# never replaced; a purge keeps it too.
+install -d -m 0700 "${TOKEN_DIR}"
+if [[ -s "${TOKEN_FILE}" ]]; then
+    echo "Keeping the token in ${TOKEN_FILE}."
+else
+    echo "Generating the token in ${TOKEN_FILE}..."
+    (umask 077 && python3 -c 'import secrets; print(secrets.token_hex(32))' > "${TOKEN_FILE}")
+fi
+chmod 0600 "${TOKEN_FILE}"
+
+# The same steps as the ones debhelper adds for a timer, which keep its enabled state over upgrades
+# and removals. The unmask undoes the mask of a removal, see the postrm.
+deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+if deb-systemd-helper --quiet was-enabled "${UNIT}"; then
+    deb-systemd-helper enable "${UNIT}" > /dev/null || true
+else
+    deb-systemd-helper update-state "${UNIT}" > /dev/null || true
+fi
+
+# deb-systemd-helper enables a new unit with its preset, and hd-base ignores every preset, so the
+# timer is enabled here on a new installation. After that, it stays as the admin left it.
+if [[ "${FRESH_INSTALL}" == "true" ]]; then
+    systemctl enable "${UNIT}"
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    systemctl --system daemon-reload
+    deb-systemd-invoke restart "${UNIT}"
+fi
