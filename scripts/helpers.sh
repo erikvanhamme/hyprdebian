@@ -183,41 +183,6 @@ in_target() {
         "$@"
 }
 
-# Clones the checkout that runs the installer into SOURCE_DIR, so it is at the commit that installed
-# the system, and points origin at SOURCE_URL. The checkout belongs to the user.
-source_checkout() {
-    # The checkout that runs the installer belongs to the user that ran sudo. git only reads it as
-    # root when it is marked as safe.
-    git -c safe.directory="${PWD}" clone "${PWD}" "${TARGET_DIR}${SOURCE_DIR}" || return 1
-    git -C "${TARGET_DIR}${SOURCE_DIR}" remote set-url origin "${SOURCE_URL}" || return 1
-    in_target chown -R ${Q_USER}:${Q_USER} "${SOURCE_DIR}"
-}
-
-# Writes /etc/issue, the line the console shows above the login prompt, with the installed
-# version and suite. agetty replaces \e{...} with a color and \l with the name of the tty.
-write_issue() {
-    printf '%s\n\n' "\\e{brown}HyprDebian\\e{reset} ${INSTALLER_VERSION} · ${Q_SUITE} · \\l" \
-        > "${TARGET_DIR}/etc/issue"
-}
-
-# Prints the path of the .deb file of a package that the deb phase built, or nothing when the deb
-# phase did not build the package. Package names have no underscore, so the prefix matches only
-# that package.
-# Usage: local_deb <package>
-local_deb() {
-    local debs
-
-    shopt -s nullglob
-    debs=("${DEB_DIR}/${1}"_*.deb)
-    shopt -u nullglob
-
-    if (( ${#debs[@]} == 0 )); then
-        return 0
-    fi
-
-    echo "${debs[0]}"
-}
-
 log_status() {
     local color="$1"
     local label="$2"
@@ -247,18 +212,6 @@ random_mac() {
 random_token() {
     od -An -N16 -tx1 /dev/urandom | tr -d ' \n'
     echo
-}
-
-# Downloads the signing key of the hyprdebian repo from the repo itself, for the Signed-By of
-# hyprdebian.local.sources. apt-helper comes with apt, so the target needs no download tool.
-repo_key_download() {
-    local url="${Q_REPO%/}/hyprdebian-archive-keyring.pgp"
-    local tmp="/tmp/hyprdebian-archive-keyring.pgp"
-
-    echo "Downloading ${url}"
-    in_target /usr/lib/apt/apt-helper download-file "$url" "$tmp" || return 1
-    in_target install -m 0644 "$tmp" "${REPO_KEY}" || return 1
-    rm -f "${TARGET_DIR}${tmp}"
 }
 
 template_dst() {

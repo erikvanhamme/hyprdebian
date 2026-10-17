@@ -143,7 +143,7 @@ o_qemu_kvm() {
     add_dependencies "pkg_post" "pkg_qemu_kvm"
     add_dependencies "svc_post" "svc_qemu_kvm"
 
-    # Keep an existing address, so a rerun or an upgrade does not change the MAC of the bridge.
+    # Keep an existing address, so a rerun does not change the MAC of the bridge.
     if [[ -z "${BR0_MAC_ADDRESS:-}" ]]; then
         BR0_MAC_ADDRESS=$(random_mac)
         save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
@@ -186,8 +186,7 @@ o_backuptools() {
             
     fi
 
-    # Compile block write utility for backups on tape. The source is compiled from /tmp, because
-    # /usr/src/hyprdebian is the checkout of the installer that u_source makes.
+    # Compile block write utility for backups on tape.
     cp src/blockwrite.c ${TARGET_DIR}/tmp/blockwrite.c || return 1
     in_target gcc -O2 -D_GNU_SOURCE -o /usr/local/bin/blockwrite /tmp/blockwrite.c || return 1
     rm -f ${TARGET_DIR}/tmp/blockwrite.c
@@ -222,8 +221,8 @@ o_syscargo_permissions() {
 }
 
 o_report() {
-    # Keep an existing token, so a rerun or an upgrade does not lock the system out of the
-    # dashboard, which only accepts the first token it sees for a host name.
+    # Keep an existing token, so a rerun does not lock the system out of the dashboard, which only
+    # accepts the first token it sees for a host name.
     if [[ -z "${REPORT_TOKEN:-}" ]]; then
         REPORT_TOKEN=$(random_token)
         save_config REPORT_TOKEN ${REPORT_TOKEN}

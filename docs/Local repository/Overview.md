@@ -57,7 +57,7 @@ Run `update_hyprdebian_repo.sh` as the repo user, without sudo. The key and the 
 The suite is `unstable` with the codename `sid`. Installed systems ask for `unstable`, the `Q_SUITE` they were installed with.
 
 ## Changing the key
-An installed system gets the key once: `b_apt_init` downloads it on a new installation, and the `0022-signed-repo` migration on an upgrade. After a new key, `apt update` fails on those systems because of the signature. To fix that, download the new key on each system:
+An installed system gets the key once: `b_apt_init` of `hd-installer` downloads it on a new installation. After a new key, `apt update` fails on those systems because of the signature. To fix that, download the new key on each system:
 ```
 sudo /usr/lib/apt/apt-helper download-file http://<repo>/hyprdebian-archive-keyring.pgp /usr/share/keyrings/hyprdebian-archive-keyring.pgp
 ```

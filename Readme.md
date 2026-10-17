@@ -134,32 +134,6 @@ You will then be prompted for the unlock passphrase as entered during installati
 
 Subsequent boots will be normal.
 
-## Upgrading
-
-An installed system can be upgraded to a newer version of hyprdebian. The installer puts a checkout of this repo in `/usr/src/hyprdebian`, owned by your user, at the version that installed the system. Get the latest version and run the upgrade:
-
-```
-cd /usr/src/hyprdebian
-git pull
-sudo ./upgrade.sh
-```
-
-A system installed by an older version has no checkout in `/usr/src/hyprdebian` yet. Clone this repo anywhere and run the upgrade from there once. The upgrade then clones it into `/usr/src/hyprdebian`:
-
-```
-git clone https://github.com/erikvanhamme/hyprdebian.git
-cd hyprdebian
-sudo ./upgrade.sh
-```
-
-The upgrade uses the answers given during the installation, and only asks the questions that were added since. It installs new packages, enables new services and updates the hyprdebian scripts and config files, including the ones in your home directory. When a config file was changed on your system, it asks whether to keep yours, take the new version or merge the two, in meld from the desktop or in sdiff from a console.
-
-Packages that are already installed are not upgraded. Use `apt` for that, as usual.
-
-Before it starts, the upgrade checks that the system is up to date, and recommends running `sudo apt full-upgrade` first when it is not.
-
-Systems installed before version v0.152 have no saved answers. The upgrade then works out the answers from the system, and asks every question once with the detected answer filled in. See [Upgrade](docs/Installer/Upgrade.md) for how the upgrade works.
-
 ## Keyboard shortcuts
 
 `SUPER + RETURN` opens a terminal and `SUPER + SPACE` opens the application launcher. See [Key Bindings](docs/HyprDebian/Key%20Bindings.md) for all the shortcuts.
@@ -168,7 +142,7 @@ Systems installed before version v0.152 have no saved answers. The upgrade then 
 
 The `docs` folder has more documentation:
 - [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
-- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it, and how the [upgrade](docs/Installer/Upgrade.md) works.
+- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
 - [Dashboard](docs/Dashboard/Overview.md): the status reports of the systems, and the dashboard that shows them.

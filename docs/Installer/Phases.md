@@ -11,8 +11,8 @@ The installer is split into phases. Each phase has its own script in the `script
 | 6 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
 | 7 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
 | 8 | Services | `services.sh` | `svc_` | Enables all queued services in the target system. |
-| 9 | User | `user.sh` | `u_` | Clones the checkout that runs the installer into `/usr/src/hyprdebian`, with `origin` pointing at GitHub over https, and gives it to the user. |
-| 10 | Cleanup | `cleanup.sh` | `c_` | Saves the config and the migrations for the [upgrade](Upgrade.md#state-on-the-installed-system). |
+| 9 | User | `user.sh` | `u_` | Has no tasks of its own; the optional components attach the tasks that need the user account to `u_post`. |
+| 10 | Cleanup | `cleanup.sh` | `c_` | Saves a copy of the config in `/etc/hyprdebian/installer.config`, which `hd-report` reads. |
 
 The disks, the base system, the bootloader, the network, the firewall, the user account and the snapshot are done by `hd-installer` (see [hd-installer](../packages/hd-installer.md)).
 

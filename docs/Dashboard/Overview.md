@@ -15,11 +15,11 @@ dashboard/scripts/setup_hyprdebian_dash.sh        sets up the dashboard VM
 
 ## On the systems
 The installer asks `Send status reports to the hyprdebian dashboard` (`Q_REPORT`, default yes) and the dashboard URL (`Q_REPORT_URL`, default `http://dash.rsq-online.ddns.net/`). On yes, `o_report`:
-- generates a random token, `REPORT_TOKEN`, saved in the installer config so an upgrade keeps it,
+- generates a random token, `REPORT_TOKEN`, saved in the installer config so a rerun of the installer keeps it,
 - deploys `hd-report`, `hd-report.service` and `hd-report.timer`, and enables the timer,
 - renders `/etc/hyprdebian/report.conf`, mode `0600`, with the URL and the token.
 
-Installed systems get the question on their next `upgrade.sh`, like every new question. The timer starts after the reboot that follows the upgrade.
+The timer starts after the first boot of the installed system.
 
 `hd-report.timer` runs `hd-report` 2 minutes after boot and then every 15 minutes, with up to a minute of random delay. `hd-report` runs as root, and POSTs a JSON report to `<url>/report`, with `Authorization: Bearer <token>`. When the dashboard cannot be reached or refuses the report, `hd-report.service` fails, and the error is in the journal:
 ```
