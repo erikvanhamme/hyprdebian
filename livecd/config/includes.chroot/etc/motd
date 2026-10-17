@@ -1,0 +1,8 @@
+
+HyprDebian live system. Install HyprDebian with:
+
+    sudo hd-installer
+
+See man hd-installer. Set up wifi with sudo nmtui. Log in over ssh as user
+with the password live; ip -br addr shows the address.
+

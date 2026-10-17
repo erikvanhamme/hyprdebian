@@ -1,0 +1,16 @@
+# A text console. live-config logs in the user user on it, with sudo; gpm
+# gives a mouse for copy and paste.
+gpm
+less
+man-db
+sudo
+user-setup
+
+# The network: NetworkManager brings up wired networks, nmtui sets up wifi.
+network-manager
+wpasupplicant
+
+# The ssh server, which allows logging in with a password, and the terminfo
+# of kitty for ssh from it.
+kitty-terminfo
+openssh-server

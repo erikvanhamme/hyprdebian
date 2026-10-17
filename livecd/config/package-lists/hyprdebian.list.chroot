@@ -1,0 +1,8 @@
+# The installer, from config/packages.chroot, and the tools it runs on the
+# live system.
+hd-installer
+debootstrap
+dosfstools
+gdisk
+mdadm
+parted

@@ -8,6 +8,10 @@
 #   make test       run make test in every package directory in TESTS
 #   make clean      remove packages/ and run make clean in every package
 #                   directory
+#   make provision-vm
+#                   ask for the name, zvol, cpus, memory and bridge of a vm,
+#                   then define it in libvirt and start it from the live cd
+#                   (vm/provision-vm.py); make the zvol first
 #
 # Each package is a directory with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
@@ -20,7 +24,7 @@ PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloade
 TESTS := hd-dashboard hd-report
 OUT := packages
 
-.PHONY: all test clean $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean provision-vm $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -43,3 +47,6 @@ $(addprefix test-,$(TESTS)):
 clean:
 	rm -rf $(OUT)
 	for package in $(PACKAGES); do $(MAKE) -C $$package clean; done
+
+provision-vm:
+	python3 vm/provision-vm.py

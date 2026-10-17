@@ -1,0 +1,7 @@
+# ZFS. The module is built with DKMS while the image is built (see
+# hooks/live/0100-zfs-dkms.hook.chroot) and loaded at boot.
+build-essential
+dkms
+linux-headers-amd64
+zfs-dkms
+zfsutils-linux

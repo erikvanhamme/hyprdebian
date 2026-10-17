@@ -1,16 +1,7 @@
-# Build environment for the hyprdebian live ISO.
-#
-# Build the image:
-#   docker build -t hyprdebian-livecd livecd/
-#
-# Build the ISO (lands in livecd/out/):
-#   mkdir -p livecd/out
-#   docker run --rm --privileged \
-#     -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
-#     -v "$PWD/livecd/out:/out" hyprdebian-livecd
-#
-# live-build mounts filesystems and creates device nodes in its chroot, so the
-# container needs --privileged.
+# Build environment for the HyprDebian live ISO: live-build and the tools to
+# build the hd-installer package. The repository is mounted at /src when the
+# container runs, so the image only has to be rebuilt when this file changes.
+# See the Makefile next to this file.
 
 FROM debian:trixie
 
@@ -19,21 +10,19 @@ RUN apt-get update \
       ca-certificates \
       debootstrap \
       dosfstools \
-      git \
       grub-efi-amd64-bin \
       grub-pc-bin \
       isolinux \
       live-build \
+      make \
       mtools \
+      python3 \
       squashfs-tools \
-      sudo \
       syslinux \
       syslinux-efi \
       syslinux-utils \
       xorriso \
  && rm -rf /var/lib/apt/lists/*
 
-COPY livecd.sh docker-entrypoint.sh /livecd/
-
 WORKDIR /build
-ENTRYPOINT ["/livecd/docker-entrypoint.sh"]
+ENTRYPOINT ["/src/livecd/build.sh"]

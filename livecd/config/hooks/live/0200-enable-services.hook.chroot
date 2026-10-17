@@ -1,4 +1,5 @@
 #!/bin/sh
+# Starts the console mouse and the ssh server at boot.
 set -e
 
 systemctl enable gpm.service

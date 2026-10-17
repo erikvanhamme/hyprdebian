@@ -57,23 +57,17 @@ cd hyprdebian
 sudo ./install.sh
 ```
 
-### From hyprdebian live ISO
+### From the HyprDebian live ISO
 
-The hyprdebian live ISO is a Debian trixie live system with a text console, ZFS support, an ssh server, the tools the installer needs and a checkout of this repo. The installer skips its prerequisites phase when it runs on it.
+The HyprDebian live ISO is a small Debian trixie live system with a text console, ZFS support, an ssh server that allows logging in with a password, and the package `hd-installer` installed.
 
-To install you will need to create the live ISO by running the script in the livecd folder.
-
-To build it in a docker container instead, so the live-build dependencies stay off your system:
+Build it in a debian:trixie docker container with:
 
 ```
-docker build -t hyprdebian-livecd livecd/
-mkdir -p livecd/out
-docker run --rm --privileged -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -v "$PWD/livecd/out:/out" hyprdebian-livecd
+make -C livecd iso
 ```
 
-The ISO is written to livecd/out/hyprdebian-live-amd64.iso.
-
-When the ISO is built, write it to a USB stick, for example with:
+The ISO is written to livecd/out/hyprdebian-live-amd64.iso. Write it to a USB stick, for example with:
 
 ```
 sudo dd if=livecd/out/hyprdebian-live-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
@@ -81,21 +75,13 @@ sudo dd if=livecd/out/hyprdebian-live-amd64.iso of=/dev/sdX bs=4M status=progres
 
 Replace /dev/sdX with the USB stick. Everything on it will be lost. The live cd boots on both UEFI and BIOS machines.
 
-The live cd boots to a text console, logged in as the live user. The mouse works on the console: select text with the left button and paste it with the middle button. You can also log in over ssh as user `user` with password `live`.
-
-Then run:
+The live cd boots to a text console, logged in as the user `user`. You can also log in over ssh as `user` with the password `live`. Then run:
 
 ```
-cd hyprdebian
-git pull
-sudo ./install.sh
+sudo hd-installer
 ```
 
-The repo on the live cd is the version from the moment the ISO was built. The `git pull` brings it up to date.
-
-The admin tools such as mdadm, gdisk and zpool are not in the PATH of the live user. Run them with sudo.
-
-See [Live cd](docs/Livecd/Overview.md) for building without docker, following the build and the warnings you can ignore.
+See [Live cd](docs/Livecd/Overview.md) for more on building and using it.
 
 ### Questions and defaults
 
@@ -144,5 +130,6 @@ The `docs` folder has more documentation:
 - [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
 - [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
+- [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
 - [Dashboard](docs/Dashboard/Overview.md): the status reports of the systems, and the dashboard that shows them.

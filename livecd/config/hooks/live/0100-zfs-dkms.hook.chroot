@@ -1,0 +1,14 @@
+#!/bin/sh
+# Builds the ZFS module for the kernel of the image. The kernel in the chroot
+# is not the one that runs, so dkms is told which one it is.
+set -e
+
+kernel=$(ls /lib/modules | head -n 1)
+if [ -z "${kernel}" ]; then
+    echo "Error: no kernel in /lib/modules" >&2
+    exit 1
+fi
+
+echo "Building the ZFS module for ${kernel}"
+dkms autoinstall -k "${kernel}"
+modinfo -k "${kernel}" zfs > /dev/null
