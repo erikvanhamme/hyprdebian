@@ -1,0 +1,56 @@
+#!/usr/bin/python3
+"""Starts yazi in the directory where it was left the last time, see hd-yazi(1).
+
+The package yazi installs this as /usr/bin/hd-yazi. yazi writes the directory it quits in to the
+state file, through its option --cwd-file, and the next start opens that directory. Without a
+state file, or when the directory in it is gone, yazi starts in the home directory.
+"""
+
+import argparse
+import os
+import sys
+
+YAZI = "yazi"
+
+
+def state_file():
+    """Returns the path of the file that holds the last directory of yazi."""
+    state_home = os.environ.get("XDG_STATE_HOME")
+    if not state_home:
+        state_home = os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(state_home, "yazi", "last-cwd")
+
+
+def start_dir(path):
+    """Returns the directory in the state file at path, or the home directory when there is no
+    usable one."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            last_dir = f.read().strip()
+    except (OSError, ValueError):
+        last_dir = ""
+
+    if last_dir and os.path.isdir(last_dir):
+        return last_dir
+    return os.path.expanduser("~")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Start yazi in the directory where it was left the last time.")
+    parser.parse_args()
+
+    path = state_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    # yazi takes the place of this process, and writes the directory it quits in to the state
+    # file.
+    try:
+        os.execvp(YAZI, [YAZI, start_dir(path), f"--cwd-file={path}"])
+    except OSError as error:
+        print(f"hd-yazi: cannot start {YAZI}: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

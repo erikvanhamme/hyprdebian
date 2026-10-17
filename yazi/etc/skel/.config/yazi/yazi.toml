@@ -40,5 +40,5 @@ run = "noop"
 url = "/stor/**"
 run = "noop"
 
-[manager]
+[mgr]
 show_hidden = true

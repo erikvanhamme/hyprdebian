@@ -72,14 +72,11 @@ o_hyprland() {
             deploy/usr/local/bin/hd-volume-down \
             deploy/usr/local/bin/hd-volume-mute \
             deploy/usr/local/bin/hd-volume-up \
-            deploy/usr/local/bin/hd-yazi \
 
     add_template templates/etc/sudoers.d/99-mount-menu.j2 0440
 
     if [[ "${Q_REPO_ENABLED}" == "true" ]]; then
         add_packages wiremix yazi
-
-        add_files deploy/etc/skel/.config/yazi/yazi.toml 
     fi
 }
 

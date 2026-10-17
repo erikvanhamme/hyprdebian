@@ -1,0 +1,16 @@
+Package: yazi
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Recommends: ffmpeg, 7zip, jq, poppler-utils, fd-find, ripgrep, fzf, zoxide
+Section: utils
+Priority: optional
+Homepage: https://yazi-rs.github.io/
+Description: Blazing fast terminal file manager written in Rust
+ Yazi is an async I/O terminal file manager that provides an intuitive
+ multi-column interface, image previews via Kitty/Sixel graphics protocol,
+ built-in code highlighting, and async plugin support.
+ .
+ This package holds yazi and its command line tool ya, built from the
+ release v@YAZI_VERSION@.

@@ -1,5 +1,5 @@
 ## Introduction
-The local hyprdebian repository holds packages that are not in Debian, like `yazi` and `wiremix`. They are built for `unstable`, so the installer only offers the repo on that suite.
+The local hyprdebian repository holds packages that are not in Debian, like `orcaslicer`. They are built for `unstable`, so the installer only offers the repo on that suite.
 
 The repository is signed. The installer downloads the public key from the repo and installs it as `/usr/share/keyrings/hyprdebian-archive-keyring.pgp`. `hyprdebian.local.sources` points `Signed-By` at that file, so apt only trusts that key for this repo, and rejects indices and packages that it did not sign.
 
@@ -35,7 +35,7 @@ The key only exists on the VM. When the VM is replaced, a new key is generated, 
 ## Adding packages
 From `repo/scripts`, build the packages and add them to the repo:
 ```
-./create_deb_yazi.sh
+./create_deb_orcaslicer.sh
 ./update_hyprdebian_repo.sh
 ```
 

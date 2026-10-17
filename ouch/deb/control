@@ -1,0 +1,16 @@
+Package: ouch
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: @DEPENDS@
+Section: utils
+Priority: optional
+Homepage: https://github.com/ouch-org/ouch
+Description: Compression and decompression utility
+ Ouch compresses and decompresses files and directories in one command,
+ for the formats tar, zip, 7z, gzip, snappy, zstd, xz, lzma, lzip, bzip2,
+ bzip3, lz4, brotli and rar (decompression and listing only). It finds the
+ format from the extension of the file.
+ .
+ This package holds ouch, built from the release @OUCH_VERSION@.

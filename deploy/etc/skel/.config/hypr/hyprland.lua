@@ -234,7 +234,7 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-reboot
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/local/bin/hd-ask-poweroff"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("/usr/local/bin/hd-mount"))
 hl.bind(mainMod .. " + U", hl.dsp.exec_cmd("/usr/local/bin/hd-unmount"))
-hl.bind(mainMod .. " + Y", hl.dsp.exec_cmd("kitty -o confirm_os_window_close=0 -e /usr/local/bin/hd-yazi"))
+hl.bind(mainMod .. " + Y", hl.dsp.exec_cmd("kitty -o confirm_os_window_close=0 -e hd-yazi"))
 hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("/usr/local/bin/hd-mode-select"))
 
 -- Move focus with mainMod + arrow keys

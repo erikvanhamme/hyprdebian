@@ -1,0 +1,14 @@
+Package: wiremix
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: @DEPENDS@
+Section: sound
+Priority: optional
+Homepage: https://github.com/tsowell/wiremix
+Description: Simple TUI audio mixer for PipeWire
+ Wiremix is a terminal-based mixer designed for PipeWire, offering
+ volume control, stream routing, and device configuration.
+ .
+ This package holds wiremix, built from the release v@WIREMIX_VERSION@.

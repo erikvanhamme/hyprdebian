@@ -1,0 +1,30 @@
+.TH HD-YAZI 1 "October 2026" "yazi" "HyprDebian"
+.SH NAME
+hd-yazi \- start yazi where it was left the last time
+.SH SYNOPSIS
+.B hd-yazi
+.SH DESCRIPTION
+.B hd-yazi
+starts
+.BR yazi ,
+the terminal file manager, in the directory it was in when it quit the last
+time.
+yazi writes that directory to the state file when it quits, through its
+option
+.BR \-\-cwd\-file .
+.PP
+Without a state file, or when the directory in it no longer exists, yazi
+starts in the home directory.
+The state file is per user.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH FILES
+.TP
+.I $XDG_STATE_HOME/yazi/last-cwd
+The last directory of yazi; without
+.BR XDG_STATE_HOME ,
+.IR ~/.local/state/yazi/last-cwd .
+.SH EXIT STATUS
+The exit status of yazi, or 1 when yazi cannot be started.
