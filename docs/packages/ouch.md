@@ -21,12 +21,12 @@ make deb
 
 This builds `build/ouch_<release>-<revision>_<arch>.deb`. Install it with:
 ```
-sudo apt install ./build/ouch_0.8.3-1_amd64.deb
+sudo apt install ./build/ouch_0.8.3-2_amd64.deb
 ```
 
-The binary is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-ouch.sh` runs in a `debian:sid` container: it installs the build tools with the `cargo` and `rustc` of Debian, clones the release tag and runs `cargo build --release --locked`, which also writes the man pages and completions. `dpkg-shlibdeps` then finds the packages of the libraries the binary links to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
+The binary is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-ouch.sh` runs in a `debian:trixie` container: it installs the build tools and the latest stable Rust toolchain with rustup, as the `rustc` in Debian is too old for ouch, clones the release tag and runs `cargo build --release --locked`, which also writes the man pages and completions. `dpkg-shlibdeps` then finds the packages of the libraries the binary links to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
 
-The container is sid because ouch needs a newer `rustc` than the one in trixie. The Depends from `dpkg-shlibdeps` hold the libc version the binary needs, so apt refuses the package on a release whose libc is too old.
+The container is trixie because the binary needs the libc of the release it is compiled on: built on trixie, it also runs on unstable.
 
 To move to a new release of ouch, change `OUCH_VERSION` in the Makefile, set `DEB_REVISION` back to 1, and update the release on this page. For a new package of the same release, raise `DEB_REVISION`.
 

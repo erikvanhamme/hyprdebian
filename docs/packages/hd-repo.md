@@ -72,7 +72,7 @@ The suites of a package come from the `deploy.json` in its package directory:
 }
 ```
 
-Most HyprDebian packages go to both suites. `hd-desktop` and `hd-screensaver` go to unstable only, as they need Hyprland, which trixie does not have, and so does `ouch`, which is built on sid and needs its libc.
+Most HyprDebian packages go to both suites. `hd-desktop` and `hd-screensaver` go to unstable only, as they need Hyprland, which trixie does not have.
 
 `make update-repo` hands `update-repo.py` each package as `<suites>:<path>`, such as `trixie,unstable:packages/hd-base_1.8_all.deb`. With `--dry-run` before the packages, it only prints the commands.
 

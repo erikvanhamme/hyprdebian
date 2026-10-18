@@ -4,7 +4,7 @@
 #
 #   make deb    build build/ouch_$(DEB_VERSION)_$(ARCH).deb. build-ouch.sh
 #               compiles the release OUCH_VERSION in a $(IMAGE) container,
-#               with the Rust toolchain of Debian, into
+#               with the latest stable Rust toolchain from rustup, into
 #               build/dist-$(OUCH_VERSION); later builds reuse it, until
 #               make clean removes it. It installs:
 #                 /usr/bin/ouch               the tool
@@ -33,7 +33,7 @@ BUILD := build
 
 # The release of ouch, as its tag, and the revision of the package of it.
 OUCH_VERSION := 0.8.3
-DEB_REVISION := 1
+DEB_REVISION := 2
 
 DEB_NAME := ouch
 DEB_VERSION := $(OUCH_VERSION)-$(DEB_REVISION)
@@ -43,9 +43,9 @@ DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
 STAGE := $(BUILD)/deb
 DIST := $(BUILD)/dist-$(OUCH_VERSION)
 DOC := /usr/share/doc/$(DEB_NAME)
-# ouch needs a newer rustc than the one in trixie, so it is built on sid. The
-# Depends from dpkg-shlibdeps say which libc the binary needs.
-IMAGE := debian:sid
+# The binary needs the libc of the release it is compiled on: built on trixie,
+# it also runs on unstable.
+IMAGE := debian:trixie
 
 .PHONY: deb deb-path clean
 

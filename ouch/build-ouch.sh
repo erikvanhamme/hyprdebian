@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds ouch in a Debian container; the Makefile runs it with docker. It
-# installs the build tools with the Rust toolchain of Debian, compiles the
+# installs the build tools and the latest stable Rust toolchain, compiles the
 # release OUCH_VERSION of ouch and copies what the package needs to /out:
 #
 #   /out/ouch                the binary
@@ -23,15 +23,20 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
   git \
   build-essential \
   pkg-config \
-  cargo \
-  rustc \
+  curl \
+  ca-certificates \
   clang \
   dpkg-dev
+
+# The rustc in trixie is too old for ouch, so install the latest stable toolchain with rustup, as
+# for yazi and wiremix. Built on trixie, the binary also runs on unstable.
+echo "--> Installing the latest stable Rust toolchain with rustup..."
+curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | \
+  sh -s -- -y --profile minimal --default-toolchain stable
+. "${HOME}/.cargo/env"
 echo "--> Using $(rustc --version)"
 
-# The tags of ouch have no v. The rust-toolchain.toml of the release only matters to rustup, so
-# cargo builds with the toolchain of Debian, and stops when it is older than the rust-version
-# ouch asks for.
+# The tags of ouch have no v.
 echo "--> Cloning ouch ${OUCH_VERSION}..."
 git clone --depth 1 --branch "${OUCH_VERSION}" "${REPO_URL}" /usr/src/ouch
 cd /usr/src/ouch
