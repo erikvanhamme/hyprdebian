@@ -12,49 +12,6 @@ o_post() {
     return 0
 }
 
-o_firewall() {
-    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
-        add_files \
-            "deploy/etc/modules-load.d/br_netfilter.conf" \
-            "deploy/etc/sysctl.d/50-bridge-netfilter.conf" \
-
-    fi
-}
-
-o_qemu_kvm() {
-    add_packages qemu-system-x86 qemu-system-gui- qemu-utils libvirt-daemon-system libvirt-clients bridge-utils ovmf
-
-    if [[ "${Q_DESKTOP}" == "true" ]]; then
-        add_packages virt-manager
-    fi
-
-    if [[ "${Q_QEMU_KVM}" == "true" ]]; then
-        add_files \
-            deploy/etc/skel/.config/libvirt/libvirt.conf \
-
-    fi
-
-    add_user_groups libvirt kvm
-
-    add_services libvirtd
-
-    add_files \
-        deploy/etc/libvirt/libvirtd.conf \
-        deploy/etc/libvirt/secret.conf \
-        deploy/etc/systemd/network/40-br0.network \
-
-    add_dependencies "pkg_post" "pkg_qemu_kvm"
-    add_dependencies "svc_post" "svc_qemu_kvm"
-
-    # Keep an existing address, so a rerun does not change the MAC of the bridge.
-    if [[ -z "${BR0_MAC_ADDRESS:-}" ]]; then
-        BR0_MAC_ADDRESS=$(random_mac)
-        save_config BR0_MAC_ADDRESS ${BR0_MAC_ADDRESS}
-    fi
-
-    add_template templates/etc/systemd/network/30-br0.netdev.j2
-}
-
 o_cups() {
     add_packages cups avahi-daemon- sane-utils-
     add_user_groups lpadmin

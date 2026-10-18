@@ -42,10 +42,10 @@ Some things to keep in mind:
 ## Static and dynamic dependencies
 Dependencies can be added in two ways:
 - **Statically**, in the body of a phase script. These are registered every time the script is sourced.
-- **Dynamically**, from within a task, usually in response to an answer of the user. For example, when the user answers yes to "Enable Qemu/KVM", `q_qemu_kvm` adds `o_qemu_kvm` to `o_main`:
+- **Dynamically**, from within a task, usually in response to an answer of the user. For example, when the user answers yes to "Install backup tools", `q_backuptools` adds `o_backuptools` to `o_main`:
   ```
-  if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM" "${default}"; then
-      add_dependencies "o_main" "o_qemu_kvm"
+  if ask_yes_no Q_BACKUPTOOLS "Install backup tools" "${default}"; then
+      add_dependencies "o_main" "o_backuptools"
   fi
   ```
 

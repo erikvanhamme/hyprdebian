@@ -1,0 +1,14 @@
+Template: hd-qemu-kvm/bridge-ports
+Type: multiselect
+Choices: ${choices}
+Description: Wired interfaces to put in the bridge br0:
+ Virtual machines reach the network through the bridge br0. The interfaces
+ chosen here become its ports and lose their own addresses: br0 takes over the
+ address settings of the first of them. More than one interface joins them in
+ one network.
+ .
+ br0 has a MAC address of its own, so DHCP may give it another address than the
+ interface had, and a connection over SSH may drop.
+ .
+ Choose none to set up the bridge later with hd-network-bridge and
+ hd-network-iface.

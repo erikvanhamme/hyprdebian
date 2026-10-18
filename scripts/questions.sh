@@ -46,29 +46,6 @@ q_kernel() {
     ask Q_KERNEL "Select kernel version to install"
 }
 
-q_desktop() {
-    # The desktop needs packages that are only in unstable.
-    if [[ "${Q_SUITE}" != "unstable" ]]; then
-        Q_DESKTOP="false"
-        save_config Q_DESKTOP ${Q_DESKTOP}
-        return 0
-    fi
-
-    # ask_yes_no saves the answer, which o_qemu_kvm uses for virt-manager. The desktop itself is
-    # the package hd-desktop. A no is not an error here.
-    local default="$(get_default Q_DESKTOP "${Q_TYPE:-}")"
-    if ask_yes_no Q_DESKTOP "Install hyprland desktop environment" "${default}"; then
-        :
-    fi
-}
-
-q_qemu_kvm() {
-    local default="$(get_default Q_QEMU_KVM "${Q_TYPE:-}")"
-    if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM" "${default}"; then
-        add_dependencies "o_main" "o_qemu_kvm"
-    fi
-}
-
 q_cups() {
     local default="$(get_default Q_CUPS "${Q_TYPE:-}")"
     if ask_yes_no Q_CUPS "Enable CUPS" "${default}"; then
@@ -105,8 +82,6 @@ q_report() {
 add_dependencies "q_main" \
     "q_defaults" \
     "q_kernel" \
-    "q_desktop" \
-    "q_qemu_kvm" \
     "q_cups" \
     "q_backuptools" \
     "q_rust" \

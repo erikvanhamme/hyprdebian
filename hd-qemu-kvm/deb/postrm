@@ -1,0 +1,32 @@
+#!/bin/sh
+# postrm of hd-qemu-kvm: a removal removes the configs of libvirtd and its secrets driver that the
+# postinst wrote and puts back the ones of libvirt, which it diverted. A purge also removes the
+# answer to the debconf question. The network settings and the groups of the users stay as they
+# are. Written for sh, as python3 may be gone by then.
+set -e
+
+LIBVIRT_CONFIGS="/etc/libvirt/libvirtd.conf /etc/libvirt/secret.conf"
+
+if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; then
+    for config in $LIBVIRT_CONFIGS; do
+        if [ "$(dpkg-divert --listpackage "$config")" = "hd-qemu-kvm" ]; then
+            rm -f "$config"
+            dpkg-divert --package hd-qemu-kvm --remove --rename --divert "$config.libvirt" \
+                "$config"
+        fi
+    done
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        systemctl try-restart libvirtd.service || true
+    fi
+fi
+
+if [ "$1" != "purge" ]; then
+    exit 0
+fi
+
+# The confmodule runs this script again under the debconf frontend.
+if [ -e /usr/share/debconf/confmodule ]; then
+    . /usr/share/debconf/confmodule
+    db_purge
+fi

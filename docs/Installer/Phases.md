@@ -6,7 +6,7 @@ The installer is split into phases. Each phase has its own script in the `script
 | 1 | Questions | `questions.sh` | `q_` | Asks the user for the optional components, and adds the dependencies and queue entries that follow from the answers. See [Questions](Questions.md). |
 | 2 | Prerequisites | `prereqs.sh` | `pr_` | Installs the tools the installer needs on the live system. Skipped on the hyprdebian live cd. |
 | 3 | Base | `base.sh` | `b_` | Installs a specific kernel, when one was downloaded. Also queues the files and services for the rotation of the machine id and the journal. |
-| 4 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (Qemu/KVM, printing, backup tools, ...). |
+| 4 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (printing, backup tools, rust, ...). |
 | 5 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
 | 6 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
 | 7 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |
@@ -23,7 +23,7 @@ Each phase has three empty tasks, `<prefix>_pre`, `<prefix>_main` and `<prefix>_
 - `<prefix>_main` holds the normal work of the phase.
 - `<prefix>_pre` and `<prefix>_post` hold work that must run just before or just after it.
 
-Tasks from one phase often attach work to the hooks of a later phase. For example, `o_qemu_kvm` adds `pkg_qemu_kvm` to `pkg_post`, so it runs right after the packages are installed, and `o_rust` adds tasks to `u_post` that need the user account to exist.
+Tasks from one phase often attach work to the hooks of a later phase. For example, `o_backuptools` adds `svc_backuptools` to `svc_post`, so it runs right after the services are enabled, and `o_rust` adds tasks to `u_post` that need the user account to exist.
 
 ## Phase script template
 A new phase script looks like this (with `x` replaced by the prefix of the phase):

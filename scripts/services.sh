@@ -18,12 +18,6 @@ svc_enable() {
     done
 }
 
-svc_qemu_kvm() {
-
-    # Ensure these are disabled to not force TCP or TLS listening
-    in_target systemctl mask libvirtd-tls.socket libvirtd-tcp.socket
-}
-
 svc_backuptools() {
 
     # Make sure iscsi target is not started automatically, it should happen on demand.

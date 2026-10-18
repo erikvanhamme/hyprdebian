@@ -7,7 +7,7 @@ scripts/questions.sh
 ```
 
 ## Asking questions
-Every answer is stored in a variable with the `Q_` prefix (`Q_DESKTOP`, `Q_QEMU_KVM`, `Q_REPORT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
+Every answer is stored in a variable with the `Q_` prefix (`Q_CUPS`, `Q_BACKUPTOOLS`, `Q_REPORT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
 
 | Function | Purpose |
 | --- | --- |
@@ -18,9 +18,7 @@ Each answer is saved in the configuration file immediately. See [Idempotency](Id
 
 Which questions are asked depends on earlier answers. For example, `q_report` only asks for the URL of the dashboard when status reports are enabled.
 
-The machine type `Q_TYPE`, the suite `Q_SUITE` and the questions about the disks, the user, the host and the network are asked by `hd-installer` (see [hd-installer](../packages/hd-installer.md)). On a suite other than `unstable`, these questions are not asked, and are answered with no:
-- `Q_SPECIFIC_KERNEL`: the kernel is `latest`, the kernel of the suite. The ZFS module of the suite may not build for a kernel from elsewhere.
-- `Q_DESKTOP`: the desktop needs packages that are only in `unstable`.
+The machine type `Q_TYPE`, the suite `Q_SUITE` and the questions about the disks, the user, the host and the network are asked by `hd-installer` (see [hd-installer](../packages/hd-installer.md)). On a suite other than `unstable`, `Q_SPECIFIC_KERNEL` is not asked, and is answered with no: the kernel is `latest`, the kernel of the suite. The ZFS module of the suite may not build for a kernel from elsewhere.
 
 ## Machine type defaults
 The defaults for the questions depend on the machine type (`desktop`, `laptop`, `server` or `vm`). They are defined in:

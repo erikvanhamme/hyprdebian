@@ -1,0 +1,204 @@
+#!/usr/bin/python3
+"""postinst of hd-qemu-kvm: replaces the configs of libvirtd and its secrets driver, applies the
+masks and the bridge settings of the firewall, and on the first installation makes the chosen wired
+interfaces ports of the bridge br0.
+
+libvirt ships /etc/libvirt/libvirtd.conf and /etc/libvirt/secret.conf as conffiles. They are
+diverted to <name>.libvirt, so dpkg keeps the ones of libvirt there, and the ones of
+/usr/share/hd-qemu-kvm are written in their place when the diversion is made, after which libvirtd
+is restarted. Later installations leave them alone, so changes made to them stay. The postrm of a
+removal removes them and puts the ones of libvirt back.
+
+It adds nobody to the groups libvirt and kvm; that is up to the administrator.
+
+The bridge is set up on the first installation, on a booted system, when the network settings of
+hd-network have no br0 yet. The wired interfaces are those with a device that are not wifi or
+ports of a bridge already. With one, it becomes the port of br0; with more, the debconf question
+hd-qemu-kvm/bridge-ports asks which ones, and offers the ones that hd-network configures. br0 takes
+over the address settings of the first chosen interface, and hd-network-render applies the
+settings. This is done last, as the address of the system may change with it.
+"""
+
+import fnmatch
+import os
+import shutil
+import subprocess
+import sys
+
+LIB_DIR = "/usr/lib/hd-network"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_network as hn
+
+PACKAGE = "hd-qemu-kvm"
+SHARE_DIR = "/usr/share/hd-qemu-kvm"
+# The configs of libvirt that hd-qemu-kvm replaces.
+LIBVIRT_CONFIGS = ["/etc/libvirt/libvirtd.conf", "/etc/libvirt/secret.conf"]
+SYSCTL_CONF = "/usr/lib/sysctl.d/50-bridge-netfilter.conf"
+NET_CLASS_DIR = "/sys/class/net"
+BRIDGE = "br0"
+QUESTION = "hd-qemu-kvm/bridge-ports"
+# The type of ethernet interfaces in /sys/class/net/<name>/type, ARPHRD_ETHER.
+ARPHRD_ETHER = "1"
+
+
+def booted():
+    return os.path.isdir("/run/systemd/system")
+
+
+def read_sys(path):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def divert(path):
+    """Diverts a config of libvirt to <path>.libvirt. True if hd-qemu-kvm had not done so yet."""
+    owner = subprocess.run(["dpkg-divert", "--listpackage", path], capture_output=True,
+                           text=True, check=True).stdout.strip()
+    if owner == PACKAGE:
+        return False
+    subprocess.run(["dpkg-divert", "--package", PACKAGE, "--add", "--rename", "--divert",
+                    path + ".libvirt", path], check=True)
+    return True
+
+
+def replace_libvirt_configs():
+    """Diverts the configs of libvirt and writes those of hd-qemu-kvm. True if one was written."""
+    written = False
+    for path in LIBVIRT_CONFIGS:
+        if not divert(path):
+            continue
+        shutil.copyfile(os.path.join(SHARE_DIR, os.path.basename(path)), path)
+        os.chmod(path, 0o644)
+        print(f"Wrote {path}; the one of libvirt is {path}.libvirt.")
+        written = True
+    return written
+
+
+def wired_interfaces(settings):
+    """The names of the wired interfaces that may become ports of br0, sorted."""
+    ports = {name for name, entry in settings.get("interfaces", {}).items() if "bridge" in entry}
+    names = []
+    for name in os.listdir(NET_CLASS_DIR):
+        path = os.path.join(NET_CLASS_DIR, name)
+        if not os.path.exists(os.path.join(path, "device")):
+            continue
+        if os.path.isdir(os.path.join(path, "wireless")):
+            continue
+        if read_sys(os.path.join(path, "type")) != ARPHRD_ETHER:
+            continue
+        if name in ports:
+            continue
+        names.append(name)
+    return sorted(names)
+
+
+def interface_entry(settings, name):
+    """The settings of hd-network that apply to the interface, or None. An exact name comes before
+    the globs, which come in the order of their files, as networkd uses the first that matches."""
+    interfaces = settings.get("interfaces", {})
+    if name in interfaces:
+        return interfaces[name]
+    globs = sorted((n for n in interfaces if hn.is_glob(n)), key=hn.interface_file)
+    for glob in globs:
+        if fnmatch.fnmatchcase(name, glob):
+            return interfaces[glob]
+    return None
+
+
+def choose_ports(settings, candidates):
+    """Asks which candidates become ports of br0. Offers the ones that hd-network configures."""
+    import debconf
+
+    offered = [name for name in candidates if interface_entry(settings, name) is not None]
+    with debconf.Debconf(run_frontend=True) as db:
+        db.subst(QUESTION, "choices", ", ".join(candidates))
+        if db.fget(QUESTION, "seen") != "true":
+            db.set(QUESTION, ", ".join(offered))
+        db.forceInput(debconf.HIGH, QUESTION)
+        db.go()
+        answer = db.get(QUESTION)
+    # stdout was the pipe to the debconf frontend, which no longer reads it. The output of the
+    # commands below goes to stderr.
+    os.dup2(2, 1)
+    return [name for name in answer.split(", ") if name in candidates]
+
+
+def address_options(entry):
+    """The options of hd-network-bridge that give br0 the address settings of an interface."""
+    options = []
+    if "dhcp" in entry:
+        options.append("--dhcp" if entry["dhcp"] else "--no-dhcp")
+    for field, option in (("addresses", "--address"), ("gateway", "--gateway"),
+                          ("dns", "--dns")):
+        for value in hn.as_list(f"{hn.CONFIG_KEY}.interfaces", entry.get(field, [])):
+            options += [option, value]
+    if "metric" in entry:
+        options += ["--metric", str(entry["metric"])]
+    return options
+
+
+def set_up_bridge(ports, settings):
+    """Makes the interfaces ports of br0, with the address settings of the first one."""
+    entry = interface_entry(settings, ports[0]) or {}
+    subprocess.run(["hd-network-bridge", "set", BRIDGE] + address_options(entry), check=True)
+    for name in ports:
+        subprocess.run(["hd-network-iface", "set", name, "--bridge", BRIDGE], check=True)
+    subprocess.run(["hd-network-render"], check=True)
+    print(f"{BRIDGE} has the ports {', '.join(ports)}.")
+
+
+def bridge_ports():
+    """The interfaces that become ports of br0 on this installation, empty for none."""
+    if not booted():
+        print(f"Not on a booted system; set up {BRIDGE} with hd-network-bridge and "
+              "hd-network-iface.")
+        return [], {}
+    settings = hn.load_settings()
+    if BRIDGE in settings.get("bridges", {}):
+        print(f"{BRIDGE} is already in the network settings; leaving it as it is.")
+        return [], settings
+    candidates = wired_interfaces(settings)
+    if not candidates:
+        print(f"There is no wired interface for {BRIDGE}.")
+        return [], settings
+    if len(candidates) == 1:
+        return candidates, settings
+    ports = choose_ports(settings, candidates)
+    if not ports:
+        print(f"No interface was chosen for {BRIDGE}.")
+    return ports, settings
+
+
+def main():
+    # configure is the only action that installs the package; the abort-* actions undo a
+    # failed upgrade or removal.
+    if len(sys.argv) < 2 or sys.argv[1] != "configure":
+        return
+
+    # The version that was configured before, empty on the first installation.
+    previous = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    # The question comes first: the debconf frontend runs this script again from the start.
+    ports, settings = [], {}
+    if previous == "":
+        ports, settings = bridge_ports()
+
+    configs_written = replace_libvirt_configs()
+
+    if booted():
+        subprocess.run(["systemctl", "daemon-reload"], check=True)
+        subprocess.run(["modprobe", "br_netfilter"], check=True)
+        subprocess.run(["sysctl", "-q", "-p", SYSCTL_CONF], check=True)
+        if configs_written:
+            subprocess.run(["systemctl", "try-restart", "libvirtd.service"], check=True)
+
+    if ports:
+        set_up_bridge(ports, settings)
+
+
+if __name__ == "__main__":
+    main()

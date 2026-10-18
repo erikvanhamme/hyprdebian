@@ -196,18 +196,6 @@ log_status() {
     printf "%b[%s]%b <%s> %s\n" "$color" "$label" "$COLOR_RESET" "$timestamp" "$step"
 }
 
-# Generates a random mac address.
-random_mac() {
-    local bytes
-    bytes=$(od -An -N6 -tx1 /dev/urandom)
-
-    # Set locally-administered bit and clear multicast bit
-    set -- $bytes
-    printf '%02x:%02x:%02x:%02x:%02x:%02x\n' \
-        "$((0x$1 & 0xfe | 0x02))" \
-        "0x$2" "0x$3" "0x$4" "0x$5" "0x$6"
-}
-
 # Prints a random token of 32 hex characters.
 random_token() {
     od -An -N16 -tx1 /dev/urandom | tr -d ' \n'
