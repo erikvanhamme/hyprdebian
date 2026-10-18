@@ -19,7 +19,7 @@ This builds `build/hd-theme_<version>_all.deb`, with the version from `version.j
 sudo apt install ./build/hd-theme_<version>_all.deb
 ```
 
-The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
+The package comes with the themes `default` and `sand`. The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
 
 The files involved are:
 ```
@@ -28,6 +28,7 @@ packages/hd-theme/version.json
 packages/hd-theme/hd-theme
 packages/hd-theme/hd-theme-card
 packages/hd-theme/themes/default.json
+packages/hd-theme/themes/sand.json
 packages/hd-theme/templates/
 packages/hd-theme/deb/control
 packages/hd-theme/deb/postinst
