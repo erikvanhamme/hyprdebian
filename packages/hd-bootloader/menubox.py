@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Draws the bootloader menu box over a wallpaper.
 
-The box is --size percent of the width and of the height of the wallpaper (80
+The box is --size percent of the width and of the height of the wallpaper (50
 by default), with its centre at --x-center percent of the width and --y-center
 percent of the height (50 by default, the centre of the wallpaper). It is
 black at 80% opacity. It is surrounded by an opaque border, 5 pixels wide by
@@ -23,7 +23,7 @@ DEFAULT_BORDER_COLOR = "#ff6600"
 DEFAULT_BORDER_WIDTH = 5
 
 # Size and centre of the box, in percent of the image.
-DEFAULT_SIZE = 80
+DEFAULT_SIZE = 50
 DEFAULT_X_CENTER = 50
 DEFAULT_Y_CENTER = 50
 

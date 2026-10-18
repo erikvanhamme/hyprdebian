@@ -90,7 +90,7 @@ The key `hd-bootloader` holds a JSON object, as `hd-bootloader-gfx` stores it:
         "color": "#0066cc",
         "selected_color": "#ff6600",
         "border_width": 5,
-        "work_area_size": 80,
+        "work_area_size": 50,
         "x_center": 50,
         "y_center": 50,
         "cmdline": {
@@ -117,7 +117,7 @@ All fields are optional; a missing field gets its default. A field of the other 
 | `color` | graphical | `#0066cc` | The colour of the menu labels. |
 | `selected_color` | graphical | `#ff6600` | The colour of the selected label and of the border of the menu box. |
 | `border_width` | graphical | `5` | The width of the border of the menu box in pixels. |
-| `work_area_size` | graphical | `80` | The width and height of the menu box in percent of the screen; the texts scale with it. |
+| `work_area_size` | graphical | `50` | The width and height of the menu box in percent of the screen; the texts scale with it. |
 | `x_center`, `y_center` | graphical | `50`, `50` | The centre of the menu box in percent of the screen. |
 
 To change the settings, write the whole key with `hd-config-update`, then update the ESPs:

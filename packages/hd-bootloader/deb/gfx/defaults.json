@@ -9,7 +9,7 @@
     "color": "#0066cc",
     "selected_color": "#ff6600",
     "border_width": 5,
-    "work_area_size": 80,
+    "work_area_size": 50,
     "x_center": 50,
     "y_center": 50,
     "cmdline": {

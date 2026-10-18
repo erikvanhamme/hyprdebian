@@ -231,7 +231,7 @@ bool blit(Bytes buffer, uint32_t x, uint32_t y)
 }
 
 // The work area of the .area section. Without a valid one, such as when it
-// does not fit on the screen, it is the default of menubox.py: 80% of the
+// does not fit on the screen, it is the default of menubox.py: 50% of the
 // screen, rounded to the nearest pixel, and centred.
 WorkArea work_area()
 {
@@ -250,8 +250,8 @@ WorkArea work_area()
         }
     }
 
-    const uint32_t width = (screen_width * 8 + 5) / 10;
-    const uint32_t height = (screen_height * 8 + 5) / 10;
+    const uint32_t width = (screen_width + 1) / 2;
+    const uint32_t height = (screen_height + 1) / 2;
     return {(screen_width - width) / 2, (screen_height - height) / 2, width, height, height / work_area_rows};
 }
 
