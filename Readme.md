@@ -115,6 +115,7 @@ Subsequent boots will be normal.
 
 The `docs` folder has more documentation:
 - [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
+- [Build requirements](docs/HyprDebian/Build%20requirements.md): what a computer needs to build the packages, run the tests and build the live ISO.
 - [Installer](docs/packages/hd-installer.md): how the installer works, its questions and how it is built.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
