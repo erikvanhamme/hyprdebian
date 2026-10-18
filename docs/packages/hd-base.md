@@ -29,7 +29,7 @@ packages/hd-base/hd-poweroff
 packages/hd-base/hd-sync-skel
 packages/hd-base/hd-issue
 packages/hd-base/hd-link-repo
-packages/hd-base/templates/hyprdebian.local.sources.j2
+packages/hd-base/templates/hyprdebian.sources.j2
 packages/hd-base/etc/skel/.bash_aliases
 packages/hd-base/etc/skel/.gitconfig
 packages/hd-base/etc/skel/.config/nano/nanorc
@@ -114,7 +114,7 @@ hd-issue
 HyprDebian <version> · <suite> · <console>
 ```
 
-with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.local.sources`, and the name of the console. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`.
+with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.sources`, and the name of the console. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`.
 
 The postinst runs it on every installation and upgrade. Run it as root after changing the suite yourself:
 ```
@@ -126,11 +126,11 @@ sudo hd-issue
 hd-link-repo [<url>] [--suite trixie|unstable]
 ```
 
-`hd-link-repo` links the system to a HyprDebian repository, the one apt gets the hd-* packages from, and to a suite of it. Without arguments it shows the current repository and suite, from `/etc/apt/sources.list.d/hyprdebian.local.sources`.
+`hd-link-repo` links the system to a HyprDebian repository, the one apt gets the hd-* packages from, and to a suite of it. Without arguments it shows the current repository and suite, from `/etc/apt/sources.list.d/hyprdebian.sources`.
 
 With a URL it switches to the repository there, and with `--suite` to another suite; what is left out stays as it is. A switch:
 1. downloads the signing key from `<url>/hyprdebian-archive-keyring.pgp` to `/usr/share/keyrings/hyprdebian-archive-keyring.pgp`, and stops when that fails;
-2. writes the apt source from the jinja2 template `/usr/share/hd-base/templates/hyprdebian.local.sources.j2`;
+2. writes the apt source from the jinja2 template `/usr/share/hd-base/templates/hyprdebian.sources.j2`;
 3. updates the package lists of that source alone, and puts the old source and key back when that fails;
 4. updates all package lists, and writes the login banner again with `hd-issue`, which shows the suite.
 
@@ -164,6 +164,7 @@ The files below `/usr/lib` are the defaults of the package: to change one, add a
 
 The postinst of the package:
 - masks `systemd-firstboot.service`, the setup of the first boot, and `rpcbind.socket` and `rpcbind.service`, which `nfs-common` pulls in but HyprDebian does not use. It does this on the first installation, and on an upgrade from a version before 0.2, so a unit that the admin unmasks again stays unmasked on upgrades. A purge unmasks them. An upgrade from a version before 1.1 unmasks `systemd-preset-all.service` and `systemd-machine-id-commit.service`, which those versions masked as well;
+- on an upgrade from a version before 1.11, renames the apt source `/etc/apt/sources.list.d/hyprdebian.local.sources`, the name of those versions, to `hyprdebian.sources`, unless that one already exists;
 - points `/etc/resolv.conf` at `/run/systemd/resolve/resolv.conf`, the name servers themselves, in place of `stub-resolv.conf`, as there is no stub resolver. It only replaces the link that systemd-resolved made. When that file is missing, because systemd-resolved does not run, as in the chroot of the installer, it is made with the name servers of the old link, so names keep resolving until systemd-resolved starts;
 - diverts `/etc/issue` of base-files to `/etc/issue.debian` and runs `hd-issue`, see below, on every installation and upgrade. A removal of the package removes the banner of `hd-issue` and puts the one of base-files back;
 - empties `/etc/motd`, on the first installation like the masks, and diverts `/etc/update-motd.d/10-uname` of base-files to `10-uname.base-files`, which run-parts skips, as the banner already shows the kernel. A removal of the package puts it back. base-files only writes `/etc/motd` when it is missing.
@@ -179,7 +180,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/bin/hd-sync-skel` | Brings the files of `/etc/skel` into the home directory. |
 | `/usr/sbin/hd-issue` | Writes the login banner in `/etc/issue`. |
 | `/usr/sbin/hd-link-repo` | Switches the HyprDebian repository and suite of apt. |
-| `/usr/share/hd-base/templates/hyprdebian.local.sources.j2` | The template of the apt source of `hd-link-repo`. |
+| `/usr/share/hd-base/templates/hyprdebian.sources.j2` | The template of the apt source of `hd-link-repo`. |
 | `/etc/hyprdebian/version.json` | The version of HyprDebian, `version.json` of the root of this repository, which is also the version of hd-base. The banners show it. A conffile. |
 | `/etc/issue` | The login banner, written by `hd-issue`. The one of base-files is diverted to `/etc/issue.debian`. |
 | `/etc/skel/.bash_aliases`, `/etc/skel/.gitconfig`, `/etc/skel/.config/nano/nanorc` | The files new users get, conffiles. |

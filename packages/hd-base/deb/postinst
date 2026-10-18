@@ -23,6 +23,10 @@ The message after a login is /etc/motd followed by the output of the scripts in
 prints the kernel again, is diverted to a name with a dot, which run-parts skips. base-files only
 writes /etc/motd when it is missing. The postrm of a removal puts 10-uname back.
 
+Versions before SOURCES_SINCE named the apt source of hd-link-repo hyprdebian.local.sources. An
+upgrade from such a version renames it to hyprdebian.sources, unless that one already exists, so
+hd-link-repo, hd-issue and hd-report find it.
+
 /etc/issue of base-files is diverted to /etc/issue.debian, and hd-issue writes the HyprDebian
 banner in its place, on every installation and upgrade, so it shows the version that is installed.
 The postrm of a removal removes it and puts the one of base-files back.
@@ -58,6 +62,11 @@ UNAME = "/etc/update-motd.d/10-uname"
 UNAME_DIVERTED = UNAME + ".base-files"
 ISSUE = "/etc/issue"
 ISSUE_DIVERTED = "/etc/issue.debian"
+
+# The apt source of hd-link-repo, and its name before SOURCES_SINCE.
+SOURCES = "/etc/apt/sources.list.d/hyprdebian.sources"
+SOURCES_OLD = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+SOURCES_SINCE = "1.11"
 
 RESOLV_CONF = "/etc/resolv.conf"
 STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]
@@ -98,6 +107,15 @@ def older_than(version, than):
     return subprocess.run(["dpkg", "--compare-versions", version, "lt", than]).returncode == 0
 
 
+def rename_sources():
+    if not os.path.exists(SOURCES_OLD):
+        return
+    if os.path.exists(SOURCES):
+        return
+    os.rename(SOURCES_OLD, SOURCES)
+    print(f"Renamed {SOURCES_OLD} to {SOURCES}.")
+
+
 def link_resolv_conf():
     if not os.path.islink(RESOLV_CONF):
         return
@@ -128,6 +146,8 @@ def main():
         empty_motd()
     if previous != "" and older_than(previous, UNMASKED_SINCE):
         unmask_units()
+    if previous != "" and older_than(previous, SOURCES_SINCE):
+        rename_sources()
     link_resolv_conf()
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)

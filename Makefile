@@ -13,6 +13,11 @@
 #                   ask for the name, zvol, cpus, memory, bridge and GPU of a
 #                   vm, then define it in libvirt and start it from the live cd
 #                   (vm/provision-vm.py); make the zvol first
+#   make iso        build every package, then the live ISO with them in
+#                   livecd/ (livecd/Makefile): hd-installer installed on the
+#                   live system, and every package as the local repository
+#                   that the installer installs the hd-* packages from, in
+#                   the suites of the deploy.json of its directory
 #   make update-repo
 #                   build every package, then ask for the host name of a
 #                   HyprDebian repository and upload the packages of every
@@ -41,7 +46,7 @@ OUT := build
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
-.PHONY: all test clean provision-vm update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean iso provision-vm update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -68,13 +73,23 @@ clean:
 provision-vm:
 	python3 vm/provision-vm.py
 
+# Prints each package of the package directories in PACKAGES as
+# <repos>:build/<package>.deb, one per line, for update-repo.py and the live cd.
+define LIST_DEBS
+for package in $(PACKAGES); do \
+	repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
+	for deb in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
+		echo "$$repos:$(OUT)/$$(basename $$deb)"; \
+	done; \
+done
+endef
+
+# Hands the live cd every package, as <repos>:build/<package>.deb.
+iso: all
+	debs=$$($(LIST_DEBS)) || exit 1; \
+	$(MAKE) -C livecd iso DEBS="$$(echo $$debs)"
+
 # Hands update-repo.py each package as <repos>:build/<package>.deb.
 update-repo: all
-	uploads=; \
-	for package in $(PACKAGES); do \
-		repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
-		for deb in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
-			uploads="$$uploads $$repos:$(OUT)/$$(basename $$deb)"; \
-		done; \
-	done; \
+	uploads=$$($(LIST_DEBS)) || exit 1; \
 	python3 update-repo/update-repo.py $$uploads

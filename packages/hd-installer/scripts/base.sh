@@ -1,7 +1,7 @@
 #!/bin/bash
 # The base phase: installs the base system with debootstrap on the ZFS pool, writes the files that
-# depend on the disks and the answers, adds the Debian and HyprDebian package repositories, and
-# installs the kernel and ZFS. The other packages are marked with add_packages and installed by the
+# depend on the disks and the answers, adds the Debian repositories and the local repository of the
+# live cd, and installs the kernel and ZFS. The other packages are marked with add_packages and installed by the
 # packages phase.
 
 b_pre() {
@@ -152,12 +152,28 @@ b_mount() {
     mount --bind /run/systemd/journal/dev-log "${TARGET_DIR}/run/systemd/journal/dev-log"
 }
 
-# The Debian repositories, and the HyprDebian repository, which the hd-* packages come from.
+# The local repository of the live cd, which the hd-* packages come from. It is bound into /run of
+# the new system, a tmpfs, so none of it ends up on the disks. Its apt source is trusted, as the
+# repository comes with the installer; c_live_repo removes it again.
+b_live_repo() {
+    if [[ ! -d "${LIVE_REPO_DIR}/dists/${Q_SUITE}" ]]; then
+        echo "ERROR: ${LIVE_REPO_DIR} has no suite ${Q_SUITE}. Run the installer from the" \
+            "HyprDebian live cd."
+        return 1
+    fi
+
+    mkdir -p "${TARGET_DIR}${LIVE_REPO_TARGET}" || return 1
+    if ! mountpoint -q "${TARGET_DIR}${LIVE_REPO_TARGET}"; then
+        mount --bind -o ro "${LIVE_REPO_DIR}" "${TARGET_DIR}${LIVE_REPO_TARGET}" || return 1
+    fi
+
+    template_render templates/etc/apt/sources.list.d/hyprdebian-live.sources.j2 0644 \
+        live_repo="${LIVE_REPO_TARGET}"
+}
+
+# The Debian repositories, next to the local repository of the live cd.
 b_apt_init() {
     template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
-
-    repo_key_download || return 1
-    template_render templates/etc/apt/sources.list.d/hyprdebian.local.sources.j2 || return 1
 
     rm -f "${TARGET_DIR}/etc/apt/sources.list" || return 1
 
@@ -270,6 +286,7 @@ add_dependencies "b_main" \
     "b_zfs_cache"  \
     "b_mount" \
     "b_mount_unit" \
+    "b_live_repo" \
     "b_apt_init" \
     "b_console" \
     "b_buildtools" \

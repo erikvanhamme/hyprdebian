@@ -9,7 +9,7 @@ The package hd-base installs this as /usr/sbin/hd-link-repo.
     hd-link-repo <url> --suite <suite>   switch both
 
 A switch downloads the signing key from the repository to the keyring that Signed-By names,
-writes the apt source /etc/apt/sources.list.d/hyprdebian.local.sources from the jinja2 template
+writes the apt source /etc/apt/sources.list.d/hyprdebian.sources from the jinja2 template
 in /usr/share/hd-base/templates, and checks the new source with apt-get update. When that check
 fails, the old source and key are put back. Then it updates all package lists and writes the
 login banner again with hd-issue, which shows the suite. Run it as root to switch.
@@ -24,7 +24,7 @@ import tempfile
 
 import jinja2
 
-SOURCES = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+SOURCES = "/etc/apt/sources.list.d/hyprdebian.sources"
 KEYRING = "/usr/share/keyrings/hyprdebian-archive-keyring.pgp"
 KEY_FILE = "hyprdebian-archive-keyring.pgp"
 APT_HELPER = "/usr/lib/apt/apt-helper"
@@ -133,7 +133,7 @@ def main():
         repo += "/"
 
     key = download_key(repo)
-    sources = TEMPLATES.get_template("hyprdebian.local.sources.j2").render(
+    sources = TEMPLATES.get_template("hyprdebian.sources.j2").render(
         repo=repo, suite=suite, keyring=KEYRING).encode("utf-8")
 
     old_key = read(KEYRING)

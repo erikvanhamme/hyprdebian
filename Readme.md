@@ -46,12 +46,12 @@ Please note:
 
 ### From the HyprDebian live ISO
 
-The HyprDebian live ISO is a small Debian trixie live system with a text console, ZFS support, an ssh server that allows logging in with a password, and the package `hd-installer` installed.
+The HyprDebian live ISO is a small Debian trixie live system with a text console, ZFS support, an ssh server that allows logging in with a password, the package `hd-installer` installed, and every hd-* package in a local repository, which the installer installs them from. The Debian packages still come from the Debian mirrors, so the installation needs internet access, but no HyprDebian repository.
 
-Build it in a debian:trixie docker container with:
+Build every package, then the ISO in a debian:trixie docker container, with:
 
 ```
-make -C livecd iso
+make iso
 ```
 
 The ISO is written to livecd/out/hyprdebian-live-amd64.iso. Write it to a USB stick, for example with:
@@ -66,6 +66,12 @@ The live cd boots to a text console, logged in as the user `user`. You can also 
 
 ```
 sudo hd-installer
+```
+
+The installed system has no HyprDebian repository. To get updates of the hd-* packages, link it to one after the first boot, see `man hd-link-repo`:
+
+```
+sudo hd-link-repo http://repo/ --suite unstable
 ```
 
 See [Live cd](docs/Livecd/Overview.md) for more on building and using it.

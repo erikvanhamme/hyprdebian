@@ -106,7 +106,7 @@ sudo /usr/lib/apt/apt-helper download-file \
     /usr/share/keyrings/hyprdebian-archive-keyring.pgp
 ```
 
-and add `/etc/apt/sources.list.d/hyprdebian.local.sources`:
+and add `/etc/apt/sources.list.d/hyprdebian.sources`:
 ```
 Types: deb
 URIs: http://repo.example/

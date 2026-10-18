@@ -1,6 +1,7 @@
 #!/bin/bash
-# The cleanup phase: takes a snapshot of the installed system, unmounts it and exports its pool, so
-# the new system can import it when it boots.
+# The cleanup phase: removes the local repository of the live cd from the apt sources, takes a
+# snapshot of the installed system, unmounts it and exports its pool, so the new system can import
+# it when it boots.
 
 c_pre() {
     return 0
@@ -12,6 +13,13 @@ c_main() {
 
 c_post() {
     return 0
+}
+
+# The new system keeps only the Debian repositories. Its hd-* packages get updates once it is
+# linked to a HyprDebian repository with hd-link-repo, see c_repo_note.
+c_live_repo() {
+    rm -f "${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian-live.sources" || return 1
+    in_target apt update
 }
 
 c_snapshots() {
@@ -27,8 +35,16 @@ c_unmount() {
     zpool export rpool
 }
 
+c_repo_note() {
+    echo "The new system has no HyprDebian repository. To get updates of the hd-* packages, link it"
+    echo "to one after the first boot, as root:"
+    echo "    hd-link-repo <url> --suite ${Q_SUITE}"
+}
+
 add_dependencies "c_main" \
+    "c_live_repo" \
     "c_snapshots" \
     "c_unmount" \
+    "c_repo_note" \
 
 add_dependencies "install_root" "c_pre" "c_main" "c_post"

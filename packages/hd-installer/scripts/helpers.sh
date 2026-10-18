@@ -109,19 +109,6 @@ template_render() {
         "${dst}" -m "${mode}"
 }
 
-# Downloads the signing key of the HyprDebian repository from the repository itself, for the
-# Signed-By of hyprdebian.local.sources. apt-helper comes with apt, so the target needs no
-# download tool.
-repo_key_download() {
-    local url="${Q_REPO%/}/hyprdebian-archive-keyring.pgp"
-    local tmp="/tmp/hyprdebian-archive-keyring.pgp"
-
-    echo "Downloading ${url}"
-    in_target /usr/lib/apt/apt-helper download-file "${url}" "${tmp}" || return 1
-    in_target install -m 0644 "${tmp}" "${REPO_KEY}" || return 1
-    rm -f "${TARGET_DIR}${tmp}"
-}
-
 # Asks for a line of text, and stores it.
 # Usage: ask <variable> <prompt> <default>
 # The saved answer is offered first, then the default; without either, the answer may be empty.

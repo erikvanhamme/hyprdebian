@@ -14,6 +14,23 @@ install
 .B hd-desktop
 on it afterwards.
 .PP
+It installs the hd-* packages from the local repository of the HyprDebian
+live cd,
+.IR /srv/hyprdebian/repo ,
+and the Debian packages from the Debian mirrors, so it needs internet access
+but no HyprDebian repository.
+The installed system keeps only the Debian repositories.
+To get updates of the hd-* packages, link it to a HyprDebian repository
+after the first boot with
+.BR hd-link-repo (8):
+.PP
+.RS
+.B hd-link-repo
+.I url
+.B \-\-suite
+.I suite
+.RE
+.PP
 The installation is a tree of tasks in phases.
 A task runs once: when it succeeds it is marked done, and a rerun skips it.
 After a failure, fix the cause and run
@@ -31,7 +48,7 @@ The Debian suite to install:
 .B unstable
 or
 .BR trixie ,
-the suites of the HyprDebian package repository;
+the suites of HyprDebian;
 .B unstable
 by default.
 .B hd-desktop
@@ -97,12 +114,6 @@ Without a wired interface, there is none, without the question.
 Whether wifi is used, not by default, and then the wifi
 interface, which also gets its address with DHCP.
 Without a wifi interface, there is no wifi, without the question.
-.TP
-.B Repository
-The URL of the HyprDebian package repository, which the packages of the
-system are installed from;
-.B http://repo/
-by default.
 .PP
 Interfaces are picked by number, by their path name, such as
 .BR enp3s0 ,
@@ -182,8 +193,10 @@ on
 .I /boot/efi
 and
 .IR /boot/efi2 .
-It adds the Debian repositories and the HyprDebian repository, with its key,
-asks the locales, the time zone and the keyboard, and installs the kernel
+It binds the local repository of the live cd into
+.I /run
+of the new system and adds it as a trusted apt source, adds the Debian
+repositories, asks the locales, the time zone and the keyboard, and installs the kernel
 and ZFS.
 It marks the other packages for the packages phase:
 .BR hd-base ,
@@ -227,10 +240,12 @@ and
 .BR video .
 .TP
 .B cleanup
-Takes the snapshot
+Removes the apt source of the local repository of the live cd, takes the
+snapshot
 .B rpool/hyprdebian@install
 of the installed system, unmounts it and exports the pool, so the new
 system imports it when it boots.
+Then it shows how to link the new system to a HyprDebian repository.
 The filesystem phase makes
 .I /mnt
 a private mount before the pool is mounted, so no service of the live system
@@ -255,9 +270,14 @@ The finished tasks.
 .TP
 .I /usr/lib/hd-installer
 The installer and its phases.
+.TP
+.I /srv/hyprdebian/repo
+The local repository of the live cd, which the hd-* packages are installed
+from.
 .SH SEE ALSO
 .BR hd-base (7),
 .BR hd-bootloader (7),
+.BR hd-link-repo (8),
 .BR hd-network (7),
 .BR hd-secboot (7)
 .SH AUTHOR

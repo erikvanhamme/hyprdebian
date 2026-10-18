@@ -11,7 +11,7 @@ hd-link-repo \- switch the HyprDebian repository of apt
 links the system to a HyprDebian repository, the one apt gets the hd-*
 packages from, and to a suite of it.
 Without arguments it shows the current repository and suite, from
-.IR /etc/apt/sources.list.d/hyprdebian.local.sources .
+.IR /etc/apt/sources.list.d/hyprdebian.sources .
 .PP
 With a
 .I url
@@ -27,7 +27,7 @@ to
 and stops when that fails;
 .IP 2. 4
 writes the apt source from the template
-.IR /usr/share/hd-base/templates/hyprdebian.local.sources.j2 ;
+.IR /usr/share/hd-base/templates/hyprdebian.sources.j2 ;
 .IP 3. 4
 updates the package lists of that source alone, and puts the old source and
 key back when that fails;
@@ -77,14 +77,14 @@ sudo hd-link-repo http://repo.example/ \-\-suite unstable
 .RE
 .SH FILES
 .TP
-.I /etc/apt/sources.list.d/hyprdebian.local.sources
+.I /etc/apt/sources.list.d/hyprdebian.sources
 The apt source of the HyprDebian repository.
 .TP
 .I /usr/share/keyrings/hyprdebian\-archive\-keyring.pgp
 The signing key of the repository, which the source names in
 .BR Signed\-By .
 .TP
-.I /usr/share/hd-base/templates/hyprdebian.local.sources.j2
+.I /usr/share/hd-base/templates/hyprdebian.sources.j2
 The template of the apt source.
 .SH SEE ALSO
 .BR hd-base (7),

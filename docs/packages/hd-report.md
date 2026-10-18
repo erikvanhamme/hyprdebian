@@ -86,7 +86,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | Part | Source |
 | --- | --- |
 | Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
-| HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.local.sources`. |
+| HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.sources`. |
 | Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`. |
 | Boot time, load, CPUs, memory, swap | `/proc`. |
 | Pools | `zpool list` and the scan line of `zpool status`. |

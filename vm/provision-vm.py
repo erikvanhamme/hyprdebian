@@ -254,7 +254,7 @@ def main():
 
     try:
         if not os.path.isfile(ISO):
-            raise ProvisionError(f"{ISO} does not exist; build it with make -C livecd iso")
+            raise ProvisionError(f"{ISO} does not exist; build it with make iso")
 
         name = ask_name(domains())
         settings = {

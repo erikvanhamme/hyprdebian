@@ -20,7 +20,7 @@ import sys
 
 ISSUE = "/etc/issue"
 VERSION = "/etc/hyprdebian/version.json"
-SOURCES = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+SOURCES = "/etc/apt/sources.list.d/hyprdebian.sources"
 UNKNOWN = "unknown"
 
 

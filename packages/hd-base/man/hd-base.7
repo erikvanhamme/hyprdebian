@@ -124,7 +124,10 @@ An upgrade from a version before 1.1 unmasks
 .B systemd-preset-all.service
 and
 .BR systemd-machine-id-commit.service ,
-which those versions masked as well.
+which those versions masked as well, and renames the apt source
+.IR /etc/apt/sources.list.d/hyprdebian.local.sources ,
+the name of versions before 1.11, to
+.IR hyprdebian.sources .
 It also points
 .I /etc/resolv.conf
 at
@@ -271,7 +274,7 @@ Writes the login banner in
 .I /usr/sbin/hd-link-repo
 Switches the HyprDebian repository and suite of apt.
 .TP
-.I /usr/share/hd-base/templates/hyprdebian.local.sources.j2
+.I /usr/share/hd-base/templates/hyprdebian.sources.j2
 The template of the apt source of
 .BR hd-link-repo .
 .TP

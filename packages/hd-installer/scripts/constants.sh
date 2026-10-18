@@ -4,8 +4,10 @@
 # Where the new system is mounted while it is installed.
 TARGET_DIR="/mnt"
 
-# Signing key of the HyprDebian repository, also in hyprdebian.local.sources.j2.
-REPO_KEY="/usr/share/keyrings/hyprdebian-archive-keyring.pgp"
+# The local repository of the live cd, which the hd-* packages are installed from, and where it is
+# bound in the new system while it is installed. The live cd puts it there in livecd/build.sh.
+LIVE_REPO_DIR="/srv/hyprdebian/repo"
+LIVE_REPO_TARGET="/run/hd-installer/repo"
 
 # The partitions of the disks, the same on every disk: the EFI system partition on the ESP
 # disks, the swap and the ZFS pool on the system disks. A disk that is only one of the two has

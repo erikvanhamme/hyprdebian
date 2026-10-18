@@ -167,15 +167,6 @@ q_wifi() {
     fi
 }
 
-# The HyprDebian package repository, which the packages of the system are installed from.
-q_repo() {
-    local default
-    default="$(get_default Q_REPO)" || return 1
-    ask_valid Q_REPO "HyprDebian repository URL" "${default}" valid_repo \
-        "The URL starts with http:// or https://, followed by the host, without spaces." \
-        || return 1
-}
-
 # Every disk picked for the system or the EFI system partition is wiped. Each must be confirmed
 # by typing the answer; the confirmation is not saved.
 q_wipe() {
@@ -212,7 +203,6 @@ add_dependencies "q_main" \
     "q_fqdn" \
     "q_iface" \
     "q_wifi" \
-    "q_repo" \
     "q_wipe" \
 
 # The password is never saved, so it must be asked again on every run.

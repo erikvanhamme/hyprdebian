@@ -1,5 +1,5 @@
-# Build environment for the HyprDebian live ISO: live-build and the tools to
-# build the hd-installer package. The repository is mounted at /src when the
+# Build environment for the HyprDebian live ISO: live-build, and apt-utils for
+# the index of the local repository of the hd-* packages. The repository is mounted at /src when the
 # container runs, so the image only has to be rebuilt when this file changes.
 # See the Makefile next to this file.
 
@@ -7,6 +7,7 @@ FROM debian:trixie
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+      apt-utils \
       ca-certificates \
       debootstrap \
       dosfstools \
@@ -14,7 +15,6 @@ RUN apt-get update \
       grub-pc-bin \
       isolinux \
       live-build \
-      make \
       mtools \
       python3 \
       squashfs-tools \

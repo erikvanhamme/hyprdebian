@@ -1,5 +1,5 @@
 ## Introduction
-This page lists what a computer needs to build HyprDebian from this repository: the packages with `make all`, their tests with `make test`, the live ISO, and the tools around them. Every build runs as a normal user; none needs root, but the Docker builds need a user that may run docker.
+This page lists what a computer needs to build HyprDebian from this repository: the packages with `make all`, their tests with `make test`, the live ISO with `make iso`, and the tools around them. Every build runs as a normal user; none needs root, but the Docker builds need a user that may run docker.
 
 The builds are made for amd64. `hd-backup`, `orcaslicer` and the packages compiled from Rust take the architecture of the build computer or are amd64 only, and the AppImage of OrcaSlicer is run on the build computer to unpack it.
 
@@ -51,13 +51,13 @@ The downloads and the compiled releases are kept in `build/` of their package di
 | `hd-report` | `python3`, only the standard library. It also loads `packages/hd-dashboard/hd-dashboard`. |
 | `hd-backup` | `python3` and the C compiler of `make deb`, as it builds `blockwrite` first. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
 
-## The live ISO: make -C livecd iso
-The ISO is built in a container, see [Live cd](../Livecd/Overview.md). The computer only needs:
+## The live ISO: make iso
+`make iso` builds every package, then the ISO in a container, see [Live cd](../Livecd/Overview.md). The computer needs everything `make all` needs, and:
 - `docker` (docker.io) and a user that may run it.
 - Privileged containers: the container runs with `--privileged`, because live-build mounts filesystems and makes device nodes in its chroot.
 - Internet access, for the `debian:trixie` image, the packages of `livecd/Dockerfile` and the packages of the live system.
 
-live-build, debootstrap, the boot loaders and the tools to build `hd-installer` are all installed in the image.
+live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), which indexes the local repository of the hd-* packages, are all installed in the image.
 
 ## The bootloader for development: make esp and make image
 `make esp` and `make image` in `packages/hd-bootloader` are not part of `make all`. They build an ESP from the kernels of the build computer, to try the bootloader in QEMU, and also need:

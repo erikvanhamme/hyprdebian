@@ -1,7 +1,7 @@
 #!/bin/bash
 # The suites and the defaults of the questions.
 
-# The Debian suites of the HyprDebian package repository, in the order they are offered.
+# The Debian suites of HyprDebian, in the order they are offered.
 SUITES=(unstable trixie)
 
 # The defaults, keyed by the variable of the question.
@@ -16,7 +16,6 @@ declare -gA DEFAULTS=(
     # The default of the FQDN is the host name followed by this domain.
     [Q_DOMAIN]="rsq-online.ddns.net"
     [Q_WIFI]="n"
-    [Q_REPO]="http://repo/"
 )
 
 # Prints the default of a question, if there is one.

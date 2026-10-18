@@ -4,7 +4,7 @@
 # ssh. pam_motd runs this as root. The package hd-base installs it.
 
 # The source of the HyprDebian packages, whose suite is shown.
-SOURCES=/etc/apt/sources.list.d/hyprdebian.local.sources
+SOURCES=/etc/apt/sources.list.d/hyprdebian.sources
 
 # The version of HyprDebian, which hd-base installs.
 VERSION=/etc/hyprdebian/version.json

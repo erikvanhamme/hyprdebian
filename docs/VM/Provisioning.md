@@ -4,7 +4,7 @@ A HyprDebian vm is provisioned on the local computer and installed there with th
 `make provision-vm`, in the root of the repository, asks the questions for a new vm, then defines it in libvirt (`qemu:///system`) and starts it from the live ISO.
 
 ## Before provisioning
-1. Build the live ISO with `make -C livecd iso` (see [Live cd](../Livecd/Overview.md)). The vm boots from `livecd/out/hyprdebian-live-amd64.iso`.
+1. Build the live ISO with `make iso`, in the root of the repository (see [Live cd](../Livecd/Overview.md)). The vm boots from `livecd/out/hyprdebian-live-amd64.iso`.
 2. Make the zvol of the vm, for example:
 ```
 sudo zfs create -V 64G rpool/vmdk/<name>

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Helpers for the network: picking the interfaces and checking the URL of the repository.
+# Helpers for the network: picking the interfaces.
 # Interfaces are named by their path name (ID_NET_NAME_PATH of udev), such as enp3s0, which is the
 # name they get on the installed system. The live system may name them otherwise.
 
@@ -58,12 +58,6 @@ iface_info() {
             return 0
         fi
     done
-}
-
-# The URL of the HyprDebian package repository: http:// or https://, a host, and optionally a
-# port and a path, without spaces.
-valid_repo() {
-    [[ "$1" =~ ^https?://[^/[:space:]]+(/[^[:space:]]*)?$ ]]
 }
 
 # Asks to pick a wired or wifi interface by number, and stores its path name.

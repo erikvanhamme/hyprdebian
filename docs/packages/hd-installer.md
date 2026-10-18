@@ -5,6 +5,8 @@ It has the questions, disk, partition, filesystem, base, packages, user and clea
 
 It depends on `python3` and `python3-jinja2`, to render the files it writes in the new system.
 
+It installs the hd-* packages from the local repository of the HyprDebian live cd, in `/srv/hyprdebian/repo`, and the Debian packages from the Debian mirrors, so it needs internet access but no HyprDebian repository. The installed system keeps only the Debian repositories; to get updates of the hd-* packages, link it to a HyprDebian repository after the first boot with `hd-link-repo <url> --suite <suite>`, see [hd-base](hd-base.md).
+
 The package comes with a man page: `man hd-installer`.
 
 ## Building the package
@@ -19,9 +21,9 @@ This builds `build/hd-installer_<version>_all.deb`, with the version from `versi
 sudo apt install ./build/hd-installer_<version>_all.deb
 ```
 
-The installer also runs from the source tree, as root:
+The installer also runs from the source tree, as root, on a live system with the local repository of the live cd:
 ```
-sudo ./hd-installer/hd-installer
+sudo ./packages/hd-installer/hd-installer
 ```
 
 The files involved are:
@@ -57,14 +59,14 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 
 | File | Purpose |
 | --- | --- |
-| `scripts/constants.sh` | The mount point of the new system, the key of the HyprDebian repository, the numbers of the partitions, the state directory, the directories of the disk names and of the network interfaces, and the colors. |
+| `scripts/constants.sh` | The mount point of the new system, the local repository of the live cd and where it is bound in the new system, the numbers of the partitions, the state directory, the directories of the disk names and of the network interfaces, and the colors. |
 | `scripts/config.sh` | `load_config` and `save_config`: the answers and the task dependencies, kept in `/tmp/hd-installer/config` as variable assignments. |
 | `scripts/defaults.sh` | The suites and the defaults of the questions. |
 | `scripts/dependencies.sh` | `add_dependencies`, `execute_task` and `always_run`: the tree of tasks, each marked done in `/tmp/hd-installer/<task>.done`. |
-| `scripts/helpers.sh` | Asking questions: `ask`, which asks for a line of text; `ask_valid`, which asks until a check function accepts the answer and only stores a valid one; `ask_password`, which asks for a password twice without showing or saving it; `ask_options`, which asks to pick one of a list of options; `ask_yes_no`, which asks a yes or no question and stores `true` or `false`; `confirm`, which asks to confirm something that cannot be undone, without a default and without saving the answer; and `set_answer`, which stores an answer that follows from earlier ones. Also `log_status`, which logs the start and end of a task; `add_packages`, which marks packages for the packages phase; `add_user_groups`, which adds groups for the user; `in_target`, which runs a command in the new system; `file_deploy`, which copies a file from `deploy/` into the new system; `template_render`, which renders a template from `templates/` into the new system with `render.py`, with the answers except the password and the variables given; and `repo_key_download`, which downloads the key of the HyprDebian repository into the new system. |
+| `scripts/helpers.sh` | Asking questions: `ask`, which asks for a line of text; `ask_valid`, which asks until a check function accepts the answer and only stores a valid one; `ask_password`, which asks for a password twice without showing or saving it; `ask_options`, which asks to pick one of a list of options; `ask_yes_no`, which asks a yes or no question and stores `true` or `false`; `confirm`, which asks to confirm something that cannot be undone, without a default and without saving the answer; and `set_answer`, which stores an answer that follows from earlier ones. Also `log_status`, which logs the start and end of a task; `add_packages`, which marks packages for the packages phase; `add_user_groups`, which adds groups for the user; `in_target`, which runs a command in the new system; `file_deploy`, which copies a file from `deploy/` into the new system; and `template_render`, which renders a template from `templates/` into the new system with `render.py`, with the answers except the password and the variables given. |
 | `scripts/helpers-disk.sh` | `list_disks`, which lists the whole disks by their name in `/dev/disk/by-id`; `ask_disk`, which asks to pick one of them; `unique_disks`, which lists the disks picked, each once; `root_disks`, `esp_disks` and `all_disks`, which list the disks of the system, of the EFI system partitions and both; `part`, which names a partition of a disk; `unmount_target`, which unmounts everything below `/mnt`, deepest first; `can_discard`, which tells whether a disk supports discard; and `valid_swap`, the check of the swap size. |
 | `scripts/helpers-host.sh` | `valid_hostname` and `valid_fqdn`, the checks of the host name and the FQDN. |
-| `scripts/helpers-network.sh` | `list_ifaces`, which lists the wired or the wifi interfaces by their path name; `ask_iface`, which asks to pick one of them; and `valid_repo`, the check of the URL of the repository. |
+| `scripts/helpers-network.sh` | `list_ifaces`, which lists the wired or the wifi interfaces by their path name; and `ask_iface`, which asks to pick one of them. |
 | `scripts/helpers-user.sh` | `valid_user` and `valid_fullname`, the checks of the user name and the full name. |
 | `scripts/questions.sh` | The questions phase: `q_pre`, `q_main` and `q_post`, and a task per question. |
 | `scripts/disk.sh` | The disk phase, with the tasks `d_`. |
@@ -83,7 +85,7 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 ## Questions
 | Question | Variable | Answers |
 | --- | --- | --- |
-| Suite | `Q_SUITE` | `unstable` or `trixie`, the suites of the HyprDebian package repository; `unstable` by default. `hd-desktop` needs packages that are only in `unstable`. |
+| Suite | `Q_SUITE` | `unstable` or `trixie`, the suites of HyprDebian; `unstable` by default. `hd-desktop` needs packages that are only in `unstable`. |
 | System mirror | `Q_ROOT_REDUNDANT` | `true` when the system, the ZFS pool and the swap, is mirrored on two disks; not by default. |
 | Encryption | `Q_ENCRYPT` | `true` when the ZFS pool is encrypted, with the password of the user as its passphrase; by default. |
 | System disks | `Q_ROOT_DISK_A`, `Q_ROOT_DISK_B` | The disk for the system, and with the mirror the second one; `Q_ROOT_DISK_B` is empty without it. |
@@ -97,7 +99,6 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 | FQDN | `Q_FQDN` | The fully qualified domain name: the host name, a dot and the domain, in labels like the host name, at most 253 characters. By default the host name followed by the domain `Q_DOMAIN` of the defaults. |
 | Wired interface | `Q_IFACE` | The wired interface, which gets its address with DHCP; by default the first one. Without a wired interface, it is empty, without the question. |
 | Wifi | `Q_WIFI`, `Q_WIFACE` | `true` when wifi is used, not by default, and then the wifi interface, which also gets its address with DHCP; `Q_WIFACE` is empty without wifi. Without a wifi interface, there is no wifi, without the question. |
-| Repository | `Q_REPO` | The URL of the HyprDebian package repository, which the packages of the system are installed from; `http://repo/` by default. It starts with `http://` or `https://`, followed by the host and optionally a port and a path. The repository is always used. |
 | Wipe | | Every disk picked above is wiped. Each one must be confirmed by typing `y`; the confirmation is not saved. This is the last question, so nothing is wiped before every question is answered. |
 
 The EFI system partitions are asked apart from the system, so they can go on other disks than the ZFS pool, such as a hardware RAID volume next to a ZFS mirror on disks that the RAID controller passes through. An ESP disk may also be one of the system disks.
@@ -141,7 +142,8 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_zfs_cache` | Copies the cache file of the ZFS pool into the new system. |
 | `b_mount` | Binds `/dev`, `/proc` and `/sys` and the journal socket into the new system. |
 | `b_mount_unit` | Writes and enables the automount units of the EFI system partitions on `/boot/efi` and, on mirrored ESP disks, `/boot/efi2`, by their UUID. |
-| `b_apt_init` | Adds the Debian repositories, with the updates and security repositories for a stable suite, and the HyprDebian repository `Q_REPO` with its key, then updates the package lists. |
+| `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository or not the suite. |
+| `b_apt_init` | Adds the Debian repositories, with the updates and security repositories for a stable suite, then updates the package lists. |
 | `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font. |
 | `b_buildtools` | Installs the tools to build the ZFS module and the initramfs, which does not wait for a resume device. |
 | `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
@@ -180,8 +182,10 @@ The cleanup phase hands the installed system over:
 
 | Task | What it does |
 | --- | --- |
+| `c_live_repo` | Removes the apt source of the local repository of the live cd and updates the package lists, so the new system keeps only the Debian repositories. |
 | `c_snapshots` | Takes the snapshot `rpool/hyprdebian@install`, the system as it was installed. |
 | `c_unmount` | Unmounts everything below `/mnt`, deepest first, and exports the pool, so the new system imports it when it boots. |
+| `c_repo_note` | Shows how to link the new system to a HyprDebian repository with `hd-link-repo`. |
 
 When the installation is done, reboot into the new system. With encryption, the initramfs asks the password before it imports the pool.
 
@@ -192,3 +196,4 @@ When the installation is done, reboot into the new system. With encryption, the 
 | `/tmp/hd-installer/*.done` | The finished tasks. |
 | `/usr/lib/hd-installer` | The installer, its helpers and its phases. |
 | `/usr/sbin/hd-installer` | A link to `/usr/lib/hd-installer/hd-installer`. |
+| `/srv/hyprdebian/repo` | The local repository of the live cd, which the hd-* packages are installed from. |
