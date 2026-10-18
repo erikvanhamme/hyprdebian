@@ -6,7 +6,9 @@ The package
 .B hd-desktop
 depends on the packages of the HyprDebian desktop, so that they are installed
 with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle and
-hyprlock, greetd, kitty, wofi, mako, PipeWire with wiremix, the screenshot
+hyprlock, greetd, kitty, wofi,
+.BR hd-menu (1),
+mako, PipeWire with wiremix, the screenshot
 tools grim, slurp and swappy, nwg-look with the GTK and Qt themes, the
 wallpapers of
 .BR hd-art (7),
@@ -71,7 +73,9 @@ The key bindings of Hyprland run these commands, in
 .IR /usr/bin :
 .TP
 .BR hd-ask-reboot ,\  hd-ask-poweroff
-Ask with wofi whether to reboot or power off, then run
+Ask with
+.BR hd-menu (1)
+whether to reboot or power off, then run
 .B hd-reboot
 or
 .B hd-poweroff
@@ -79,14 +83,16 @@ of
 .BR hd-base (7).
 .TP
 .B hd-mode-select
-Choose the resolution and refresh rate of a monitor with wofi.
+Choose the resolution and refresh rate of a monitor with
+.BR hd-menu (1).
 .TP
 .BR hd-mount ,\  hd-unmount
 Mount a drive or an
 .I /etc/fstab
 entry, on
 .IR /mnt/<user>/<n> ,
-and unmount it again, with wofi.
+and unmount it again, with
+.BR hd-menu (1).
 They run
 .I /usr/libexec/hd-desktop/hd-mount-helper
 with sudo; the users in the group
@@ -101,8 +107,11 @@ Change the volume of the default output and show it in a notification.
 Run wofi with the given arguments, unless a wofi of
 .B hd-wofi
 is already open; then it exits with 1.
-The launcher and the menus above open with it, so a second press of a key
-binding opens no second menu.
+The launcher opens with it, so a second press of its key binding opens no
+second launcher.
+The menus above use
+.BR hd-menu (1),
+which has a lock of its own.
 .SH DARK THEME
 .I /etc/dconf/db/local.d/00-dark-theme
 asks GTK applications for the dark Adwaita theme.

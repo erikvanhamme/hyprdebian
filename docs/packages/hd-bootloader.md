@@ -86,7 +86,7 @@ The key `hd-bootloader` holds a JSON object, as `hd-bootloader-gfx` stores it:
         "res_y": 1080,
         "timeout": 5,
         "banner_text": "HyprDebian Bootloader",
-        "font": "JetBrainsMono Nerd Font Mono",
+        "font": "JetBrainsMono NFM Medium",
         "color": "#0066cc",
         "selected_color": "#ff6600",
         "border_width": 5,
@@ -113,7 +113,7 @@ All fields are optional; a missing field gets its default. A field of the other 
 | `cmdline` | both | see above | The kernel command line of the UKIs: `root` (the value of `root=`), `quiet`, `splash`, and `extra`, a list of more arguments. The graphical frontend adds `video=<res_x>x<res_y>` before those of `extra`, which can override it. |
 | `wallpaper` | graphical | `/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png` | The wallpaper; a relative path is relative to `/etc/hyprdebian`. |
 | `res_x`, `res_y` | graphical | `1920`, `1080` | The display resolution of the bootloader, also passed to the kernel as `video=<res_x>x<res_y>`, so that the plymouth boot splash and the desktop start with the same resolution. |
-| `font` | graphical | `JetBrainsMono Nerd Font Mono` | The fontconfig name or file of the font. |
+| `font` | graphical | `JetBrainsMono NFM Medium` | The fontconfig name or file of the font. |
 | `color` | graphical | `#0066cc` | The colour of the menu labels. |
 | `selected_color` | graphical | `#ff6600` | The colour of the selected label and of the border of the menu box. |
 | `border_width` | graphical | `5` | The width of the border of the menu box in pixels. |

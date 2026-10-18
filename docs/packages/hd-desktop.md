@@ -2,7 +2,7 @@
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
 - Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown;
 - greetd, which logs the user in to Hyprland at the boot;
-- kitty, wofi, mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
+- kitty, wofi, [hd-menu](hd-menu.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
 - nwg-look with the GTK and Qt themes, the wallpapers of [hd-art](hd-art.md) and the fonts of [hd-fonts](hd-fonts.md);
 - yazi, and the applications audacious, mpv, imv, firefox and meld.
 
@@ -89,11 +89,11 @@ The key bindings run these commands, in `/usr/bin`:
 
 | Command | |
 | --- | --- |
-| `hd-ask-reboot`, `hd-ask-poweroff` | Ask with wofi whether to reboot or power off, then run `hd-reboot` or `hd-poweroff` of [hd-base](hd-base.md). |
-| `hd-mode-select` | Choose the resolution and refresh rate of a monitor with wofi. |
-| `hd-mount`, `hd-unmount` | Mount a drive or an `/etc/fstab` entry, a drive on `/mnt/<user>/<n>`, and unmount it again, with wofi. |
+| `hd-ask-reboot`, `hd-ask-poweroff` | Ask with [hd-menu](hd-menu.md) whether to reboot or power off, then run `hd-reboot` or `hd-poweroff` of [hd-base](hd-base.md). |
+| `hd-mode-select` | Choose the resolution and refresh rate of a monitor with [hd-menu](hd-menu.md). |
+| `hd-mount`, `hd-unmount` | Mount a drive or an `/etc/fstab` entry, a drive on `/mnt/<user>/<n>`, and unmount it again, with [hd-menu](hd-menu.md). |
 | `hd-volume-up`, `hd-volume-down`, `hd-volume-mute` | Change the volume of the default output and show it in a notification. |
-| `hd-wofi` | Run wofi with the given arguments, unless a wofi of `hd-wofi` is already open; then it exits with 1. The launcher and the menus above open with it, so a second press of a key binding opens no second menu. |
+| `hd-wofi` | Run wofi with the given arguments, unless a wofi of `hd-wofi` is already open; then it exits with 1. The launcher opens with it, so a second press of its key binding opens no second launcher. The menus above use [hd-menu](hd-menu.md), which has a lock of its own. |
 
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
 

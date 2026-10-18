@@ -62,7 +62,7 @@ DEFAULTS = {
     "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
     "res_x": 1920,
     "res_y": 1080,
-    "font": "JetBrainsMono Nerd Font Mono",
+    "font": "JetBrainsMono NFM Medium",
     "color": "#0066cc",
     "selected_color": "#ff6600",
     "border_width": 5,

@@ -28,15 +28,16 @@ if [[ -z "$COMBINED_LIST" ]]; then
     exit 0
 fi
 
-# Present options in wofi
-SELECTED_LINE=$(echo "$COMBINED_LIST" | hd-wofi --dmenu --prompt "Select device to mount:" --width 1024 --lines 10)
+# Present options in hd-menu: each line is the device path/source string, a
+# tab and its description. The label shows both; the value, which hd-menu
+# prints, is the device.
+MENU=$(jq -Rn --arg banner "Select device to mount" \
+    '{banner: $banner, options: [inputs | select(. != "") | split("\t") | {label: "\(.[0])  \(.[1])", value: .[0]}]}' <<< "$COMBINED_LIST")
+TARGET_DEV=$(echo "$MENU" | hd-menu)
 
-if [[ -z "$SELECTED_LINE" ]]; then
+if [[ -z "$TARGET_DEV" ]]; then
     exit 0
 fi
-
-# Extract device path/source string (first column before tab)
-TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
 
 # Execute mount helper with elevated privileges, and dispatch the outcome via mako.
 # The result is tested in the if, so set -e does not end the script before a failure is shown.

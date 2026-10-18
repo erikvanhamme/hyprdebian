@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIRM=$(echo -e "No\nYes" | hd-wofi --dmenu --prompt "Power off system?" --width 350 --height 150)
+# The menu of hd-menu: No, selected, and Yes, with a cross and a check mark
+# of the Nerd Font. hd-menu prints the value of the option chosen, and exits
+# with 1 when the menu is closed without a choice.
+MENU='{"banner": "Power off system?", "options": [{"label": "\uf00d  No", "value": "No", "default": true}, {"label": "\uf00c  Yes", "value": "Yes"}]}'
+
+CONFIRM=$(echo "$MENU" | hd-menu)
 
 if [[ "$CONFIRM" == "Yes" ]]; then
     hd-poweroff
 fi
-

@@ -5,7 +5,7 @@
     "res_y": 1080,
     "timeout": 5,
     "banner_text": "HyprDebian Bootloader",
-    "font": "JetBrainsMono Nerd Font Mono",
+    "font": "JetBrainsMono NFM Medium",
     "color": "#0066cc",
     "selected_color": "#ff6600",
     "border_width": 5,

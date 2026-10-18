@@ -42,14 +42,14 @@ packages/hd-fonts/man/hd-fonts.7
 ```
 
 ## Using the fonts
-Name a family in the configuration of a program, with the style or size where it takes one. For example, in `~/.config/kitty/kitty.conf`:
+Name the font in the configuration of a program by a family name, with the size where it takes one. The families also have the short names `JetBrainsMono NF` and `JetBrainsMono NFM`, and every style but Regular and Bold has a family name of its own, such as `JetBrainsMono NFM Medium`. Such a name works in every program: in those that look up a family name, and in those that read a style after the family, as GTK and Pango do. HyprDebian uses `JetBrainsMono NFM Medium` everywhere. For example, in `~/.config/kitty/kitty.conf`:
 ```
-font_family JetBrainsMono Nerd Font Mono
+font_family JetBrainsMono NFM Medium
 ```
 
 or, in a GTK font name:
 ```
-JetBrainsMono Nerd Font Medium 11
+JetBrainsMono NFM Medium 11
 ```
 
 To list the installed styles:

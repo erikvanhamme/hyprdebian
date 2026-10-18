@@ -53,9 +53,9 @@ text_colour.blue = 1.0;
 
 # The fonts, from hd-fonts. The initramfs-tools hook of hd-plymouth puts
 # them in the initramfs.
-FONT = "JetBrainsMono Nerd Font Mono Medium 18";
-FONT_ITALIC = "JetBrainsMono Nerd Font Mono Medium Italic 18";
-FONT_SMALL = "JetBrainsMono Nerd Font Mono Medium 13";
+FONT = "JetBrainsMono NFM Medium 18";
+FONT_ITALIC = "JetBrainsMono NFM Medium Italic 18";
+FONT_SMALL = "JetBrainsMono NFM Medium 13";
 
 PLACEHOLDER_TEXT = "Enter Password";
 FAIL_TEXT = "Wrong password";

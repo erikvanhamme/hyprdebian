@@ -6,14 +6,14 @@ height (ascent plus descent) fills it. That way images of different texts in
 the same font and height line up, whatever their letters. The image is as wide
 as the text.
 
-The font is a fontconfig name such as "JetBrainsMono Nerd Font Mono" (looked
+The font is a fontconfig name such as "JetBrainsMono NFM Medium" (looked
 up with fc-match) or a path to a font file.
 
 Needs python3-pil.
 
 Example:
     text2png.py --text "HyprDebian-Kernel-7.2.10" --color "#0066cc" \\
-        --font "JetBrainsMono Nerd Font Mono" --height 65 --output label.png
+        --font "JetBrainsMono NFM Medium" --height 65 --output label.png
 """
 
 import argparse

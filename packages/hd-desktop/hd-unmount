@@ -9,7 +9,8 @@ if [[ ! -f "$STATE_FILE" || ! -s "$STATE_FILE" ]]; then
     exit 0
 fi
 
-# Build wofi selection menu from active state tracking file
+# Build the lines of the menu from the active state tracking file: the device,
+# a tab and where it is mounted
 MENU_ITEMS=""
 while IFS='|' read -r dev mp is_fstab; do
     if [[ -n "$dev" ]]; then
@@ -28,13 +29,15 @@ if [[ -z "$MENU_ITEMS" ]]; then
     exit 0
 fi
 
-SELECTED_LINE=$(echo "$MENU_ITEMS" | hd-wofi --dmenu --prompt "Select device to unmount:" --width 1024 --lines 10)
+# Present them in hd-menu. The label shows the whole line; the value, which
+# hd-menu prints, is the device.
+MENU=$(jq -Rn --arg banner "Select device to unmount" \
+    '{banner: $banner, options: [inputs | select(. != "") | split("\t") | {label: "\(.[0])  \(.[1])", value: .[0]}]}' <<< "$MENU_ITEMS")
+TARGET_DEV=$(echo "$MENU" | hd-menu)
 
-if [[ -z "$SELECTED_LINE" ]]; then
+if [[ -z "$TARGET_DEV" ]]; then
     exit 0
 fi
-
-TARGET_DEV=$(echo "$SELECTED_LINE" | awk -F'\t' '{print $1}')
 
 # The result is tested in the if, so set -e does not end the script before a failure is shown.
 if RESULT=$(sudo /usr/libexec/hd-desktop/hd-mount-helper unmount "$TARGET_DEV" "$CURRENT_USER" 2>&1); then

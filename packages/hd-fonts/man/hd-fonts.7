@@ -27,14 +27,25 @@ The fonts are in
 fontconfig finds them there, and refreshes its cache when the package is
 installed, upgraded or removed.
 .SH USING THE FONTS
-Name a family in the configuration of a program, with the style or size
-where it takes one.
+Name the font in the configuration of a program by a family name, with the
+size where it takes one.
+The families also have the short names
+.B JetBrainsMono NF
+and
+.BR "JetBrainsMono NFM" ,
+and every style but Regular and Bold has a family name of its own, such as
+.BR "JetBrainsMono NFM Medium" .
+Such a name works in every program: in those that look up a family name,
+and in those that read a style after the family, as GTK and Pango do.
+HyprDebian uses
+.B JetBrainsMono NFM Medium
+everywhere.
 For example, in
 .IR ~/.config/kitty/kitty.conf :
 .PP
 .RS
 .nf
-font_family JetBrainsMono Nerd Font Mono
+font_family JetBrainsMono NFM Medium
 .fi
 .RE
 .PP
@@ -42,7 +53,7 @@ or, in a GTK font name:
 .PP
 .RS
 .nf
-JetBrainsMono Nerd Font Medium 11
+JetBrainsMono NFM Medium 11
 .fi
 .RE
 .PP
