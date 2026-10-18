@@ -40,7 +40,7 @@ def healthy(host="box", version="1.3"):
         "format": 1,
         "host": host,
         "fqdn": host + ".example.net",
-        "hyprdebian": {"version": version, "type": "desktop", "suite": "unstable"},
+        "hyprdebian": {"version": version, "suite": "unstable"},
         "os": {"debian": "forky/sid", "kernel": "7.2.10", "kernel_newest": "7.2.10", "boot_time": NOW - 3600},
         "load": [0.5, 0.4, 0.3],
         "cpus": 4,

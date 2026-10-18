@@ -6,9 +6,7 @@
 # The source of the HyprDebian packages, whose suite is shown.
 SOURCES=/etc/apt/sources.list.d/hyprdebian.local.sources
 
-# The HyprDebian configuration, where the installer saved the type of the installation, and the
-# version of HyprDebian, which hd-base installs.
-CONFIG=/etc/hyprdebian/config.json
+# The version of HyprDebian, which hd-base installs.
 VERSION=/etc/hyprdebian/version.json
 
 # The colors of the window borders: orange for the logo, blue for its shadow.
@@ -26,21 +24,6 @@ hyprdebian_version() {
     value=$(python3 -c 'import json, sys
 v = json.load(open(sys.argv[1]))
 print("%d.%d" % (v["major"], v["minor"]))' "$VERSION" 2>/dev/null)
-
-    if [[ -z "$value" ]]; then
-        value="unknown"
-    fi
-
-    echo "$value"
-}
-
-# Prints the type of the installation, such as desktop or server, from the key hd-installer of the
-# configuration, or "unknown".
-install_type() {
-    local value
-
-    value=$(python3 -c 'import json, sys
-print(json.load(open(sys.argv[1]))["hd-installer"]["type"])' "$CONFIG" 2>/dev/null)
 
     if [[ -z "$value" ]]; then
         value="unknown"
@@ -98,8 +81,8 @@ show_version() {
 
     debian=$(cat /etc/debian_version 2>/dev/null)
 
-    printf '  %sHyprDebian%s %s · %s · %s · Debian %s\n' "$ACCENT" "$RESET" \
-        "$(hyprdebian_version)" "$(install_type)" "$(suite)" "${debian:-unknown}"
+    printf '  %sHyprDebian%s %s · %s · Debian %s\n' "$ACCENT" "$RESET" \
+        "$(hyprdebian_version)" "$(suite)" "${debian:-unknown}"
     printf '  %sMaintained by Erik Van Hamme <erik.vanhamme@gmail.com>%s\n\n' "$LABEL" "$RESET"
 }
 

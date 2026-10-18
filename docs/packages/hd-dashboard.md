@@ -95,7 +95,7 @@ The connection is plain HTTP, meant for the local network.
 | --- | --- |
 | `format` | The layout of the report, now 1. Reports with a newer format than the dashboard knows are refused with 400. |
 | `host`, `fqdn` | The host name, by which the dashboard knows the system, and its FQDN. |
-| `hyprdebian` | `version`, `type` and `suite` of the HyprDebian installation. |
+| `hyprdebian` | `version` and `suite` of the HyprDebian installation. |
 | `os` | `debian`, the Debian version, `kernel`, the running kernel, `kernel_newest`, the newest installed kernel, and `boot_time`. |
 | `load`, `cpus` | The load averages and the number of CPUs. |
 | `memory`, `swap` | `total` and `used`, in bytes. |

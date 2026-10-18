@@ -211,16 +211,12 @@ b_esp() {
     fi
 }
 
-# Desktops and laptops get the graphical bootloader, the others the text-only one. Its postinst
+# The base system gets the text-only bootloader. Its postinst
 # does not write the ESPs: pkg_esps does that once all packages are installed, with the DKMS MOK
 # that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-secboot. pkg_boot_entries
 # then adds its firmware boot entries.
 b_bootloader() {
-    if [[ "${Q_TYPE}" == "desktop" || "${Q_TYPE}" == "laptop" ]]; then
-        add_packages hd-bootloader-gfx
-    else
-        add_packages hd-bootloader-txt
-    fi
+    add_packages hd-bootloader-txt
 
     add_packages efibootmgr
 
@@ -234,11 +230,7 @@ b_secureboot() {
 }
 
 b_systemd() {
-    if [[ "${Q_TYPE}" != "vm" ]]; then
-        add_packages systemd-timesyncd
-    fi
-
-    add_packages systemd-resolved
+    add_packages systemd-timesyncd systemd-resolved
 
     # adm lets the user read the logs, which stay in the systemd journal.
     add_user_groups adm
@@ -248,10 +240,6 @@ b_systemd() {
 # files in /etc/skel that root gets in pkg_root_skel and the user in u_skel.
 b_utilities() {
     add_packages hd-base
-
-    if [[ "${Q_TYPE}" == "vm" ]]; then
-        add_packages qemu-guest-agent
-    fi
 
     add_dependencies "pkg_post" "pkg_utilities" "pkg_root_skel"
 }

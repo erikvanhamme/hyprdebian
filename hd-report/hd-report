@@ -84,15 +84,6 @@ def hyprdebian_version(path=VERSION_FILE):
         return ""
 
 
-def install_type(path=CONFIG_FILE):
-    """The type of the installation, from the key hd-installer of the configuration."""
-    config = read_json(path)
-    try:
-        return str(config["hd-installer"]["type"])
-    except (KeyError, TypeError):
-        return ""
-
-
 def parse_suite(text):
     """The suite of the HyprDebian packages, from their apt source."""
     for line in (text or "").splitlines():
@@ -373,7 +364,6 @@ def collect():
         "sent_at": int(time.time()),
         "hyprdebian": {
             "version": hyprdebian_version(),
-            "type": install_type(),
             "suite": parse_suite(read_file(SOURCES_FILE)),
         },
         "os": {

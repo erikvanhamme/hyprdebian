@@ -86,7 +86,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | Part | Source |
 | --- | --- |
 | Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
-| HyprDebian version, type, suite | `/etc/hyprdebian/version.json` of `hd-base`, `type` in the key `hd-installer` of `/etc/hyprdebian/config.json`, and the suite in `/etc/apt/sources.list.d/hyprdebian.local.sources`. |
+| HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.local.sources`. |
 | Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`. |
 | Boot time, load, CPUs, memory, swap | `/proc`. |
 | Pools | `zpool list` and the scan line of `zpool status`. |
@@ -100,7 +100,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 Removing the package stops the timer and keeps the settings and the token. Purging it also removes the key `hd-report` of `/etc/hyprdebian/config.json`; the token stays.
 
 ## Tests
-The tests are in `hd-report/tests`: parsing what the system tools print, the version, type and suite, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
+The tests are in `hd-report/tests`: parsing what the system tools print, the version and suite, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
 ```
 cd hd-report
 make test

@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-installer` installs HyprDebian on the disks of a computer, from a live system. It asks all its questions first, then runs the installation without questions.
+The package `hd-installer` installs HyprDebian on the disks of a computer, from a live system. It asks all its questions first, then runs the installation without questions. It installs the base system, the same on every computer; for a desktop, install `hd-desktop` on it afterwards.
 
 It has the questions, disk, partition, filesystem, base, packages, user and cleanup phases; the prerequisites phase, which installs the tools it needs on a live system that lacks them, is still to come.
 
@@ -59,7 +59,7 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 | --- | --- |
 | `scripts/constants.sh` | The mount point of the new system, the key of the HyprDebian repository, the numbers of the partitions, the state directory, the directories of the disk names and of the network interfaces, and the colors. |
 | `scripts/config.sh` | `load_config` and `save_config`: the answers and the task dependencies, kept in `/tmp/hd-installer/config` as variable assignments. |
-| `scripts/defaults.sh` | The machine types, the suites and the defaults of the questions, per machine type. |
+| `scripts/defaults.sh` | The suites and the defaults of the questions. |
 | `scripts/dependencies.sh` | `add_dependencies`, `execute_task` and `always_run`: the tree of tasks, each marked done in `/tmp/hd-installer/<task>.done`. |
 | `scripts/helpers.sh` | Asking questions: `ask`, which asks for a line of text; `ask_valid`, which asks until a check function accepts the answer and only stores a valid one; `ask_password`, which asks for a password twice without showing or saving it; `ask_options`, which asks to pick one of a list of options; `ask_yes_no`, which asks a yes or no question and stores `true` or `false`; `confirm`, which asks to confirm something that cannot be undone, without a default and without saving the answer; and `set_answer`, which stores an answer that follows from earlier ones. Also `log_status`, which logs the start and end of a task; `add_packages`, which marks packages for the packages phase; `add_user_groups`, which adds groups for the user; `in_target`, which runs a command in the new system; `file_deploy`, which copies a file from `deploy/` into the new system; `template_render`, which renders a template from `templates/` into the new system with `render.py`, with the answers except the password and the variables given; and `repo_key_download`, which downloads the key of the HyprDebian repository into the new system. |
 | `scripts/helpers-disk.sh` | `list_disks`, which lists the whole disks by their name in `/dev/disk/by-id`; `ask_disk`, which asks to pick one of them; `unique_disks`, which lists the disks picked, each once; `root_disks`, `esp_disks` and `all_disks`, which list the disks of the system, of the EFI system partitions and both; `part`, which names a partition of a disk; `unmount_target`, which unmounts everything below `/mnt`, deepest first; `can_discard`, which tells whether a disk supports discard; and `valid_swap`, the check of the swap size. |
@@ -83,10 +83,9 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 ## Questions
 | Question | Variable | Answers |
 | --- | --- | --- |
-| Type | `Q_TYPE` | `desktop`, `laptop`, `server` or `vm`; sets the defaults of the other questions. |
-| Suite | `Q_SUITE` | `unstable` or `trixie`, the suites of the HyprDebian package repository. Desktops and laptops always get `unstable`, without the question: the desktop needs packages that are only there. |
-| System mirror | `Q_ROOT_REDUNDANT` | `true` when the system, the ZFS pool and the swap, is mirrored on two disks; by default only for servers. |
-| Encryption | `Q_ENCRYPT` | `true` when the ZFS pool is encrypted, with the password of the user as its passphrase; by default for every type but `vm`. |
+| Suite | `Q_SUITE` | `unstable` or `trixie`, the suites of the HyprDebian package repository; `unstable` by default. `hd-desktop` needs packages that are only in `unstable`. |
+| System mirror | `Q_ROOT_REDUNDANT` | `true` when the system, the ZFS pool and the swap, is mirrored on two disks; not by default. |
+| Encryption | `Q_ENCRYPT` | `true` when the ZFS pool is encrypted, with the password of the user as its passphrase; by default. |
 | System disks | `Q_ROOT_DISK_A`, `Q_ROOT_DISK_B` | The disk for the system, and with the mirror the second one; `Q_ROOT_DISK_B` is empty without it. |
 | Swap | `Q_SWAP` | The size of the swap partition on the disks of the system, in GiB, a whole number; 2 by default, 0 for no swap. With the system mirrored, the swap is mirrored too. |
 | ESP mirror | `Q_ESP_REDUNDANT` | `true` when there is an EFI system partition on two disks; by default when the system is mirrored. |
@@ -94,10 +93,10 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 | User name | `Q_USER` | The user account: a lower case letter, then lower case letters, digits, `-` and `_`, at most 32 characters, as `adduser` accepts by default. |
 | Password | `Q_PASSWORD` | The password of the user, and with encryption the passphrase of the ZFS pool; at least 8 characters, the least that ZFS takes, typed twice and not shown. It is never saved, nor passed in the environment of other commands, so it is asked again on every run. |
 | Full name | `Q_FULLNAME` | The full name of the user, for the GECOS field of `/etc/passwd`; it cannot be empty, nor contain `:` or `,`. |
-| Host name | `Q_HOSTNAME` | `hyprdebian` for a desktop, `hyprlaptop` for a laptop, `hyprserver` for a server and `hyprvm` for a vm by default. One DNS label: lower case letters, digits and `-`, not at the start or the end, at most 63 characters. |
+| Host name | `Q_HOSTNAME` | `hyprdebian` by default. One DNS label: lower case letters, digits and `-`, not at the start or the end, at most 63 characters. |
 | FQDN | `Q_FQDN` | The fully qualified domain name: the host name, a dot and the domain, in labels like the host name, at most 253 characters. By default the host name followed by the domain `Q_DOMAIN` of the defaults. |
-| Wired interface | `Q_IFACE` | The wired interface, which gets its address with DHCP; by default `enp1s0` for a vm, otherwise the first one. Without a wired interface, it is empty, without the question. |
-| Wifi | `Q_WIFI`, `Q_WIFACE` | `true` when wifi is used, by default only for laptops, and then the wifi interface, which also gets its address with DHCP; `Q_WIFACE` is empty without wifi. Without a wifi interface, there is no wifi, without the question. |
+| Wired interface | `Q_IFACE` | The wired interface, which gets its address with DHCP; by default the first one. Without a wired interface, it is empty, without the question. |
+| Wifi | `Q_WIFI`, `Q_WIFACE` | `true` when wifi is used, not by default, and then the wifi interface, which also gets its address with DHCP; `Q_WIFACE` is empty without wifi. Without a wifi interface, there is no wifi, without the question. |
 | Repository | `Q_REPO` | The URL of the HyprDebian package repository, which the packages of the system are installed from; `http://repo/` by default. It starts with `http://` or `https://`, followed by the host and optionally a port and a path. The repository is always used. |
 | Wipe | | Every disk picked above is wiped. Each one must be confirmed by typing `y`; the confirmation is not saved. This is the last question, so nothing is wiped before every question is answered. |
 
@@ -148,10 +147,10 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
 | `b_zfs_support` | Installs ZFS, with its module built by DKMS. |
 | `b_esp` | Mounts the EFI system partitions on `/boot/efi` and `/boot/efi2` in the new system. |
-| `b_bootloader` | Marks `hd-bootloader-gfx` for a desktop or laptop, otherwise `hd-bootloader-txt`, and `efibootmgr`. |
+| `b_bootloader` | Marks `hd-bootloader-txt` and `efibootmgr`. |
 | `b_secureboot` | Marks `hd-secboot`, which generates the Secure Boot keys. |
-| `b_systemd` | Marks `systemd-timesyncd`, except on a vm, and `systemd-resolved`, and adds the user to `adm`, which may read the logs in the systemd journal. There is no syslog daemon. |
-| `b_utilities` | Marks `hd-base`, and on a vm `qemu-guest-agent`. |
+| `b_systemd` | Marks `systemd-timesyncd` and `systemd-resolved`, and adds the user to `adm`, which may read the logs in the systemd journal. There is no syslog daemon. |
+| `b_utilities` | Marks `hd-base`. |
 | `b_firewall` | Adds `pkg_enable_firewall`, which turns on ufw, which comes with hd-base. |
 | `b_network` | Marks `hd-network`, and for wifi `iwd` and `firmware-iwlwifi`. |
 
@@ -181,7 +180,6 @@ The cleanup phase hands the installed system over:
 
 | Task | What it does |
 | --- | --- |
-| `c_save_config` | Saves the type of the installation in the key `hd-installer` of `/etc/hyprdebian/config.json` with `hd-config-update`, as `{"type": "<type>"}`, for the banners of hd-base, and writes the login banner again with `hd-issue`, as hd-base wrote it before the type was saved. |
 | `c_snapshots` | Takes the snapshot `rpool/hyprdebian@install`, the system as it was installed. |
 | `c_unmount` | Unmounts everything below `/mnt`, deepest first, and exports the pool, so the new system imports it when it boots. |
 

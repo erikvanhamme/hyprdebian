@@ -98,14 +98,13 @@ hd-issue
 
 `hd-issue` writes the banner in `/etc/issue`, which the console shows above the login prompt:
 ```
-HyprDebian <version> · <type> · <suite> · <console>
+HyprDebian <version> · <suite> · <console>
 ```
 
-with the version of HyprDebian from `/etc/hyprdebian/version.json`, the type of the installation from `type` in the key `hd-installer` of `/etc/hyprdebian/config.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.local.sources`, and the name of the console. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`.
+with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.local.sources`, and the name of the console. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`.
 
-The postinst runs it on every installation and upgrade, and the installer once more after it saved the type. Run it as root after changing the type or the suite yourself:
+The postinst runs it on every installation and upgrade. Run it as root after changing the suite yourself:
 ```
-sudo hd-config-update hd-installer '{"type": "vm"}'
 sudo hd-issue
 ```
 
@@ -143,7 +142,7 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 | `/etc/profile.d/local-bin-path.sh` | Adds `~/.local/bin` to the `PATH` of login shells, when that folder exists. |
 | `/etc/apt/preferences.d/00-block-unwanted` | Keeps apt from installing `ifupdown`, as systemd-networkd runs the network, `os-prober` and `turnstile`. |
 | `/usr/lib/systemd/system/getty@.service.d/numlock.conf` | Turns Num Lock on for a console before its login prompt shows, with `setleds`. When that fails, the login prompt still shows. |
-| `/etc/update-motd.d/00-hyprdebian` | Shows the HyprDebian banner after a login on the console or over ssh, with the version of HyprDebian from `/etc/hyprdebian/version.json`, the type of the installation, such as `desktop` or `server`, from `type` in the key `hd-installer` of `/etc/hyprdebian/config.json`, the suite of the HyprDebian packages and the Debian version, the kernel, the uptime, the load, the memory, the health of the ZFS pools and the RAID arrays, and the failed units. |
+| `/etc/update-motd.d/00-hyprdebian` | Shows the HyprDebian banner after a login on the console or over ssh, with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages and the Debian version, the kernel, the uptime, the load, the memory, the health of the ZFS pools and the RAID arrays, and the failed units. |
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | A swap in compressed RAM, `/dev/zram0`, of a quarter of the RAM, compressed with zstd, with priority 16384, so it is used before the swap on disk. |
 | `/usr/lib/sysctl.d/50-zram.conf` | `vm.swappiness` 180, as swapping to zram is cheaper than dropping the page cache, and `vm.page-cluster` 0, as reading ahead does not help with zram. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | systemd-resolved passes the queries straight to the name servers of the network: no stub resolver on 127.0.0.53, no cache, no LLMNR, no multicast DNS and no fallback servers. |

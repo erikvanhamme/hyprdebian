@@ -29,19 +29,14 @@ report = load_hd_report()
 
 
 class TestParsing(unittest.TestCase):
-    def test_version_type_and_suite(self):
+    def test_version_and_suite(self):
         with tempfile.TemporaryDirectory() as tmp:
             version = os.path.join(tmp, "version.json")
             with open(version, "w") as f:
                 json.dump({"major": 1, "minor": 1}, f)
-            config = os.path.join(tmp, "config.json")
-            with open(config, "w") as f:
-                json.dump({"hd-installer": {"type": "server"}}, f)
 
             self.assertEqual(report.hyprdebian_version(version), "1.1")
-            self.assertEqual(report.install_type(config), "server")
             self.assertEqual(report.hyprdebian_version(os.path.join(tmp, "missing")), "")
-            self.assertEqual(report.install_type(version), "")
 
         sources = "Types: deb\nURIs: http://repo.example/\nSuites: trixie\nComponents: main\n"
         self.assertEqual(report.parse_suite(sources), "trixie")

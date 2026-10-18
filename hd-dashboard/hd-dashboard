@@ -484,7 +484,7 @@ def host_rows(host, history, now):
 
     rows = [
         ("Seen", when(host["last_seen"], now) + f' <span class="dim">from {esc(host["address"])}</span>'),
-        ("Version", f'{esc(hd.get("version") or "?")} <span class="dim">· {esc(hd.get("type"))} · {esc(hd.get("suite"))} · Debian {esc(system.get("debian"))}</span>'),
+        ("Version", f'{esc(hd.get("version") or "?")} <span class="dim">· {esc(hd.get("suite"))} · Debian {esc(system.get("debian"))}</span>'),
         ("Kernel", esc(system.get("kernel"))),
         ("Up", when(system.get("boot_time"), now).replace(" ago", "")),
         ("Load", f'{sparkline(history, "load", now)} ' + esc(" ".join(f"{v:.2f}" for v in load if number(v) is not None)) +

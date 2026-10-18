@@ -32,6 +32,6 @@ Description: HyprDebian base system
  points /etc/resolv.conf at the name servers of systemd-resolved.
  After a login it shows the HyprDebian banner and the state of the system:
  the pools, the RAID arrays and the failed units. Above the login prompt it
- shows the version, the type of the installation and the suite, written in
+ shows the version and the suite, written in
  /etc/issue by hd-issue. hd-link-repo switches the HyprDebian repository and
  suite that apt gets the hd-* packages from.

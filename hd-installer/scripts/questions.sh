@@ -15,36 +15,23 @@ q_post() {
     return 0
 }
 
-q_type() {
-    local default
-    default="$(get_default Q_TYPE)" || return 1
-    ask_options Q_TYPE "What type of computer are you installing" "${default}" "${MACHINE_TYPES[@]}"
-}
-
 q_suite() {
-    # Desktops and laptops are always unstable: the desktop needs packages that are only there.
-    if [[ "${Q_TYPE}" == "desktop" || "${Q_TYPE}" == "laptop" ]]; then
-        set_answer Q_SUITE unstable
-        echo "Suite: unstable"
-        return 0
-    fi
-
     local default
-    default="$(get_default Q_SUITE "${Q_TYPE}")" || return 1
+    default="$(get_default Q_SUITE)" || return 1
     ask_options Q_SUITE "Which suite are you installing" "${default}" "${SUITES[@]}"
 }
 
 # The system, the ZFS pool and the swap, goes on one disk, or is mirrored on two.
 q_root_redundant() {
     local default
-    default="$(get_default Q_ROOT_REDUNDANT "${Q_TYPE}")" || return 1
+    default="$(get_default Q_ROOT_REDUNDANT)" || return 1
     ask_yes_no Q_ROOT_REDUNDANT "Mirror the system (ZFS pool and swap) on two disks" "${default}"
 }
 
 # Whether the ZFS pool is encrypted, with the password of the user as its passphrase.
 q_encrypt() {
     local default
-    default="$(get_default Q_ENCRYPT "${Q_TYPE}")" || return 1
+    default="$(get_default Q_ENCRYPT)" || return 1
     ask_yes_no Q_ENCRYPT "Encrypt the system" "${default}"
 }
 
@@ -62,7 +49,7 @@ q_root_disks() {
 
 q_swap() {
     local default
-    default="$(get_default Q_SWAP "${Q_TYPE}")" || return 1
+    default="$(get_default Q_SWAP)" || return 1
     ask_valid Q_SWAP "Swap size in GiB (0 for no swap)" "${default}" valid_swap \
         "Please enter a whole number of GiB." || return 1
 
@@ -95,7 +82,7 @@ q_esp_disks() {
 
 q_user() {
     local default
-    default="$(get_default Q_USER "${Q_TYPE}")" || return 1
+    default="$(get_default Q_USER)" || return 1
     ask_valid Q_USER "User name" "${default}" valid_user \
         "A user name is a lower case letter, then lower case letters, digits, - and _." || return 1
 }
@@ -113,7 +100,7 @@ q_password() {
 
 q_fullname() {
     local default
-    default="$(get_default Q_FULLNAME "${Q_TYPE}")" || return 1
+    default="$(get_default Q_FULLNAME)" || return 1
     ask_valid Q_FULLNAME "Full name" "${default}" valid_fullname \
         "The full name cannot be empty, nor contain : or ,." || return 1
 }
@@ -121,7 +108,7 @@ q_fullname() {
 
 q_hostname() {
     local default
-    default="$(get_default Q_HOSTNAME "${Q_TYPE}")" || return 1
+    default="$(get_default Q_HOSTNAME)" || return 1
     ask_valid Q_HOSTNAME "Host name" "${default}" valid_hostname \
         "A host name has lower case letters, digits and -, not at the start or the end." \
         || return 1
@@ -130,9 +117,9 @@ q_hostname() {
 
 q_fqdn() {
     local default
-    default="$(get_default Q_FQDN "${Q_TYPE}")" || return 1
+    default="$(get_default Q_FQDN)" || return 1
     if [[ -z "${default}" ]]; then
-        default="${Q_HOSTNAME}.$(get_default Q_DOMAIN "${Q_TYPE}")" || return 1
+        default="${Q_HOSTNAME}.$(get_default Q_DOMAIN)" || return 1
     fi
     ask_valid Q_FQDN "Fully qualified domain name" "${default}" valid_fqdn \
         "The fully qualified domain name is ${Q_HOSTNAME}. followed by the domain, in lower case." \
@@ -151,7 +138,7 @@ q_iface() {
         return 0
     fi
 
-    default="$(get_default Q_IFACE "${Q_TYPE}")" || return 1
+    default="$(get_default Q_IFACE)" || return 1
     echo "Wired interfaces:"
     ask_iface Q_IFACE "Wired interface" "${default}" wired
 }
@@ -169,7 +156,7 @@ q_wifi() {
         return 0
     fi
 
-    default="$(get_default Q_WIFI "${Q_TYPE}")" || return 1
+    default="$(get_default Q_WIFI)" || return 1
     ask_yes_no Q_WIFI "Enable wifi" "${default}" || return 1
 
     if [[ "${Q_WIFI}" == "true" ]]; then
@@ -183,7 +170,7 @@ q_wifi() {
 # The HyprDebian package repository, which the packages of the system are installed from.
 q_repo() {
     local default
-    default="$(get_default Q_REPO "${Q_TYPE}")" || return 1
+    default="$(get_default Q_REPO)" || return 1
     ask_valid Q_REPO "HyprDebian repository URL" "${default}" valid_repo \
         "The URL starts with http:// or https://, followed by the host, without spaces." \
         || return 1
@@ -211,7 +198,6 @@ q_wipe() {
 # Add additional questions here.
 
 add_dependencies "q_main" \
-    "q_type" \
     "q_suite" \
     "q_root_redundant" \
     "q_encrypt" \

@@ -9,6 +9,10 @@ hd-installer \- install HyprDebian
 installs HyprDebian on the disks of this computer, from a live system.
 It asks all its questions first, then runs the installation without
 questions.
+It installs the base system, the same on every computer; for a desktop,
+install
+.B hd-desktop
+on it afterwards.
 .PP
 The installation is a tree of tasks in phases.
 A task runs once: when it succeeds it is marked done, and a rerun skips it.
@@ -22,33 +26,25 @@ so a reboot of the live system starts over.
 Run it as root.
 .SH QUESTIONS
 .TP
-.B Type
-The type of computer:
-.BR desktop ,
-.BR laptop ,
-.B server
-or
-.BR vm .
-The type sets the defaults of the other questions.
-.TP
 .B Suite
 The Debian suite to install:
 .B unstable
 or
 .BR trixie ,
-the suites of the HyprDebian package repository.
-Desktops and laptops always get
-.BR unstable ,
-without the question: the desktop needs packages that are only there.
+the suites of the HyprDebian package repository;
+.B unstable
+by default.
+.B hd-desktop
+needs packages that are only in
+.BR unstable .
 .TP
 .B System mirror
 Whether the system, the ZFS pool and the swap, is mirrored on two disks;
-by default only for servers.
+not by default.
 .TP
 .B Encryption
 Whether the ZFS pool is encrypted, with the password of the user as its
-passphrase; by default for every type but
-.BR vm .
+passphrase; by default.
 .TP
 .B System disks
 The disk for the system, and with the mirror the second one.
@@ -85,27 +81,20 @@ or
 .TP
 .B Host name
 By default
-.B hyprdebian
-for a desktop,
-.B hyprlaptop
-for a laptop,
-.B hyprserver
-for a server and
-.B hyprvm
-for a vm; lower case letters, digits and
+.BR hyprdebian ;
+lower case letters, digits and
 .BR \- .
 .TP
 .B FQDN
 The fully qualified domain name: the host name followed by its domain.
 .TP
 .B Wired interface
-The wired interface, which gets its address with DHCP; by default
-.B enp1s0
-for a vm.
+The wired interface, which gets its address with DHCP; by default the
+first one.
 Without a wired interface, there is none, without the question.
 .TP
 .B Wifi
-Whether wifi is used, by default only for laptops, and then the wifi
+Whether wifi is used, not by default, and then the wifi
 interface, which also gets its address with DHCP.
 Without a wifi interface, there is no wifi, without the question.
 .TP
@@ -198,10 +187,7 @@ asks the locales, the time zone and the keyboard, and installs the kernel
 and ZFS.
 It marks the other packages for the packages phase:
 .BR hd-base ,
-.B hd-bootloader-gfx
-for a desktop or laptop or
-.B hd-bootloader-txt
-otherwise,
+.BR hd-bootloader-txt ,
 .BR hd-secboot ,
 .BR hd-network ,
 and for wifi
@@ -241,13 +227,7 @@ and
 .BR video .
 .TP
 .B cleanup
-Saves the type of the installation in the key
-.B hd-installer
-of
-.IR /etc/hyprdebian/config.json ,
-for the banners of hd-base, writes the login banner again with
-.BR hd-issue (8),
-then takes the snapshot
+Takes the snapshot
 .B rpool/hyprdebian@install
 of the installed system, unmounts it and exports the pool, so the new
 system imports it when it boots.

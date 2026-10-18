@@ -87,9 +87,9 @@ See [Live cd](docs/Livecd/Overview.md) for more on building and using it.
 
 The installer first asks all its questions. Nothing is changed on the disks until all questions are answered.
 
-One of the first questions is the machine type: `desktop`, `laptop`, `server` or `vm`. Each machine type has its own default answers, for example wifi on a laptop and redundant drives on a server. When you choose to use the machine type defaults, every question that has a default is answered with it without asking. The disks, the disk destruction confirmation and the password are always asked.
+The installer installs the base system, the same on every computer. For a desktop, install `hd-desktop` on it afterwards.
 
-See [Defaults](docs/Installer/Defaults.md) for all the default answers.
+See [hd-installer](docs/packages/hd-installer.md#questions) for all the questions and their default answers.
 
 ### When the installer fails
 
