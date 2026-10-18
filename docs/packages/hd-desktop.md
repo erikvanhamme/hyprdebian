@@ -93,6 +93,7 @@ The key bindings run these commands, in `/usr/bin`:
 | `hd-mode-select` | Choose the resolution and refresh rate of a monitor with wofi. |
 | `hd-mount`, `hd-unmount` | Mount a drive or an `/etc/fstab` entry, a drive on `/mnt/<user>/<n>`, and unmount it again, with wofi. |
 | `hd-volume-up`, `hd-volume-down`, `hd-volume-mute` | Change the volume of the default output and show it in a notification. |
+| `hd-wofi` | Run wofi with the given arguments, unless a wofi of `hd-wofi` is already open; then it exits with 1. The launcher and the menus above open with it, so a second press of a key binding opens no second menu. |
 
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
 

@@ -28,7 +28,7 @@ if [[ -z "$MENU_ITEMS" ]]; then
     exit 0
 fi
 
-SELECTED_LINE=$(echo "$MENU_ITEMS" | wofi --dmenu --prompt "Select device to unmount:" --width 1024 --lines 10)
+SELECTED_LINE=$(echo "$MENU_ITEMS" | hd-wofi --dmenu --prompt "Select device to unmount:" --width 1024 --lines 10)
 
 if [[ -z "$SELECTED_LINE" ]]; then
     exit 0

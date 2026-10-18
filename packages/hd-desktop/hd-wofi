@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Runs wofi with the given arguments, unless a wofi of hd-wofi is already
+# open; then it exits with 1, as wofi does when the menu is closed without a
+# choice. wofi inherits the lock and holds it until it closes.
+set -euo pipefail
+
+exec flock --nonblock "${XDG_RUNTIME_DIR}/hd-wofi.lock" wofi "$@"

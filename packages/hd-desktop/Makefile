@@ -58,7 +58,7 @@ USR := $(shell find usr -type f)
 SUDOERS := etc/sudoers.d/hd-desktop
 # The commands, installed in /usr/bin.
 COMMANDS := hd-ask-poweroff hd-ask-reboot hd-mode-select hd-mount hd-unmount hd-volume-down \
-	hd-volume-mute hd-volume-up
+	hd-volume-mute hd-volume-up hd-wofi
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-desktop-render
 TEMPLATES := $(wildcard templates/*)

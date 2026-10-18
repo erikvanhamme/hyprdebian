@@ -29,7 +29,7 @@ if [[ -z "$COMBINED_LIST" ]]; then
 fi
 
 # Present options in wofi
-SELECTED_LINE=$(echo "$COMBINED_LIST" | wofi --dmenu --prompt "Select device to mount:" --width 1024 --lines 10)
+SELECTED_LINE=$(echo "$COMBINED_LIST" | hd-wofi --dmenu --prompt "Select device to mount:" --width 1024 --lines 10)
 
 if [[ -z "$SELECTED_LINE" ]]; then
     exit 0

@@ -14,7 +14,7 @@ if [ "$MONITOR_COUNT" -eq 0 ]; then
 elif [ "$MONITOR_COUNT" -eq 1 ]; then
     TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[0].name')
 else
-    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[].name' | wofi --dmenu --prompt "Select Monitor" --width 30% --height 24% --cache-file /dev/null)
+    TARGET_MONITOR=$(echo "$MONITORS_JSON" | jq -r '.[].name' | hd-wofi --dmenu --prompt "Select Monitor" --width 30% --height 24% --cache-file /dev/null)
 fi
 
 [ -z "$TARGET_MONITOR" ] && exit 0
@@ -45,14 +45,14 @@ current_first() {
 
 # 3a. Select the resolution (e.g. "2560x1440")
 RESOLUTIONS=$(echo "$AVAILABLE_MODES" | cut -d@ -f1 | sort -urV)
-SELECTED_RES=$(current_first "$CURRENT_RES" "$RESOLUTIONS" | wofi --dmenu --prompt "Resolution for $TARGET_MONITOR" --width 30% --height 24% --cache-file /dev/null)
+SELECTED_RES=$(current_first "$CURRENT_RES" "$RESOLUTIONS" | hd-wofi --dmenu --prompt "Resolution for $TARGET_MONITOR" --width 30% --height 24% --cache-file /dev/null)
 
 [ -z "$SELECTED_RES" ] && exit 0
 echo "$RESOLUTIONS" | grep -Fxq "$SELECTED_RES" || exit 0
 
 # 3b. Select the refresh rate supported at that resolution (e.g. "165.00Hz")
 RATES=$(echo "$AVAILABLE_MODES" | awk -F@ -v res="$SELECTED_RES" '$1 == res { print $2 "Hz" }' | sort -urn)
-SELECTED_RATE=$(current_first "${CURRENT_RATE}Hz" "$RATES" | wofi --dmenu --prompt "Refresh rate for $TARGET_MONITOR at $SELECTED_RES" --width 30% --height 24% --cache-file /dev/null)
+SELECTED_RATE=$(current_first "${CURRENT_RATE}Hz" "$RATES" | hd-wofi --dmenu --prompt "Refresh rate for $TARGET_MONITOR at $SELECTED_RES" --width 30% --height 24% --cache-file /dev/null)
 
 [ -z "$SELECTED_RATE" ] && exit 0
 echo "$RATES" | grep -Fxq "$SELECTED_RATE" || exit 0

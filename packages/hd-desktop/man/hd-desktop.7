@@ -96,6 +96,13 @@ may do so without a password, by
 .TP
 .BR hd-volume-up ,\  hd-volume-down ,\  hd-volume-mute
 Change the volume of the default output and show it in a notification.
+.TP
+.B hd-wofi
+Run wofi with the given arguments, unless a wofi of
+.B hd-wofi
+is already open; then it exits with 1.
+The launcher and the menus above open with it, so a second press of a key
+binding opens no second menu.
 .SH DARK THEME
 .I /etc/dconf/db/local.d/00-dark-theme
 asks GTK applications for the dark Adwaita theme.
