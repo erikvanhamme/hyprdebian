@@ -13,9 +13,9 @@ The first, empty indices of both suites are made and signed during the installat
 The package comes with two man pages: `man hd-repo` describes the repository and how to use it, `man hd-repo-update` the command that updates it.
 
 ## Building the package
-The package is built from `hd-repo` in this repository:
+The package is built from `packages/hd-repo` in this repository:
 ```
-cd hd-repo
+cd packages/hd-repo
 make deb
 ```
 
@@ -26,15 +26,15 @@ sudo apt install ./build/hd-repo_<version>_all.deb
 
 The files involved are:
 ```
-hd-repo/Makefile
-hd-repo/version.json
-hd-repo/hd-repo-update
-hd-repo/deb/control
-hd-repo/deb/postinst
-hd-repo/deb/postrm
-hd-repo/deb/etc/nginx/sites-available/hd-repo
-hd-repo/man/hd-repo.7
-hd-repo/man/hd-repo-update.1
+packages/hd-repo/Makefile
+packages/hd-repo/version.json
+packages/hd-repo/hd-repo-update
+packages/hd-repo/deb/control
+packages/hd-repo/deb/postinst
+packages/hd-repo/deb/postrm
+packages/hd-repo/deb/etc/nginx/sites-available/hd-repo
+packages/hd-repo/man/hd-repo.7
+packages/hd-repo/man/hd-repo-update.1
 ```
 
 ## Setting up
@@ -63,7 +63,7 @@ From the root of this repository:
 make update-repo
 ```
 
-This builds every package into `packages/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
+This builds every package into `build/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
 
 The suites of a package come from the `deploy.json` in its package directory:
 ```

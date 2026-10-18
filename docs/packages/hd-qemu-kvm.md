@@ -19,9 +19,9 @@ Members of the group `libvirt` control the virtual machines, and so the whole sy
 The package comes with a man page: `man hd-qemu-kvm`.
 
 ## Building the package
-The package is built from `hd-qemu-kvm` in this repository:
+The package is built from `packages/hd-qemu-kvm` in this repository:
 ```
-cd hd-qemu-kvm
+cd packages/hd-qemu-kvm
 make deb
 ```
 
@@ -32,18 +32,18 @@ sudo apt install ./build/hd-qemu-kvm_<version>_all.deb
 
 The files involved are:
 ```
-hd-qemu-kvm/Makefile
-hd-qemu-kvm/version.json
-hd-qemu-kvm/br_netfilter.conf
-hd-qemu-kvm/50-bridge-netfilter.conf
-hd-qemu-kvm/libvirt/libvirtd.conf
-hd-qemu-kvm/libvirt/secret.conf
-hd-qemu-kvm/deb/control
-hd-qemu-kvm/deb/templates
-hd-qemu-kvm/deb/postinst
-hd-qemu-kvm/deb/postrm
-hd-qemu-kvm/deb/etc/skel/.config/libvirt/libvirt.conf
-hd-qemu-kvm/man/hd-qemu-kvm.7
+packages/hd-qemu-kvm/Makefile
+packages/hd-qemu-kvm/version.json
+packages/hd-qemu-kvm/br_netfilter.conf
+packages/hd-qemu-kvm/50-bridge-netfilter.conf
+packages/hd-qemu-kvm/libvirt/libvirtd.conf
+packages/hd-qemu-kvm/libvirt/secret.conf
+packages/hd-qemu-kvm/deb/control
+packages/hd-qemu-kvm/deb/templates
+packages/hd-qemu-kvm/deb/postinst
+packages/hd-qemu-kvm/deb/postrm
+packages/hd-qemu-kvm/deb/etc/skel/.config/libvirt/libvirt.conf
+packages/hd-qemu-kvm/man/hd-qemu-kvm.7
 ```
 
 ## The bridge

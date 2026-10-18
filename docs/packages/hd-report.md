@@ -11,9 +11,9 @@ The timer starts right away, and as the system has been up for more than 2 minut
 The package comes with the man page `man hd-report`.
 
 ## Building the package
-The package is built from `hd-report` in this repository:
+The package is built from `packages/hd-report` in this repository:
 ```
-cd hd-report
+cd packages/hd-report
 make deb
 ```
 
@@ -24,18 +24,18 @@ sudo apt install ./build/hd-report_<version>_all.deb
 
 The files involved are:
 ```
-hd-report/Makefile
-hd-report/version.json
-hd-report/hd-report
-hd-report/defaults.json
-hd-report/hd-report.service
-hd-report/hd-report.timer
-hd-report/deb/control
-hd-report/deb/postinst
-hd-report/deb/prerm
-hd-report/deb/postrm
-hd-report/man/hd-report.8
-hd-report/tests/test_report.py
+packages/hd-report/Makefile
+packages/hd-report/version.json
+packages/hd-report/hd-report
+packages/hd-report/defaults.json
+packages/hd-report/hd-report.service
+packages/hd-report/hd-report.timer
+packages/hd-report/deb/control
+packages/hd-report/deb/postinst
+packages/hd-report/deb/prerm
+packages/hd-report/deb/postrm
+packages/hd-report/man/hd-report.8
+packages/hd-report/tests/test_report.py
 ```
 
 ## The timer
@@ -100,9 +100,9 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 Removing the package stops the timer and keeps the settings and the token. Purging it also removes the key `hd-report` of `/etc/hyprdebian/config.json`; the token stays.
 
 ## Tests
-The tests are in `hd-report/tests`: parsing what the system tools print, the version and suite, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
+The tests are in `packages/hd-report/tests`: parsing what the system tools print, the version and suite, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
 ```
-cd hd-report
+cd packages/hd-report
 make test
 ```
 

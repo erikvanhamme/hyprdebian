@@ -23,9 +23,9 @@ New users get `~/.config/yazi/yazi.toml` from `/etc/skel/.config/yazi/yazi.toml`
 Users that exist already do not get the file; copy it to `~/.config/yazi/yazi.toml` for them.
 
 ## Building the package
-The package is built from `yazi` in this repository:
+The package is built from `packages/yazi` in this repository:
 ```
-cd yazi
+cd packages/yazi
 make deb
 ```
 
@@ -42,13 +42,13 @@ To move to a new release of Yazi, change `YAZI_VERSION` in the Makefile, set `DE
 
 The files involved are:
 ```
-yazi/Makefile
-yazi/build-yazi.sh
-yazi/hd-yazi
-yazi/man/hd-yazi.1
-yazi/etc/skel/.config/yazi/yazi.toml
-yazi/deb/control
-yazi/deb/copyright
+packages/yazi/Makefile
+packages/yazi/build-yazi.sh
+packages/yazi/hd-yazi
+packages/yazi/man/hd-yazi.1
+packages/yazi/etc/skel/.config/yazi/yazi.toml
+packages/yazi/deb/control
+packages/yazi/deb/copyright
 ```
 
 ## Copyright

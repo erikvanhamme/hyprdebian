@@ -8,9 +8,9 @@ It depends on `python3` and `python3-jinja2`, to render the files it writes in t
 The package comes with a man page: `man hd-installer`.
 
 ## Building the package
-The package is built from `hd-installer` in this repository:
+The package is built from `packages/hd-installer` in this repository:
 ```
-cd hd-installer
+cd packages/hd-installer
 make deb
 ```
 
@@ -26,21 +26,21 @@ sudo ./hd-installer/hd-installer
 
 The files involved are:
 ```
-hd-installer/Makefile
-hd-installer/version.json
-hd-installer/hd-installer
-hd-installer/scripts/constants.sh
-hd-installer/scripts/config.sh
-hd-installer/scripts/defaults.sh
-hd-installer/scripts/dependencies.sh
-hd-installer/scripts/helpers.sh
-hd-installer/scripts/helpers-disk.sh
-hd-installer/scripts/helpers-host.sh
-hd-installer/scripts/helpers-network.sh
-hd-installer/scripts/helpers-user.sh
-hd-installer/scripts/questions.sh
-hd-installer/deb/control
-hd-installer/man/hd-installer.8
+packages/hd-installer/Makefile
+packages/hd-installer/version.json
+packages/hd-installer/hd-installer
+packages/hd-installer/scripts/constants.sh
+packages/hd-installer/scripts/config.sh
+packages/hd-installer/scripts/defaults.sh
+packages/hd-installer/scripts/dependencies.sh
+packages/hd-installer/scripts/helpers.sh
+packages/hd-installer/scripts/helpers-disk.sh
+packages/hd-installer/scripts/helpers-host.sh
+packages/hd-installer/scripts/helpers-network.sh
+packages/hd-installer/scripts/helpers-user.sh
+packages/hd-installer/scripts/questions.sh
+packages/hd-installer/deb/control
+packages/hd-installer/man/hd-installer.8
 ```
 
 ## Running the installer

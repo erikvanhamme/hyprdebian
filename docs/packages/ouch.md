@@ -13,9 +13,9 @@ It handles tar, zip, 7z, gzip, snappy, zstd, xz, lzma, lzip, bzip2, bzip3, lz4 a
 The package also installs the man pages of the release (`man ouch`) and its completions for bash, zsh and fish.
 
 ## Building the package
-The package is built from `ouch` in this repository:
+The package is built from `packages/ouch` in this repository:
 ```
-cd ouch
+cd packages/ouch
 make deb
 ```
 
@@ -32,10 +32,10 @@ To move to a new release of ouch, change `OUCH_VERSION` in the Makefile, set `DE
 
 The files involved are:
 ```
-ouch/Makefile
-ouch/build-ouch.sh
-ouch/deb/control
-ouch/deb/copyright
+packages/ouch/Makefile
+packages/ouch/build-ouch.sh
+packages/ouch/deb/control
+packages/ouch/deb/copyright
 ```
 
 ## Copyright

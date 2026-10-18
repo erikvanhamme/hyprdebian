@@ -11,9 +11,9 @@ On its first installation, it generates the keys in `/etc/hyprdebian/secboot`. W
 The package comes with two man pages: `man hd-secboot` describes the keys, `man hd-secboot-enroll` the command that enrolls them.
 
 ## Building the package
-The package is built from `hd-secboot` in this repository:
+The package is built from `packages/hd-secboot` in this repository:
 ```
-cd hd-secboot
+cd packages/hd-secboot
 make deb
 ```
 
@@ -24,13 +24,13 @@ sudo apt install ./build/hd-secboot_<version>_all.deb
 
 The files involved are:
 ```
-hd-secboot/Makefile
-hd-secboot/version.json
-hd-secboot/hd-secboot-enroll
-hd-secboot/deb/control
-hd-secboot/deb/postinst
-hd-secboot/man/hd-secboot.7
-hd-secboot/man/hd-secboot-enroll.8
+packages/hd-secboot/Makefile
+packages/hd-secboot/version.json
+packages/hd-secboot/hd-secboot-enroll
+packages/hd-secboot/deb/control
+packages/hd-secboot/deb/postinst
+packages/hd-secboot/man/hd-secboot.7
+packages/hd-secboot/man/hd-secboot-enroll.8
 ```
 
 ## The keys

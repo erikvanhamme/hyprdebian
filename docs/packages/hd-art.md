@@ -14,9 +14,9 @@ The 3440x1440 wallpaper is rendered from the middle band of the 3840x2160 SVG.
 The package comes with a man page: `man hd-art`.
 
 ## Building the package
-The package is built from `hd-art` in this repository:
+The package is built from `packages/hd-art` in this repository:
 ```
-cd hd-art
+cd packages/hd-art
 make deb
 ```
 
@@ -27,12 +27,12 @@ sudo apt install ./build/hd-art_<version>_all.deb
 
 The files involved are:
 ```
-hd-art/Makefile
-hd-art/version.json
-hd-art/deb/control
-hd-art/deb/copyright
-hd-art/man/hd-art.7
-hd-art/wallpapers/emerald-*.png
+packages/hd-art/Makefile
+packages/hd-art/version.json
+packages/hd-art/deb/control
+packages/hd-art/deb/copyright
+packages/hd-art/man/hd-art.7
+packages/hd-art/wallpapers/emerald-*.png
 ```
 
 ## Using the wallpapers

@@ -12,8 +12,8 @@ import threading
 import time
 import unittest
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-HD_REPORT = os.path.join(REPO, 'hd-report', 'hd-report')
+PACKAGES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+HD_REPORT = os.path.join(PACKAGES_DIR, 'hd-report', 'hd-report')
 
 
 def load_hd_report():
@@ -133,7 +133,7 @@ class TestParsing(unittest.TestCase):
 
 class TestSettings(unittest.TestCase):
     def test_the_url_of_the_settings_overrides_the_default(self):
-        with open(os.path.join(REPO, 'hd-report', 'defaults.json')) as f:
+        with open(os.path.join(PACKAGES_DIR, 'hd-report', 'defaults.json')) as f:
             defaults = json.load(f)
 
         self.assertEqual(report.dashboard_url(None, defaults), defaults["url"])
@@ -157,7 +157,7 @@ class TestCollect(unittest.TestCase):
         json.dumps(collected)
 
     def test_hd_dashboard_accepts_the_report(self):
-        loader = importlib.machinery.SourceFileLoader('hd_dashboard', os.path.join(REPO, 'hd-dashboard', 'hd-dashboard'))
+        loader = importlib.machinery.SourceFileLoader('hd_dashboard', os.path.join(PACKAGES_DIR, 'hd-dashboard', 'hd-dashboard'))
         spec = importlib.util.spec_from_loader('hd_dashboard', loader)
         dashboard = importlib.util.module_from_spec(spec)
         loader.exec_module(dashboard)

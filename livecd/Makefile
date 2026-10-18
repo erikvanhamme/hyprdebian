@@ -6,9 +6,10 @@
 #   make clean  remove out/
 #
 # The container gets the repository read-only at /src and builds everything
-# in its own filesystem: the package hd-installer from ../hd-installer, then
-# the ISO with the live-build configuration in config/ (see build.sh). Only
-# the ISO is written back, to out/, owned by the user that runs make.
+# in its own filesystem: the package hd-installer from
+# ../packages/hd-installer, then the ISO with the live-build configuration in
+# config/ (see build.sh). Only the ISO is written back, to out/, owned by the
+# user that runs make.
 # live-build mounts filesystems and makes device nodes in its chroot, so the
 # container runs with --privileged.
 

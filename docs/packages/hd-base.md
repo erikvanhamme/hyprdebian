@@ -8,9 +8,9 @@ When a package becomes part of every hyprdebian system, it is added to the `Depe
 The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue` and `man hd-link-repo` the commands.
 
 ## Building the package
-The package is built from `hd-base` in this repository:
+The package is built from `packages/hd-base` in this repository:
 ```
-cd hd-base
+cd packages/hd-base
 make deb
 ```
 
@@ -21,35 +21,35 @@ sudo apt install ./build/hd-base_<version>_all.deb
 
 The files involved are:
 ```
-hd-base/Makefile
+packages/hd-base/Makefile
 version.json
-hd-base/hd-up
-hd-base/hd-reboot
-hd-base/hd-poweroff
-hd-base/hd-sync-skel
-hd-base/hd-issue
-hd-base/hd-link-repo
-hd-base/templates/hyprdebian.local.sources.j2
-hd-base/etc/skel/.bash_aliases
-hd-base/etc/skel/.gitconfig
-hd-base/etc/skel/.config/nano/nanorc
-hd-base/etc/profile.d/local-bin-path.sh
-hd-base/etc/apt/preferences.d/00-block-unwanted
-hd-base/etc/update-motd.d/00-hyprdebian
-hd-base/usr/lib/systemd/system/getty@.service.d/numlock.conf
-hd-base/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf
-hd-base/usr/lib/sysctl.d/50-zram.conf
-hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
-hd-base/deb/postinst
-hd-base/deb/postrm
-hd-base/deb/control
-hd-base/man/hd-base.7
-hd-base/man/hd-up.1
-hd-base/man/hd-reboot.1
-hd-base/man/hd-poweroff.1
-hd-base/man/hd-sync-skel.1
-hd-base/man/hd-issue.8
-hd-base/man/hd-link-repo.8
+packages/hd-base/hd-up
+packages/hd-base/hd-reboot
+packages/hd-base/hd-poweroff
+packages/hd-base/hd-sync-skel
+packages/hd-base/hd-issue
+packages/hd-base/hd-link-repo
+packages/hd-base/templates/hyprdebian.local.sources.j2
+packages/hd-base/etc/skel/.bash_aliases
+packages/hd-base/etc/skel/.gitconfig
+packages/hd-base/etc/skel/.config/nano/nanorc
+packages/hd-base/etc/profile.d/local-bin-path.sh
+packages/hd-base/etc/apt/preferences.d/00-block-unwanted
+packages/hd-base/etc/update-motd.d/00-hyprdebian
+packages/hd-base/usr/lib/systemd/system/getty@.service.d/numlock.conf
+packages/hd-base/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf
+packages/hd-base/usr/lib/sysctl.d/50-zram.conf
+packages/hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
+packages/hd-base/deb/postinst
+packages/hd-base/deb/postrm
+packages/hd-base/deb/control
+packages/hd-base/man/hd-base.7
+packages/hd-base/man/hd-up.1
+packages/hd-base/man/hd-reboot.1
+packages/hd-base/man/hd-poweroff.1
+packages/hd-base/man/hd-sync-skel.1
+packages/hd-base/man/hd-issue.8
+packages/hd-base/man/hd-link-repo.8
 ```
 
 ## Packages

@@ -13,8 +13,8 @@ import unittest.mock
 import urllib.error
 import urllib.request
 
-REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-HD_DASHBOARD = os.path.join(REPO, 'hd-dashboard', 'hd-dashboard')
+PACKAGES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+HD_DASHBOARD = os.path.join(PACKAGES_DIR, 'hd-dashboard', 'hd-dashboard')
 
 NOW = 1_800_000_000
 TOKEN = "a" * 32
@@ -215,7 +215,7 @@ class TestPages(unittest.TestCase):
 
 class TestConfig(unittest.TestCase):
     def test_the_defaults_of_the_package(self):
-        with open(os.path.join(REPO, 'hd-dashboard', 'defaults.json')) as f:
+        with open(os.path.join(PACKAGES_DIR, 'hd-dashboard', 'defaults.json')) as f:
             self.assertEqual(dash.parse_config(None, json.load(f)), DEFAULTS)
 
     def test_settings_override_the_defaults(self):

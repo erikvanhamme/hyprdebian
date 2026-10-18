@@ -2,9 +2,10 @@
 # hyprdebian system has.
 #
 #   make deb    build build/hd-base_$(DEB_VERSION)_all.deb, with the version
-#               from ../version.json, the version of HyprDebian. It installs:
+#               from ../../version.json, the version of HyprDebian. It
+#               installs:
 #                 /etc/hyprdebian/version.json
-#                                             ../version.json, which the
+#                                             ../../version.json, which the
 #                                             banners show, a conffile
 #                 /usr/bin/hd-up              upgrades the system after a
 #                                             ZFS snapshot
@@ -53,8 +54,8 @@
 #               deb/postrm, which undoes the diversions on a removal and
 #               unmasks the units on a purge. Add a package there, to the
 #               man page and to docs/packages/hd-base.md when every system
-#               must have it. Raise the version in ../version.json for every
-#               change to a package or the installer.
+#               must have it. Raise the version in ../../version.json for
+#               every change to a package or the installer.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -65,7 +66,7 @@ PYTHON := python3
 
 DEB_NAME := hd-base
 # The version of HyprDebian, in the root of the repository, is the version of hd-base.
-VERSION_FILE := ../version.json
+VERSION_FILE := ../../version.json
 DEB_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("$(VERSION_FILE)")); print("%d.%d" % (v["major"], v["minor"]))')
 DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_all.deb
 STAGE := $(BUILD)/deb

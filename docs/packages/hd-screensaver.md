@@ -6,9 +6,9 @@ hypridle starts it after 2 minutes without input, and stops it before it locks t
 The package comes with the man page `man 7 hd-screensaver`.
 
 ## Building the package
-The package is built from `hd-screensaver` in this repository:
+The package is built from `packages/hd-screensaver` in this repository:
 ```
-cd hd-screensaver
+cd packages/hd-screensaver
 make deb
 ```
 
@@ -19,14 +19,14 @@ sudo apt install ./build/hd-screensaver_<version>_all.deb
 
 The files involved are:
 ```
-hd-screensaver/Makefile
-hd-screensaver/version.json
-hd-screensaver/deb/control
-hd-screensaver/hd-launch-screensaver
-hd-screensaver/hd-cmd-screensaver
-hd-screensaver/hd-kill-screensaver
-hd-screensaver/screensaver.txt
-hd-screensaver/man/hd-screensaver.7
+packages/hd-screensaver/Makefile
+packages/hd-screensaver/version.json
+packages/hd-screensaver/deb/control
+packages/hd-screensaver/hd-launch-screensaver
+packages/hd-screensaver/hd-cmd-screensaver
+packages/hd-screensaver/hd-kill-screensaver
+packages/hd-screensaver/screensaver.txt
+packages/hd-screensaver/man/hd-screensaver.7
 ```
 
 The commands came with `hd-desktop` before 0.2; the package replaces those versions, so an upgrade moves them over.

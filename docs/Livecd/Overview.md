@@ -39,7 +39,7 @@ livecd/config/includes.chroot/
 | --- | --- |
 | `Makefile` | Builds the docker image, then runs it with the repository read-only at `/src` and `livecd/out` at `/out`. |
 | `Dockerfile` | The debian:trixie image with live-build and the tools to build `hd-installer`. Its entrypoint is `build.sh` in `/src`, so the image only has to be rebuilt when the Dockerfile changes. |
-| `build.sh` | Builds the package `hd-installer` from a copy of `hd-installer/`, runs `lb config`, puts `config/` and the package on top, makes the boot menus start the live system after 5 seconds, runs `lb build` and copies the ISO to `/out`. |
+| `build.sh` | Builds the package `hd-installer` from a copy of `packages/hd-installer/`, runs `lb config`, puts `config/` and the package on top, makes the boot menus start the live system after 5 seconds, runs `lb build` and copies the ISO to `/out`. |
 | `config/package-lists/` | The packages of the live system: `hyprdebian.list.chroot` for the installer and its tools, `zfs.list.chroot` for ZFS and `console.list.chroot` for the console, the network and ssh. |
 | `config/hooks/live/0100-zfs-dkms.hook.chroot` | Builds the ZFS module for the kernel of the image. |
 | `config/hooks/live/0200-enable-services.hook.chroot` | Enables gpm and the ssh server. |

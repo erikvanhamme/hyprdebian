@@ -10,9 +10,9 @@ The initramfs holds a copy of the `.link` files, so the interfaces get the same 
 The package comes with four man pages: `man hd-network` describes the settings, `man hd-network-iface` and `man hd-network-bridge` the commands that change them, and `man hd-network-render` the command that applies them.
 
 ## Building the package
-The package is built from `hd-network` in this repository:
+The package is built from `packages/hd-network` in this repository:
 ```
-cd hd-network
+cd packages/hd-network
 make deb
 ```
 
@@ -23,23 +23,23 @@ sudo apt install ./build/hd-network_<version>_all.deb
 
 The files involved are:
 ```
-hd-network/Makefile
-hd-network/version.json
-hd-network/hd-network-render
-hd-network/hd-network-iface
-hd-network/hd-network-bridge
-hd-network/lib/hd_network.py
-hd-network/deb/control
-hd-network/deb/triggers
-hd-network/templates/header.j2
-hd-network/templates/bridge.netdev.j2
-hd-network/templates/interface.network.j2
-hd-network/link/10-ethernet.link
-hd-network/link/20-wifi.link
-hd-network/man/hd-network.7
-hd-network/man/hd-network-render.8
-hd-network/man/hd-network-iface.8
-hd-network/man/hd-network-bridge.8
+packages/hd-network/Makefile
+packages/hd-network/version.json
+packages/hd-network/hd-network-render
+packages/hd-network/hd-network-iface
+packages/hd-network/hd-network-bridge
+packages/hd-network/lib/hd_network.py
+packages/hd-network/deb/control
+packages/hd-network/deb/triggers
+packages/hd-network/templates/header.j2
+packages/hd-network/templates/bridge.netdev.j2
+packages/hd-network/templates/interface.network.j2
+packages/hd-network/link/10-ethernet.link
+packages/hd-network/link/20-wifi.link
+packages/hd-network/man/hd-network.7
+packages/hd-network/man/hd-network-render.8
+packages/hd-network/man/hd-network-iface.8
+packages/hd-network/man/hd-network-bridge.8
 ```
 
 ## Settings

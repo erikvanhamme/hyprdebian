@@ -4,7 +4,7 @@
 #
 # It expects the repository read-only at /src and a folder for the ISO at
 # /out, and builds in /build:
-#   1. the package hd-installer, from a copy of /src/hd-installer
+#   1. the package hd-installer, from a copy of /src/packages/hd-installer
 #   2. the live-build configuration: lb config, then the files of
 #      /src/livecd/config on top, with the package in packages.chroot
 #   3. the ISO, which is copied to /out/hyprdebian-live-amd64.iso, owned by
@@ -21,7 +21,7 @@ version=$(python3 -c 'import json, sys; v = json.load(open(sys.argv[1])); print(
 echo "=== HyprDebian live ${version} ==="
 
 # The package hd-installer, built from a copy so that the checkout stays untouched.
-cp -a "${SRC}/hd-installer" "${BUILD}/hd-installer"
+cp -a "${SRC}/packages/hd-installer" "${BUILD}/hd-installer"
 make -C "${BUILD}/hd-installer" clean deb
 deb="${BUILD}/hd-installer/$(make -s --no-print-directory -C "${BUILD}/hd-installer" deb-path)"
 

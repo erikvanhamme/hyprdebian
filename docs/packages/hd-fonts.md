@@ -15,9 +15,9 @@ The fonts are in `/usr/share/fonts/truetype/jetbrains-mono-nerd`. fontconfig fin
 The package comes with a man page: `man hd-fonts`.
 
 ## Building the package
-The package is built from `hd-fonts` in this repository:
+The package is built from `packages/hd-fonts` in this repository:
 ```
-cd hd-fonts
+cd packages/hd-fonts
 make deb
 ```
 
@@ -34,11 +34,11 @@ To move to a new Nerd Fonts release, change `NERD_FONTS_VERSION` and `ZIP_SHA256
 
 The files involved are:
 ```
-hd-fonts/Makefile
-hd-fonts/version.json
-hd-fonts/deb/control
-hd-fonts/deb/copyright
-hd-fonts/man/hd-fonts.7
+packages/hd-fonts/Makefile
+packages/hd-fonts/version.json
+packages/hd-fonts/deb/control
+packages/hd-fonts/deb/copyright
+packages/hd-fonts/man/hd-fonts.7
 ```
 
 ## Using the fonts

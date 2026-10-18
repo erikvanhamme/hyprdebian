@@ -16,9 +16,9 @@ The file is changed with two commands, both run as root:
 The package comes with three man pages: `man hd-config` describes the configuration and how packages use it, `man hd-config-update` and `man hd-config-remove` the commands.
 
 ## Building the package
-The package is built from `hd-config` in this repository:
+The package is built from `packages/hd-config` in this repository:
 ```
-cd hd-config
+cd packages/hd-config
 make deb
 ```
 
@@ -29,14 +29,14 @@ sudo apt install ./build/hd-config_<version>_all.deb
 
 The files involved are:
 ```
-hd-config/Makefile
-hd-config/version.json
-hd-config/hd-config-update
-hd-config/hd-config-remove
-hd-config/deb/control
-hd-config/man/hd-config.7
-hd-config/man/hd-config-update.8
-hd-config/man/hd-config-remove.8
+packages/hd-config/Makefile
+packages/hd-config/version.json
+packages/hd-config/hd-config-update
+packages/hd-config/hd-config-remove
+packages/hd-config/deb/control
+packages/hd-config/man/hd-config.7
+packages/hd-config/man/hd-config-update.8
+packages/hd-config/man/hd-config-remove.8
 ```
 
 ## hd-config-update

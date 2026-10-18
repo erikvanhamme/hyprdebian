@@ -2,7 +2,7 @@
 """Uploads the HyprDebian packages to a HyprDebian package repository, each for its suites.
 
 Each argument is a package with the suites it goes to, as <suites>:<path>, the suites separated by
-commas, such as trixie,unstable:packages/hd-base_1.8_all.deb. It asks for the host name of the
+commas, such as trixie,unstable:build/hd-base_1.8_all.deb. It asks for the host name of the
 repository, copies the packages to the inboxes of their suites of the user repo there,
 inbox/trixie and inbox/unstable, then runs hd-repo-update there for the suites that got packages,
 which moves them into the pools and signs the indices, see hd-repo(7). It logs in as repo with
@@ -93,7 +93,7 @@ def main():
                         help="only print the commands, without uploading")
     parser.add_argument("packages", nargs="+", metavar="PACKAGE",
                         help="a package with its suites, as <suites>:<path>, "
-                             "such as trixie,unstable:packages/hd-base_1.8_all.deb")
+                             "such as trixie,unstable:build/hd-base_1.8_all.deb")
     args = parser.parse_args()
 
     try:

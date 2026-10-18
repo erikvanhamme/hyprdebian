@@ -11,9 +11,9 @@ sudo usermod -a -G lpadmin <user>
 The package comes with a man page: `man hd-cups`.
 
 ## Building the package
-The package is built from `hd-cups` in this repository:
+The package is built from `packages/hd-cups` in this repository:
 ```
-cd hd-cups
+cd packages/hd-cups
 make deb
 ```
 
@@ -24,8 +24,8 @@ sudo apt install ./build/hd-cups_<version>_all.deb
 
 The files involved are:
 ```
-hd-cups/Makefile
-hd-cups/version.json
-hd-cups/deb/control
-hd-cups/man/hd-cups.7
+packages/hd-cups/Makefile
+packages/hd-cups/version.json
+packages/hd-cups/deb/control
+packages/hd-cups/man/hd-cups.7
 ```

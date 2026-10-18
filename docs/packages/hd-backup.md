@@ -20,9 +20,9 @@ sudo systemctl enable --now hd-backup-vms.timer
 Each command has a man page: `man hd-backup`, `man blockwrite`, `man hd-backup-prep`, `man hd-backup-load` (also `man hd-backup-unload`), `man hd-backup-vm`, `man hd-backup-vms` and `man hd-restore-vm`.
 
 ## Building the package
-The package is built from `hd-backup` in this repository:
+The package is built from `packages/hd-backup` in this repository:
 ```
-cd hd-backup
+cd packages/hd-backup
 make deb
 ```
 
@@ -33,34 +33,34 @@ sudo apt install ./build/hd-backup_<version>_all.deb
 
 The files involved are:
 ```
-hd-backup/Makefile
-hd-backup/version.json
-hd-backup/hd-backup
-hd-backup/blockwrite.c
-hd-backup/hd-backup-prep
-hd-backup/hd-backup-load
-hd-backup/hd-backup-unload
-hd-backup/hd-backup-vm
-hd-backup/hd-backup-vms
-hd-backup/hd-restore-vm
-hd-backup/hd-backup-vms.service
-hd-backup/hd-backup-vms.timer
-hd-backup/deb/control
-hd-backup/deb/postinst
-hd-backup/deb/prerm
-hd-backup/deb/postrm
-hd-backup/man/hd-backup.1
-hd-backup/man/blockwrite.1
-hd-backup/man/hd-backup-prep.8
-hd-backup/man/hd-backup-load.8
-hd-backup/man/hd-backup-unload.8
-hd-backup/man/hd-backup-vm.8
-hd-backup/man/hd-backup-vms.8
-hd-backup/man/hd-restore-vm.8
-hd-backup/tests/test_vm.py
-hd-backup/tests/test_blockwrite.py
-hd-backup/tests/test_drive.py
-hd-backup/tests/fake-command
+packages/hd-backup/Makefile
+packages/hd-backup/version.json
+packages/hd-backup/hd-backup
+packages/hd-backup/blockwrite.c
+packages/hd-backup/hd-backup-prep
+packages/hd-backup/hd-backup-load
+packages/hd-backup/hd-backup-unload
+packages/hd-backup/hd-backup-vm
+packages/hd-backup/hd-backup-vms
+packages/hd-backup/hd-restore-vm
+packages/hd-backup/hd-backup-vms.service
+packages/hd-backup/hd-backup-vms.timer
+packages/hd-backup/deb/control
+packages/hd-backup/deb/postinst
+packages/hd-backup/deb/prerm
+packages/hd-backup/deb/postrm
+packages/hd-backup/man/hd-backup.1
+packages/hd-backup/man/blockwrite.1
+packages/hd-backup/man/hd-backup-prep.8
+packages/hd-backup/man/hd-backup-load.8
+packages/hd-backup/man/hd-backup-unload.8
+packages/hd-backup/man/hd-backup-vm.8
+packages/hd-backup/man/hd-backup-vms.8
+packages/hd-backup/man/hd-restore-vm.8
+packages/hd-backup/tests/test_vm.py
+packages/hd-backup/tests/test_blockwrite.py
+packages/hd-backup/tests/test_drive.py
+packages/hd-backup/tests/fake-command
 ```
 
 ## hd-backup
@@ -151,9 +151,9 @@ It then defines the VM in libvirt with the XML of the backup, with the disks poi
 Removing the package stops the timer and keeps the list of VMs and the backups. Purging it also removes the key `hd-backup` of `/etc/hyprdebian/config.json`. The backups and the snapshot of the last backup of each disk stay.
 
 ## Tests
-The tests are in `hd-backup/tests`. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
+The tests are in `packages/hd-backup/tests`. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
 ```
-cd hd-backup
+cd packages/hd-backup
 make test
 ```
 

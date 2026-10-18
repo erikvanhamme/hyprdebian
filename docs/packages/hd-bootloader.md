@@ -15,9 +15,9 @@ The settings are the key `hd-bootloader` in the hyprdebian configuration, `/etc/
 The packages come with two man pages: `man hd-bootloader` describes the bootloader and its settings, `man hd-bootloader-update` the command that writes it to an ESP.
 
 ## Building the packages
-The packages are built from `hd-bootloader` in this repository:
+The packages are built from `packages/hd-bootloader` in this repository:
 ```
-cd hd-bootloader
+cd packages/hd-bootloader
 make deb
 ```
 
@@ -37,31 +37,31 @@ For development, `make esp` writes the bootloader and the UKIs of the kernels in
 
 The files involved are:
 ```
-hd-bootloader/Makefile
-hd-bootloader/version.json
-hd-bootloader/bootloader.cpp
-hd-bootloader/bootloader.hpp
-hd-bootloader/graphical.cpp
-hd-bootloader/text.cpp
-hd-bootloader/assets.cpp
-hd-bootloader/update-bootloader.py
-hd-bootloader/mkuki.py
-hd-bootloader/graphical.py
-hd-bootloader/text2png.py
-hd-bootloader/png2bin.py
-hd-bootloader/menubox.py
-hd-bootloader/text.py
-hd-bootloader/update-esps
-hd-bootloader/deb/postinst
-hd-bootloader/deb/gfx/control
-hd-bootloader/deb/gfx/defaults.json
-hd-bootloader/deb/txt/control
-hd-bootloader/deb/txt/defaults.json
-hd-bootloader/deb/etc/kernel/postinst.d/zz-hd-bootloader
-hd-bootloader/deb/etc/kernel/postrm.d/zz-hd-bootloader
-hd-bootloader/deb/etc/initramfs/post-update.d/zz-hd-bootloader
-hd-bootloader/man/hd-bootloader.7
-hd-bootloader/man/hd-bootloader-update.8
+packages/hd-bootloader/Makefile
+packages/hd-bootloader/version.json
+packages/hd-bootloader/bootloader.cpp
+packages/hd-bootloader/bootloader.hpp
+packages/hd-bootloader/graphical.cpp
+packages/hd-bootloader/text.cpp
+packages/hd-bootloader/assets.cpp
+packages/hd-bootloader/update-bootloader.py
+packages/hd-bootloader/mkuki.py
+packages/hd-bootloader/graphical.py
+packages/hd-bootloader/text2png.py
+packages/hd-bootloader/png2bin.py
+packages/hd-bootloader/menubox.py
+packages/hd-bootloader/text.py
+packages/hd-bootloader/update-esps
+packages/hd-bootloader/deb/postinst
+packages/hd-bootloader/deb/gfx/control
+packages/hd-bootloader/deb/gfx/defaults.json
+packages/hd-bootloader/deb/txt/control
+packages/hd-bootloader/deb/txt/defaults.json
+packages/hd-bootloader/deb/etc/kernel/postinst.d/zz-hd-bootloader
+packages/hd-bootloader/deb/etc/kernel/postrm.d/zz-hd-bootloader
+packages/hd-bootloader/deb/etc/initramfs/post-update.d/zz-hd-bootloader
+packages/hd-bootloader/man/hd-bootloader.7
+packages/hd-bootloader/man/hd-bootloader-update.8
 ```
 
 ## Installation

@@ -16,9 +16,9 @@ Members of that group control Docker, and so the whole system.
 The package comes with a man page: `man hd-docker`.
 
 ## Building the package
-The package is built from `hd-docker` in this repository:
+The package is built from `packages/hd-docker` in this repository:
 ```
-cd hd-docker
+cd packages/hd-docker
 make deb
 ```
 
@@ -29,14 +29,14 @@ sudo apt install ./build/hd-docker_<version>_all.deb
 
 The files involved are:
 ```
-hd-docker/Makefile
-hd-docker/version.json
-hd-docker/docker-ufw.rules
-hd-docker/deb/control
-hd-docker/deb/postinst
-hd-docker/deb/postrm
-hd-docker/deb/etc/docker/daemon.json
-hd-docker/man/hd-docker.7
+packages/hd-docker/Makefile
+packages/hd-docker/version.json
+packages/hd-docker/docker-ufw.rules
+packages/hd-docker/deb/control
+packages/hd-docker/deb/postinst
+packages/hd-docker/deb/postrm
+packages/hd-docker/deb/etc/docker/daemon.json
+packages/hd-docker/man/hd-docker.7
 ```
 
 ## Addresses

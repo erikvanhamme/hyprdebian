@@ -14,9 +14,9 @@ The alpha releases of OrcaSlicer no longer crash. When the next stable release i
 The package goes to both suites of the repository, `trixie` and `unstable`.
 
 ## Building the package
-The package is built from `orcaslicer` in this repository:
+The package is built from `packages/orcaslicer` in this repository:
 ```
-cd orcaslicer
+cd packages/orcaslicer
 make deb
 ```
 
@@ -29,12 +29,12 @@ The build downloads the AppImage of the release with `wget` and checks it agains
 
 The files involved are:
 ```
-orcaslicer/Makefile
-orcaslicer/orcaslicer
-orcaslicer/deb/control
-orcaslicer/deb/copyright
-orcaslicer/deb/orcaslicer.desktop
-orcaslicer/deploy.json
+packages/orcaslicer/Makefile
+packages/orcaslicer/orcaslicer
+packages/orcaslicer/deb/control
+packages/orcaslicer/deb/copyright
+packages/orcaslicer/deb/orcaslicer.desktop
+packages/orcaslicer/deploy.json
 ```
 
 ## Files

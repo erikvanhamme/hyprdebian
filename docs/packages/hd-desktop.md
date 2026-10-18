@@ -13,9 +13,9 @@ It also installs the files that new users get in their home directory, the comma
 The package comes with the man pages `man 7 hd-desktop` and `man hd-desktop-render`.
 
 ## Building the package
-The package is built from `hd-desktop` in this repository:
+The package is built from `packages/hd-desktop` in this repository:
 ```
-cd hd-desktop
+cd packages/hd-desktop
 make deb
 ```
 
@@ -26,19 +26,19 @@ sudo apt install ./build/hd-desktop_<version>_all.deb
 
 The files involved are:
 ```
-hd-desktop/Makefile
-hd-desktop/version.json
-hd-desktop/deb/control
-hd-desktop/deb/postinst
-hd-desktop/deb/postrm
-hd-desktop/hd-desktop-render
-hd-desktop/templates/greetd.toml.j2
-hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd-mount-helper,
+packages/hd-desktop/Makefile
+packages/hd-desktop/version.json
+packages/hd-desktop/deb/control
+packages/hd-desktop/deb/postinst
+packages/hd-desktop/deb/postrm
+packages/hd-desktop/hd-desktop-render
+packages/hd-desktop/templates/greetd.toml.j2
+packages/hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd-mount-helper,
 hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
-hd-desktop/etc/...
-hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
-hd-desktop/man/hd-desktop.7
-hd-desktop/man/hd-desktop-render.8
+packages/hd-desktop/etc/...
+packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
+packages/hd-desktop/man/hd-desktop.7
+packages/hd-desktop/man/hd-desktop-render.8
 ```
 
 ## Booting into Hyprland

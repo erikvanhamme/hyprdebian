@@ -17,9 +17,9 @@ wiremix works without a configuration file. To change its settings or keys, make
 The options on the command line override the file; see `wiremix --help`.
 
 ## Building the package
-The package is built from `wiremix` in this repository:
+The package is built from `packages/wiremix` in this repository:
 ```
-cd wiremix
+cd packages/wiremix
 make deb
 ```
 
@@ -36,10 +36,10 @@ To move to a new release of wiremix, change `WIREMIX_VERSION` in the Makefile, s
 
 The files involved are:
 ```
-wiremix/Makefile
-wiremix/build-wiremix.sh
-wiremix/deb/control
-wiremix/deb/copyright
+packages/wiremix/Makefile
+packages/wiremix/build-wiremix.sh
+packages/wiremix/deb/control
+packages/wiremix/deb/copyright
 ```
 
 ## Copyright

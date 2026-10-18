@@ -12,9 +12,9 @@ The installation does not open the port of the dashboard, 80 by default, in the 
 The package comes with two man pages: `man 7 hd-dashboard` describes the dashboard, its settings and the reports, `man 8 hd-dashboard` the command.
 
 ## Building the package
-The package is built from `hd-dashboard` in this repository:
+The package is built from `packages/hd-dashboard` in this repository:
 ```
-cd hd-dashboard
+cd packages/hd-dashboard
 make deb
 ```
 
@@ -25,18 +25,18 @@ sudo apt install ./build/hd-dashboard_<version>_all.deb
 
 The files involved are:
 ```
-hd-dashboard/Makefile
-hd-dashboard/version.json
-hd-dashboard/hd-dashboard
-hd-dashboard/defaults.json
-hd-dashboard/hd-dashboard.service
-hd-dashboard/deb/control
-hd-dashboard/deb/postinst
-hd-dashboard/deb/prerm
-hd-dashboard/deb/postrm
-hd-dashboard/man/hd-dashboard.7
-hd-dashboard/man/hd-dashboard.8
-hd-dashboard/tests/test_dashboard.py
+packages/hd-dashboard/Makefile
+packages/hd-dashboard/version.json
+packages/hd-dashboard/hd-dashboard
+packages/hd-dashboard/defaults.json
+packages/hd-dashboard/hd-dashboard.service
+packages/hd-dashboard/deb/control
+packages/hd-dashboard/deb/postinst
+packages/hd-dashboard/deb/prerm
+packages/hd-dashboard/deb/postrm
+packages/hd-dashboard/man/hd-dashboard.7
+packages/hd-dashboard/man/hd-dashboard.8
+packages/hd-dashboard/tests/test_dashboard.py
 ```
 
 ## The service
@@ -147,7 +147,7 @@ hd-dashboard [--config <file>] [--database <file>] forget <host>
 `--config` reads the settings from another file than `/etc/hyprdebian/config.json`, and `--database` uses another database than `/var/lib/hd-dashboard/dashboard.db`. With both, the dashboard can be tried from this repository, without installing it:
 ```
 echo '{"hd-dashboard": {"listen": "127.0.0.1", "port": 18080}}' > /tmp/dashboard.json
-hd-dashboard/hd-dashboard --config /tmp/dashboard.json --database /tmp/dashboard.db serve
+packages/hd-dashboard/hd-dashboard --config /tmp/dashboard.json --database /tmp/dashboard.db serve
 ```
 
 It exits with 0 on success, 1 on an error and 2 on wrong arguments.
@@ -156,9 +156,9 @@ It exits with 0 on success, 1 on an error and 2 on wrong arguments.
 Removing the package stops the service and keeps the settings and the database, so a new installation takes them over. Purging it also removes the key `hd-dashboard` of `/etc/hyprdebian/config.json` and the database. Firewall rules for the dashboard stay; remove them by hand.
 
 ## Tests
-The tests are in `hd-dashboard/tests`: accepting and refusing reports and tokens, the history, judging the systems, escaping report values in the pages, the settings, the server on a free local port, and `hd-dashboard forget`. They need nothing beyond Python:
+The tests are in `packages/hd-dashboard/tests`: accepting and refusing reports and tokens, the history, judging the systems, escaping report values in the pages, the settings, the server on a free local port, and `hd-dashboard forget`. They need nothing beyond Python:
 ```
-cd hd-dashboard
+cd packages/hd-dashboard
 make test
 ```
 
