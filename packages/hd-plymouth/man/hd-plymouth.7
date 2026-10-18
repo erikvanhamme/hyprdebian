@@ -1,0 +1,94 @@
+.TH HD-PLYMOUTH 7 "October 2026" "hd-plymouth" "HyprDebian"
+.SH NAME
+hd-plymouth \- the boot splash of HyprDebian
+.SH DESCRIPTION
+The package
+.B hd-plymouth
+holds the
+.BR plymouth (8)
+theme
+.BR hyprdebian ,
+the boot splash of HyprDebian, and makes it the theme of plymouth.
+.BR hd-desktop (7)
+recommends it.
+It looks like the lock screen of
+.BR hyprlock (1),
+as
+.I ~/.config/hypr/hyprlock.conf
+of hd-desktop sets it up: the Emerald wallpaper of
+.BR hd-art (7),
+scaled to cover the screen, and, when the boot asks for a password, an input
+field in the middle with an orange outline.
+.PP
+The theme is based on the theme emerald of the Debian package
+.BR desktop-base .
+hd-plymouth conflicts with desktop-base, whose themes it replaces.
+.SH PASSWORDS
+The ZFS script of the initramfs asks for the password of an encrypted
+dataset with plymouth when the splash shows, up to three times.
+The prompt, such as
+.IR "Encrypted ZFS password for rpool/hyprdebian" ,
+is above the field.
+The empty field says
+.IR "Enter Password" ;
+every key press adds a blue dot.
+After Enter, the outline turns yellow while the password is checked, and
+the field hides after about two seconds.
+When the same prompt comes back, the password was wrong: the outline turns
+red and the field says how many attempts failed, until the next key press.
+.PP
+The text is in JetBrains Mono of
+.BR hd-fonts (7).
+The hook of hd-plymouth for initramfs-tools puts its fonts in the
+initramfs, as the hook of plymouth only takes the default fonts.
+.SH SETTING THE THEME
+plymouth reads its theme from
+.IR /etc/plymouth/plymouthd.conf .
+The package diverts the one of plymouth to
+.I /etc/plymouth/plymouthd.conf.plymouth
+and copies its own in its place, on every installation and upgrade.
+The settings that it leaves out come from
+.IR /usr/share/plymouth/plymouthd.defaults .
+Removing the package puts the one of plymouth back.
+.PP
+The initramfs holds the theme.
+Installing, upgrading or removing the package has initramfs-tools rebuild
+it, and hd-bootloader then rebuilds its UKIs.
+.PP
+The splash shows when the kernel command line has
+.BR splash ,
+which hd-bootloader adds by default.
+The bootloader passes its resolution with
+.BR video= ,
+so the splash starts at that resolution.
+.SH FILES
+.TP
+.I /usr/share/plymouth/themes/hyprdebian/
+The theme: the script, the images of the input field, and
+.IR background.png ,
+a link to
+.I /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
+of hd-art.
+.TP
+.I /usr/share/hd-plymouth/plymouthd.conf
+The config of plymouthd that the package copies to
+.IR /etc/plymouth/plymouthd.conf .
+.TP
+.I /etc/plymouth/plymouthd.conf.plymouth
+The config of plymouth, diverted.
+.TP
+.I /usr/share/initramfs-tools/hooks/hd-plymouth
+Puts the fonts of the theme in the initramfs.
+.TP
+.I /usr/share/doc/hd-plymouth/copyright
+The copyright and license of the theme.
+.SH SEE ALSO
+.BR plymouth (8),
+.BR plymouth-set-default-theme (1),
+.BR hyprlock (1),
+.BR hd-desktop (7),
+.BR hd-art (7),
+.BR hd-fonts (7),
+.BR hd-bootloader (7)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

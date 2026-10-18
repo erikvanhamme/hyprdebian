@@ -1,0 +1,15 @@
+#!/bin/sh
+# postrm of hd-plymouth: a removal removes the config of plymouth that the postinst wrote and puts
+# back the one of plymouth, which the postinst diverted. The trigger update-initramfs then
+# rebuilds the initramfs without the theme. Written for sh, as python3 may be gone by then.
+set -e
+
+PLYMOUTH_CONFIG=/etc/plymouth/plymouthd.conf
+
+if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; then
+    if [ "$(dpkg-divert --listpackage "$PLYMOUTH_CONFIG")" = "hd-plymouth" ]; then
+        rm -f "$PLYMOUTH_CONFIG"
+        dpkg-divert --package hd-plymouth --remove --rename --divert "$PLYMOUTH_CONFIG.plymouth" \
+            "$PLYMOUTH_CONFIG"
+    fi
+fi

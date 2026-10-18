@@ -8,6 +8,8 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 
 It recommends the screensaver of [hd-screensaver](hd-screensaver.md), which hypridle starts after 2 minutes. Without it, hypridle only locks the screen and turns the monitors off: the command line that starts the screensaver ends in `|| true`, so hypridle logs no failed command.
 
+It also recommends the boot splash of [hd-plymouth](hd-plymouth.md), which looks like the lock screen of hyprlock and asks for the password of an encrypted ZFS dataset.
+
 It also installs the files that new users get in their home directory, the commands that the key bindings run, the dark theme for GTK applications and the sudoers rule of the mount menus.
 
 The package comes with the man pages `man 7 hd-desktop` and `man hd-desktop-render`.

@@ -17,6 +17,10 @@ It recommends the screensaver of
 .BR hd-screensaver (7),
 which hypridle starts after 2 minutes; without it, hypridle only locks the
 screen.
+It also recommends the boot splash of
+.BR hd-plymouth (7),
+which looks like the lock screen of hyprlock and asks for the password of
+an encrypted ZFS dataset.
 .SH BOOTING INTO HYPRLAND
 greetd runs on tty7 and logs a user in to Hyprland at the boot, without a
 password, with
@@ -125,6 +129,7 @@ before greetd starts.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
 .BR hd-screensaver (7),
+.BR hd-plymouth (7),
 .BR hd-base (7),
 .BR hd-config (7),
 .BR greetd (1),

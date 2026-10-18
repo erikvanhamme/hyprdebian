@@ -127,4 +127,5 @@ The `docs` folder has more documentation:
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
 - [Desktop](docs/packages/hd-desktop.md): the Hyprland desktop and the login with greetd.
+- [Boot splash](docs/packages/hd-plymouth.md): the boot splash, which looks like the lock screen and asks for the ZFS password.
 - [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.
