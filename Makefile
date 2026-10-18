@@ -37,7 +37,7 @@
 # Add every new package directory to PACKAGES, and to TESTS when its Makefile
 # also has the target test, which runs the tests of the package.
 
-PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-plymouth hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-screensaver hd-desktop hd-docker hd-qemu-kvm hd-cups hd-base hd-installer
+PACKAGES := hd-repo hd-art hd-fonts hd-config hd-network hd-secboot hd-bootloader hd-plymouth hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-screensaver hd-menu hd-desktop hd-docker hd-qemu-kvm hd-cups hd-base hd-installer
 # The package directories with tests.
 TESTS := hd-dashboard hd-report hd-backup hd-secboot
 # The directory with the package directories.
