@@ -63,9 +63,18 @@ From the root of this repository:
 make update-repo
 ```
 
-This builds every package into `packages/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages and asks for a go-ahead. It then copies the packages to both inboxes, `inbox/trixie` and `inbox/unstable`, and runs `hd-repo-update trixie unstable` there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`. The HyprDebian packages fit both suites.
+This builds every package into `packages/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
 
-`python3 update-repo/update-repo.py --dry-run` only prints the commands.
+The suites of a package come from the `deploy.json` in its package directory:
+```
+{
+    "repos" : ["trixie", "unstable"]
+}
+```
+
+Most HyprDebian packages go to both suites. `hd-desktop` and `hd-screensaver` go to unstable only, as they need Hyprland, which trixie does not have, and so does `ouch`, which is built on sid and needs its libc.
+
+`make update-repo` hands `update-repo.py` each package as `<suites>:<path>`, such as `trixie,unstable:packages/hd-base_1.8_all.deb`. With `--dry-run` before the packages, it only prints the commands.
 
 ## hd-repo-update
 ```
