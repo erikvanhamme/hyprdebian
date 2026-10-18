@@ -19,20 +19,6 @@ o_firewall() {
             "deploy/etc/sysctl.d/50-bridge-netfilter.conf" \
 
     fi
-
-    if [[ "${Q_DOCKER}" == "true" ]]; then
-        add_files \
-            deploy/etc/ufw/after.rules \
-            
-    fi
-}
-
-o_docker() {
-    add_packages docker.io docker-compose
-
-    add_user_groups docker
-
-    add_files deploy/etc/docker/daemon.json
 }
 
 o_qemu_kvm() {

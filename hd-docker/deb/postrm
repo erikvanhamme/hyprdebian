@@ -1,0 +1,27 @@
+#!/bin/sh
+# postrm of hd-docker: a removal takes the Docker block, between "# BEGIN DOCKER UFW FIX" and
+# "# END DOCKER UFW FIX", out of /etc/ufw/after.rules, with the empty line that the postinst put
+# before it, and reloads ufw when it is active. Written for sh, as python3 may be gone by then.
+set -e
+
+AFTER_RULES=/etc/ufw/after.rules
+
+if [ "$1" != "remove" ] && [ "$1" != "abort-install" ] && [ "$1" != "disappear" ]; then
+    exit 0
+fi
+
+if [ -f "$AFTER_RULES" ] && grep -qx '# BEGIN DOCKER UFW FIX' "$AFTER_RULES"; then
+    # Holds back empty lines until the next line shows whether the block follows them.
+    awk '
+        /^# BEGIN DOCKER UFW FIX$/ { inside = 1; blank = ""; next }
+        inside { if ($0 == "# END DOCKER UFW FIX") inside = 0; next }
+        /^$/ { blank = blank "\n"; next }
+        { printf "%s", blank; blank = ""; print }
+    ' "$AFTER_RULES" > "$AFTER_RULES.hd-docker"
+    chmod --reference="$AFTER_RULES" "$AFTER_RULES.hd-docker"
+    mv "$AFTER_RULES.hd-docker" "$AFTER_RULES"
+    echo "Removed the Docker rules from $AFTER_RULES."
+    if command -v ufw > /dev/null && ufw status | grep -q '^Status: active'; then
+        ufw reload
+    fi
+fi

@@ -6,7 +6,7 @@ The installer is split into phases. Each phase has its own script in the `script
 | 1 | Questions | `questions.sh` | `q_` | Asks the user for the optional components, and adds the dependencies and queue entries that follow from the answers. See [Questions](Questions.md). |
 | 2 | Prerequisites | `prereqs.sh` | `pr_` | Installs the tools the installer needs on the live system. Skipped on the hyprdebian live cd. |
 | 3 | Base | `base.sh` | `b_` | Installs a specific kernel, when one was downloaded. Also queues the files and services for the rotation of the machine id and the journal. |
-| 4 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (desktop, docker, Qemu/KVM, ...). |
+| 4 | Optional | `optional.sh` | `o_` | Queues the optional components the user selected (Qemu/KVM, printing, backup tools, ...). |
 | 5 | Packages | `packages.sh` | `pkg_` | Installs all queued packages in the target system. |
 | 6 | Files | `files.sh` | `fil_` | Copies all queued files from `deploy/` to the target system. |
 | 7 | Templates | `templates.sh` | `tpl_` | Renders all queued templates from `templates/` to the target system. |

@@ -1,0 +1,21 @@
+# BEGIN DOCKER UFW FIX
+# Added by hd-docker, which keeps this block up to date and removes it when the
+# package is removed. Changes between these two lines are lost then.
+*filter
+:ufw-user-forward - [0:0]
+:DOCKER-USER - [0:0]
+
+# 1. Allow return traffic for ESTABLISHED and RELATED container connections
+-A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# 2. Evaluate standard UFW forward rules (e.g., 'ufw route allow ...')
+-A DOCKER-USER -j ufw-user-forward
+
+# 3. Allow local Docker bridge communication, the address pool of
+# /etc/docker/daemon.json
+-A DOCKER-USER -j RETURN -s 192.168.240.0/20
+
+# 4. Drop all other external/unmatched traffic to Docker
+-A DOCKER-USER -j DROP
+COMMIT
+# END DOCKER UFW FIX

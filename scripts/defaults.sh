@@ -3,7 +3,7 @@
 # Defaults for the installer questions, per machine type.
 #
 # Every machine type has its own table, named DEFAULTS_<type>. The keys are
-# the names of the question variables (Q_DESKTOP, Q_DOCKER, ...), the values
+# the names of the question variables (Q_DESKTOP, Q_QEMU_KVM, ...), the values
 # are the defaults to pass to the ask functions. Yes/no questions use "y" and
 # "n", the defaults ask_yes_no takes.
 #
@@ -39,28 +39,24 @@ declare -gA DEFAULTS_common=(
 
 declare -gA DEFAULTS_desktop=(
     [Q_DESKTOP]="y"
-    [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="y"
 )
 
 declare -gA DEFAULTS_laptop=(
     [Q_DESKTOP]="y"
-    [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="y"
 )
 
 declare -gA DEFAULTS_server=(
     [Q_DESKTOP]="n"
-    [Q_DOCKER]="y"
     [Q_QEMU_KVM]="y"
     [Q_BACKUPTOOLS]="y"
 )
 
 declare -gA DEFAULTS_vm=(
     [Q_DESKTOP]="n"
-    [Q_DOCKER]="n"
     [Q_QEMU_KVM]="n"
     [Q_BACKUPTOOLS]="n"
 )

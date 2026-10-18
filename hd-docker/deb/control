@@ -1,0 +1,18 @@
+Package: hd-docker
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, docker.io, docker-compose, ufw
+Section: admin
+Priority: optional
+Description: HyprDebian Docker support
+ Installs Docker and Docker Compose, and sets them up to work with the ufw
+ firewall.
+ .
+ /etc/docker/daemon.json gives the bridge of Docker the address
+ 192.168.253.1/24 and takes the networks of containers from 192.168.240.0/20,
+ so they stay clear of the usual home and office networks. The rules that
+ hd-docker adds to /etc/ufw/after.rules keep the ports that containers
+ publish from bypassing ufw: traffic from outside reaches a container only
+ when a route rule of ufw allows it, such as ufw route allow.

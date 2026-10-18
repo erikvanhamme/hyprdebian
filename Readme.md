@@ -22,7 +22,7 @@ Feel free to experiment with it.
 9.  Basic notification system using mako.
 10. Optional printing support through cups. (Configured via cups web interface)
 11. Some laptop friendly optimization.
-12. Optional docker support.
+12. Optional docker support. See [hd-docker](docs/packages/hd-docker.md).
 13. Optional QEMU/KVM support.
 14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md).
 15. Optional status reports to a dashboard that shows all hyprdebian systems on one page. See [hd-dashboard](docs/packages/hd-dashboard.md) and [hd-report](docs/packages/hd-report.md).

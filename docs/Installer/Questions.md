@@ -7,7 +7,7 @@ scripts/questions.sh
 ```
 
 ## Asking questions
-Every answer is stored in a variable with the `Q_` prefix (`Q_DESKTOP`, `Q_DOCKER`, `Q_REPORT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
+Every answer is stored in a variable with the `Q_` prefix (`Q_DESKTOP`, `Q_QEMU_KVM`, `Q_REPORT`, ...). The questions are asked with these helpers from `scripts/helpers.sh`:
 
 | Function | Purpose |
 | --- | --- |

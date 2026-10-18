@@ -4,7 +4,7 @@ Configuration files reach the target system in two ways: as fixed files from the
 ## Deployed files
 The `deploy` directory mirrors the root of the target system. A file is copied to the same path under `/mnt`, with the `deploy/` prefix removed:
 ```
-deploy/etc/docker/daemon.json  ->  /mnt/etc/docker/daemon.json
+deploy/etc/libvirt/libvirtd.conf  ->  /mnt/etc/libvirt/libvirtd.conf
 ```
 
 Use `add_files` to queue a file, or `file_deploy` to copy it right away. Missing directories are created.

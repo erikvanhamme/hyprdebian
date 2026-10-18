@@ -1,5 +1,5 @@
 ## Introduction
-Most [questions](Questions.md) of the installer have a default answer. The defaults depend on the machine type: a desktop gets the hyprland desktop, a server docker and Qemu/KVM, and so on. The machine type itself, `Q_TYPE`, and the suite, `Q_SUITE`, are asked by `hd-installer` (see [hd-installer](../packages/hd-installer.md)).
+Most [questions](Questions.md) of the installer have a default answer. The defaults depend on the machine type: a desktop gets the hyprland desktop, a server Qemu/KVM, and so on. The machine type itself, `Q_TYPE`, and the suite, `Q_SUITE`, are asked by `hd-installer` (see [hd-installer](../packages/hd-installer.md)).
 
 The defaults are defined in:
 ```
@@ -32,7 +32,6 @@ These defaults differ per machine type (`DEFAULTS_desktop`, `DEFAULTS_laptop`, `
 | Key | Question | desktop | laptop | server | vm |
 | --- | --- | --- | --- | --- | --- |
 | `Q_DESKTOP` | Install hyprland desktop environment | `y` | `y` | `n` | `n` |
-| `Q_DOCKER` | Enable docker | `n` | `n` | `y` | `n` |
 | `Q_QEMU_KVM` | Enable Qemu/KVM | `n` | `n` | `y` | `n` |
 | `Q_BACKUPTOOLS` | Install backup tools | `y` | `y` | `y` | `n` |
 
@@ -43,7 +42,7 @@ These defaults differ per machine type (`DEFAULTS_desktop`, `DEFAULTS_laptop`, `
 ### Looking up a default
 Each question looks up its default with `get_default`, passing the machine type when it is known:
 ```
-local default="$(get_default Q_DOCKER "${Q_TYPE:-}")"
+local default="$(get_default Q_QEMU_KVM "${Q_TYPE:-}")"
 ```
 
 `get_default key [type]` works as follows:

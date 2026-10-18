@@ -1,0 +1,117 @@
+.TH HD-DOCKER 7 "October 2026" "hd-docker" "HyprDebian"
+.SH NAME
+hd-docker \- Docker on HyprDebian
+.SH DESCRIPTION
+The package
+.B hd-docker
+installs Docker, from the package
+.BR docker.io ,
+and Docker Compose, from
+.BR docker-compose ,
+and sets them up to work with the
+.BR ufw (8)
+firewall, which it also depends on.
+.PP
+To use Docker without sudo, add your user to the group
+.B docker
+and log in again:
+.PP
+.RS
+.nf
+sudo usermod \-a \-G docker <user>
+.fi
+.RE
+.PP
+Members of that group control Docker, and so the whole system.
+.SH ADDRESSES
+.I /etc/docker/daemon.json
+gives the bridge
+.B docker0
+the address 192.168.253.1/24, and the networks that Docker makes, such as
+those of
+.BR "docker compose" ,
+a /24 each from 192.168.240.0/20.
+This keeps them clear of the usual home and office networks.
+.PP
+The file is a conffile of
+.BR hd-docker .
+Restart Docker after changing it:
+.PP
+.RS
+.nf
+sudo systemctl restart docker
+.fi
+.RE
+.PP
+When you change the address pool, change the
+.B RETURN
+rule of the firewall block to match; see
+.BR FIREWALL .
+.PP
+The first installation of
+.B hd-docker
+restarts Docker, which
+.B docker.io
+started with its default addresses; later installations do not, as a restart
+stops the containers that run.
+.SH FIREWALL
+Docker publishes the ports of containers with rules of its own, which come
+before those of ufw, so a published port would be open whatever ufw says.
+.B hd-docker
+puts rules in the chain
+.B DOCKER-USER
+that Docker checks first:
+.IP \(bu 2
+replies to connections that a container made, or that were allowed, pass;
+.IP \(bu 2
+the route rules of ufw are checked, so a container is reached only when one
+of them allows it;
+.IP \(bu 2
+traffic from the networks of Docker, 192.168.240.0/20, passes;
+.IP \(bu 2
+all other traffic to the containers is dropped.
+.PP
+To open a published port, allow it with a route rule.
+Docker has already sent the traffic on to the container by then, so the rule
+names the port inside the container, not the published one: for
+.BR "\-p 8080:80" ,
+.PP
+.RS
+.nf
+sudo ufw route allow proto tcp to any port 80
+.fi
+.RE
+.PP
+The rules are in a block at the end of
+.IR /etc/ufw/after.rules ,
+between the lines
+.B # BEGIN DOCKER UFW FIX
+and
+.BR "# END DOCKER UFW FIX" .
+That file belongs to ufw, so
+.B hd-docker
+does not ship it: every installation and upgrade puts the block in from
+.I /usr/share/hd-docker/docker-ufw.rules
+and keeps the rest of the file, and ufw is reloaded when the block changed and
+the firewall is on.
+Changes made inside the block are lost then; put your own rules outside it.
+Removing the package takes the block out again.
+.SH FILES
+.TP
+.I /etc/docker/daemon.json
+The addresses of the networks of Docker, a conffile.
+.TP
+.I /etc/ufw/after.rules
+The rules of ufw, with the block of
+.BR hd-docker .
+.TP
+.I /usr/share/hd-docker/docker-ufw.rules
+The block that goes in
+.IR /etc/ufw/after.rules .
+.SH SEE ALSO
+.BR docker (1),
+.BR docker-compose (1),
+.BR ufw (8),
+.BR ufw-framework (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

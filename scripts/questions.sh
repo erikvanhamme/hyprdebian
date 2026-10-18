@@ -62,13 +62,6 @@ q_desktop() {
     fi
 }
 
-q_docker() {
-    local default="$(get_default Q_DOCKER "${Q_TYPE:-}")"
-    if ask_yes_no Q_DOCKER "Enable docker" "${default}"; then
-        add_dependencies "o_main" "o_docker"
-    fi
-}
-
 q_qemu_kvm() {
     local default="$(get_default Q_QEMU_KVM "${Q_TYPE:-}")"
     if ask_yes_no Q_QEMU_KVM "Enable Qemu/KVM" "${default}"; then
@@ -113,7 +106,6 @@ add_dependencies "q_main" \
     "q_defaults" \
     "q_kernel" \
     "q_desktop" \
-    "q_docker" \
     "q_qemu_kvm" \
     "q_cups" \
     "q_backuptools" \
