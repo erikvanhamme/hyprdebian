@@ -12,14 +12,6 @@ b_post() {
     return 0
 }
 
-b_files() {
-
-    # These files need to be deployed for sure.
-    add_files \
-        deploy/etc/skel/.bash_aliases \
-
-}
-
 b_kernel() {
     if [[ "${Q_KERNEL}" == "latest" ]]; then
         return 0
@@ -41,9 +33,6 @@ b_systemd() {
         deploy/etc/systemd/system/rotate-machine-id.service \
 
 }
-
-add_dependencies "b_pre" \
-    "b_files" \
 
 add_dependencies "b_main" \
     "b_kernel" \

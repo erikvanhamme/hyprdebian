@@ -145,7 +145,7 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 
 | File | Content |
 | --- | --- |
-| `.bash_aliases` | `ls` and `ll` with eza, and a history search on Ctrl-R with fzf. |
+| `.bash_aliases` | `ls` and `ll` with eza, `y` for yazi, `wav2flac`, which converts the `.wav` files below the current folder to `.flac` with ffmpeg and deletes them, and a history search on Ctrl-R with fzf. |
 | `.gitconfig` | delta as the pager and diff filter of git. |
 | `.config/nano/nanorc` | Indents with four spaces, remembers the search history, and colors the interface and the syntax. |
 
