@@ -100,6 +100,11 @@ and
 by default), and
 .BR extra ,
 a list of more arguments.
+The graphical frontend adds
+.BI video= res_x x res_y
+before those of
+.BR extra ,
+which can override it.
 .PP
 The fields of the graphical frontend:
 .TP
@@ -112,6 +117,11 @@ A relative path is relative to
 .TP
 .BR res_x ", " res_y
 The display resolution of the bootloader; 1920 by 1080 by default.
+It is also passed to the kernel as
+.BI video= res_x x res_y\fR,\fP
+so that the boot splash of
+.BR plymouth (8)
+and the desktop start with the same resolution.
 .TP
 .B font
 The fontconfig name or file of the font;

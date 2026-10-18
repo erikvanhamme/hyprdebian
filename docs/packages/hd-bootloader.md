@@ -110,9 +110,9 @@ All fields are optional; a missing field gets its default. A field of the other 
 | `frontend` | both | `graphical` | `graphical` or `text`, the frontend of the installed package. |
 | `timeout` | both | `5` | Seconds before the default entry boots. |
 | `banner_text` | both | `HyprDebian Bootloader` | The text above the menu. |
-| `cmdline` | both | see above | The kernel command line of the UKIs: `root` (the value of `root=`), `quiet`, `splash`, and `extra`, a list of more arguments. |
+| `cmdline` | both | see above | The kernel command line of the UKIs: `root` (the value of `root=`), `quiet`, `splash`, and `extra`, a list of more arguments. The graphical frontend adds `video=<res_x>x<res_y>` before those of `extra`, which can override it. |
 | `wallpaper` | graphical | `/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png` | The wallpaper; a relative path is relative to `/etc/hyprdebian`. |
-| `res_x`, `res_y` | graphical | `1920`, `1080` | The display resolution of the bootloader. |
+| `res_x`, `res_y` | graphical | `1920`, `1080` | The display resolution of the bootloader, also passed to the kernel as `video=<res_x>x<res_y>`, so that the plymouth boot splash and the desktop start with the same resolution. |
 | `font` | graphical | `JetBrainsMono Nerd Font Mono` | The fontconfig name or file of the font. |
 | `color` | graphical | `#0066cc` | The colour of the menu labels. |
 | `selected_color` | graphical | `#ff6600` | The colour of the selected label and of the border of the menu box. |

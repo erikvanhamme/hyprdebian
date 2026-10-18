@@ -12,6 +12,12 @@ update-bootloader.py adds them to assets.efi when the config has
     .lblN     the label of menu row N, unselected
     .lblNs    the label of menu row N, selected
 
+It also adds video=<res_x>x<res_y> to the kernel command lines of the
+UKIs, so that the kernel sets the displays to the resolution of the
+bootloader: the boot splash of plymouth then has it too, and so does the
+desktop until it sets a mode of its own. An argument video= in cmdline.extra
+comes after it and wins.
+
 The work area holds ten rows of text, so the banner and the menu labels are
 rendered at a tenth of its height. Images are in the raw image format of
 png2bin.py.
@@ -22,7 +28,8 @@ update-bootloader.py), of which it uses banner_text:
     wallpaper       PNG or other image; a relative path is relative to the
                     config file
     res_x, res_y    display resolution of the bootloader: the size of the
-                    background
+                    background, and the mode of video= on the kernel
+                    command lines
     font            fontconfig name or file of the font for all texts
     color           colour of unselected menu labels
     selected_color  colour of the selected menu label and the menu box border
@@ -87,13 +94,28 @@ def scale_to_cover(image, width, height):
     return scaled.crop((left, top, left + width, top + height))
 
 
+def resolution(config):
+    """Returns res_x and res_y of the config. Exits if they are not positive whole numbers."""
+    for key in ["res_x", "res_y"]:
+        value = config[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            sys.exit(f"{key} must be a positive whole number (pixels), not {value!r}")
+    return config["res_x"], config["res_y"]
+
+
+def cmdline(config):
+    """Returns the arguments the frontend adds to the kernel command lines: the resolution of the bootloader."""
+    res_x, res_y = resolution(config)
+    return [f"video={res_x}x{res_y}"]
+
+
 def sections(config, labels):
     """Returns the {name: data} sections of the frontend for the menu rows with the given label texts.
 
     labels holds the text of each row, top to bottom; row N (from 1) gets
     .lblN and .lblNs.
     """
-    res_x, res_y = config["res_x"], config["res_y"]
+    res_x, res_y = resolution(config)
 
     for key in ["work_area_size", "x_center", "y_center"]:
         value = config[key]

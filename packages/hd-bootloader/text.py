@@ -31,6 +31,11 @@ def to_ucs2(text, what):
     return text.encode("utf-16-le")
 
 
+def cmdline(config):
+    """Returns the arguments the frontend adds to the kernel command lines: none."""
+    return []
+
+
 def sections(config, labels):
     """Returns the {name: data} sections of the frontend for the menu rows with the given label texts.
 

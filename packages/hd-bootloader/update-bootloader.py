@@ -68,7 +68,9 @@ Config keys of every frontend:
                     console of the firmware
     timeout         seconds before the default entry boots
     cmdline         root, quiet, splash and extra (a list) for the kernel
-                    command lines, see mkuki.py
+                    command lines, see mkuki.py; the frontend may add
+                    arguments before those of extra, as the graphical one
+                    adds video=<res_x>x<res_y>
     banner_text     text of the banner
 
 and those of the frontend, in DEFAULTS of its module (graphical.py,
@@ -133,6 +135,8 @@ CONFIG_KEY = "hd-bootloader"
 #   PATH_KEYS                 those of its keys that are file paths, which
 #                             may be relative to the config file
 #   sections(config, labels)  builds its sections
+#   cmdline(config)           the arguments it adds to the kernel command
+#                             lines, before those of extra
 # A package installs only the module of its own frontend, so a module is only
 # imported when the config names it.
 FRONTENDS = ["graphical", "text"]
@@ -319,8 +323,12 @@ def written(signing):
     return "unsigned" if signing is None else "signed"
 
 
-def build_ukis(config, esp, kernels, signing):
-    """Writes the UKIs of the kernels that changed, signed if signing. Returns their file names, newest first."""
+def build_ukis(config, frontend, esp, kernels, signing):
+    """Writes the UKIs of the kernels that changed, signed if signing. Returns their file names, newest first.
+
+    The arguments that the frontend adds to the command lines come before
+    those of extra, so that extra can override them.
+    """
     linux = esp / "EFI" / "Linux"
     linux.mkdir(parents=True, exist_ok=True)
 
@@ -330,7 +338,7 @@ def build_ukis(config, esp, kernels, signing):
         flags.append("--no-quiet")
     if not cmdline["splash"]:
         flags.append("--no-splash")
-    for extra in cmdline["extra"]:
+    for extra in frontend.cmdline(config) + cmdline["extra"]:
         flags += ["--extra", extra]
 
     names = []
@@ -518,7 +526,7 @@ def main():
     kernels = find_kernels(args.boot_dir)
     if not kernels:
         sys.exit(f"no kernels with an initrd found in {args.boot_dir}")
-    uki_names = build_ukis(config, args.esp, kernels, signing)
+    uki_names = build_ukis(config, frontend, args.esp, kernels, signing)
     rows = menu_rows(uki_names)
 
     # 2. The assets: the config, the menu rows, the DKMS MOK and the sections
