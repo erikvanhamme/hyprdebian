@@ -1,0 +1,16 @@
+Package: hd-cups
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: cups
+Conflicts: avahi-daemon, sane-utils
+Section: admin
+Priority: optional
+Description: HyprDebian printing support
+ Installs CUPS, the print server, which is set up through its web interface
+ on http://localhost:631.
+ .
+ It keeps avahi-daemon, which cups recommends, and sane-utils, the scanner
+ tools, from being installed. Adding users to the group lpadmin, which may
+ manage the printers, is left to the administrator.

@@ -20,7 +20,7 @@ Feel free to experiment with it.
 7.  Keyboard shortcuts for the commonly used tools.
 8.  Wofi launcher for the other tools.
 9.  Basic notification system using mako.
-10. Optional printing support through cups. (Configured via cups web interface)
+10. Optional printing support through cups, configured via the cups web interface. See [hd-cups](docs/packages/hd-cups.md).
 11. Some laptop friendly optimization.
 12. Optional docker support. See [hd-docker](docs/packages/hd-docker.md).
 13. Optional QEMU/KVM support. See [hd-qemu-kvm](docs/packages/hd-qemu-kvm.md).
@@ -43,19 +43,6 @@ See [About](docs/HyprDebian/About.md) for more.
 Please note:
 1. The installer will not do any handholding. If it asks questions, you better have the right answers.
 2. Near the end, it will complain that 'rpool' could not be exported. This is a known bug which is very hard to fix, see 'First boot' below for a workaround.
-
-### From Debian trixie live ISO
-
-To install you will need a Debian Trixie live ISO written to a USB stick to boot from.
-
-After boot, open a terminal and run:
-
-```
-sudo apt install -y git
-git clone https://github.com/erikvanhamme/hyprdebian.git
-cd hyprdebian
-sudo ./install.sh
-```
 
 ### From the HyprDebian live ISO
 
@@ -93,12 +80,12 @@ See [hd-installer](docs/packages/hd-installer.md#questions) for all the question
 
 ### When the installer fails
 
-The installer can be started again after a failure. Tasks that completed before are skipped, and the installation continues with the task that failed. Fix the cause and run `sudo ./install.sh` again.
+The installer can be started again after a failure. Tasks that completed before are skipped, and the installation continues with the task that failed. Fix the cause and run `sudo hd-installer` again.
 
-The answers and progress are kept in `/tmp/hyprdebian`. To start a completely fresh installation, remove it:
+The answers and progress are kept in `/tmp/hd-installer`. To start a completely fresh installation, remove it:
 
 ```
-sudo rm -rf /tmp/hyprdebian
+sudo rm -rf /tmp/hd-installer
 ```
 
 Because it is in `/tmp`, it is also gone after a reboot of the live system.
@@ -128,7 +115,7 @@ Subsequent boots will be normal.
 
 The `docs` folder has more documentation:
 - [HyprDebian](docs/HyprDebian/About.md): what HyprDebian is, and its [key bindings](docs/HyprDebian/Key%20Bindings.md).
-- [Installer](docs/Installer/Structure.md): how the installer is built, for anyone who wants to change or extend it.
+- [Installer](docs/packages/hd-installer.md): how the installer works, its questions and how it is built.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
 - [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.

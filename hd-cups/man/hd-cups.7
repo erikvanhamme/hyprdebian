@@ -1,0 +1,40 @@
+.TH HD-CUPS 7 "October 2026" "hd-cups" "HyprDebian"
+.SH NAME
+hd-cups \- printing on HyprDebian
+.SH DESCRIPTION
+The package
+.B hd-cups
+installs
+.BR cups ,
+the print server.
+Printers are set up through the web interface of CUPS, on
+.UR http://localhost:631
+.UE .
+.PP
+It conflicts with
+.BR avahi-daemon ,
+which
+.B cups
+recommends, and
+.BR sane-utils ,
+the scanner tools, so they are not installed with it.
+Without
+.BR avahi-daemon ,
+printers on the network are not found by themselves; add them in the web
+interface by their address.
+.PP
+To manage the printers, add your user to the group
+.B lpadmin
+and log in again:
+.PP
+.RS
+.nf
+sudo usermod \-a \-G lpadmin <user>
+.fi
+.RE
+.SH SEE ALSO
+.BR cupsd (8),
+.BR lpadmin (8),
+.BR lp (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
