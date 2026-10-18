@@ -24,7 +24,10 @@ otherwise,
 which switches the HyprDebian repository and suite of apt, and the files
 that new users
 get in their home directory, from
-.IR /etc/skel :
+.IR /etc/skel ,
+with
+.BR hd-sync-skel (1),
+which brings them into an existing home directory:
 .TP
 .I .bash_aliases
 .B ls
@@ -246,6 +249,11 @@ Upgrades the system after a ZFS snapshot.
 .I /usr/bin/hd-poweroff
 Reboot and power off the system.
 .TP
+.I /usr/bin/hd-sync-skel
+Brings the files of
+.I /etc/skel
+into the home directory.
+.TP
 .I /usr/sbin/hd-issue
 Writes the login banner in
 .IR /etc/issue .
@@ -294,6 +302,7 @@ The config of systemd-resolved.
 .SH SEE ALSO
 .BR hd-up (1),
 .BR hd-reboot (1),
+.BR hd-sync-skel (1),
 .BR hd-issue (8),
 .BR hd-link-repo (8),
 .BR hd-network (7),

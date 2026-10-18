@@ -1,0 +1,75 @@
+.TH HD-SYNC-SKEL 1 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-sync-skel \- bring the files of /etc/skel into the home directory
+.SH SYNOPSIS
+.B hd-sync-skel
+.SH DESCRIPTION
+.B hd-sync-skel
+compares the files in
+.I /etc/skel
+with those in the home directory of the user who runs it, and updates the
+home directory:
+.IP \(bu 2
+A file of
+.I /etc/skel
+that is missing in the home directory is copied, with the folders it is in.
+.IP \(bu 2
+For a file that differs, the user chooses:
+.B k
+keeps the own file,
+.B t
+takes the new version from
+.IR /etc/skel ,
+and
+.B m
+merges the two.
+A file that is not a text file cannot be merged.
+.IP \(bu 2
+Files in the home directory that are not in
+.I /etc/skel
+are left alone.
+.PP
+The merge runs in
+.BR meld (1)
+in a graphical session, recognized by
+.B WAYLAND_DISPLAY
+or
+.B DISPLAY
+in the environment, when meld is installed.
+The new version is on the left and the own file on the right; save the
+right side to keep the merge.
+Otherwise the merge runs with
+.BR sdiff (1),
+the new version on the left:
+.B l
+takes the new lines,
+.B r
+keeps the own lines,
+.B e
+edits them in
+.B $EDITOR
+(nano when it is not set), and
+.B q
+quits and leaves the file as it was.
+.PP
+Taking or merging writes into the file, so it keeps its mode.
+Run it as the user whose home directory is to be updated; with
+.B sudo
+it updates the home directory of root.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when all files are handled, 1 on an error or when the user stops it with
+Ctrl-C or Ctrl-D.
+.SH FILES
+.TP
+.I /etc/skel
+The files new users get.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR meld (1),
+.BR sdiff (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

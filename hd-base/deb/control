@@ -25,7 +25,8 @@ Description: HyprDebian base system
  It also installs hd-up, which upgrades the system after a ZFS snapshot,
  hd-reboot and hd-poweroff, which work on a desktop and without one,
  and the files that new users get in their home directory: aliases for eza
- and fzf, a git config with delta, and a nano config. It adds ~/.local/bin to
+ and fzf, a git config with delta, and a nano config, with hd-sync-skel,
+ which brings them into an existing home directory. It adds ~/.local/bin to
  the PATH, keeps ifupdown, os-prober and turnstile from being installed, and
  turns Num Lock on at the console login. It sets up the zram swap, the
  resolver without a stub, masks the units HyprDebian does not use, and

@@ -1,11 +1,11 @@
 ## Introduction
 The meta package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
 
-It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
+It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
 When a package becomes part of every hyprdebian system, it is added to the `Depends` of `hd-base`, to its man page and to this page.
 
-The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-issue` and `man hd-link-repo` the commands.
+The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue` and `man hd-link-repo` the commands.
 
 ## Building the package
 The package is built from `hd-base` in this repository:
@@ -26,6 +26,7 @@ version.json
 hd-base/hd-up
 hd-base/hd-reboot
 hd-base/hd-poweroff
+hd-base/hd-sync-skel
 hd-base/hd-issue
 hd-base/hd-link-repo
 hd-base/templates/hyprdebian.local.sources.j2
@@ -46,6 +47,7 @@ hd-base/man/hd-base.7
 hd-base/man/hd-up.1
 hd-base/man/hd-reboot.1
 hd-base/man/hd-poweroff.1
+hd-base/man/hd-sync-skel.1
 hd-base/man/hd-issue.8
 hd-base/man/hd-link-repo.8
 ```
@@ -90,6 +92,17 @@ hd-poweroff
 `hd-reboot` reboots the system and `hd-poweroff` powers it off. In a Hyprland session, when `hyprshutdown` is installed, they let it close the applications and show "Rebooting" or "Shutting down" first, then run `systemctl reboot` or `systemctl poweroff`. A session is recognized by `HYPRLAND_INSTANCE_SIGNATURE` in the environment, which Hyprland sets for the programs it starts.
 
 Otherwise, as on the console, over ssh, or on a system without a desktop, they run `systemctl reboot` or `systemctl poweroff` right away. Whether the user may do that is up to polkit, as for `systemctl` itself: a user who is logged in on the console of the system may, a user over ssh is asked for the password of an administrator.
+
+## hd-sync-skel
+```
+hd-sync-skel
+```
+
+`hd-sync-skel` compares the files in `/etc/skel` with those in the home directory of the user who runs it. A file of `/etc/skel` that is missing in the home directory is copied, with the folders it is in. For a file that differs, the user chooses: `k` keeps the own file, `t` takes the new version from `/etc/skel`, and `m` merges the two; a file that is not a text file cannot be merged. Files in the home directory that are not in `/etc/skel` are left alone.
+
+The merge runs in meld in a graphical session, recognized by `WAYLAND_DISPLAY` or `DISPLAY`, when meld is installed: the new version is on the left and the own file on the right, save the right side to keep the merge. Otherwise it runs with `sdiff`, the new version on the left: `l` takes the new lines, `r` keeps the own lines, `e` edits them in `$EDITOR` (nano when it is not set), and `q` quits and leaves the file as it was.
+
+Run it as the user whose home directory is to be updated; with `sudo` it updates the home directory of root.
 
 ## hd-issue
 ```
@@ -163,6 +176,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | --- | --- |
 | `/usr/bin/hd-up` | Upgrades the system after a ZFS snapshot. |
 | `/usr/bin/hd-reboot`, `/usr/bin/hd-poweroff` | Reboot and power off the system. |
+| `/usr/bin/hd-sync-skel` | Brings the files of `/etc/skel` into the home directory. |
 | `/usr/sbin/hd-issue` | Writes the login banner in `/etc/issue`. |
 | `/usr/sbin/hd-link-repo` | Switches the HyprDebian repository and suite of apt. |
 | `/usr/share/hd-base/templates/hyprdebian.local.sources.j2` | The template of the apt source of `hd-link-repo`. |
@@ -176,4 +190,4 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |
 | `/usr/lib/sysctl.d/50-zram.conf` | The sysctls for the zram swap. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
-| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |
+| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |

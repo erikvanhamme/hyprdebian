@@ -1,0 +1,181 @@
+#!/usr/bin/python3
+"""Brings the files of /etc/skel into the home directory of the user.
+
+The package hd-base installs this as /usr/bin/hd-sync-skel.
+
+    hd-sync-skel    compare /etc/skel with the home directory and update it
+
+A file of /etc/skel that is missing in the home directory is copied. For a file that differs, the
+user chooses: [k]eep mine, [t]ake new, or [m]erge. The merge runs in meld in a graphical session
+when meld is installed, and with sdiff otherwise. Files in the home directory that are not in
+/etc/skel are left alone.
+"""
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+SKEL = Path("/etc/skel")
+
+
+def is_text(path):
+    """True when the file has no NUL bytes, as grep -I sees a text file."""
+    with open(path, "rb") as f:
+        return b"\0" not in f.read()
+
+
+def same(src, dst):
+    """True when both files have the same content."""
+    with open(src, "rb") as a, open(dst, "rb") as b:
+        return a.read() == b.read()
+
+
+def write_into(src, dst):
+    """Writes the content of src into dst, which keeps the mode of dst."""
+    with open(src, "rb") as a, open(dst, "wb") as b:
+        shutil.copyfileobj(a, b)
+
+
+def show(path):
+    """The path with the home directory shown as ~."""
+    home = Path.home()
+
+    if path.is_relative_to(home):
+        return "~/" + str(path.relative_to(home))
+
+    return str(path)
+
+
+def merge_meld(src, dst):
+    """Merges in meld, new version on the left, the file of the user on the right. Returns what
+    happened."""
+    print("Merging in meld: new version on the left, save the right side to keep the merge.",
+          flush=True)
+    result = subprocess.run(["meld", "--label", "New version", "--label", f"{show(dst)} (mine)",
+                             str(src), str(dst)])
+
+    if result.returncode != 0:
+        print(f"Warning: meld exited with {result.returncode}, {show(dst)} is as meld left it.")
+
+    return "merged"
+
+
+def merge_sdiff(src, dst):
+    """Merges with sdiff, new version on the left. The file is left as it was when the merge is
+    not finished. Returns what happened."""
+    print("Merging with sdiff: l = take new, r = keep mine, e = edit, q = quit and leave the file "
+          "as it is.", flush=True)
+    width = str(shutil.get_terminal_size((160, 24)).columns)
+    env = dict(os.environ)
+    env.setdefault("EDITOR", "nano")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        merged = Path(tmp) / "merged"
+        # sdiff exits with 1 when the files differ, and with 2 on trouble or when the user quits.
+        result = subprocess.run(["sdiff", "-s", "-o", str(merged), "-w", width, str(src), str(dst)],
+                                env=env)
+
+        if result.returncode <= 1:
+            write_into(merged, dst)
+            return "merged"
+
+        print(f"Warning: {show(dst)} was not merged and is left as it was.")
+        return "kept"
+
+
+def merge(src, dst):
+    """Merges with meld in a graphical session when it is installed, otherwise with sdiff.
+    Returns what happened."""
+    graphical = os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")
+
+    if graphical and shutil.which("meld"):
+        return merge_meld(src, dst)
+
+    return merge_sdiff(src, dst)
+
+
+def update(src, dst):
+    """Lets the user keep, take or merge a file that differs from the one in /etc/skel. Returns
+    what happened."""
+    while True:
+        choice = input(f"{show(dst)} differs from {src}. [k]eep mine, [t]ake new, [m]erge: ")
+        choice = choice.strip().lower()
+
+        if choice.startswith("k"):
+            return "kept"
+
+        if choice.startswith("t"):
+            write_into(src, dst)
+            return "taken"
+
+        if choice.startswith("m"):
+            if is_text(src) and is_text(dst):
+                return merge(src, dst)
+
+            print(f"{show(dst)} is not a text file and cannot be merged.")
+            continue
+
+        print("Please answer k, t or m.")
+
+
+def skel_files():
+    """The regular files of /etc/skel, by their path below it, sorted."""
+    files = []
+
+    for root, dirs, names in os.walk(SKEL):
+        dirs.sort()
+
+        for name in sorted(names):
+            path = Path(root) / name
+
+            if path.is_file() and not path.is_symlink():
+                files.append(path.relative_to(SKEL))
+
+    return files
+
+
+def main():
+    argparse.ArgumentParser(
+        description="Bring the files of /etc/skel into the home directory: copy the missing ones, "
+        "and keep, take or merge the ones that differ. Files that are not in /etc/skel are left "
+        "alone.").parse_args()
+
+    home = Path.home()
+    counts = {"added": 0, "kept": 0, "taken": 0, "merged": 0}
+
+    try:
+        for rel in skel_files():
+            src = SKEL / rel
+            dst = home / rel
+
+            if not dst.exists() and not dst.is_symlink():
+                print(f"Adding {show(dst)}")
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy(src, dst)
+                counts["added"] += 1
+                continue
+
+            if not dst.is_file():
+                print(f"Warning: {show(dst)} is not a file, skipped.")
+                continue
+
+            if same(src, dst):
+                continue
+
+            counts[update(src, dst)] += 1
+    except (EOFError, KeyboardInterrupt):
+        print("\nStopped.")
+        sys.exit(1)
+    except OSError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(", ".join(f"{count} {what}" for what, count in counts.items()))
+
+
+if __name__ == "__main__":
+    main()

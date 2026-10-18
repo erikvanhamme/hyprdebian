@@ -13,6 +13,8 @@
 #                                             hyprshutdown in a Hyprland
 #                                             session, otherwise with
 #                                             systemctl
+#                 /usr/bin/hd-sync-skel       brings the files of /etc/skel
+#                                             into the home directory
 #                 /usr/sbin/hd-issue          writes the login banner in
 #                                             /etc/issue
 #                 /usr/sbin/hd-link-repo      switches the HyprDebian
@@ -38,6 +40,7 @@
 #                 /usr/share/man/man1/hd-up.1.gz
 #                 /usr/share/man/man1/hd-reboot.1.gz
 #                 /usr/share/man/man1/hd-poweroff.1.gz
+#                 /usr/share/man/man1/hd-sync-skel.1.gz
 #                 /usr/share/man/man8/hd-issue.8.gz
 #                 /usr/share/man/man8/hd-link-repo.8.gz
 #                                             the man pages in man/
@@ -70,15 +73,15 @@ STAGE := $(BUILD)/deb
 ETC := $(shell find etc -type f)
 USR := $(shell find usr -type f)
 # The commands, installed in /usr/bin.
-COMMANDS := hd-up hd-reboot hd-poweroff
+COMMANDS := hd-up hd-reboot hd-poweroff hd-sync-skel
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-issue hd-link-repo
 # The jinja2 templates of hd-link-repo.
 TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
 TEMPLATES := $(wildcard templates/*)
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
-MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-issue.8 \
-	man/hd-link-repo.8
+MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
+	man/hd-issue.8 man/hd-link-repo.8
 
 .PHONY: deb deb-path clean
 
