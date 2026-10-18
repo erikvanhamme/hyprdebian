@@ -30,7 +30,8 @@
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
 #   make images render the images of the input field in theme/ again with
-#               ImageMagick: the dot and a pixel of each outline colour.
+#               ImageMagick: the dot, a black pixel for the fill and a
+#               pixel of each outline colour.
 #               They are kept in the repository, so make deb does not need
 #               ImageMagick.
 #   make clean  remove build/
@@ -92,13 +93,15 @@ $(DEB): version.json $(THEME) plymouthd.conf initramfs/hd-plymouth deb/control d
 	dpkg-deb --root-owner-group --build $(STAGE) $@
 
 # The colours are those of the input field in hyprlock.conf of hd-desktop:
-# font_color for the dot, outer_color for the outline, and the defaults of
-# hyprlock for check_color and fail_color. The dot is drawn at four times
+# font_color for the dot, black for inner_color, whose opacity the theme
+# sets, outer_color for the outline, and the defaults of hyprlock for
+# check_color and fail_color. The dot is drawn at four times
 # its size and scaled down, for smooth edges; the theme scales it again to a
 # quarter of the height of the field.
 images:
 	$(MAGICK) -size 100x100 xc:none -fill 'rgb(0,102,204)' -draw 'circle 49.5,49.5 49.5,0' \
 		-resize 25x25 $(PNG_OPTIONS) theme/dot.png
+	$(MAGICK) -size 1x1 xc:'rgb(0,0,0)' $(PNG_OPTIONS) theme/fill.png
 	$(MAGICK) -size 1x1 xc:'rgb(255,102,0)' $(PNG_OPTIONS) theme/outline.png
 	$(MAGICK) -size 1x1 xc:'rgb(204,136,34)' $(PNG_OPTIONS) theme/outline-check.png
 	$(MAGICK) -size 1x1 xc:'rgb(204,34,34)' $(PNG_OPTIONS) theme/outline-fail.png

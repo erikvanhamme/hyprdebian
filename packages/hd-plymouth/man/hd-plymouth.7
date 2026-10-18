@@ -18,7 +18,7 @@ as
 of hd-desktop sets it up: the Emerald wallpaper of
 .BR hd-art (7),
 scaled to cover the screen, and, when the boot asks for a password, an input
-field in the middle with an orange outline.
+field in the middle with a black fill of 80% opacity and an orange outline.
 .PP
 The theme is based on the theme emerald of the Debian package
 .BR desktop-base .
@@ -26,9 +26,7 @@ hd-plymouth conflicts with desktop-base, whose themes it replaces.
 .SH PASSWORDS
 The ZFS script of the initramfs asks for the password of an encrypted
 dataset with plymouth when the splash shows, up to three times.
-The prompt, such as
-.IR "Encrypted ZFS password for rpool/hyprdebian" ,
-is above the field.
+The field does not show the prompt of the question.
 The empty field says
 .IR "Enter Password" ;
 every key press adds a blue dot.
@@ -64,7 +62,8 @@ so the splash starts at that resolution.
 .SH FILES
 .TP
 .I /usr/share/plymouth/themes/hyprdebian/
-The theme: the script, the images of the input field, and
+The theme: the script, the images of the input field: the dot, the fill and
+the outline colours, and
 .IR background.png ,
 a link to
 .I /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png

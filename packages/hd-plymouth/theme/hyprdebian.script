@@ -22,18 +22,21 @@
 #  The splash looks like the lock screen of hyprlock, as configured in
 #  ~/.config/hypr/hyprlock.conf of hd-desktop: the wallpaper of hd-art,
 #  and for a password, such as the one of an encrypted ZFS dataset, an
-#  empty input field with an orange outline and blue dots. While the
+#  input field with a translucent black fill, an orange outline and blue
+#  dots. While the
 #  password is checked the outline turns yellow, and when the same prompt
 #  comes back, the password was wrong: the outline turns red and the field
 #  says how many attempts failed.
 
 
 #------------------------------- Constants -----------------------------------------
-# The input field of hyprlock.conf: size, outline_thickness, and the
-# relative dots_size and dots_spacing of hyprlock.
+# The input field of hyprlock.conf: size, outline_thickness, the opacity
+# of the black inner_color, and the relative dots_size and dots_spacing of
+# hyprlock.
 FIELD.width = 650;
 FIELD.height = 100;
 FIELD.outline = 4;
+FIELD.fill_opacity = 0.8;
 DOTS_SIZE = 0.25;
 DOTS_SPACING = 0.15;
 # The space between the dots and the outline, relative to the height.
@@ -114,6 +117,11 @@ field.height = FIELD.height;
 field.x = screen.x + Math.Int ((screen.width - field.width) / 2);
 field.y = screen.y + Math.Int ((screen.height - field.height) / 2);
 
+# The fill is an image of one black pixel, scaled to the field, under the
+# outline.
+fill = Sprite (Image ("fill.png").Scale (field.width, field.height));
+fill.SetPosition (field.x, field.y, 9);
+
 # The outline is four bars, scaled from an image of one pixel of its
 # colour: outer_color of hyprlock.conf, and check_color and fail_color,
 # which hyprlock.conf leaves at the defaults of hyprlock.
@@ -183,23 +191,11 @@ fun ShowFieldText (image) {
     field_text.SetOpacity (1);
 }
 
-# The prompt of the question, above the field.
-prompt_text = Sprite ();
-prompt_text.SetOpacity (0);
-
-fun ShowPrompt (prompt) {
-    local.image = ImageFromText (prompt, text_colour, FONT_SMALL);
-    prompt_text.SetImage (local.image);
-    prompt_text.SetPosition (screen.x + Math.Int ((screen.width - local.image.GetWidth ()) / 2),
-                             field.y - local.image.GetHeight () - Math.Int (field.height / 3), 11);
-    prompt_text.SetOpacity (1);
-}
-
 fun HideField () {
+    fill.SetOpacity (0);
     SetOutlineOpacity (0);
     ShowDots (0);
     field_text.SetOpacity (0);
-    prompt_text.SetOpacity (0);
 }
 
 SetOutline (outline_input);
@@ -315,7 +311,8 @@ fun display_password_callback (prompt, bullets) {
     global.last_prompt = prompt;
     global.state = "input";
 
-    ShowPrompt (prompt);
+    # The prompt only tells the questions apart; the field does not show it.
+    fill.SetOpacity (FIELD.fill_opacity);
     ShowDots (bullets);
     if (bullets > 0) {
         SetOutline (outline_input);
