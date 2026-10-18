@@ -33,7 +33,7 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 ### Per package
 | Package | Needs | Why |
 | --- | --- | --- |
-| `hd-art`, `hd-base`, `hd-config`, `hd-cups`, `hd-dashboard`, `hd-desktop`, `hd-docker`, `hd-installer`, `hd-network`, `hd-plymouth`, `hd-qemu-kvm`, `hd-repo`, `hd-report`, `hd-screensaver`, `hd-secboot` | Only the tools above. | They only stage scripts, configs and man pages. |
+| `hd-art`, `hd-base`, `hd-config`, `hd-cups`, `hd-dashboard`, `hd-desktop`, `hd-docker`, `hd-installer`, `hd-network`, `hd-plymouth`, `hd-qemu-kvm`, `hd-repo`, `hd-report`, `hd-screensaver`, `hd-secboot`, `hd-theme` | Only the tools above. | They only stage scripts, configs and man pages. |
 | `hd-backup` | `gcc`, `libc6-dev`, `dpkg-buildflags` (dpkg-dev), `strip` (binutils); all in build-essential | Compiles `blockwrite` from `blockwrite.c` with the hardening flags of Debian, and strips it. |
 | `hd-bootloader` | `clang++` (clang), `lld-link` (lld), the headers in `/usr/include/efi` (gnu-efi) | Compiles the EFI bootloader for the target `x86_64-unknown-windows` and links it as a PE32+ image. Only the headers of gnu-efi are used. Works with gnu-efi 3.0 (trixie) and 4.0. |
 | `hd-fonts` | `wget`, `unzip`, ca-certificates, internet access | Downloads the JetBrains Mono zip of Nerd Fonts 3.4.0 from GitHub once, checks its sha256 and unpacks the fonts. |

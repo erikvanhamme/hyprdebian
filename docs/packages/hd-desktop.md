@@ -2,7 +2,7 @@
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
 - Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown;
 - greetd, which logs the user in to Hyprland at the boot;
-- kitty, wofi, [hd-menu](hd-menu.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
+- kitty, wofi, [hd-menu](hd-menu.md), [hd-theme](hd-theme.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
 - nwg-look with the GTK and Qt themes, the wallpapers of [hd-art](hd-art.md) and the fonts of [hd-fonts](hd-fonts.md);
 - yazi, and the applications audacious, mpv, imv, firefox and meld.
 
@@ -76,6 +76,8 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/nwg-look`, `~/.local/share/nwg-look` | The GTK theme and font, applied by `nwg-look -a` when Hyprland starts. |
 | `~/.config/VSCodium` | The settings of VSCodium. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
+
+The configs of Hyprland, hyprlock, hyprpaper, kitty, mako and wofi take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
 
 The installation of the package also gives these files to the user who is logged in to Hyprland, the one that `hd-desktop-render --print-user` prints, when that user exists: it copies the files of `/etc/skel` that are missing from their home directory, as that user, with `cp -a --update=none`. Files that the user has are kept. This is done on the first installation, and on an upgrade from a version before 0.3, which did not do it; later upgrades do not copy again, so a file that the user removed stays away. When the installer runs, the user does not exist yet, and the installer copies `/etc/skel` itself.
 

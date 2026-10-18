@@ -1,0 +1,19 @@
+Package: hd-theme
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: hd-config, hd-art, hd-fonts, python3, python3-jinja2, python3-cairo, python3-gi,
+ gir1.2-pango-1.0, imv
+Section: x11
+Priority: optional
+Description: HyprDebian theme engine
+ Keeps the themes of HyprDebian in /etc/hyprdebian/themes, one JSON file per
+ theme, and the one theme of the system in the key hd-theme of
+ /etc/hyprdebian/config.json, where hd-menu and other packages read it.
+ .
+ hd-theme adds, deletes and selects themes as root. Every user lists them
+ with it, and applies the selected theme with it: that writes the theme files
+ of kitty, Hyprland, hyprlock, hyprpaper, mako and wofi in their home
+ directory. hd-theme-card renders a theme into a card, a PNG that
+ hd-theme --list shows in imv-wayland.

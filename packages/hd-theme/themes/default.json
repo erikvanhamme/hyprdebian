@@ -1,0 +1,16 @@
+{
+    "font": "JetBrainsMono NFM Medium",
+    "font-size-big": 24,
+    "font-size-normal": 18,
+    "font-size-small": 14,
+    "highlight": "#ff6600",
+    "normal": "#0066cc",
+    "dark": "#071422",
+    "light": "#e6edf5",
+    "border": 4,
+    "radius": 10,
+    "gap": 4,
+    "opacity": 0.8,
+    "icon_size": 64,
+    "background": "emerald"
+}

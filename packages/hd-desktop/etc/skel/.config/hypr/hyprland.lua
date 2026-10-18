@@ -88,16 +88,6 @@ hl.env("ELECTRON_OZONE_PLATFORM_HINT", "wayland")
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
     general = {
-        gaps_in  = 0,
-        gaps_out = 0,
-
-        border_size = 3,
-
-        col = {
-            active_border   = "rgba(ff6600ff)",
-            inactive_border = "rgba(0066ccff)",
-        },
-
         -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
         resize_on_border = false,
 
@@ -111,6 +101,13 @@ hl.config({
         enabled = false,
     },
 })
+
+-- The gaps, borders, border colours and rounding of the HyprDebian theme, written by
+-- hd-theme --apply in ~/.config/hypr/hd-theme.lua. Settings after this take the place of the
+-- theme. pcall: before hd-theme --apply ran for the first time, the file is not there yet.
+-- Forgetting it first makes a reload read it again.
+package.loaded["hd-theme"] = nil
+pcall(require, "hd-theme")
 
 -- Ref https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
 hl.window_rule({

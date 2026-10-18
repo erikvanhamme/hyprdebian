@@ -1,0 +1,48 @@
+/* The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+   Do not change this file: hd-theme --apply writes it again. style.css imports it; rules after
+   that take the place of these. */
+* {
+    font-family: "{{ theme["font"] }}";
+    font-size: {{ theme["font-size-normal"] }}pt;
+}
+
+#window {
+    border: {{ theme["border"] }}px solid {{ theme["highlight"] }};
+    border-radius: {{ theme["radius"] }}px;
+    background-color: rgba({{ theme["dark"] | rgb }}, {{ theme["opacity"] }});
+}
+
+#outer-box {
+    margin: 0px;
+    padding: 6px;
+}
+
+#input {
+    margin: 0px 0px 6px 0px;
+    padding: 6px 12px;
+    border: {{ theme["border"] }}px solid {{ theme["normal"] }};
+    border-radius: {{ inner_radius }}px;
+    background-color: transparent;
+    color: {{ theme["light"] }};
+    font-size: {{ theme["font-size-big"] }}pt;
+}
+
+#input:focus {
+    border-color: {{ theme["highlight"] }};
+    outline: none;
+}
+
+#entry {
+    padding: 4px 8px;
+    border-radius: {{ inner_radius }}px;
+}
+
+#entry:selected {
+    background-color: {{ theme["normal"] }};
+    outline: none;
+}
+
+#text,
+#text:selected {
+    color: {{ theme["light"] }};
+}

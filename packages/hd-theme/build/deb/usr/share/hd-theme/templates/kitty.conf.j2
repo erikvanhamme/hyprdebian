@@ -1,0 +1,14 @@
+# The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+# Do not change this file: hd-theme --apply writes it again. Settings in kitty.conf after
+# "include hd-theme.conf" take the place of these.
+font_family {{ theme["font"] }}
+font_size {{ theme["font-size-small"] }}
+
+foreground {{ theme["light"] }}
+background {{ theme["dark"] }}
+background_opacity {{ theme["opacity"] }}
+selection_foreground {{ theme["light"] }}
+selection_background {{ theme["normal"] }}
+
+active_border_color {{ theme["highlight"] }}
+inactive_border_color {{ theme["normal"] }}

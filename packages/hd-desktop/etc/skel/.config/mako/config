@@ -1,10 +1,7 @@
-font=JetBrainsMono NFM Medium 18
-text-color=#0066cc
+# The font, colours, border and radius of the HyprDebian theme, written by hd-theme --apply.
+# Settings below take the place of the theme.
+include=~/.config/mako/hd-theme
 
-background-color=#000000
-
-border-size=3
-border-color=#ff6600
 width=400
 height=200
 

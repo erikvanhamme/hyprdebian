@@ -1,0 +1,11 @@
+# The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+# Do not change this file: hd-theme --apply writes it again. hyprlock.conf sources it and uses
+# these variables.
+$hd_font = {{ theme["font"] }}
+$hd_highlight = rgb({{ theme["highlight"] | hex }})
+$hd_normal = rgb({{ theme["normal"] | hex }})
+$hd_light = rgb({{ theme["light"] | hex }})
+$hd_dark = rgba({{ theme["dark"] | rgb }}, {{ theme["opacity"] }})
+$hd_border = {{ theme["border"] }}
+$hd_radius = {{ theme["radius"] }}
+$hd_background = {{ background }}
