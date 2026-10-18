@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, sudo, kbd, hd-network,
+Depends: python3, python3-jinja2, sudo, kbd, hd-network,
  openssh-server, kitty-terminfo, ufw,
  zfs-dkms, zfsutils-linux, zfs-initramfs, build-essential, initramfs-tools,
  firmware-linux, firmware-qlogic, efibootmgr,
@@ -33,4 +33,5 @@ Description: HyprDebian base system
  After a login it shows the HyprDebian banner and the state of the system:
  the pools, the RAID arrays and the failed units. Above the login prompt it
  shows the version, the type of the installation and the suite, written in
- /etc/issue by hd-issue.
+ /etc/issue by hd-issue. hd-link-repo switches the HyprDebian repository and
+ suite that apt gets the hd-* packages from.

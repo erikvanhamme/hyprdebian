@@ -1,0 +1,96 @@
+.TH HD-LINK-REPO 8 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-link-repo \- switch the HyprDebian repository of apt
+.SH SYNOPSIS
+.B hd-link-repo
+.RI [ url ]
+.RB [ \-\-suite
+.IR suite ]
+.SH DESCRIPTION
+.B hd-link-repo
+links the system to a HyprDebian repository, the one apt gets the hd-*
+packages from, and to a suite of it.
+Without arguments it shows the current repository and suite, from
+.IR /etc/apt/sources.list.d/hyprdebian.local.sources .
+.PP
+With a
+.I url
+it switches to the repository there, and with
+.B \-\-suite
+to another suite; what is left out stays as it is.
+A switch:
+.IP 1. 4
+downloads the signing key from
+.IB url /hyprdebian\-archive\-keyring.pgp
+to
+.IR /usr/share/keyrings/hyprdebian\-archive\-keyring.pgp ,
+and stops when that fails;
+.IP 2. 4
+writes the apt source from the template
+.IR /usr/share/hd-base/templates/hyprdebian.local.sources.j2 ;
+.IP 3. 4
+updates the package lists of that source alone, and puts the old source and
+key back when that fails;
+.IP 4. 4
+updates all package lists, and writes the login banner again with
+.BR hd-issue (8),
+which shows the suite.
+.PP
+It does not upgrade the packages; run
+.BR hd-up (1)
+for that.
+Run it as root to switch.
+.SH OPTIONS
+.TP
+.I url
+The URL of the repository, starting with
+.B http://
+or
+.BR https:// .
+.TP
+.BR \-s ", " \-\-suite " " \fIsuite\fR
+The suite of the hd-* packages:
+.B trixie
+or
+.BR unstable .
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when the repository and suite were shown or switched, 1 when the switch
+failed, with the old source in place, and 2 for wrong arguments.
+.SH EXAMPLES
+Show the current repository and suite:
+.PP
+.RS
+.nf
+hd-link-repo
+.fi
+.RE
+.PP
+Switch to another repository, and to unstable:
+.PP
+.RS
+.nf
+sudo hd-link-repo http://repo.example/ \-\-suite unstable
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/apt/sources.list.d/hyprdebian.local.sources
+The apt source of the HyprDebian repository.
+.TP
+.I /usr/share/keyrings/hyprdebian\-archive\-keyring.pgp
+The signing key of the repository, which the source names in
+.BR Signed\-By .
+.TP
+.I /usr/share/hd-base/templates/hyprdebian.local.sources.j2
+The template of the apt source.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR hd-issue (8),
+.BR hd-up (1),
+.BR hd-repo (7),
+.BR sources.list (5)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

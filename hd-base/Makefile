@@ -15,6 +15,12 @@
 #                                             systemctl
 #                 /usr/sbin/hd-issue          writes the login banner in
 #                                             /etc/issue
+#                 /usr/sbin/hd-link-repo      switches the HyprDebian
+#                                             repository and suite of apt
+#                 /usr/share/hd-base/templates/*
+#                                             the jinja2 templates in
+#                                             templates/, rendered by
+#                                             hd-link-repo
 #                 /etc/...                    the files in etc/, at the
 #                                             same path and with the same
 #                                             mode, conffiles: the files
@@ -33,6 +39,7 @@
 #                 /usr/share/man/man1/hd-reboot.1.gz
 #                 /usr/share/man/man1/hd-poweroff.1.gz
 #                 /usr/share/man/man8/hd-issue.8.gz
+#                 /usr/share/man/man8/hd-link-repo.8.gz
 #                                             the man pages in man/
 #               with the control file deb/control, whose Depends are the
 #               packages of the base system, and the maintainer scripts
@@ -65,9 +72,13 @@ USR := $(shell find usr -type f)
 # The commands, installed in /usr/bin.
 COMMANDS := hd-up hd-reboot hd-poweroff
 # The commands for root, installed in /usr/sbin.
-SBIN_COMMANDS := hd-issue
+SBIN_COMMANDS := hd-issue hd-link-repo
+# The jinja2 templates of hd-link-repo.
+TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
+TEMPLATES := $(wildcard templates/*)
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
-MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-issue.8
+MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-issue.8 \
+	man/hd-link-repo.8
 
 .PHONY: deb deb-path clean
 
@@ -81,12 +92,13 @@ $(BUILD):
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(ETC) $(USR) deb/control deb/postinst \
+$(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(TEMPLATES) $(ETC) $(USR) deb/control deb/postinst \
 		deb/postrm $(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
-	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin
+	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(TEMPLATE_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
+	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	for file in $(ETC); do \
 		install -D -m $$(stat -c %a $$file) $$file $(STAGE)/$$file; \
 		echo /$$file >> $(STAGE)/DEBIAN/conffiles; \

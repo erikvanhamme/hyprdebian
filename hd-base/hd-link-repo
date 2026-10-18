@@ -1,0 +1,157 @@
+#!/usr/bin/python3
+"""Links the system to a HyprDebian repository: the one the hd-* packages come from.
+
+The package hd-base installs this as /usr/sbin/hd-link-repo.
+
+    hd-link-repo                         show the repository and the suite
+    hd-link-repo <url>                   switch to the repository at <url>, same suite
+    hd-link-repo --suite <suite>         switch to another suite, same repository
+    hd-link-repo <url> --suite <suite>   switch both
+
+A switch downloads the signing key from the repository to the keyring that Signed-By names,
+writes the apt source /etc/apt/sources.list.d/hyprdebian.local.sources from the jinja2 template
+in /usr/share/hd-base/templates, and checks the new source with apt-get update. When that check
+fails, the old source and key are put back. Then it updates all package lists and writes the
+login banner again with hd-issue, which shows the suite. Run it as root to switch.
+"""
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+import jinja2
+
+SOURCES = "/etc/apt/sources.list.d/hyprdebian.local.sources"
+KEYRING = "/usr/share/keyrings/hyprdebian-archive-keyring.pgp"
+KEY_FILE = "hyprdebian-archive-keyring.pgp"
+APT_HELPER = "/usr/lib/apt/apt-helper"
+HD_ISSUE = "/usr/sbin/hd-issue"
+SUITES = ("trixie", "unstable")
+URL_PATTERN = re.compile(r"https?://[^/\s]+(/\S*)?")
+
+TEMPLATE_DIR = "/usr/share/hd-base/templates"
+TEMPLATES = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+                               undefined=jinja2.StrictUndefined, keep_trailing_newline=True,
+                               trim_blocks=True, lstrip_blocks=True)
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def current():
+    """The repository and the suite of the apt source, None for what it does not have."""
+    values = {"URIs": None, "Suites": None}
+    try:
+        with open(SOURCES, encoding="utf-8") as f:
+            for line in f:
+                match = re.match(r"(URIs|Suites):\s*(\S+)", line)
+                if match:
+                    values[match.group(1)] = match.group(2)
+    except OSError:
+        pass
+    return values["URIs"], values["Suites"]
+
+
+def read(path):
+    """The content of a file, None when it does not exist."""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+
+def write(path, content):
+    """Replaces a file with the content, with mode 0644, or removes it for None."""
+    if content is None:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    tmp = path + ".hd-link-repo"
+    with open(tmp, "wb") as f:
+        f.write(content)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def download_key(repo):
+    """Downloads the signing key of the repository, and returns it."""
+    url = repo + KEY_FILE
+    print(f"Downloading {url}", flush=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, KEY_FILE)
+        result = subprocess.run([APT_HELPER, "download-file", url, path], check=False)
+        if result.returncode != 0:
+            fail(f"Could not download the key from {url}.")
+        return read(path)
+
+
+def check_source():
+    """Updates the package lists of the HyprDebian source alone; False when that fails."""
+    result = subprocess.run(["apt-get", "update", "--error-on=any",
+                             "-o", f"Dir::Etc::sourcelist={SOURCES}",
+                             "-o", "Dir::Etc::sourceparts=-",
+                             "-o", "APT::Get::List-Cleanup=0"], check=False)
+    return result.returncode == 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Link the system to a HyprDebian repository and suite. Without arguments, "
+        "show the current ones.")
+    parser.add_argument("url", nargs="?",
+                        help="the URL of the repository, such as http://repo/; "
+                        "the current one when left out")
+    parser.add_argument("-s", "--suite", choices=SUITES,
+                        help="the suite of the hd-* packages; the current one when left out")
+    args = parser.parse_args()
+
+    old_repo, old_suite = current()
+    if args.url is None and args.suite is None:
+        print(f"Repository: {old_repo or 'unknown'}")
+        print(f"Suite:      {old_suite or 'unknown'}")
+        return
+
+    if os.geteuid() != 0:
+        fail("This script must be run as root.")
+
+    repo = args.url or old_repo
+    suite = args.suite or old_suite
+    if repo is None:
+        fail(f"{SOURCES} has no repository; give its URL.")
+    if suite is None:
+        fail(f"{SOURCES} has no suite; give it with --suite.")
+    if not URL_PATTERN.fullmatch(repo):
+        fail(f"{repo} is not a URL: it starts with http:// or https://, followed by the host, "
+             "without spaces.")
+    if not repo.endswith("/"):
+        repo += "/"
+
+    key = download_key(repo)
+    sources = TEMPLATES.get_template("hyprdebian.local.sources.j2").render(
+        repo=repo, suite=suite, keyring=KEYRING).encode("utf-8")
+
+    old_key = read(KEYRING)
+    old_sources = read(SOURCES)
+    os.makedirs(os.path.dirname(KEYRING), exist_ok=True)
+    write(KEYRING, key)
+    write(SOURCES, sources)
+
+    print(f"Checking {suite} of {repo}", flush=True)
+    if not check_source():
+        write(KEYRING, old_key)
+        write(SOURCES, old_sources)
+        fail(f"apt could not use {suite} of {repo}; the old source is back.")
+
+    subprocess.run(["apt-get", "update"], check=False)
+    subprocess.run([HD_ISSUE], check=False)
+    print(f"Linked to {suite} of {repo}")
+
+
+if __name__ == "__main__":
+    main()

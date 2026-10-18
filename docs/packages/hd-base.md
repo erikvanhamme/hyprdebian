@@ -1,11 +1,11 @@
 ## Introduction
 The meta package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
 
-It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, the files that new users get in their home directory, from `/etc/skel`, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
+It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
 When a package becomes part of every hyprdebian system, it is added to the `Depends` of `hd-base`, to its man page and to this page.
 
-The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`) and `man hd-issue` the commands.
+The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-issue` and `man hd-link-repo` the commands.
 
 ## Building the package
 The package is built from `hd-base` in this repository:
@@ -27,6 +27,8 @@ hd-base/hd-up
 hd-base/hd-reboot
 hd-base/hd-poweroff
 hd-base/hd-issue
+hd-base/hd-link-repo
+hd-base/templates/hyprdebian.local.sources.j2
 hd-base/etc/skel/.bash_aliases
 hd-base/etc/skel/.gitconfig
 hd-base/etc/skel/.config/nano/nanorc
@@ -45,12 +47,13 @@ hd-base/man/hd-up.1
 hd-base/man/hd-reboot.1
 hd-base/man/hd-poweroff.1
 hd-base/man/hd-issue.8
+hd-base/man/hd-link-repo.8
 ```
 
 ## Packages
 | Group | Packages |
 | --- | --- |
-| hyprdebian | `hd-network`, the network configuration; see [hd-network](hd-network.md). `python3` and `sudo`, for `hd-up`; `kbd`, for Num Lock on the console. |
+| hyprdebian | `hd-network`, the network configuration; see [hd-network](hd-network.md). `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo`; `kbd`, for Num Lock on the console. |
 | Remote access and firewall | `openssh-server`, and `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
 | ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `build-essential` and `initramfs-tools` to build the ZFS module and the initrd. |
 | Firmware and boot | `firmware-linux` and `firmware-qlogic`; `efibootmgr` for the boot entries of the firmware. |
@@ -106,6 +109,25 @@ sudo hd-config-update hd-installer '{"type": "vm"}'
 sudo hd-issue
 ```
 
+## hd-link-repo
+```
+hd-link-repo [<url>] [--suite trixie|unstable]
+```
+
+`hd-link-repo` links the system to a HyprDebian repository, the one apt gets the hd-* packages from, and to a suite of it. Without arguments it shows the current repository and suite, from `/etc/apt/sources.list.d/hyprdebian.local.sources`.
+
+With a URL it switches to the repository there, and with `--suite` to another suite; what is left out stays as it is. A switch:
+1. downloads the signing key from `<url>/hyprdebian-archive-keyring.pgp` to `/usr/share/keyrings/hyprdebian-archive-keyring.pgp`, and stops when that fails;
+2. writes the apt source from the jinja2 template `/usr/share/hd-base/templates/hyprdebian.local.sources.j2`;
+3. updates the package lists of that source alone, and puts the old source and key back when that fails;
+4. updates all package lists, and writes the login banner again with `hd-issue`, which shows the suite.
+
+It does not upgrade the packages; run `hd-up` for that. Run it as root to switch:
+```
+hd-link-repo
+sudo hd-link-repo http://repo.example/ --suite unstable
+```
+
 ## Skel files
 New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades.
 
@@ -143,6 +165,8 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/bin/hd-up` | Upgrades the system after a ZFS snapshot. |
 | `/usr/bin/hd-reboot`, `/usr/bin/hd-poweroff` | Reboot and power off the system. |
 | `/usr/sbin/hd-issue` | Writes the login banner in `/etc/issue`. |
+| `/usr/sbin/hd-link-repo` | Switches the HyprDebian repository and suite of apt. |
+| `/usr/share/hd-base/templates/hyprdebian.local.sources.j2` | The template of the apt source of `hd-link-repo`. |
 | `/etc/hyprdebian/version.json` | The version of HyprDebian, `version.json` of the root of this repository, which is also the version of hd-base. The banners show it. A conffile. |
 | `/etc/issue` | The login banner, written by `hd-issue`. The one of base-files is diverted to `/etc/issue.debian`. |
 | `/etc/skel/.bash_aliases`, `/etc/skel/.gitconfig`, `/etc/skel/.config/nano/nanorc` | The files new users get, conffiles. |
@@ -153,4 +177,4 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |
 | `/usr/lib/sysctl.d/50-zram.conf` | The sysctls for the zram swap. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
-| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man8/hd-issue.8.gz` | The man pages. |
+| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |

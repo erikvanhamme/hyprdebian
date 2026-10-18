@@ -19,7 +19,10 @@ which reboot and power off the system with
 .B hyprshutdown
 in a Hyprland session and with
 .B systemctl
-otherwise, and the files that new users
+otherwise,
+.BR hd-link-repo (8),
+which switches the HyprDebian repository and suite of apt, and the files
+that new users
 get in their home directory, from
 .IR /etc/skel :
 .TP
@@ -164,6 +167,9 @@ and
 .BR sudo ,
 for
 .BR hd-up (1);
+.BR python3-jinja2 ,
+for
+.BR hd-link-repo (8);
 .BR kbd ,
 for Num Lock on the console.
 .TP
@@ -248,6 +254,13 @@ Reboot and power off the system.
 Writes the login banner in
 .IR /etc/issue .
 .TP
+.I /usr/sbin/hd-link-repo
+Switches the HyprDebian repository and suite of apt.
+.TP
+.I /usr/share/hd-base/templates/hyprdebian.local.sources.j2
+The template of the apt source of
+.BR hd-link-repo .
+.TP
 .I /etc/hyprdebian/version.json
 The version of HyprDebian, a conffile.
 .TP
@@ -286,6 +299,7 @@ The config of systemd-resolved.
 .BR hd-up (1),
 .BR hd-reboot (1),
 .BR hd-issue (8),
+.BR hd-link-repo (8),
 .BR hd-network (7),
 .BR zram-generator.conf (5),
 .BR resolved.conf (5),

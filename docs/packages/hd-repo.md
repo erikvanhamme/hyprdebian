@@ -116,7 +116,7 @@ Signed-By: /usr/share/keyrings/hyprdebian-archive-keyring.pgp
 Architectures: amd64
 ```
 
-For trixie, set `Suites` to `trixie`.
+For trixie, set `Suites` to `trixie`. On a HyprDebian system, `hd-link-repo` of `hd-base` does both: `sudo hd-link-repo http://repo.example/ --suite unstable`.
 
 The key is downloaded over the same connection as the packages, so it does not protect against someone who can change that traffic. It makes sure that every client keeps getting its packages from the repository it was set up with.
 
