@@ -1,0 +1,15 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: OrcaSlicer
+Upstream-Contact: SoftFever <https://github.com/OrcaSlicer/OrcaSlicer>
+Source: https://github.com/OrcaSlicer/OrcaSlicer
+Comment: /usr/lib/orcaslicer is the AppImage of the release named in the
+ control file, unpacked and unchanged. It holds libraries and web resources
+ that come with their own licenses, such as zlib, liblzma, libexpat, libmspack
+ and swiper, whose license files are next to them.
+
+Files: *
+Copyright: 2022 - SoftFever and the OrcaSlicer contributors
+           Bambu Lab, Prusa Research and the Slic3r contributors
+License: AGPL-3.0
+ On Debian systems, the full text of the GNU Affero General Public License
+ version 3 is in /usr/share/common-licenses/AGPL-3.0.

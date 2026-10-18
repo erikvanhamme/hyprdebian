@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=OrcaSlicer
+GenericName=3D Printing Software
+Comment=G-code generator for 3D printers
+Exec=orcaslicer %F
+Icon=orcaslicer
+Terminal=false
+Type=Application
+PrefersNonDefaultGPU=true
+Categories=Graphics;3DGraphics;Engineering;
+MimeType=model/stl;application/vnd.ms-3mfdocument;application/prs.wavefront-obj;application/x-amf;

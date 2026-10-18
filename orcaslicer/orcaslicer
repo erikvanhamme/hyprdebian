@@ -1,0 +1,17 @@
+#!/bin/sh
+# Starts OrcaSlicer from the AppImage unpacked in /usr/lib/orcaslicer.
+#
+# OrcaSlicer 2.4.2 crashes in the radeonsi driver of Mesa 26 when it renders
+# the plate thumbnails, so with Mesa 26 or newer it renders in software. The
+# Mesa of trixie is older and keeps rendering on the GPU. A LIBGL_ALWAYS_SOFTWARE
+# that is set already wins, so LIBGL_ALWAYS_SOFTWARE=0 uses the GPU anyway.
+# Remove this when a release of OrcaSlicer with the fix is packaged.
+if [ -z "${LIBGL_ALWAYS_SOFTWARE+set}" ]; then
+    mesa=$(dpkg-query -W -f='${Version}' mesa-libgallium:amd64 2>/dev/null) || mesa=""
+
+    if [ -n "$mesa" ] && dpkg --compare-versions "$mesa" ge 26; then
+        export LIBGL_ALWAYS_SOFTWARE=1
+    fi
+fi
+
+exec /usr/lib/orcaslicer/AppRun "$@"
