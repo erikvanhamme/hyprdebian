@@ -1,5 +1,5 @@
 # Builds the package hd-backup, the backup tools: hd-backup for filesets on hard drives and tape,
-# and hd-backup-vm, hd-backup-vms and hd-restore-vm for virtual machines on ZFS volumes. The
+# hd-backup-prep, hd-backup-load and hd-backup-unload for its hard drives, and hd-backup-vm, hd-backup-vms and hd-restore-vm for virtual machines on ZFS volumes. The
 # package is for amd64, as it holds blockwrite, compiled from blockwrite.c.
 #
 #   make deb    build build/hd-backup_$(DEB_VERSION)_amd64.deb, with the
@@ -8,6 +8,13 @@
 #                                             drives and tape
 #                 /usr/bin/blockwrite         writes the tape stream of
 #                                             hd-backup in blocks of 4 MiB
+#                 /usr/sbin/hd-backup-prep    turns a drive into an
+#                                             encrypted ZFS pool for
+#                                             hd-backup
+#                 /usr/sbin/hd-backup-load    imports, unlocks and mounts
+#                                             such a drive
+#                 /usr/sbin/hd-backup-unload  exports it, so it can be
+#                                             disconnected
 #                 /usr/sbin/hd-backup-vm      backs up a VM
 #                 /usr/sbin/hd-backup-vms     backs up the VMs in the key
 #                                             hd-backup of
@@ -43,15 +50,19 @@ DEB_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("version.js
 DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_amd64.deb
 STAGE := $(BUILD)/deb
 UNIT_DIR := /usr/lib/systemd/system
-# hd-backup keeps a database per user, so every user can run it; the VM tools are for root.
+# hd-backup keeps a database per user, so every user can run it; the drive and VM tools are for
+# root.
 USER_COMMANDS := hd-backup
-ADMIN_COMMANDS := hd-backup-vm hd-backup-vms hd-restore-vm
+ADMIN_COMMANDS := hd-backup-prep hd-backup-load hd-backup-unload hd-backup-vm hd-backup-vms \
+	hd-restore-vm
 UNITS := hd-backup-vms.service hd-backup-vms.timer
 BLOCKWRITE := $(BUILD)/blockwrite
 # The maintainer scripts in deb/.
 SCRIPTS := deb/postinst deb/prerm deb/postrm
 # The man pages, named <page>.<section>.
-MANPAGES := man/hd-backup.1 man/blockwrite.1 man/hd-backup-vm.8 man/hd-backup-vms.8 man/hd-restore-vm.8
+# hd-backup-unload.8 includes hd-backup-load.8.
+MANPAGES := man/hd-backup.1 man/blockwrite.1 man/hd-backup-prep.8 man/hd-backup-load.8 \
+	man/hd-backup-unload.8 man/hd-backup-vm.8 man/hd-backup-vms.8 man/hd-restore-vm.8
 
 .PHONY: deb deb-path test clean
 

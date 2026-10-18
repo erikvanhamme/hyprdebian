@@ -1,5 +1,5 @@
 # HyprDebian
-This repo holds the HyprDebian installation scripts.
+This repo holds the HyprDebian packages and the installer.
 
 HyprDebian is a Debian unstable based custom distro focussing on Hyprland.
 

@@ -5,6 +5,9 @@ The package `hd-backup` holds the backup tools of HyprDebian:
 | --- | --- |
 | `hd-backup` | Writes backups of filesets as tarballs to hard drives or LTO tape, and keeps track of what is on which carrier in a SQLite database per user. |
 | `blockwrite` | Writes the tape stream of `hd-backup` in fixed blocks of 4 MiB. |
+| `hd-backup-prep` | Turns a whole drive into an encrypted ZFS pool, a carrier for `hd-backup`. |
+| `hd-backup-load` | Imports, unlocks and mounts such a drive. |
+| `hd-backup-unload` | Exports it, so it can be disconnected. |
 | `hd-backup-vm` | Backs up a virtual machine of libvirt whose disks are ZFS volumes. |
 | `hd-backup-vms` | Backs up every VM in the key `hd-backup` of `/etc/hyprdebian/config.json`. |
 | `hd-restore-vm` | Restores a VM from a backup of `hd-backup-vm`. |
@@ -14,7 +17,7 @@ Installing the package stores an empty list of VMs in the key `hd-backup` of `/e
 sudo systemctl enable --now hd-backup-vms.timer
 ```
 
-Each command has a man page: `man hd-backup`, `man blockwrite`, `man hd-backup-vm`, `man hd-backup-vms` and `man hd-restore-vm`.
+Each command has a man page: `man hd-backup`, `man blockwrite`, `man hd-backup-prep`, `man hd-backup-load` (also `man hd-backup-unload`), `man hd-backup-vm`, `man hd-backup-vms` and `man hd-restore-vm`.
 
 ## Building the package
 The package is built from `hd-backup` in this repository:
@@ -23,7 +26,7 @@ cd hd-backup
 make deb
 ```
 
-This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags`; building it needs `gcc` and `dpkg-dev`. It depends on `libc6`, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-config`, `zfsutils-linux`, `zstd` and `libvirt-clients`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
+This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags`; building it needs `gcc` and `dpkg-dev`. It depends on `libc6`, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-config`, `zfsutils-linux`, `zstd`, `libvirt-clients` and `udev`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
 ```
 sudo apt install ./build/hd-backup_<version>_all.deb
 ```
@@ -34,6 +37,9 @@ hd-backup/Makefile
 hd-backup/version.json
 hd-backup/hd-backup
 hd-backup/blockwrite.c
+hd-backup/hd-backup-prep
+hd-backup/hd-backup-load
+hd-backup/hd-backup-unload
 hd-backup/hd-backup-vm
 hd-backup/hd-backup-vms
 hd-backup/hd-restore-vm
@@ -45,11 +51,15 @@ hd-backup/deb/prerm
 hd-backup/deb/postrm
 hd-backup/man/hd-backup.1
 hd-backup/man/blockwrite.1
+hd-backup/man/hd-backup-prep.8
+hd-backup/man/hd-backup-load.8
+hd-backup/man/hd-backup-unload.8
 hd-backup/man/hd-backup-vm.8
 hd-backup/man/hd-backup-vms.8
 hd-backup/man/hd-restore-vm.8
 hd-backup/tests/test_vm.py
 hd-backup/tests/test_blockwrite.py
+hd-backup/tests/test_drive.py
 hd-backup/tests/fake-command
 ```
 
@@ -66,6 +76,22 @@ blockwrite <device>
 ```
 
 `hd-backup write-tape` writes its tarballs through `mbuffer` and `blockwrite`. `blockwrite` reads a stream from its standard input and writes it to the device in blocks of exactly 4 MiB, one `write` per block, with `O_DIRECT`, so every block is one record on the tape. The last block is filled up with zeros. A short write is an error and is never continued. At the end, also on an error, it prints `Total bytes written: <N>` on standard error, the bytes written in full blocks, from which `hd-backup` knows how much of a tarball is on a tape that ran full.
+
+## Backup drives
+A hard drive for `hd-backup` is a ZFS pool of its own, made with `hd-backup-prep`, which wipes the whole drive:
+```
+sudo hd-backup-prep /dev/disk/by-id/<drive> <pool>
+```
+
+It shows the drive, its size and the pool, and asks before it changes anything. It removes the ZFS labels, the signatures and the partition table, zeroes the first 100 MiB, and creates the pool with native encryption (`aes-256-gcm`, with a passphrase that `zpool` asks for), `zstd` compression and a record size of 4 MiB, mounted at `/mnt/<pool>`. The dataset `<pool>/reserved` reserves a tenth of the drive, to keep part of it free. The mountpoint is given to the user who ran `sudo`, or to `--owner <user>`, so that user can write the backups. Use the name of the pool as the label of the carrier.
+
+After that, the drive is connected and disconnected with:
+```
+sudo hd-backup-load <pool>
+sudo hd-backup-unload <pool>
+```
+
+`hd-backup-load` imports the pool with `-f`, so a drive that was pulled without unloading it can be loaded again, asks the passphrase and mounts it. `hd-backup-unload` exports the pool, which unmounts it and forgets its key.
 
 ## Backing up VMs
 ```
@@ -125,7 +151,7 @@ It then defines the VM in libvirt with the XML of the backup, with the disks poi
 Removing the package stops the timer and keeps the list of VMs and the backups. Purging it also removes the key `hd-backup` of `/etc/hyprdebian/config.json`. The backups and the snapshot of the last backup of each disk stay.
 
 ## Tests
-The tests are in `hd-backup/tests`. In the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
+The tests are in `hd-backup/tests`. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
 ```
 cd hd-backup
 make test
@@ -138,6 +164,8 @@ make test
 | --- | --- |
 | `/usr/bin/hd-backup` | Backs up filesets to hard drives and tape. |
 | `/usr/bin/blockwrite` | Writes the tape stream in blocks of 4 MiB. |
+| `/usr/sbin/hd-backup-prep` | Turns a drive into a backup carrier. |
+| `/usr/sbin/hd-backup-load`, `/usr/sbin/hd-backup-unload` | Connect and disconnect a backup drive. |
 | `/usr/sbin/hd-backup-vm` | Backs up a VM. |
 | `/usr/sbin/hd-backup-vms` | Backs up the VMs in the configuration. |
 | `/usr/sbin/hd-restore-vm` | Restores a VM. |

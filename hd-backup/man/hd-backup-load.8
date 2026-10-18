@@ -1,0 +1,49 @@
+.TH HD-BACKUP-LOAD 8 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-backup-load, hd-backup-unload \- connect and disconnect a backup drive
+.SH SYNOPSIS
+.B hd-backup-load
+.I pool
+.br
+.B hd-backup-unload
+.I pool
+.SH DESCRIPTION
+.B hd-backup-load
+imports the ZFS pool
+.I pool
+of a backup drive made with
+.BR hd\-backup\-prep (8),
+asks for its passphrase and mounts it, at
+.IR /mnt/pool .
+It imports with
+.BR "zpool import \-f" ,
+so a drive that was not unloaded, because it was pulled or the system went
+down, can be loaded again.
+.PP
+.B hd-backup-unload
+exports the pool, which unmounts it and forgets its key, so the drive can be
+disconnected.
+.PP
+Run them as root.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXAMPLE
+.RS
+.nf
+sudo hd-backup-load bk01
+hd-backup write home /mnt/bk01
+sudo hd-backup-unload bk01
+.fi
+.RE
+.SH EXIT STATUS
+0 on success, 1 when a step fails, 130 when it is interrupted.
+.SH SEE ALSO
+.BR hd\-backup (1),
+.BR hd\-backup\-prep (8),
+.BR zpool\-import (8),
+.BR zpool\-export (8),
+.BR zfs\-load\-key (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

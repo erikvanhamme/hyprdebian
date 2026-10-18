@@ -1,0 +1,85 @@
+.TH HD-BACKUP-PREP 8 "October 2026" "hd-backup" "HyprDebian"
+.SH NAME
+hd-backup-prep \- turn a drive into a backup carrier for hd-backup
+.SH SYNOPSIS
+.B hd-backup-prep
+.RB [ \-\-owner
+.IR user ]
+.I device pool
+.SH DESCRIPTION
+.B hd-backup-prep
+wipes the whole drive
+.I device
+and creates the ZFS pool
+.I pool
+on it, as a carrier for the backups of
+.BR hd\-backup (1).
+Everything on the drive is lost.
+It shows the drive, its size, the pool and the mountpoint, and asks before it
+changes anything.
+Run it as root.
+.PP
+It removes the ZFS labels, the signatures and the partition table of the
+drive, zeroes its first 100 MiB and has the kernel and udev read it again.
+Then it creates the pool with:
+.IP \(bu 2
+native encryption,
+.BR aes\-256\-gcm ,
+with a passphrase that
+.BR zpool (8)
+asks for;
+.IP \(bu 2
+.B zstd
+compression and a record size of 4 MiB, to match the tarballs of
+.BR hd\-backup ;
+.IP \(bu 2
+.BR ashift=12 ,
+.B xattr=sa
+and
+.BR dnodesize=auto ;
+.IP \(bu 2
+the mountpoint
+.IR /mnt/pool .
+.PP
+The dataset
+.I pool/reserved
+reserves a tenth of the drive, to keep part of it free.
+The mountpoint is given to the user who ran
+.BR sudo ,
+or to
+.IR user ,
+so that user can write the backups.
+.PP
+Use the name of the pool as the label of the carrier in
+.BR hd\-backup .
+Afterwards,
+.BR hd\-backup\-load (8)
+and
+.BR hd\-backup\-unload (8)
+connect and disconnect the drive.
+.SH OPTIONS
+.TP
+.BI \-\-owner " user"
+The user who gets the mountpoint, instead of the user who ran
+.BR sudo ,
+or root without it.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXAMPLE
+.RS
+.nf
+sudo hd-backup-prep /dev/disk/by-id/ata-WDC_WD40EFRX-68N32N0_WD-1234 bk01
+.fi
+.RE
+.SH EXIT STATUS
+0 when the pool is created, 1 on an error or when the question is answered
+with no, 130 when it is interrupted.
+.SH SEE ALSO
+.BR hd\-backup (1),
+.BR hd\-backup\-load (8),
+.BR hd\-backup\-unload (8),
+.BR zpool\-create (8),
+.BR zfsprops (7)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

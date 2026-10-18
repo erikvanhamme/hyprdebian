@@ -3,21 +3,7 @@
 
 The tool keeps track of every file it protects in a SQLite database. A backup only writes what is not on the backup yet: the first write is a full backup, every following write is incremental. When a carrier (a drive or a tape) is full, the backup continues on the next carrier.
 
-The tool is a Python script:
-```
-deploy/usr/local/bin/hd-backup
-```
-
-It is installed with the optional component "Install backup tools" (`Q_BACKUPTOOLS`, task `o_backuptools` in `scripts/optional.sh`). That component also installs:
-
-| Path | Purpose |
-| --- | --- |
-| `/usr/local/bin/hd-backup-prep` | Prepares a hard drive as a backup carrier. See [Preparing a hard drive](#preparing-a-hard-drive). |
-| `/usr/local/bin/hd-backup-load` | Imports, unlocks and mounts a backup drive. |
-| `/usr/local/bin/hd-backup-unload` | Exports a backup drive, so it can be disconnected. |
-| `/usr/local/bin/blockwrite` | Writes a stream to tape in fixed 4 MiB blocks. Compiled from `src/blockwrite.c` during the installation. |
-
-And the packages `python3-colorama`, `python3-tabulate` (used by `hd-backup`), `mbuffer` and `mt-st` (used for tape).
+The tool is installed with the package `hd-backup`, together with `blockwrite`, which writes a stream to tape in fixed 4 MiB blocks. See [hd-backup](../packages/hd-backup.md) for the package, its files and the backups of VMs.
 
 ## Concepts
 | Concept | Meaning |
@@ -228,21 +214,21 @@ tar -b 8192 -xpf /dev/nst0 -C /restore
 After the last tarball, run its delete list (see [Deletes](#deletes)) to remove what was deleted before the last backup.
 
 ## Preparing a hard drive
-`hd-backup-prep` turns a whole drive into a backup carrier. It destroys everything on the drive:
+`hd-backup-prep` turns a whole drive into a backup carrier. It destroys everything on the drive, after asking:
 ```
-hd-backup-prep DEVICE POOL
+sudo hd-backup-prep DEVICE POOL
 ```
 
 It wipes the drive and creates a ZFS pool on it, mounted at `/mnt/POOL`:
 - Native encryption (`aes-256-gcm`) with a passphrase, asked when the pool is created.
 - `zstd` compression and a record size of 4 MiB, to match the tarballs.
-- A dataset `POOL/reserved` with a reservation, to keep part of the drive free.
-- The mountpoint is owned by the user that ran it.
+- A dataset `POOL/reserved` that reserves a tenth of the drive, to keep part of it free.
+- The mountpoint is owned by the user that ran `sudo`, or by `--owner USER`.
 
 Use the pool name as the carrier label. After that, the drive is used with:
 ```
-hd-backup-load POOL
-hd-backup-unload POOL
+sudo hd-backup-load POOL
+sudo hd-backup-unload POOL
 ```
 
 `hd-backup-load` imports the pool, asks the passphrase and mounts it at `/mnt/POOL`. `hd-backup-unload` exports the pool, so the drive can be disconnected.

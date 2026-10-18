@@ -1,0 +1,192 @@
+#!/usr/bin/python3
+"""Turns a whole drive into a backup carrier for hd-backup, see hd-backup-prep(8).
+
+The package hd-backup installs this as /usr/sbin/hd-backup-prep. Run it as root.
+
+    hd-backup-prep <device> <pool>
+
+It wipes the drive and creates the ZFS pool <pool> on it, encrypted with a passphrase that zpool
+asks for, mounted at /mnt/<pool>. The dataset <pool>/reserved reserves a tenth of the drive, to
+keep part of it free. The mountpoint is given to the user who ran it with sudo, or to --owner.
+"""
+
+import argparse
+import os
+import pwd
+import shutil
+import stat
+import subprocess
+import sys
+
+MOUNT_DIR = "/mnt"
+# The share of the drive that <pool>/reserved keeps free, in percent.
+RESERVED_PERCENT = 10
+# The start of the drive that is zeroed, past the partition tables and the signatures, in MiB.
+ZERO_MIB = 100
+MIB = 1024 * 1024
+POOL_OPTIONS = [
+    "-o", "ashift=12",
+    "-O", "encryption=aes-256-gcm",
+    "-O", "keyformat=passphrase",
+    "-O", "keylocation=prompt",
+    "-O", "compression=zstd",
+    "-O", "recordsize=4M",
+    "-O", "xattr=sa",
+    "-O", "dnodesize=auto",
+]
+
+
+class PrepError(Exception):
+    pass
+
+
+def run(*args, check=True, capture=False):
+    """Runs a command; with capture, returns what it prints."""
+    result = subprocess.run(args, check=check, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+    if capture:
+        return result.stdout
+
+    return result
+
+
+def quiet(*args):
+    """Runs a command whose failure does not matter, without its output. Returns whether it
+    succeeded."""
+    result = subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return result.returncode == 0
+
+
+def check_device(device):
+    """Returns the size of the block device in bytes."""
+    try:
+        mode = os.stat(device).st_mode
+    except FileNotFoundError:
+        raise PrepError(f"{device} does not exist.")
+
+    if not stat.S_ISBLK(mode):
+        raise PrepError(f"{device} is not a block device.")
+
+    size = int(run("blockdev", "--getsize64", device, capture=True).strip())
+    if size == 0:
+        raise PrepError(f"{device} has a size of 0.")
+
+    return size
+
+
+def owner_of(name):
+    """Returns the uid and the gid of the user who gets the mountpoint."""
+    try:
+        user = pwd.getpwnam(name)
+    except KeyError:
+        raise PrepError(f"the user {name} does not exist.")
+
+    return user.pw_uid, user.pw_gid
+
+
+def confirm(device, pool):
+    """Asks before the drive is wiped. Returns whether the user agreed."""
+    answer = input(f"Everything on {device} will be lost. Create the pool {pool} on it (y/N): ")
+    return answer.strip().lower() in ("y", "yes")
+
+
+def zero_start(device):
+    """Zeroes the start of the drive, so no partition table or file system is left there."""
+    zeros = bytes(MIB)
+    fd = os.open(device, os.O_WRONLY)
+    try:
+        for _ in range(ZERO_MIB):
+            os.write(fd, zeros)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def wipe(device):
+    """Removes the ZFS labels, the signatures and the partition table of the drive, and has the
+    kernel and udev let go of what was on it."""
+    print(f"Wiping {device}...")
+    # A drive without ZFS labels or signatures makes these fail, which is fine.
+    quiet("zpool", "labelclear", "-f", device)
+    quiet("wipefs", "-a", "-f", device)
+    zero_start(device)
+
+    if not quiet("blockdev", "--rereadpt", device) and shutil.which("partprobe"):
+        quiet("partprobe", device)
+
+    quiet("udevadm", "trigger", "--action=change", device)
+    run("udevadm", "settle")
+
+
+def give(path, uid, gid):
+    """Gives the mountpoint and what is below it to the user."""
+    os.chown(path, uid, gid)
+    for root, dirs, files in os.walk(path):
+        for name in dirs + files:
+            os.chown(os.path.join(root, name), uid, gid, follow_symlinks=False)
+
+
+def prep(device, pool, owner):
+    size = check_device(device)
+    uid, gid = owner_of(owner)
+    reservation = size * RESERVED_PERCENT // 100
+    mountpoint = os.path.join(MOUNT_DIR, pool)
+
+    print(f"Device:      {device}")
+    print(f"Size:        {size} bytes")
+    print(f"Pool:        {pool}")
+    print(f"Mountpoint:  {mountpoint}")
+    print(f"Owner:       {owner}")
+    print(f"Reservation: {reservation} bytes, {RESERVED_PERCENT}% of the drive")
+
+    if not confirm(device, pool):
+        print("Nothing was changed.")
+        return False
+
+    wipe(device)
+
+    print(f"Creating the encrypted pool {pool}...")
+    run("zpool", "create", "-f", *POOL_OPTIONS, "-O", f"mountpoint={mountpoint}", pool, device)
+    run("zfs", "create", "-o", f"reservation={reservation}", f"{pool}/reserved")
+    give(mountpoint, uid, gid)
+
+    print(f"The pool {pool} is mounted at {mountpoint}.")
+    return True
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Wipe a whole drive and create an encrypted ZFS pool on it, mounted at "
+        "/mnt/<pool>, as a backup carrier for hd-backup.")
+    parser.add_argument("device", help="the drive, for example /dev/disk/by-id/ata-...")
+    parser.add_argument("pool", help="the name of the pool, also the label of the carrier")
+    parser.add_argument("--owner", default=os.environ.get("SUDO_USER") or "root",
+                        help="the user who gets the mountpoint (default: the user who ran sudo)")
+    args = parser.parse_args(argv)
+
+    if os.geteuid() != 0:
+        print("Error: hd-backup-prep must run as root.", file=sys.stderr)
+        return 1
+
+    try:
+        if not prep(args.device, args.pool, args.owner):
+            return 1
+    except PrepError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except subprocess.CalledProcessError as error:
+        print(f"Error: {' '.join(error.cmd)} failed with status {error.returncode}.",
+              file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return 130
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

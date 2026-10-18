@@ -17,7 +17,7 @@ The project owner (Erik Van Hamme) has final say on all changes. Agents are help
 
 ## Versions
 
-The version of HyprDebian is in `version.json` in the root of the repository (`{"major": 1, "minor": N}`). It is also the version of the package `hd-base`, which installs a copy as `/etc/hyprdebian/version.json`; the login banner and the message after a login show it. It replaces `version.sh` of the old installer.
+The version of HyprDebian is in `version.json` in the root of the repository (`{"major": 1, "minor": N}`). It is also the version of the package `hd-base`, which installs a copy as `/etc/hyprdebian/version.json`; the login banner and the message after a login show it.
 
 - **Bump it when a change affects a package or the installer.** That covers every `hd-*` package folder, `hd-installer/` among them, and anything else that ends up in a package or on an installed system.
 - **Bump it once per set of working changes, not once per edit.** Before finishing a task, run `git diff HEAD -- version.json`. If it already shows an uncommitted bump, or the file is not committed yet, leave it; otherwise bump. Never assume from earlier in the session: the owner may have committed in the meantime.

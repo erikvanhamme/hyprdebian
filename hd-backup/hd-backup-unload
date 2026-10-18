@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+"""Exports a backup drive of hd-backup-prep, so it can be disconnected, see hd-backup-unload(8).
+
+The package hd-backup installs this as /usr/sbin/hd-backup-unload. Run it as root.
+
+    hd-backup-unload <pool>
+
+Exporting unmounts the pool and forgets its key.
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+
+
+def unload(pool):
+    subprocess.run(["zpool", "export", pool], check=True)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Export a backup drive of hd-backup-prep, so it can be disconnected.")
+    parser.add_argument("pool", help="the name of the pool")
+    args = parser.parse_args(argv)
+
+    if os.geteuid() != 0:
+        print("Error: hd-backup-unload must run as root.", file=sys.stderr)
+        return 1
+
+    try:
+        unload(args.pool)
+    except subprocess.CalledProcessError as error:
+        print(f"Error: {' '.join(error.cmd)} failed with status {error.returncode}.",
+              file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

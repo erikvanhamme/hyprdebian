@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+"""Imports, unlocks and mounts a backup drive of hd-backup-prep, see hd-backup-load(8).
+
+The package hd-backup installs this as /usr/sbin/hd-backup-load. Run it as root.
+
+    hd-backup-load <pool>
+
+It imports the pool, asks for its passphrase and mounts it, at /mnt/<pool> for a pool of
+hd-backup-prep.
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+
+
+def load(pool):
+    # A pool that was not exported, because the drive was pulled or the system went down, still
+    # counts as in use by the system it was on; -f imports it anyway.
+    subprocess.run(["zpool", "import", "-f", pool], check=True)
+    subprocess.run(["zfs", "load-key", pool], check=True)
+    subprocess.run(["zfs", "mount", pool], check=True)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Import a backup drive of hd-backup-prep, unlock it with its passphrase and "
+        "mount it.")
+    parser.add_argument("pool", help="the name of the pool")
+    args = parser.parse_args(argv)
+
+    if os.geteuid() != 0:
+        print("Error: hd-backup-load must run as root.", file=sys.stderr)
+        return 1
+
+    try:
+        load(args.pool)
+    except subprocess.CalledProcessError as error:
+        print(f"Error: {' '.join(error.cmd)} failed with status {error.returncode}.",
+              file=sys.stderr)
+        return 1
+    except OSError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
