@@ -49,6 +49,14 @@ UPGRADE_DAYS = 14
 POOL_WARN = 80
 POOL_BAD = 90
 
+# What the states of Secure Boot in a report other than on mean, see hd-secboot-check.
+SECURE_BOOT = {
+    "off": "Secure Boot is off",
+    "setup": "Secure Boot is off, firmware in setup mode",
+    "unsupported": "Secure Boot is not supported by the firmware",
+    "legacy": "Secure Boot is off, booted without UEFI",
+}
+
 # The levels of the issues, from good to bad.
 LEVELS = ["ok", "info", "warn", "bad"]
 
@@ -97,7 +105,8 @@ def parse_config(config, defaults):
     if not isinstance(settings.get("listen"), str) or not settings["listen"]:
         raise ConfigError("listen is not an address")
 
-    for key, low, high in [("port", 1, 65535), ("stale_minutes", 1, None), ("history_days", 1, None)]:
+    for key, low, high in [("port", 1, 65535), ("stale_minutes", 1, None), ("offline_days", 1, None),
+                           ("history_days", 1, None)]:
         value = settings.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or value < low or (high and value > high):
             raise ConfigError(f"{key} is not a whole number from {low}" + (f" to {high}" if high else " up"))
@@ -252,16 +261,20 @@ def age(seconds):
     return f"{round(seconds / 86400)} days"
 
 
-def assess(report, last_seen, now, stale_minutes, dashboard_version):
-    """Returns the issues of a host, as (level, message) pairs. A host with a HyprDebian version
-    older than dashboard_version, the version of the dashboard, is outdated."""
+def assess(report, last_seen, now, stale_minutes, offline_days, dashboard_version):
+    """Returns the issues of a host, as (level, message) pairs. A host that did not report for
+    stale_minutes is offline, which is only a note: a laptop may be off for days. After
+    offline_days it is an error. A host with a HyprDebian version older than dashboard_version,
+    the version of the dashboard, is outdated."""
     issues = []
 
     def add(level, message):
         issues.append((level, message))
 
-    if now - last_seen > stale_minutes * 60:
+    if now - last_seen > offline_days * 86400:
         add("bad", f"No report for {age(now - last_seen)}")
+    elif now - last_seen > stale_minutes * 60:
+        add("info", f"Offline, no report for {age(now - last_seen)}")
 
     units = report.get("units") or {}
     failed = units.get("failed") or []
@@ -280,6 +293,15 @@ def assess(report, last_seen, now, stale_minutes, dashboard_version):
         elif capacity >= POOL_WARN:
             add("warn", f"Pool {pool.get('name')} is {capacity}% full")
 
+        # The last completed scrub. Repaired bytes are a warning: the pool healed itself, but a
+        # drive may be failing. Errors are data the scrub could not repair.
+        scrub = pool.get("scrub")
+        if isinstance(scrub, dict):
+            if number(scrub.get("errors")):
+                add("bad", f"Scrub of {pool.get('name')} found {scrub['errors']} errors")
+            if number(scrub.get("repaired")):
+                add("warn", f"Scrub of {pool.get('name')} repaired {size(scrub['repaired'])}")
+
     for array in report.get("arrays") or []:
         if array.get("degraded"):
             add("bad", f"Array {array.get('name')} is degraded")
@@ -289,6 +311,12 @@ def assess(report, last_seen, now, stale_minutes, dashboard_version):
             add("bad", f"{timer.get('service')} failed: {timer.get('result')}")
 
     system = report.get("os") or {}
+    secure_boot = system.get("secure_boot")
+    if secure_boot is None:
+        add("bad", "Secure Boot not reported")
+    elif secure_boot != "on":
+        add("bad", SECURE_BOOT.get(secure_boot, f"Secure Boot is {secure_boot}"))
+
     updates = report.get("updates") or {}
     if updates.get("reboot_required") or (system.get("kernel_newest") and system.get("kernel_newest") != system.get("kernel")):
         add("warn", "Reboot pending")
@@ -321,7 +349,7 @@ def level_of(issues):
     return worst
 
 
-def load_hosts(db, now, stale_minutes):
+def load_hosts(db, now, stale_minutes, offline_days):
     """Returns the hosts with their report, history and issues, the worst first."""
     hosts = []
     # Read for every page, so an upgrade of the dashboard's system shows without a restart.
@@ -342,7 +370,7 @@ def load_hosts(db, now, stale_minutes):
         })
 
     for host in hosts:
-        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, dashboard_version)
+        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, offline_days, dashboard_version)
         host["level"] = level_of(host["issues"])
 
     hosts.sort(key=lambda host: (-LEVELS.index(host["level"]), host["name"]))
@@ -487,6 +515,8 @@ def host_rows(host, history, now):
         ("Version", f'{esc(hd.get("version") or "?")} <span class="dim">· {esc(hd.get("suite"))} · Debian {esc(system.get("debian"))}</span>'),
         ("Kernel", esc(system.get("kernel"))),
         ("Up", when(system.get("boot_time"), now).replace(" ago", "")),
+        ("Secure Boot", f'<span class="{"ok" if system.get("secure_boot") == "on" else "bad"}">'
+                        f'{esc(system.get("secure_boot") or "?")}</span>'),
         ("Load", f'{sparkline(history, "load", now)} ' + esc(" ".join(f"{v:.2f}" for v in load if number(v) is not None)) +
                  f' <span class="dim">· {esc(report.get("cpus"))} CPUs</span>'),
     ]
@@ -536,8 +566,8 @@ def issue_list(issues):
     return '<ul class="issues">' + "".join(f'<li class="{level}">{esc(message)}</li>' for level, message in issues) + "</ul>"
 
 
-def overview_page(db, now, stale_minutes):
-    hosts = load_hosts(db, now, stale_minutes)
+def overview_page(db, now, stale_minutes, offline_days):
+    hosts = load_hosts(db, now, stale_minutes, offline_days)
     counts = {level: sum(1 for host in hosts if host["level"] == level) for level in LEVELS}
 
     cards = []
@@ -563,8 +593,8 @@ def overview_page(db, now, stale_minutes):
     return page("HyprDebian Dashboard", body + f'<div class="grid">{"".join(cards)}</div>')
 
 
-def host_page(db, name, now, stale_minutes, history_days):
-    hosts = [host for host in load_hosts(db, now, stale_minutes) if host["name"] == name]
+def host_page(db, name, now, stale_minutes, offline_days, history_days):
+    hosts = [host for host in load_hosts(db, now, stale_minutes, offline_days) if host["name"] == name]
     if not hosts:
         return None
 
@@ -635,19 +665,20 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         now = int(time.time())
         stale = self.config["stale_minutes"]
+        offline = self.config["offline_days"]
 
         db = self.database()
         try:
             if path == "/":
-                return self.respond(200, "text/html; charset=utf-8", overview_page(db, now, stale))
+                return self.respond(200, "text/html; charset=utf-8", overview_page(db, now, stale, offline))
 
             if path == "/api/hosts":
-                hosts = load_hosts(db, now, stale)
+                hosts = load_hosts(db, now, stale, offline)
                 return self.respond(200, "application/json", json.dumps(hosts, indent=2))
 
             if path.startswith("/host/"):
                 name = urllib.parse.unquote(path[6:])
-                body = host_page(db, name, now, stale, self.config["history_days"])
+                body = host_page(db, name, now, stale, offline, self.config["history_days"])
                 if body is not None:
                     return self.respond(200, "text/html; charset=utf-8", body)
         finally:
@@ -677,7 +708,7 @@ def serve(config, database):
 def list_hosts(config, database):
     db = connect_existing(database)
     now = int(time.time())
-    for host in load_hosts(db, now, config["stale_minutes"]):
+    for host in load_hosts(db, now, config["stale_minutes"], config["offline_days"]):
         version = (host["report"].get("hyprdebian") or {}).get("version") or "?"
         print(f'{host["name"]:<24} {host["level"]:<5} {version:<8} {host["address"]:<16} seen {age(now - host["last_seen"])} ago')
     return 0

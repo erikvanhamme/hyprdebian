@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-secboot` lets a hyprdebian system boot under Secure Boot with keys of its owner, instead of, or next to, the keys of Microsoft that most firmware ships with. `hd-secboot-enroll` enrolls the keys in the firmware.
+The package `hd-secboot` lets a hyprdebian system boot under Secure Boot with keys of its owner, instead of, or next to, the keys of Microsoft that most firmware ships with. `hd-secboot-enroll` enrolls the keys in the firmware, and `hd-secboot-check` checks that Secure Boot is on.
 
 It depends on the tools that make and use the keys, so they are installed with it and stay installed:
 - `openssl` makes the keys and their certificates;
@@ -8,7 +8,7 @@ It depends on the tools that make and use the keys, so they are installed with i
 
 On its first installation, it generates the keys in `/etc/hyprdebian/secboot`. When that directory already exists, on an upgrade, a reinstall or when the keys were put there by hand, the keys are kept: keys that are enrolled in the firmware are never replaced. Removing or purging the package keeps the keys as well.
 
-The package comes with two man pages: `man hd-secboot` describes the keys, `man hd-secboot-enroll` the command that enrolls them.
+The package comes with three man pages: `man hd-secboot` describes the keys, `man hd-secboot-enroll` the command that enrolls them, and `man hd-secboot-check` the command that checks that Secure Boot is on.
 
 ## Building the package
 The package is built from `packages/hd-secboot` in this repository:
@@ -27,10 +27,13 @@ The files involved are:
 packages/hd-secboot/Makefile
 packages/hd-secboot/version.json
 packages/hd-secboot/hd-secboot-enroll
+packages/hd-secboot/hd-secboot-check
 packages/hd-secboot/deb/control
 packages/hd-secboot/deb/postinst
 packages/hd-secboot/man/hd-secboot.7
 packages/hd-secboot/man/hd-secboot-enroll.8
+packages/hd-secboot/man/hd-secboot-check.8
+packages/hd-secboot/tests/test_check.py
 ```
 
 ## The keys
@@ -67,7 +70,7 @@ cd /etc/hyprdebian/secboot
 sudo sbsign --key db.key --cert db.crt --output signed.efi unsigned.efi
 ```
 
-Until Secure Boot is turned on, the system boots as before.
+Until Secure Boot is turned on, the system boots as before. After the next boot, `hd-secboot-check` says whether it is on.
 
 ## hd-secboot-enroll
 ```
@@ -84,6 +87,32 @@ Before each write, it clears the immutable flag that the kernel puts on the vari
 
 With `-n` or `--dry-run`, it runs the checks of step 1 and shows the commands it would run, and changes nothing. It exits with 0 when the keys were enrolled, 1 on an error and 2 on wrong arguments.
 
+## hd-secboot-check
+```
+hd-secboot-check [-q]
+```
+
+`hd-secboot-check` checks that the system booted with Secure Boot on, from the EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`. Every user can read those, so it does not need root. When Secure Boot is off, it says why:
+
+| State | Meaning |
+| --- | --- |
+| on | Secure Boot is on. |
+| off | Secure Boot is turned off in the setup menu of the firmware. |
+| setup | The firmware is in setup mode, without a platform key: enroll the keys with `hd-secboot-enroll`. |
+| unsupported | The firmware has no Secure Boot. |
+| legacy | The system was not booted with UEFI. |
+
+With `-q` or `--quiet`, it says nothing and only sets the exit status. It exits with 0 when Secure Boot is on, 1 when it is not, and 2 on wrong arguments. `hd-report` sends the same state to the dashboard, which shows a system without Secure Boot as an error, see [hd-dashboard](hd-dashboard.md#issues).
+
+## Tests
+The tests are in `packages/hd-secboot/tests`: the state `hd-secboot-check` finds in EFI variables in a temporary directory. They need nothing beyond Python:
+```
+cd packages/hd-secboot
+make test
+```
+
+`make test` in the root of this repository runs them with the tests of the other packages.
+
 ## Backup
 Back up `/etc/hyprdebian/secboot` somewhere safe. Without the private keys, no new EFI file can be signed for a firmware that has the keys enrolled; with them, anyone can.
 
@@ -92,3 +121,4 @@ Back up `/etc/hyprdebian/secboot` somewhere safe. Without the private keys, no n
 | --- | --- |
 | `/etc/hyprdebian/secboot` | The keys. |
 | `/usr/sbin/hd-secboot-enroll` | Enrolls the keys in the firmware. |
+| `/usr/sbin/hd-secboot-check` | Checks that Secure Boot is on. |

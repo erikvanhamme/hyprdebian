@@ -75,9 +75,12 @@ The host name, the FQDN, the version of HyprDebian from
 .IR /etc/hyprdebian/version.json ,
 the suite of the HyprDebian packages, the Debian
 version, the running and the newest installed kernel, the boot time, the
-load, the CPUs, the memory and the swap, the ZFS pools, the mdadm arrays, the
+state of Secure Boot as
+.BR hd-secboot-check (8)
+finds it, the load, the CPUs, the memory, the ZFS pools with their last
+completed scrub, the mdadm arrays, the
 state of systemd and the failed units, the upgradable packages from the
-package lists apt has now, the last apt run and the last upgrade, a pending
+package lists apt has now, the last upgrade, a pending
 reboot, the newest
 .B hd-up
 snapshot of
@@ -108,4 +111,5 @@ Run hd-report every 15 minutes.
 .SH SEE ALSO
 .BR hd-dashboard (7),
 .BR hd-config-update (8),
+.BR hd-secboot-check (8),
 .BR hd-up (1)

@@ -7,7 +7,9 @@ The package
 lets a hyprdebian system boot under Secure Boot with keys of its owner,
 instead of, or next to, the keys of Microsoft that most firmware ships with.
 .BR hd-secboot-enroll (8)
-enrolls the keys in the firmware.
+enrolls the keys in the firmware, and
+.BR hd-secboot-check (8)
+checks that Secure Boot is on.
 .PP
 It depends on the tools that make and use the keys, so they are installed
 with it and stay installed:
@@ -97,6 +99,11 @@ turned on:
 sbsign \-\-key db.key \-\-cert db.crt \-\-output signed.efi unsigned.efi
 .fi
 .RE
+.PP
+Then turn Secure Boot on in the setup menu of the firmware.
+After the next boot,
+.BR hd-secboot-check (8)
+says whether it is on.
 .SH BACKUP
 Back up
 .I /etc/hyprdebian/secboot
@@ -109,6 +116,7 @@ has the keys enrolled; with them, anyone can.
 The keys.
 .SH SEE ALSO
 .BR hd-secboot-enroll (8),
+.BR hd-secboot-check (8),
 .BR efi-updatevar (1),
 .BR sbsign (1),
 .BR sbverify (1),

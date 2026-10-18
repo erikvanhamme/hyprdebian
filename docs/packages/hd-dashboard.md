@@ -52,7 +52,7 @@ journalctl -u hd-dashboard.service
 ## Settings
 The settings are the key `hd-dashboard` of `/etc/hyprdebian/config.json`. The installation stores the defaults there, from `/usr/share/hd-dashboard/defaults.json`, when the key is missing; a setting that is missing from the key has its default value. Change them with `hd-config-update`, which replaces the key as a whole, and restart the service:
 ```
-sudo hd-config-update hd-dashboard '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "history_days": 30}'
+sudo hd-config-update hd-dashboard '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14, "history_days": 30}'
 sudo systemctl restart hd-dashboard.service
 ```
 
@@ -60,7 +60,8 @@ sudo systemctl restart hd-dashboard.service
 | --- | --- | --- |
 | `listen` | `"0.0.0.0"` | The address to listen on. |
 | `port` | `80` | The port to listen on. |
-| `stale_minutes` | `45` | A system that did not report for this long is an error. Systems report every 15 minutes. |
+| `stale_minutes` | `45` | A system that did not report for this long is offline, which is a note. Systems report every 15 minutes. |
+| `offline_days` | `14` | A system that did not report for this many days is an error, so a laptop that is off for a while does not turn red. |
 | `history_days` | `30` | How long the history is kept. |
 
 The service does not start when a setting has the wrong type; the journal says which one.
@@ -96,15 +97,15 @@ The connection is plain HTTP, meant for the local network.
 | `format` | The layout of the report, now 1. Reports with a newer format than the dashboard knows are refused with 400. |
 | `host`, `fqdn` | The host name, by which the dashboard knows the system, and its FQDN. |
 | `hyprdebian` | `version` and `suite` of the HyprDebian installation. |
-| `os` | `debian`, the Debian version, `kernel`, the running kernel, `kernel_newest`, the newest installed kernel, and `boot_time`. |
+| `os` | `debian`, the Debian version, `kernel`, the running kernel, `kernel_newest`, the newest installed kernel, `boot_time`, and `secure_boot`, the state of Secure Boot as `hd-secboot-check` finds it: `on`, `off`, `setup`, `unsupported` or `legacy`, see [hd-secboot](hd-secboot.md#hd-secboot-check). |
 | `load`, `cpus` | The load averages and the number of CPUs. |
-| `memory`, `swap` | `total` and `used`, in bytes. |
-| `pools` | Per ZFS pool: `name`, `health`, `size`, `alloc`, `capacity` in percent and `scan`. |
+| `memory` | `total` and `used`, in bytes. |
+| `pools` | Per ZFS pool: `name`, `health`, `size`, `capacity` in percent, and `scrub`, the last completed scrub, with `repaired`, the bytes it repaired, `errors` and `time`, when it ended; `null` when the pool has none. |
 | `arrays` | Per mdadm array: `name`, `state` and `degraded`. |
 | `units` | `state`, the state of systemd, and `failed`, the failed units. |
-| `updates` | `upgradable`, the number of packages that can be upgraded, `lists_time`, `last_apt`, `last_upgrade` and `reboot_required`. |
+| `updates` | `upgradable`, the number of packages that can be upgraded, `lists_time`, `last_upgrade` and `reboot_required`. |
 | `snapshot` | `name` and `time` of the newest snapshot of the system. |
-| `timers` | Per timer: `unit`, `service`, `last`, `next`, `result` and `state`. |
+| `timers` | Per timer: `unit`, `service`, `last`, `next` and `result`. |
 
 Times are Unix timestamps. Parts that are missing are left out of the pages. Raise `FORMAT` in both `hd-dashboard` and `hd-report` when the layout changes in a way the dashboard must know about, and update the dashboard before the systems.
 
@@ -123,16 +124,20 @@ Each system is judged on its last report. The card gets the color of its worst i
 
 | Level | Issue |
 | --- | --- |
-| Error | No report for longer than `stale_minutes`. |
+| Error | No report for longer than `offline_days`. |
 | Error | Failed units. |
 | Error | A pool that is not `ONLINE`, or 90% full or more. |
+| Error | The last completed scrub of a pool found errors it could not repair. |
 | Error | A degraded mdadm array. |
 | Error | The last run of the service of a timer failed. |
+| Error | Secure Boot is not on, or the report does not say, as from an `hd-report` before 0.5. |
 | Warning | A pool that is 80% full or more. |
+| Warning | The last completed scrub of a pool repaired bytes: the pool healed itself, but a drive may be failing. The warning stays until a scrub repairs nothing. |
 | Warning | The system is starting or stopping. |
 | Warning | A reboot is pending: `reboot_required`, or a newer kernel than the running one. |
 | Warning | No upgrade for 14 days, or never. |
 | Warning | A HyprDebian version older than the version on the system of the dashboard, from `/etc/hyprdebian/version.json`. A system with a newer version, like a test machine, gets no warning; without that file no versions are judged. |
+| Note | No report for longer than `stale_minutes`: the system is offline. |
 | Note | Upgradable packages. Notes do not change the color of the card: on unstable there almost always are some. |
 
 ## hd-dashboard

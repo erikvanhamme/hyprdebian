@@ -15,4 +15,4 @@ Description: HyprDebian Secure Boot keys
  a platform key (PK), a key exchange key (KEK) and a signature database key
  (db), each with its certificate, EFI signature list and signed update.
  Existing keys are never replaced. hd-secboot-enroll enrolls them in the
- firmware.
+ firmware, and hd-secboot-check checks that Secure Boot is on.

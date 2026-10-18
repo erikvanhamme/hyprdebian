@@ -32,6 +32,8 @@ SOURCES_FILE = "/etc/apt/sources.list.d/hyprdebian.sources"
 APT_HISTORY = "/var/log/apt/history.log"
 APT_LISTS = "/var/lib/apt/lists"
 ROOT_DATASET = "rpool/hyprdebian"
+EFIVARS = "/sys/firmware/efi/efivars"
+GLOBAL_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
 # The timers in the report: those of the admin in /etc, and those of the hyprdebian packages.
 TIMER_GLOBS = ["/etc/systemd/system/*.timer", "/usr/lib/systemd/system/hd-*.timer"]
 # The timer of hd-report itself is left out: when it fails, no report arrives anyway.
@@ -40,6 +42,12 @@ OWN_TIMER = "hd-report.timer"
 # The layout of the report, see FORMAT in hd-dashboard. The dashboard refuses reports with a newer
 # format than it knows.
 FORMAT = 1
+
+# The scan line of `zpool status` after a completed scrub, like
+# "scrub repaired 1.50M in 00:12:01 with 0 errors on Sun Oct 11 00:36:02 2026".
+SCRUB_DONE = re.compile(r"^scrub repaired (\S+) in .* with (\d+) errors on (.+)$")
+# The units of the sizes zpool prints, in powers of 1024.
+SIZE_UNITS = "BKMGTPE"
 
 # apt commands that upgrade the system, as they show up on the Commandline of the apt history.
 UPGRADE_COMMAND = re.compile(r"\b(upgrade|full-upgrade|dist-upgrade)\b")
@@ -95,7 +103,7 @@ def parse_suite(text):
 
 
 def parse_meminfo(text):
-    """Returns the memory and swap in use and in total, in bytes."""
+    """Returns the memory in use and in total, in bytes."""
     values = {}
 
     for line in (text or "").splitlines():
@@ -103,21 +111,26 @@ def parse_meminfo(text):
         if match:
             values[match.group(1)] = int(match.group(2)) * 1024
 
-    memory = {
+    return {
         "total": values.get("MemTotal", 0),
         "used": values.get("MemTotal", 0) - values.get("MemAvailable", 0),
     }
-    swap = {
-        "total": values.get("SwapTotal", 0),
-        "used": values.get("SwapTotal", 0) - values.get("SwapFree", 0),
-    }
-
-    return memory, swap
 
 
-def parse_pools(listing, status):
-    """Combines `zpool list -Hp` with the scan lines of `zpool status`."""
-    scans = {}
+def parse_size(text):
+    """Converts a size of zpool, like 0B, 512B, 1.50M or 2048, to bytes, or None."""
+    match = re.match(r"^(\d+(?:\.\d+)?)([BKMGTPE]?)$", text)
+    if not match:
+        return None
+
+    return round(float(match.group(1)) * 1024 ** SIZE_UNITS.index(match.group(2) or "B"))
+
+
+def parse_scrubs(status):
+    """Returns the last completed scrub of each pool in `zpool status`: the bytes it repaired, the
+    errors it found and when it ended. Pools without one, or with a scrub that is running, paused
+    or was canceled, or whose last scan was a resilver, are left out."""
+    scrubs = {}
     pool = None
 
     for line in (status or "").splitlines():
@@ -125,24 +138,44 @@ def parse_pools(listing, status):
 
         if line.startswith("pool:"):
             pool = line[5:].strip()
-        elif line.startswith("scan:") and pool:
-            scans[pool] = line[5:].strip()
+            continue
 
+        if not line.startswith("scan:") or pool is None:
+            continue
+
+        match = SCRUB_DONE.match(line[5:].strip())
+        if not match:
+            continue
+
+        try:
+            # zpool prints the time as ctime does, in English.
+            end = int(time.mktime(time.strptime(" ".join(match.group(3).split()), "%a %b %d %H:%M:%S %Y")))
+        except ValueError:
+            end = None
+
+        scrubs[pool] = {"repaired": parse_size(match.group(1)), "errors": int(match.group(2)), "time": end}
+
+    return scrubs
+
+
+def parse_pools(listing, status):
+    """Returns the pools in `zpool list -Hp -o name,health,size,capacity`, with their last
+    completed scrub from `zpool status`."""
+    scrubs = parse_scrubs(status)
     pools = []
 
     for line in (listing or "").splitlines():
         fields = line.split("\t")
-        if len(fields) != 5:
+        if len(fields) != 4:
             continue
 
-        name, health, size, alloc, capacity = fields
+        name, health, size, capacity = fields
         pools.append({
             "name": name,
             "health": health,
             "size": int(size),
-            "alloc": int(alloc),
             "capacity": int(capacity.rstrip("%")),
-            "scan": scans.get(name, ""),
+            "scrub": scrubs.get(name),
         })
 
     return pools
@@ -178,8 +211,8 @@ def parse_failed_units(text):
     return [line.split()[0] for line in (text or "").splitlines() if line.strip()]
 
 
-def parse_history(text, upgrades_only):
-    """Returns the time of the last apt run in an apt history log, or the last upgrade."""
+def parse_history(text):
+    """Returns the time of the last upgrade in an apt history log."""
     last = None
     command = ""
 
@@ -187,7 +220,7 @@ def parse_history(text, upgrades_only):
         if line.startswith("Commandline:"):
             command = line[12:]
         elif line.startswith("End-Date:"):
-            if upgrades_only and not UPGRADE_COMMAND.search(command):
+            if not UPGRADE_COMMAND.search(command):
                 continue
 
             try:
@@ -219,9 +252,9 @@ def read_history(path):
     return logs
 
 
-def last_in_history(logs, upgrades_only):
+def last_upgrade(logs):
     for text in logs:
-        last = parse_history(text, upgrades_only)
+        last = parse_history(text)
         if last is not None:
             return last
 
@@ -321,8 +354,7 @@ def collect_timers(timer_globs=TIMER_GLOBS):
             continue
 
         service = properties.get("Triggers", "").split(" ")[0]
-        result = parse_properties(run("systemctl", "show", "--timestamp=unix", service,
-                                      "-p", "Result,ExecMainStatus,ActiveState"))
+        result = parse_properties(run("systemctl", "show", service, "-p", "Result"))
 
         timers.append({
             "unit": timer,
@@ -330,10 +362,34 @@ def collect_timers(timer_globs=TIMER_GLOBS):
             "last": unix_time(properties.get("LastTriggerUSec")),
             "next": unix_time(properties.get("NextElapseUSecRealtime")),
             "result": result.get("Result", ""),
-            "state": result.get("ActiveState", ""),
         })
 
     return timers
+
+
+def read_var(efivars, name):
+    """The value of an EFI variable, without the 4 bytes of attributes in front, or None."""
+    try:
+        with open(os.path.join(efivars, f"{name}-{GLOBAL_GUID}"), "rb") as f:
+            return f.read()[4:]
+    except OSError:
+        return None
+
+
+def secure_boot_state(efivars=EFIVARS):
+    """The state of Secure Boot, as hd-secboot-check of hd-secboot finds it: on, off, setup (off,
+    with the firmware in setup mode), unsupported (UEFI without Secure Boot) or legacy (not
+    booted with UEFI)."""
+    if not os.path.isdir(efivars):
+        return "legacy"
+    secure_boot = read_var(efivars, "SecureBoot")
+    if secure_boot is None:
+        return "unsupported"
+    if secure_boot == b"\x01":
+        return "on"
+    if read_var(efivars, "SetupMode") == b"\x01":
+        return "setup"
+    return "off"
 
 
 def fqdn():
@@ -347,11 +403,11 @@ def fqdn():
 
 def collect():
     """Collects the report."""
-    memory, swap = parse_meminfo(read_file("/proc/meminfo"))
+    memory = parse_meminfo(read_file("/proc/meminfo"))
     uptime = float((read_file("/proc/uptime") or "0").split()[0])
     history = read_history(APT_HISTORY)
 
-    zpool_list = run("zpool", "list", "-Hp", "-o", "name,health,size,alloc,capacity")
+    zpool_list = run("zpool", "list", "-Hp", "-o", "name,health,size,capacity")
     zpool_status = run("zpool", "status")
     snapshots = run("zfs", "list", "-Hp", "-t", "snapshot", "-o", "name,creation", "-d", "1", ROOT_DATASET)
     # is-system-running fails when the state is not running, but still prints the state.
@@ -361,7 +417,6 @@ def collect():
         "format": FORMAT,
         "host": socket.gethostname(),
         "fqdn": fqdn(),
-        "sent_at": int(time.time()),
         "hyprdebian": {
             "version": hyprdebian_version(),
             "suite": parse_suite(read_file(SOURCES_FILE)),
@@ -371,11 +426,11 @@ def collect():
             "kernel": os.uname().release,
             "kernel_newest": newest_kernel(),
             "boot_time": int(time.time() - uptime),
+            "secure_boot": secure_boot_state(),
         },
         "load": [float(value) for value in (read_file("/proc/loadavg") or "0 0 0").split()[:3]],
         "cpus": os.cpu_count(),
         "memory": memory,
-        "swap": swap,
         "pools": parse_pools(zpool_list, zpool_status),
         "arrays": collect_arrays(),
         "units": {
@@ -385,8 +440,7 @@ def collect():
         "updates": {
             "upgradable": count_upgradable(),
             "lists_time": lists_time(),
-            "last_apt": last_in_history(history, upgrades_only=False),
-            "last_upgrade": last_in_history(history, upgrades_only=True),
+            "last_upgrade": last_upgrade(history),
             "reboot_required": os.path.exists("/run/reboot-required"),
         },
         "snapshot": parse_snapshots(snapshots),

@@ -75,7 +75,7 @@ Restart the service after a change:
 .RS
 .nf
 sudo hd-config-update hd-dashboard \e
-    '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "history_days": 30}'
+    '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14, "history_days": 30}'
 sudo systemctl restart hd-dashboard.service
 .fi
 .RE
@@ -89,7 +89,12 @@ The port to listen on, default 80.
 Allow it in the firewall.
 .TP
 .B stale_minutes
-A system that did not report for this many minutes is an error, default 45.
+A system that did not report for this many minutes is offline, which is a
+note, default 45.
+.TP
+.B offline_days
+A system that did not report for this many days is an error, default 14, so
+a laptop that is off for a while does not turn red.
 .TP
 .B history_days
 How many days the history is kept, default 30.
@@ -127,7 +132,6 @@ The other parts are
 .BR load ,
 .BR cpus ,
 .BR memory ,
-.BR swap ,
 .BR pools ,
 .BR arrays ,
 .BR units ,
@@ -146,17 +150,23 @@ A reinstalled system has a new token: forget the old one with
 and the next report registers the new one.
 .SH ISSUES
 Errors: no report for longer than
-.BR stale_minutes ,
-failed units, a pool that is not ONLINE or 90% full or more, a degraded mdadm
-array, and a failed last run of the service of a timer.
+.BR offline_days ,
+failed units, a pool that is not ONLINE or 90% full or more, errors found by
+the last completed scrub of a pool, a degraded mdadm
+array, a failed last run of the service of a timer, and Secure Boot that is
+not on or not reported, see
+.BR hd-secboot-check (8).
 .PP
-Warnings: a pool that is 80% full or more, a system that is starting or
+Warnings: a pool that is 80% full or more, bytes repaired by the last
+completed scrub of a pool, a system that is starting or
 stopping, a pending reboot, no upgrade for 14 days or never, and a HyprDebian
 version older than the one on the system of the dashboard, from
 .IR /etc/hyprdebian/version.json .
 A newer version gets no warning; without that file, versions are not judged.
 .PP
-Notes: upgradable packages.
+Notes: a system that did not report for longer than
+.BR stale_minutes ,
+and upgradable packages.
 Notes do not change the color of the card.
 .SH REMOVAL
 Removing the package stops the service and keeps the settings and the
@@ -190,6 +200,7 @@ The SQLite database, kept by systemd in
 .SH SEE ALSO
 .BR hd-dashboard (8),
 .BR hd-report (8),
+.BR hd-secboot-check (8),
 .BR hd-config (7),
 .BR hd-config-update (8),
 .BR ufw (8),

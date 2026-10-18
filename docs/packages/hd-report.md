@@ -88,11 +88,12 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
 | HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.sources`. |
 | Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`. |
-| Boot time, load, CPUs, memory, swap | `/proc`. |
-| Pools | `zpool list` and the scan line of `zpool status`. |
+| Secure Boot | The EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`, read as `hd-secboot-check` reads them, see [hd-secboot](hd-secboot.md#hd-secboot-check); `hd-report` does not need `hd-secboot` for it. |
+| Boot time, load, CPUs, memory | `/proc`. |
+| Pools | `zpool list`, and the last completed scrub from the scan line of `zpool status`: the bytes it repaired, the errors it found and when it ended. A scrub that is running, paused or was canceled, and a resilver, leave it out. |
 | Arrays | The mdadm arrays in `/sys/block`, named as in `/dev/md`. |
 | Units | `systemctl is-system-running` and the failed units. |
-| Updates | The packages `apt full-upgrade` would upgrade, from the package lists apt has now (`hd-report` does not run `apt update`), when the lists were updated, the last apt run and the last upgrade in the apt history, and `/run/reboot-required`. |
+| Updates | The packages `apt full-upgrade` would upgrade, from the package lists apt has now (`hd-report` does not run `apt update`), when the lists were updated, the last upgrade in the apt history, and `/run/reboot-required`. |
 | Snapshot | The newest `hd-up-` snapshot of `rpool/hyprdebian`, see `hd-up` in [hd-base](hd-base.md). |
 | Timers | The enabled timers in `/etc/systemd/system`, those of the admin, and the `hd-*` timers of the packages in `/usr/lib/systemd/system`, with the last and next run and the result of their service. `hd-report.timer` itself is left out. |
 
@@ -100,7 +101,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 Removing the package stops the timer and keeps the settings and the token. Purging it also removes the key `hd-report` of `/etc/hyprdebian/config.json`; the token stays.
 
 ## Tests
-The tests are in `packages/hd-report/tests`: parsing what the system tools print, the version and suite, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
+The tests are in `packages/hd-report/tests`: parsing what the system tools print, the version and suite, the scrubs of the pools, the state of Secure Boot, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
 ```
 cd packages/hd-report
 make test

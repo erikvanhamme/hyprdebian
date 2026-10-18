@@ -42,23 +42,35 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(report.parse_suite(sources), "trixie")
         self.assertEqual(report.parse_suite(None), "")
 
-    def test_meminfo_gives_used_memory_and_swap_in_bytes(self):
-        memory, swap = report.parse_meminfo("MemTotal: 1000 kB\nMemAvailable: 400 kB\n"
-                                            "SwapTotal: 200 kB\nSwapFree: 150 kB\n")
+    def test_meminfo_gives_used_memory_in_bytes(self):
+        memory = report.parse_meminfo("MemTotal: 1000 kB\nMemAvailable: 400 kB\n"
+                                      "SwapTotal: 200 kB\nSwapFree: 150 kB\n")
 
         self.assertEqual(memory, {"total": 1024000, "used": 614400})
-        self.assertEqual(swap, {"total": 204800, "used": 51200})
 
-    def test_pools_get_the_scan_line_of_zpool_status(self):
-        listing = "bpool\tONLINE\t1000\t250\t25%\nrpool\tDEGRADED\t2000\t1800\t90\n"
-        status = ("  pool: bpool\n state: ONLINE\n  scan: scrub repaired 0B with 0 errors on Sun\n"
-                  "  pool: rpool\n state: DEGRADED\n")
+    def test_pools_get_their_last_completed_scrub(self):
+        listing = "bpool\tONLINE\t1000\t25%\nrpool\tDEGRADED\t2000\t90\n"
+        status = ("  pool: bpool\n state: ONLINE\n"
+                  "  scan: scrub repaired 1.50M in 00:12:01 with 2 errors on Sun Oct 11 00:36:02 2026\n"
+                  "  pool: rpool\n state: DEGRADED\n  scan: resilvered 1.2G in 00:10:00 with 0 errors on Sun Oct 11 00:30:00 2026\n")
 
-        pools = report.parse_pools(listing, status)
+        self.assertEqual(report.parse_pools(listing, status), [
+            {"name": "bpool", "health": "ONLINE", "size": 1000, "capacity": 25,
+             "scrub": {"repaired": 1572864, "errors": 2, "time": int(time.mktime((2026, 10, 11, 0, 36, 2, 0, 0, -1)))}},
+            {"name": "rpool", "health": "DEGRADED", "size": 2000, "capacity": 90, "scrub": None},
+        ])
 
-        self.assertEqual(pools[0], {"name": "bpool", "health": "ONLINE", "size": 1000, "alloc": 250,
-                                    "capacity": 25, "scan": "scrub repaired 0B with 0 errors on Sun"})
-        self.assertEqual((pools[1]["health"], pools[1]["capacity"], pools[1]["scan"]), ("DEGRADED", 90, ""))
+    def test_only_completed_scrubs_count(self):
+        for line in ["scrub in progress since Sun Oct 11 00:24:01 2026",
+                     "scrub paused since Sun Oct 11 00:24:01 2026",
+                     "scrub canceled on Sun Oct 11 00:30:00 2026",
+                     "none requested"]:
+            with self.subTest(line=line):
+                self.assertEqual(report.parse_scrubs(f"  pool: rpool\n  scan: {line}\n"), {})
+
+    def test_sizes_of_zpool(self):
+        self.assertEqual([report.parse_size(text) for text in ["0B", "512B", "12K", "1.50M", "2048", "x"]],
+                         [0, 512, 12288, 1572864, 2048, None])
 
     def test_no_zpool_gives_no_pools(self):
         self.assertEqual(report.parse_pools(None, None), [])
@@ -69,14 +81,12 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(report.parse_failed_units(text), ["zfs-zed.service", "foo.mount"])
         self.assertEqual(report.parse_failed_units(""), [])
 
-    def test_history_finds_the_last_run_and_the_last_upgrade(self):
+    def test_history_finds_the_last_upgrade(self):
         text = ("Start-Date: 2026-10-01  10:00:00\nCommandline: apt full-upgrade -y\nEnd-Date: 2026-10-01  10:05:00\n\n"
                 "Start-Date: 2026-10-02  11:00:00\nCommandline: apt install foo\nEnd-Date: 2026-10-02  11:01:00\n")
 
-        upgrade = int(time.mktime((2026, 10, 1, 10, 5, 0, 0, 0, -1)))
-        install = int(time.mktime((2026, 10, 2, 11, 1, 0, 0, 0, -1)))
-        self.assertEqual(report.parse_history(text, upgrades_only=True), upgrade)
-        self.assertEqual(report.parse_history(text, upgrades_only=False), install)
+        self.assertEqual(report.parse_history(text), int(time.mktime((2026, 10, 1, 10, 5, 0, 0, 0, -1))))
+        self.assertIsNone(report.parse_history("Commandline: apt install foo\nEnd-Date: 2026-10-02  11:01:00\n"))
 
     def test_upgrade_is_found_in_a_rotated_history_log(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -89,7 +99,7 @@ class TestParsing(unittest.TestCase):
 
             logs = report.read_history(path)
 
-        self.assertEqual(report.last_in_history(logs, upgrades_only=True),
+        self.assertEqual(report.last_upgrade(logs),
                          int(time.mktime((2026, 9, 20, 9, 0, 0, 0, 0, -1))))
 
     def test_newest_kernel_compares_versions_by_number(self):
@@ -129,6 +139,25 @@ class TestParsing(unittest.TestCase):
             arrays = report.collect_arrays(os.path.join(tmp, "block"), os.path.join(tmp, "dev", "md"))
 
         self.assertEqual(arrays, [{"name": "swap", "state": "clean", "degraded": 1}])
+
+    def test_secure_boot_state(self):
+        cases = [
+            ({"SecureBoot": b"\x01", "SetupMode": b"\x00"}, "on"),
+            ({"SecureBoot": b"\x00", "SetupMode": b"\x00"}, "off"),
+            ({"SecureBoot": b"\x00", "SetupMode": b"\x01"}, "setup"),
+            ({}, "unsupported"),
+        ]
+
+        for variables, state in cases:
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as tmp:
+                for name, value in variables.items():
+                    with open(os.path.join(tmp, f"{name}-{report.GLOBAL_GUID}"), "wb") as f:
+                        f.write(b"\x06\x00\x00\x00" + value)
+
+                self.assertEqual(report.secure_boot_state(tmp), state)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(report.secure_boot_state(os.path.join(tmp, "missing")), "legacy")
 
 
 class TestSettings(unittest.TestCase):

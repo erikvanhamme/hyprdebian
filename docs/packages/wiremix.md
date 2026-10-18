@@ -1,5 +1,5 @@
 ## Introduction
-The package `wiremix` holds [wiremix](https://github.com/tsowell/wiremix), the terminal audio mixer for PipeWire, built from release v0.9.0. Debian has no package of it, so HyprDebian builds one from the upstream release, unchanged.
+The package `wiremix` holds [wiremix](https://github.com/tsowell/wiremix), the terminal audio mixer for PipeWire, built from release v0.11.0. Debian has no package of it, so HyprDebian builds one from the upstream release, unchanged.
 
 wiremix sets the volume of devices and streams, routes streams between devices, and sets the ports and profiles of devices. Run it in a terminal:
 ```
@@ -25,7 +25,7 @@ make deb
 
 This builds `build/wiremix_<release>-<revision>_<arch>.deb`. Install it with:
 ```
-sudo apt install ./build/wiremix_0.9.0-1_amd64.deb
+sudo apt install ./build/wiremix_0.11.0-1_amd64.deb
 ```
 
 The binary is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-wiremix.sh` runs in a `debian:trixie` container: it installs the build tools, `libpipewire-0.3-dev` and the latest stable Rust toolchain with rustup, clones the release tag and runs `cargo build --release --locked`. `dpkg-shlibdeps` then finds the packages of the libraries the binary links to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.

@@ -32,7 +32,7 @@ BUILD := build
 
 # The release of wiremix, without the v of its tag, and the revision of the
 # package of it.
-WIREMIX_VERSION := 0.9.0
+WIREMIX_VERSION := 0.11.0
 DEB_REVISION := 1
 
 DEB_NAME := wiremix

@@ -31,7 +31,7 @@ def load_hd_dashboard():
 
 dash = load_hd_dashboard()
 
-DEFAULTS = {"listen": "0.0.0.0", "port": 80, "stale_minutes": 45, "history_days": 30}
+DEFAULTS = {"listen": "0.0.0.0", "port": 80, "stale_minutes": 45, "offline_days": 14, "history_days": 30}
 
 
 def healthy(host="box", version="1.3"):
@@ -41,19 +41,20 @@ def healthy(host="box", version="1.3"):
         "host": host,
         "fqdn": host + ".example.net",
         "hyprdebian": {"version": version, "suite": "unstable"},
-        "os": {"debian": "forky/sid", "kernel": "7.2.10", "kernel_newest": "7.2.10", "boot_time": NOW - 3600},
+        "os": {"debian": "forky/sid", "kernel": "7.2.10", "kernel_newest": "7.2.10", "boot_time": NOW - 3600,
+               "secure_boot": "on"},
         "load": [0.5, 0.4, 0.3],
         "cpus": 4,
         "memory": {"total": 1000, "used": 250},
-        "swap": {"total": 0, "used": 0},
-        "pools": [{"name": "rpool", "health": "ONLINE", "size": 1000, "alloc": 300, "capacity": 30, "scan": ""}],
+        "pools": [{"name": "rpool", "health": "ONLINE", "size": 1000, "capacity": 30,
+                   "scrub": {"repaired": 0, "errors": 0, "time": NOW - 86400}}],
         "arrays": [],
         "units": {"state": "running", "failed": []},
-        "updates": {"upgradable": 0, "lists_time": NOW, "last_apt": NOW, "last_upgrade": NOW - 86400,
+        "updates": {"upgradable": 0, "lists_time": NOW, "last_upgrade": NOW - 86400,
                     "reboot_required": False},
         "snapshot": {"name": "hd-up-2026-10-01_100000", "time": NOW - 86400},
         "timers": [{"unit": "backup-vms.timer", "service": "backup-vms.service", "last": NOW - 3600,
-                    "next": NOW + 3600, "result": "success", "state": "inactive"}],
+                    "next": NOW + 3600, "result": "success"}],
     }
 
 
@@ -111,7 +112,7 @@ class TestAccept(unittest.TestCase):
 
 class TestAssess(unittest.TestCase):
     def messages(self, report, last_seen=NOW, dashboard_version="1.3"):
-        return dash.assess(report, last_seen, NOW, 45, dashboard_version)
+        return dash.assess(report, last_seen, NOW, 45, 14, dashboard_version)
 
     def test_a_healthy_host_has_no_issues(self):
         self.assertEqual(self.messages(healthy()), [])
@@ -119,24 +120,52 @@ class TestAssess(unittest.TestCase):
     def test_problems_are_found(self):
         report = healthy(version="1.2")
         report["units"] = {"state": "degraded", "failed": ["zfs-zed.service"]}
-        report["pools"][0].update(health="DEGRADED", capacity=92)
+        report["pools"][0].update(health="DEGRADED", capacity=92,
+                                  scrub={"repaired": 1572864, "errors": 2, "time": NOW - 86400})
         report["arrays"] = [{"name": "swap", "state": "clean", "degraded": 1}]
         report["timers"][0]["result"] = "exit-code"
-        report["os"]["kernel_newest"] = "7.3.0"
+        report["os"].update(kernel_newest="7.3.0", secure_boot="setup")
         report["updates"].update(upgradable=3, last_upgrade=NOW - 20 * 86400)
 
-        self.assertEqual(self.messages(report, last_seen=NOW - 3600), [
-            ("bad", "No report for 60 min"),
+        self.assertEqual(self.messages(report, last_seen=NOW - 15 * 86400), [
+            ("bad", "No report for 15 days"),
             ("bad", "1 failed: zfs-zed.service"),
             ("bad", "Pool rpool is DEGRADED"),
             ("bad", "Pool rpool is 92% full"),
+            ("bad", "Scrub of rpool found 2 errors"),
+            ("warn", "Scrub of rpool repaired 1.5 MiB"),
             ("bad", "Array swap is degraded"),
             ("bad", "backup-vms.service failed: exit-code"),
+            ("bad", "Secure Boot is off, firmware in setup mode"),
             ("warn", "Reboot pending"),
             ("warn", "Last upgrade 20 days ago"),
             ("info", "3 upgradable packages"),
             ("warn", "HyprDebian 1.2, dashboard is 1.3"),
         ])
+
+    def test_an_offline_host_is_a_note_for_two_weeks(self):
+        self.assertEqual(self.messages(healthy(), last_seen=NOW - 3600), [("info", "Offline, no report for 60 min")])
+        self.assertEqual(self.messages(healthy(), last_seen=NOW - 13 * 86400), [("info", "Offline, no report for 13 days")])
+        self.assertEqual(self.messages(healthy(), last_seen=NOW - 15 * 86400), [("bad", "No report for 15 days")])
+
+    def test_a_pool_without_a_completed_scrub_has_no_issues(self):
+        report = healthy()
+        report["pools"][0]["scrub"] = None
+        self.assertEqual(self.messages(report), [])
+
+    def test_secure_boot_must_be_on(self):
+        for state, message in [("off", "Secure Boot is off"),
+                               ("unsupported", "Secure Boot is not supported by the firmware"),
+                               ("legacy", "Secure Boot is off, booted without UEFI")]:
+            with self.subTest(state=state):
+                report = healthy()
+                report["os"]["secure_boot"] = state
+                self.assertEqual(self.messages(report), [("bad", message)])
+
+    def test_a_report_without_secure_boot_is_an_error(self):
+        report = healthy()
+        del report["os"]["secure_boot"]
+        self.assertEqual(self.messages(report), [("bad", "Secure Boot not reported")])
 
     def test_versions_compare_by_number(self):
         self.assertLess(dash.version_key("v0.99"), dash.version_key("v0.100"))
@@ -160,7 +189,7 @@ class TestAssess(unittest.TestCase):
         post(db, healthy("gamma", version="1.4"), token="c" * 32)
 
         with unittest.mock.patch.object(dash, "hyprdebian_version", return_value="1.3"):
-            issues = {host["name"]: host["issues"] for host in dash.load_hosts(db, NOW, 45)}
+            issues = {host["name"]: host["issues"] for host in dash.load_hosts(db, NOW, 45, 14)}
 
         self.assertEqual(issues, {"alpha": [("warn", "HyprDebian 1.2, dashboard is 1.3")], "beta": [], "gamma": []})
 
@@ -190,7 +219,7 @@ class TestAssess(unittest.TestCase):
         post(db, failing, token="b" * 32)
 
         with unittest.mock.patch.object(dash, "hyprdebian_version", return_value="1.3"):
-            self.assertEqual([host["name"] for host in dash.load_hosts(db, NOW, 45)], ["beta", "alpha"])
+            self.assertEqual([host["name"] for host in dash.load_hosts(db, NOW, 45, 14)], ["beta", "alpha"])
 
 
 class TestPages(unittest.TestCase):
@@ -202,15 +231,15 @@ class TestPages(unittest.TestCase):
         report["units"]["failed"] = ["<script>alert(1)</script>"]
         post(self.db, report)
 
-        for body in [dash.overview_page(self.db, NOW, 45), dash.host_page(self.db, "box", NOW, 45, 30)]:
+        for body in [dash.overview_page(self.db, NOW, 45, 14), dash.host_page(self.db, "box", NOW, 45, 14, 30)]:
             self.assertNotIn("<script>", body)
             self.assertIn("&lt;script&gt;", body)
 
     def test_unknown_host_has_no_page(self):
-        self.assertIsNone(dash.host_page(self.db, "nope", NOW, 45, 30))
+        self.assertIsNone(dash.host_page(self.db, "nope", NOW, 45, 14, 30))
 
     def test_empty_dashboard(self):
-        self.assertIn("No reports yet", dash.overview_page(self.db, NOW, 45))
+        self.assertIn("No reports yet", dash.overview_page(self.db, NOW, 45, 14))
 
 
 class TestConfig(unittest.TestCase):
@@ -230,6 +259,7 @@ class TestConfig(unittest.TestCase):
             {"hd-dashboard": {"port": True}},
             {"hd-dashboard": {"listen": ""}},
             {"hd-dashboard": {"history_days": 0}},
+            {"hd-dashboard": {"offline_days": 0}},
         ]
 
         for config in cases:
