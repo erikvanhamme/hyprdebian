@@ -1,0 +1,352 @@
+#!/usr/bin/python3
+"""Writes the menu of the application launcher of the HyprDebian desktop, the input of hd-menu.
+
+The package hd-desktop installs this as /usr/sbin/hd-launcher. Its apt hook,
+/etc/apt/apt.conf.d/90hd-launcher, runs it each time apt has run dpkg, so the menu follows the
+applications that are installed, upgraded and removed.
+
+    hd-launcher              write /var/cache/hd-launcher/launcher.json and its icons
+    hd-launcher --dry-run    print the menu that would be written, write nothing
+
+The applications are the .desktop files in /usr/share/applications and its subdirectories, of the
+type Application, that are not hidden, not left out for Hyprland by OnlyShowIn or NotShowIn, and
+whose TryExec, when they have one, is installed. The key hd-launcher of
+/etc/hyprdebian/config.json is a list of desktop file IDs to leave out as well, such as
+"org.gnome.Settings.desktop"; the .desktop at the end may be left out.
+
+Every application is an option of the menu: its Name is the label and its desktop file ID the
+value, which a launcher starts with "uwsm app -- <ID>". The options are sorted on the Name, in
+ascending order, without regard to case. The icon of an application is looked up by its Icon in the
+icon themes hicolor and Adwaita and in /usr/share/pixmaps, or taken from its path when it is one. A
+PNG is used as it is; an SVG is rendered to a PNG of the icon_size of the hd-theme in
+/var/cache/hd-launcher/icons, only when the PNG there was not rendered from that SVG at that size.
+Icons of applications that are gone are removed. Run it as root.
+"""
+
+import argparse
+import configparser
+import json
+import os
+import shutil
+import sys
+
+import cairo
+import gi
+
+gi.require_version("Rsvg", "2.0")
+from gi.repository import GLib, Rsvg  # noqa: E402
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-launcher"
+THEME_KEY = "hd-theme"
+APPLICATIONS = "/usr/share/applications"
+CACHE_DIR = "/var/cache/hd-launcher"
+ICON_THEMES = ["/usr/share/icons/hicolor", "/usr/share/icons/Adwaita"]
+PIXMAPS = "/usr/share/pixmaps"
+BANNER = "Applications"
+
+# The default of hd-menu when the theme has no icon_size.
+ICON_SIZE = 64
+
+# The desktop of OnlyShowIn and NotShowIn, as uwsm sets XDG_CURRENT_DESKTOP.
+DESKTOP = "Hyprland"
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def warn(message):
+    print(f"Warning: {message}", file=sys.stderr)
+
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except (OSError, ValueError) as e:
+        fail(f"Cannot read {CONFIG_FILE}: {e}")
+    if not isinstance(config, dict):
+        fail(f"{CONFIG_FILE} does not hold a JSON object.")
+    return config
+
+
+def exclusions(config):
+    """The desktop file IDs to leave out, with .desktop at the end."""
+    excluded = config.get(CONFIG_KEY, [])
+    if not isinstance(excluded, list) or not all(isinstance(e, str) for e in excluded):
+        fail(f"The key {CONFIG_KEY} of {CONFIG_FILE} is not a list of strings.")
+    ids = set()
+    for entry in excluded:
+        if entry.endswith(".desktop"):
+            ids.add(entry)
+        else:
+            ids.add(entry + ".desktop")
+    return ids
+
+
+def icon_size(config):
+    theme = config.get(THEME_KEY)
+    if not isinstance(theme, dict):
+        return ICON_SIZE
+    size = theme.get("icon_size")
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        return ICON_SIZE
+    return size
+
+
+def desktop_files():
+    """The desktop file IDs and paths of the .desktop files in APPLICATIONS. The ID of a file in a
+    subdirectory is its path below APPLICATIONS with - for /."""
+    files = []
+    for root, _, names in os.walk(APPLICATIONS):
+        for name in names:
+            if not name.endswith(".desktop"):
+                continue
+            path = os.path.join(root, name)
+            files.append((os.path.relpath(path, APPLICATIONS).replace("/", "-"), path))
+    return files
+
+
+def read_entry(path):
+    """The keys of the group Desktop Entry of a .desktop file, or None when it cannot be read."""
+    parser = configparser.ConfigParser(interpolation=None, strict=False,
+                                       delimiters=("=",), comment_prefixes=("#",))
+    # The keys are case sensitive.
+    parser.optionxform = str
+    try:
+        with open(path, encoding="utf-8") as f:
+            parser.read_file(f)
+    except (OSError, UnicodeDecodeError, configparser.Error) as e:
+        warn(f"Cannot read {path}: {e}")
+        return None
+    if not parser.has_section("Desktop Entry"):
+        return None
+    return parser["Desktop Entry"]
+
+
+def is_true(entry, key):
+    return entry.get(key, "false").strip() == "true"
+
+
+def desktops(entry, key):
+    return [d for d in entry.get(key, "").split(";") if d != ""]
+
+
+def shown(entry):
+    """True when the entry is an application that the launcher shows."""
+    if entry.get("Type") != "Application":
+        return False
+    if entry.get("Name", "") == "" or entry.get("Exec", "") == "":
+        return False
+    if is_true(entry, "NoDisplay") or is_true(entry, "Hidden"):
+        return False
+    only = desktops(entry, "OnlyShowIn")
+    if only and DESKTOP not in only:
+        return False
+    if DESKTOP in desktops(entry, "NotShowIn"):
+        return False
+    try_exec = entry.get("TryExec", "")
+    if try_exec != "" and shutil.which(try_exec) is None:
+        return False
+    return True
+
+
+def theme_icons(theme, name):
+    """The PNG and SVG files of an icon in an icon theme, as (size, path), with size None for an
+    SVG."""
+    found = []
+    try:
+        size_dirs = os.listdir(theme)
+    except FileNotFoundError:
+        return found
+    for size_dir in size_dirs:
+        # Symbolic icons are monochrome, for small sizes only.
+        if "symbolic" in size_dir:
+            continue
+        try:
+            contexts = os.listdir(os.path.join(theme, size_dir))
+        except NotADirectoryError:
+            continue
+        # Most icons of applications are in apps, but an Icon may name one of any context, such
+        # as printer in devices.
+        for context in contexts:
+            directory = os.path.join(theme, size_dir, context)
+            png = os.path.join(directory, name + ".png")
+            svg = os.path.join(directory, name + ".svg")
+            if os.path.isfile(png):
+                size = size_dir.split("@")[0].split("x")[0]
+                if size.isdigit():
+                    found.append((int(size), png))
+            if os.path.isfile(svg):
+                found.append((None, svg))
+    return found
+
+
+def best_icon(icons, size):
+    """The best of the icons of a theme for size: the smallest PNG at least that large, else an
+    SVG, else the largest PNG."""
+    pngs = sorted((s, p) for s, p in icons if s is not None)
+    svgs = sorted(p for s, p in icons if s is None)
+    larger = [p for s, p in pngs if s >= size]
+    if larger:
+        return larger[0]
+    if svgs:
+        return svgs[0]
+    if pngs:
+        return pngs[-1][1]
+    return None
+
+
+def find_icon(icon, size):
+    """The PNG or SVG file of the Icon of an entry, or None."""
+    if icon == "":
+        return None
+    if os.path.isabs(icon):
+        if os.path.isfile(icon) and icon.endswith((".png", ".svg", ".svgz")):
+            return icon
+        return None
+    for theme in ICON_THEMES:
+        path = best_icon(theme_icons(theme, icon), size)
+        if path is not None:
+            return path
+    for extension in (".png", ".svg"):
+        path = os.path.join(PIXMAPS, icon + extension)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def png_size(path):
+    """The width and height of a PNG, or None when it cannot be read."""
+    try:
+        surface = cairo.ImageSurface.create_from_png(path)
+    except (OSError, cairo.Error, MemoryError):
+        return None
+    return surface.get_width(), surface.get_height()
+
+
+def up_to_date(svg, png, size):
+    """True when the PNG was rendered from this SVG at size: render_svg gives the PNG the
+    modification time of the SVG. dpkg gives files the time of the package, so a newer SVG can
+    have an older time; only the same time counts."""
+    if not os.path.exists(png):
+        return False
+    if os.stat(png).st_mtime_ns != os.stat(svg).st_mtime_ns:
+        return False
+    return png_size(png) == (size, size)
+
+
+def render_svg(svg, png, size):
+    """Renders an SVG into a PNG of size by size, fitted and centred; False when it fails."""
+    try:
+        handle = Rsvg.Handle.new_from_file(svg)
+    except GLib.Error as e:
+        warn(f"Cannot read {svg}: {e.message}")
+        return False
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+    context = cairo.Context(surface)
+    viewport = Rsvg.Rectangle()
+    viewport.x = 0
+    viewport.y = 0
+    viewport.width = size
+    viewport.height = size
+    try:
+        handle.render_document(context, viewport)
+    except GLib.Error as e:
+        warn(f"Cannot render {svg}: {e.message}")
+        return False
+    tmp = png + ".tmp"
+    surface.write_to_png(tmp)
+    os.chmod(tmp, 0o644)
+    mtime = os.stat(svg).st_mtime_ns
+    os.utime(tmp, ns=(mtime, mtime))
+    os.replace(tmp, png)
+    return True
+
+
+def menu_icon(desktop_id, source, size, icon_dir, dry_run):
+    """The path of the icon that the menu shows for an application, or None. An SVG is rendered
+    to a PNG in icon_dir, unless dry_run."""
+    if source is None:
+        return None
+    if source.endswith(".png"):
+        return source
+    png = os.path.join(icon_dir, desktop_id[:-len(".desktop")] + ".png")
+    if dry_run or up_to_date(source, png, size):
+        return png
+    if not render_svg(source, png, size):
+        return None
+    return png
+
+
+def build_menu(config, icon_dir, dry_run):
+    """The menu of hd-menu, and the PNGs in icon_dir that it uses."""
+    excluded = exclusions(config)
+    size = icon_size(config)
+    if not dry_run:
+        os.makedirs(icon_dir, mode=0o755, exist_ok=True)
+
+    options = []
+    for desktop_id, path in desktop_files():
+        if desktop_id in excluded:
+            continue
+        entry = read_entry(path)
+        if entry is None or not shown(entry):
+            continue
+        option = {"label": entry["Name"], "value": desktop_id}
+        icon = menu_icon(desktop_id, find_icon(entry.get("Icon", ""), size), size, icon_dir,
+                         dry_run)
+        if icon is not None:
+            option["icon"] = icon
+        options.append(option)
+    options.sort(key=lambda o: (o["label"].casefold(), o["label"], o["value"]))
+    used = {o["icon"] for o in options if o.get("icon", "").startswith(icon_dir + "/")}
+    return {"banner": BANNER, "options": options}, used
+
+
+def remove_unused(icon_dir, used):
+    """Removes the PNGs in icon_dir of applications that are gone or left out."""
+    for name in os.listdir(icon_dir):
+        path = os.path.join(icon_dir, name)
+        if path not in used:
+            os.remove(path)
+
+
+def write_json(path, value):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(value, f, indent=4, ensure_ascii=False)
+        f.write("\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Write the menu of the application launcher, {CACHE_DIR}/launcher.json, "
+        f"from the .desktop files in {APPLICATIONS}.")
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        help="print the menu that would be written, write nothing")
+    args = parser.parse_args()
+    if not args.dry_run and os.geteuid() != 0:
+        fail("Run hd-launcher as root.")
+
+    icon_dir = os.path.join(CACHE_DIR, "icons")
+    menu, used = build_menu(load_config(), icon_dir, args.dry_run)
+    if args.dry_run:
+        json.dump(menu, sys.stdout, indent=4, ensure_ascii=False)
+        print()
+        return
+
+    remove_unused(icon_dir, used)
+    launcher = os.path.join(CACHE_DIR, "launcher.json")
+    write_json(launcher, menu)
+    print(f"hd-launcher: wrote {launcher} with {len(menu['options'])} applications.")
+
+
+if __name__ == "__main__":
+    main()

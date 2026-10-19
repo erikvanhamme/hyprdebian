@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 """postinst of hd-desktop: diverts /etc/greetd/config.toml of greetd, writes the greetd config of
-HyprDebian in its place with hd-desktop-render, compiles the dconf database of the dark theme, and
-copies /etc/skel to the home directory of the user.
+HyprDebian in its place with hd-desktop-render, compiles the dconf database of the dark theme,
+copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
+with hd-launcher.
 
 greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
@@ -18,6 +19,10 @@ desktop. Files that the user has are kept. This is done on the first installatio
 upgrade from a version before SKEL_SINCE, which did not do it, so a file that the user removed
 does not come back on later upgrades. It runs as the user, so the files belong to them. When the
 installer runs, the user does not exist yet, and the installer copies /etc/skel itself.
+
+The apt hook of hd-launcher writes the menu after every run of dpkg by apt, but not when the
+package is installed with dpkg alone, so the postinst writes it too. A menu that cannot be written
+does not fail the installation.
 """
 
 import os
@@ -79,6 +84,8 @@ def main():
     subprocess.run(["dconf", "update"], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
+    if subprocess.run(["/usr/sbin/hd-launcher"]).returncode != 0:
+        print("Could not write the menu of the launcher.", file=sys.stderr)
     if not os.path.isdir("/run/systemd/system"):
         return
     subprocess.run(["systemctl", "daemon-reload"], check=True)

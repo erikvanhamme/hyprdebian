@@ -1,0 +1,130 @@
+.TH HD-LAUNCHER 8 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-launcher \- write the menu of the application launcher
+.SH SYNOPSIS
+.B hd-launcher
+.RB [ \-n | \-\-dry\-run ]
+.SH DESCRIPTION
+.B hd-launcher
+writes the menu of the application launcher of the HyprDebian desktop,
+.IR /var/cache/hd-launcher/launcher.json ,
+the input of
+.BR hd-menu (1),
+from the
+.I .desktop
+files in
+.I /usr/share/applications
+and its subdirectories.
+.PP
+An application is in the menu when its
+.I .desktop
+file is of the
+.B Type
+Application, has a
+.B Name
+and an
+.BR Exec ,
+is not
+.B NoDisplay
+or
+.BR Hidden ,
+is not left out for Hyprland by
+.B OnlyShowIn
+or
+.BR NotShowIn ,
+has its
+.B TryExec
+installed, when it has one, and is not in the exclusion list.
+.PP
+Every application is an option: its
+.B Name
+is the label and its desktop file ID the value, such as
+.IR firefox.desktop ;
+the ID of a file in a subdirectory is its path below
+.I /usr/share/applications
+with \- for /.
+A launcher starts it with
+.BR "uwsm app \-\- <ID>" .
+The options are sorted on the
+.BR Name ,
+in ascending order, without regard to case.
+.PP
+The icon of an application is looked up by its
+.B Icon
+in the icon themes hicolor and Adwaita and in
+.IR /usr/share/pixmaps ,
+or taken from its path when it is one.
+A PNG is used as it is.
+An SVG is rendered to a PNG of the
+.B icon_size
+of the
+.B hd-theme
+of
+.IR /etc/hyprdebian/config.json ,
+64 without one, in
+.IR /var/cache/hd-launcher/icons ;
+only when the PNG there was not rendered from that SVG at that size.
+The icons of applications that are gone or left out are removed.
+.PP
+The apt hook
+.I /etc/apt/apt.conf.d/90hd-launcher
+runs
+.B hd-launcher
+each time apt has run dpkg: after an installation, an upgrade or a removal.
+A failure is reported but does not fail apt.
+The installation of
+.BR hd-desktop (7)
+runs it too.
+After another theme is selected, with another
+.BR icon_size ,
+run it again.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.BR \-n ,\  \-\-dry\-run
+Print the menu that would be written, write nothing; it may be run by any
+user.
+.SH CONFIGURATION
+The key
+.B hd-launcher
+of
+.I /etc/hyprdebian/config.json
+is a list of the desktop file IDs to leave out of the menu; the
+.I .desktop
+at the end may be left out:
+.PP
+.RS
+.nf
+"hd-launcher": ["org.gnome.Meld.desktop", "debian-xterm"]
+.fi
+.RE
+.SH FILES
+.TP
+.I /var/cache/hd-launcher/launcher.json
+The menu, for
+.BR hd-menu (1).
+.TP
+.I /var/cache/hd-launcher/icons
+The PNGs rendered from SVG icons.
+.TP
+.I /etc/apt/apt.conf.d/90hd-launcher
+The apt hook.
+.TP
+.I /etc/hyprdebian/config.json
+The exclusion list, in the key
+.BR hd-launcher ,
+and the
+.BR icon_size ,
+in the key
+.BR hd-theme .
+.SH EXIT STATUS
+0 when the menu was written, 1 on an error.
+.SH SEE ALSO
+.BR hd-desktop (7),
+.BR hd-menu (1),
+.BR hd-theme (7),
+.BR hd-config (7)

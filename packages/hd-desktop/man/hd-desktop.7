@@ -116,6 +116,29 @@ second launcher.
 The menus above use
 .BR hd-menu (1),
 which has a lock of its own.
+.SH APPLICATION LAUNCHER
+.BR hd-launcher (8)
+writes the menu of the application launcher,
+.IR /var/cache/hd-launcher/launcher.json ,
+the input of
+.BR hd-menu (1),
+from the
+.I .desktop
+files in
+.IR /usr/share/applications ,
+sorted on their names, with their icons; SVG icons are rendered to PNGs of
+the
+.B icon_size
+of the theme.
+The applications in the key
+.B hd-launcher
+of
+.IR /etc/hyprdebian/config.json ,
+a list of desktop file IDs, are left out.
+The apt hook
+.I /etc/apt/apt.conf.d/90hd-launcher
+writes the menu again each time apt has run dpkg, and the installation of
+the package writes it too.
 .SH DARK THEME
 .I /etc/dconf/db/local.d/00-dark-theme
 asks GTK applications for the dark Adwaita theme.
@@ -127,8 +150,10 @@ compiles it with
 Removing the package puts back the config of the package greetd, which
 logs nobody in.
 The files in
-.I /etc/skel
-and the sudoers rule stay until the package is purged.
+.IR /etc/skel ,
+the sudoers rule, the apt hook and the menu of the launcher stay until the
+package is purged; the apt hook does nothing without
+.BR hd-launcher .
 .SH FILES
 .TP
 .I /etc/greetd/config.toml
@@ -136,8 +161,13 @@ The greetd config, written by
 .BR hd-desktop-render (8).
 .TP
 .I /etc/hyprdebian/config.json
-The settings, in the key
-.BR hd-desktop .
+The settings, in the keys
+.B hd-desktop
+and
+.BR hd-launcher .
+.TP
+.I /var/cache/hd-launcher
+The menu of the launcher and its icons.
 .TP
 .I /var/log/hyprland.log
 The output of Hyprland.
@@ -148,6 +178,7 @@ Runs
 before greetd starts.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
+.BR hd-launcher (8),
 .BR hd-screensaver (7),
 .BR hd-plymouth (7),
 .BR hd-base (7),

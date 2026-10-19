@@ -10,14 +10,19 @@
 #                                             mounts and unmounts for the
 #                                             mount menus, run with sudo
 #                 /usr/sbin/hd-desktop-render writes /etc/greetd/config.toml
+#                 /usr/sbin/hd-launcher       writes the menu of the
+#                                             launcher in
+#                                             /var/cache/hd-launcher
 #                 /usr/share/hd-desktop/templates/greetd.toml.j2
 #                                             the template of that config
 #                 /etc/...                    the files in etc/, at the
 #                                             same path, conffiles: the
 #                                             files new users get in
 #                                             /etc/skel, the dark theme
-#                                             for dconf and the sudoers
-#                                             rule of the mount menus
+#                                             for dconf, the sudoers
+#                                             rule of the mount menus and
+#                                             the apt hook that runs
+#                                             hd-launcher
 #                 /etc/skel/.icons
 #                 /etc/skel/Pictures/Screenshots
 #                                             empty directories for new
@@ -29,14 +34,17 @@
 #                                             greetd starts
 #                 /usr/share/man/man7/hd-desktop.7.gz
 #                 /usr/share/man/man8/hd-desktop-render.8.gz
+#                 /usr/share/man/man8/hd-launcher.8.gz
 #                                             the man pages in man/
 #               with the control file deb/control, whose Depends are the
 #               packages of the desktop, and the maintainer scripts
 #               deb/postinst, which diverts /etc/greetd/config.toml of
-#               greetd, writes it with hd-desktop-render and compiles the
-#               dconf database, and deb/postrm, which undoes the diversion
-#               on a removal. Raise the version in version.json for every
-#               package that is handed out.
+#               greetd, writes it with hd-desktop-render, compiles the
+#               dconf database and writes the menu of the launcher with
+#               hd-launcher, and deb/postrm, which undoes the diversion on
+#               a removal and removes the menu on a purge. Raise the
+#               version in version.json for every package that is handed
+#               out.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -60,10 +68,10 @@ SUDOERS := etc/sudoers.d/hd-desktop
 COMMANDS := hd-ask-poweroff hd-ask-reboot hd-mode-select hd-mount hd-unmount hd-volume-down \
 	hd-volume-mute hd-volume-up hd-wofi
 # The commands for root, installed in /usr/sbin.
-SBIN_COMMANDS := hd-desktop-render
+SBIN_COMMANDS := hd-desktop-render hd-launcher
 TEMPLATES := $(wildcard templates/*)
 # The man pages, named <page>.<section>.
-MANPAGES := man/hd-desktop.7 man/hd-desktop-render.8
+MANPAGES := man/hd-desktop.7 man/hd-desktop-render.8 man/hd-launcher.8
 
 .PHONY: deb deb-path clean
 
