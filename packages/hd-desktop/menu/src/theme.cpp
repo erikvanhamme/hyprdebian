@@ -76,7 +76,8 @@ Theme load_theme(const std::string& path)
         }
     }
     if (numbers.count("font-size-big") != 0 && numbers["font-size-big"] > 0) {
-        theme.font_size_big = numbers["font-size-big"];
+        // Points to logical pixels: a point is 1/72 inch, a logical pixel 1/96.
+        theme.font_size_big = numbers["font-size-big"] * 96.0 / 72.0;
     }
     if (numbers.count("icon_size") != 0 && numbers["icon_size"] > 0) {
         theme.icon_size = numbers["icon_size"];

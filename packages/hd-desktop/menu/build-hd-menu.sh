@@ -20,6 +20,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
   python3 \
   libwayland-dev \
   wayland-protocols \
+  libxkbcommon-dev \
   libcairo2-dev \
   librsvg2-dev
 

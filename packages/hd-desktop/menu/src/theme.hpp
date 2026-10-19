@@ -30,10 +30,11 @@ struct Theme {
     /**
      * @brief The size of all text: font-size-big.
      *
-     * The theme also has font-size-normal and font-size-small; hd-menu uses
-     * the big one.
+     * The theme has it in points; load_theme() converts it to logical pixels
+     * at 96 dpi, the resolution of a logical pixel. The theme also has
+     * font-size-normal and font-size-small; hd-menu uses the big one.
      */
-    double font_size_big = 30;
+    double font_size_big = 32;  // 24 pt
     /** @brief The width and height of the icons of the options. */
     double icon_size = 64;
     /** @brief Focus: the outline of the focused window. Never a fill behind text. */

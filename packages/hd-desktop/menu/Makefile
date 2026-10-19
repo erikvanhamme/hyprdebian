@@ -12,8 +12,9 @@
 #                 echo '{"banner": "Power off system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu
 #
 #               It needs g++, make, pkgconf, libwayland-dev,
-#               wayland-protocols, libcairo2-dev and librsvg2-dev on this
-#               computer; make deb of ../Makefile only needs docker.
+#               wayland-protocols, libxkbcommon-dev, libcairo2-dev and
+#               librsvg2-dev on this computer; make deb of ../Makefile only
+#               needs docker.
 #   make clean  remove build/
 #
 # wayland-scanner, of libwayland-bin, turns the XML of each Wayland protocol
@@ -25,7 +26,7 @@
 BUILD := build
 
 PROGRAM := $(BUILD)/hd-menu
-PKGS := wayland-client cairo librsvg-2.0
+PKGS := wayland-client xkbcommon cairo librsvg-2.0
 # Without the -dev packages, as for make deb of ../Makefile, these stay empty, quietly.
 WAYLAND_SCANNER := $(shell pkg-config --variable=wayland_scanner wayland-scanner 2>/dev/null)
 XDG_SHELL := $(shell pkg-config --variable=pkgdatadir wayland-protocols 2>/dev/null)/stable/xdg-shell/xdg-shell.xml

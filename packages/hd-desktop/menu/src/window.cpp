@@ -4,9 +4,11 @@
 #include <cerrno>
 #include <climits>
 #include <cstring>
+#include <poll.h>
 #include <stdexcept>
 #include <string>
 #include <sys/mman.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
@@ -52,20 +54,39 @@ Window::Window(WindowHandler& handler) : handler_(handler)
         fail("the compositor lacks wl_compositor 4, wl_shm, wl_seat 5 or zwlr_layer_shell_v1");
     }
 
-    // The keyboard. Only the key codes matter: hd-menu needs no keymap for
-    // the arrows, Enter and Escape. The keymap still comes as a file
-    // descriptor, which has to be closed.
+    // The keyboard. The arrows, Enter and Escape go by key code, which needs
+    // no keymap. Letters such as q go by keysym, from the keymap that the
+    // compositor sends, so that they follow the keyboard layout.
+    // A held key repeats at the rate and after the delay of the compositor,
+    // those of input:repeat_rate and input:repeat_delay in Hyprland, with a
+    // timer that run() polls.
+    xkb_context_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (xkb_context_ == nullptr) {
+        fail("cannot create the xkb context");
+    }
+    repeat_fd_ = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+    if (repeat_fd_ < 0) {
+        fail(std::string("cannot create the key repeat timer: ") + std::strerror(errno));
+    }
     static const wl_keyboard_listener keyboard_listener = {
-        .keymap = [](void*, wl_keyboard*, uint32_t, int32_t fd, uint32_t) { close(fd); },
+        .keymap = [](void* data, wl_keyboard*, uint32_t format, int32_t fd, uint32_t size) {
+            static_cast<Window*>(data)->set_keymap(format, fd, size);
+        },
         .enter = [](void*, wl_keyboard*, uint32_t, wl_surface*, wl_array*) {},
-        .leave = [](void*, wl_keyboard*, uint32_t, wl_surface*) {},
+        .leave = [](void* data, wl_keyboard*, uint32_t, wl_surface*) { static_cast<Window*>(data)->stop_repeat(); },
         .key = [](void* data, wl_keyboard*, uint32_t, uint32_t, uint32_t key, uint32_t state) {
-            if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-                static_cast<Window*>(data)->handler_.key(key);
+            static_cast<Window*>(data)->key_event(key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        },
+        .modifiers = [](void* data, wl_keyboard*, uint32_t, uint32_t depressed, uint32_t latched, uint32_t locked,
+                        uint32_t group) {
+            Window* window = static_cast<Window*>(data);
+            if (window->xkb_state_ != nullptr) {
+                xkb_state_update_mask(window->xkb_state_, depressed, latched, locked, 0, 0, group);
             }
         },
-        .modifiers = [](void*, wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) {},
-        .repeat_info = [](void*, wl_keyboard*, int32_t, int32_t) {},
+        .repeat_info = [](void* data, wl_keyboard*, int32_t rate, int32_t delay) {
+            static_cast<Window*>(data)->set_repeat(rate, delay);
+        },
     };
     keyboard_ = wl_seat_get_keyboard(seat_);
     wl_keyboard_add_listener(keyboard_, &keyboard_listener, this);
@@ -121,6 +142,18 @@ Window::~Window()
     if (keyboard_ != nullptr) {
         wl_keyboard_release(keyboard_);
     }
+    if (xkb_state_ != nullptr) {
+        xkb_state_unref(xkb_state_);
+    }
+    if (xkb_keymap_ != nullptr) {
+        xkb_keymap_unref(xkb_keymap_);
+    }
+    if (xkb_context_ != nullptr) {
+        xkb_context_unref(xkb_context_);
+    }
+    if (repeat_fd_ >= 0) {
+        close(repeat_fd_);
+    }
     if (layer_shell_ != nullptr) {
         zwlr_layer_shell_v1_destroy(layer_shell_);
     }
@@ -157,6 +190,105 @@ void Window::bind_global(wl_registry* registry, uint32_t name, const char* inter
         layer_shell_ = static_cast<zwlr_layer_shell_v1*>(
             wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 4));
     }
+}
+
+void Window::set_keymap(uint32_t format, int fd, uint32_t size)
+{
+    // The keymap is a string ending in a NUL, in memory to map read only.
+    xkb_keymap* keymap = nullptr;
+    if (format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 && size > 0) {
+        void* map = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
+        if (map != MAP_FAILED) {
+            keymap = xkb_keymap_new_from_string(xkb_context_, static_cast<const char*>(map),
+                                                XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+            munmap(map, size);
+        }
+    }
+    close(fd);
+    if (keymap == nullptr) {
+        return;
+    }
+    xkb_state* state = xkb_state_new(keymap);
+    if (state == nullptr) {
+        xkb_keymap_unref(keymap);
+        return;
+    }
+    if (xkb_state_ != nullptr) {
+        xkb_state_unref(xkb_state_);
+    }
+    if (xkb_keymap_ != nullptr) {
+        xkb_keymap_unref(xkb_keymap_);
+    }
+    xkb_keymap_ = keymap;
+    xkb_state_ = state;
+}
+
+void Window::key_event(uint32_t key, bool pressed)
+{
+    if (!pressed) {
+        if (key == repeat_key_) {
+            stop_repeat();
+        }
+        return;
+    }
+    stop_repeat();
+    // Keys that do not repeat in the keymap, such as Shift, stay single;
+    // without a keymap every key repeats.
+    bool repeats = repeat_rate_ > 0;
+    if (repeats && xkb_keymap_ != nullptr) {
+        repeats = xkb_keymap_key_repeats(xkb_keymap_, key + 8) != 0;
+    }
+    if (repeats) {
+        const long interval = 1000000000L / repeat_rate_;
+        itimerspec spec = {};
+        spec.it_value.tv_sec = repeat_delay_ / 1000;
+        spec.it_value.tv_nsec = (repeat_delay_ % 1000) * 1000000L;
+        spec.it_interval.tv_sec = interval / 1000000000L;
+        spec.it_interval.tv_nsec = interval % 1000000000L;
+        // A delay of 0 would disarm the timer; the first repeat comes at once instead.
+        if (spec.it_value.tv_sec == 0 && spec.it_value.tv_nsec == 0) {
+            spec.it_value.tv_nsec = 1;
+        }
+        timerfd_settime(repeat_fd_, 0, &spec, nullptr);
+        repeat_key_ = key;
+    }
+    handler_.key(key, keysym(key));
+}
+
+void Window::set_repeat(int32_t rate, int32_t delay)
+{
+    repeat_rate_ = std::max(rate, 0);
+    repeat_delay_ = std::max(delay, 0);
+    stop_repeat();
+}
+
+void Window::stop_repeat()
+{
+    const itimerspec off = {};
+    timerfd_settime(repeat_fd_, 0, &off, nullptr);
+    repeat_key_ = 0;
+}
+
+void Window::repeat()
+{
+    uint64_t expirations = 0;
+    if (read(repeat_fd_, &expirations, sizeof expirations) != sizeof expirations) {
+        return;
+    }
+    // When hd-menu falls behind, the repeats it missed still count, so that
+    // the selection moves as far as the time held asks.
+    for (uint64_t i = 0; i < expirations && running_ && repeat_key_ != 0; ++i) {
+        handler_.key(repeat_key_, keysym(repeat_key_));
+    }
+}
+
+xkb_keysym_t Window::keysym(uint32_t key) const
+{
+    if (xkb_state_ == nullptr) {
+        return XKB_KEY_NoSymbol;
+    }
+    // xkb numbers the keys 8 higher than the Linux key codes.
+    return xkb_state_key_get_one_sym(xkb_state_, key + 8);
 }
 
 void Window::configure(uint32_t serial, uint32_t width, uint32_t height)
@@ -291,9 +423,37 @@ void Window::destroy_buffers()
 // it waits.
 void Window::run()
 {
+    // wl_display_dispatch() would block on the connection alone; this waits
+    // for the connection and the repeat timer together, the way libwayland
+    // describes: prepare the read, flush the requests, poll, then read and
+    // dispatch the events.
     while (running_) {
-        if (wl_display_dispatch(display_) < 0) {
+        while (wl_display_prepare_read(display_) != 0) {
+            if (wl_display_dispatch_pending(display_) < 0) {
+                fail("lost the connection to the compositor");
+            }
+        }
+        wl_display_flush(display_);
+        pollfd fds[2] = {{wl_display_get_fd(display_), POLLIN, 0}, {repeat_fd_, POLLIN, 0}};
+        if (poll(fds, 2, -1) < 0) {
+            wl_display_cancel_read(display_);
+            if (errno == EINTR) {
+                continue;
+            }
+            fail(std::string("cannot wait for events: ") + std::strerror(errno));
+        }
+        if ((fds[0].revents & (POLLIN | POLLERR | POLLHUP)) != 0) {
+            if (wl_display_read_events(display_) < 0) {
+                fail("lost the connection to the compositor");
+            }
+        } else {
+            wl_display_cancel_read(display_);
+        }
+        if (wl_display_dispatch_pending(display_) < 0) {
             fail("lost the connection to the compositor");
+        }
+        if (running_ && (fds[1].revents & POLLIN) != 0) {
+            repeat();
         }
     }
 }

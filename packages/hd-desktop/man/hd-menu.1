@@ -84,8 +84,15 @@ Move a page, or to the first or the last option.
 .B Enter
 Choose the selected option.
 .TP
-.B Escape
-Close the menu without a choice.
+.BR Escape ", " q
+Close the menu without a choice. q is the key with the letter q in the
+keyboard layout, with or without Shift.
+.PP
+A key that is held repeats at the rate and after the delay of the compositor,
+.B input:repeat_rate
+and
+.B input:repeat_delay
+in Hyprland, so that holding Down keeps moving the selection.
 .SH THE THEME
 .B hd-menu
 draws the menu in the
@@ -93,8 +100,8 @@ draws the menu in the
 of
 .IR /etc/hyprdebian/config.json ,
 which
-.BR hd-config-update (8)
-sets: the font and its
+.BR hd-theme (1)
+sets when a theme is selected: the font and its
 .BR font-size-big ,
 the colours
 .B dark
@@ -111,6 +118,12 @@ width, the corner
 .B radius
 and the
 .BR icon_size .
+The font size is in points, like in the other programs of the theme;
+.B hd-menu
+draws it at 4/3 logical pixels per point.
+The border, the radius and the icon size are in logical pixels.
+The scale of the monitor decides how large that is on the screen, so the
+menu has the same size as the other programs on every monitor.
 A setting that is missing has its default; when the file cannot be read, the
 whole theme has.
 .SH EXIT STATUS
@@ -147,5 +160,6 @@ fi
 .fi
 .SH SEE ALSO
 .BR hd-desktop (7),
-.BR hd-config-update (8),
+.BR hd-theme (1),
+.BR hd-config (7),
 .BR hd-reboot (1)

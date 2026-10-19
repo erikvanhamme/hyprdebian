@@ -52,10 +52,10 @@ wlr-layer-shell is not in a Debian package, so `protocols/` has a copy of it fro
 | `icon` | Optional: the path of a PNG or SVG (`.svg` or `.svgz`) image, shown left of the label at the `icon_size` of the theme. |
 | `default` | Optional: `true` for the option selected at the start; the first option when none has it. |
 
-The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter chooses and Escape closes the menu without a choice.
+The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter chooses and Escape or `q` closes the menu without a choice. `q` is the key with the letter q in the keyboard layout, with or without Shift. A key that is held repeats at the rate and after the delay of the compositor, `input:repeat_rate` and `input:repeat_delay` in Hyprland, so that holding Down keeps moving the selection.
 
 ## The theme
-`hd-menu` takes its look from the `hd-theme` key of `/etc/hyprdebian/config.json`, which [hd-config](hd-config.md) sets:
+`hd-menu` takes its look from the `hd-theme` key of `/etc/hyprdebian/config.json` of [hd-config](hd-config.md), which [hd-theme](hd-theme.md) sets when a theme is selected:
 
 | Setting | Used for |
 | --- | --- |
@@ -66,6 +66,8 @@ The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter choo
 | `highlight` | The border of the menu. |
 | `border`, `radius` | The width and the corner radius of the border. What is inside it has the radius minus the border. |
 | `icon_size` | The size of the icons. |
+
+The font size is in points, like in the other programs of the theme; `hd-menu` draws it at 4/3 logical pixels per point. The border, the radius and the icon size are in logical pixels. The scale of the monitor decides how large that is on the screen, so the menu has the same size as the other programs on every monitor.
 
 A setting that is missing has its default; when the file cannot be read, the whole theme has.
 

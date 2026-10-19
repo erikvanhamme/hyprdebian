@@ -25,6 +25,7 @@
 #include <cairo.h>
 #include <cstddef>
 #include <cstdint>
+#include <xkbcommon/xkbcommon.h>
 
 struct wl_buffer;
 struct wl_compositor;
@@ -59,8 +60,11 @@ public:
      * @brief Handles a key press.
      * @param key The Linux key code (KEY_UP, ... of linux/input-event-codes.h):
      *            the physical key, whatever the keyboard layout.
+     * @param sym The keysym of the key in the keyboard layout, with the
+     *            modifiers that are down (XKB_KEY_q, ...); XKB_KEY_NoSymbol
+     *            when the compositor sent no keymap that could be read.
      */
-    virtual void key(uint32_t key) = 0;
+    virtual void key(uint32_t key, xkb_keysym_t sym) = 0;
 
     /** @brief Handles the compositor closing the surface. */
     virtual void closed() = 0;
@@ -146,6 +150,45 @@ private:
     void configure(uint32_t serial, uint32_t width, uint32_t height);
 
     /**
+     * @brief Reads the keymap of the keyboard and closes its file descriptor.
+     *
+     * A keymap that cannot be read leaves the keysyms as they were; the keys
+     * that go by key code work without one.
+     *
+     * @param format The format of the keymap.
+     * @param fd     The file descriptor of the keymap.
+     * @param size   The size of the keymap, in bytes.
+     */
+    void set_keymap(uint32_t format, int fd, uint32_t size);
+
+    /**
+     * @brief Handles a key going down or up, and starts or stops its repeat.
+     * @param key     The Linux key code.
+     * @param pressed Whether the key went down.
+     */
+    void key_event(uint32_t key, bool pressed);
+
+    /**
+     * @brief Sets the repeat of the keyboard, as the compositor tells it.
+     * @param rate  Repeats per second; 0 for no repeat.
+     * @param delay Milliseconds from the press to the first repeat.
+     */
+    void set_repeat(int32_t rate, int32_t delay);
+
+    /** @brief Stops the repeat of the key that is held, if any. */
+    void stop_repeat();
+
+    /** @brief Handles the expirations of the repeat timer: one key press per expiration. */
+    void repeat();
+
+    /**
+     * @brief The keysym of a key in the keymap, with the current modifiers.
+     * @param key The Linux key code.
+     * @return The keysym; XKB_KEY_NoSymbol without a keymap.
+     */
+    xkb_keysym_t keysym(uint32_t key) const;
+
+    /**
      * @brief Changes the scale of the buffers and draws again.
      * @param scale The buffer scale the compositor prefers.
      */
@@ -188,6 +231,24 @@ private:
     wl_seat* seat_ = nullptr;
     /** @brief The keyboard of the seat. */
     wl_keyboard* keyboard_ = nullptr;
+    /** @brief Compiles the keymap. */
+    xkb_context* xkb_context_ = nullptr;
+    /** @brief The keymap of the keyboard; null until the compositor sends one. */
+    xkb_keymap* xkb_keymap_ = nullptr;
+    /** @brief The keymap with the modifiers that are down; null without a keymap. */
+    xkb_state* xkb_state_ = nullptr;
+    /** @brief The timerfd of the key repeat, polled in run() next to the connection. */
+    int repeat_fd_ = -1;
+    /** @brief The key that repeats while it is held; 0 for none. */
+    uint32_t repeat_key_ = 0;
+    /**
+     * @brief Repeats per second; 0 for no repeat.
+     *
+     * Until the compositor sends its repeat_info, the defaults of Hyprland.
+     */
+    int32_t repeat_rate_ = 25;
+    /** @brief Milliseconds from the press to the first repeat. */
+    int32_t repeat_delay_ = 600;
     /** @brief Gives the surface the layer-shell role. */
     zwlr_layer_shell_v1* layer_shell_ = nullptr;
 

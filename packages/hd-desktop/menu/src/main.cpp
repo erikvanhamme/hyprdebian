@@ -1,13 +1,13 @@
-// hd-menu: a menu in the manner of wofi, for Hyprland and other compositors
-// with wlr-layer-shell. It reads the menu as JSON from stdin (see menu.hpp)
+// hd-menu: the keyboard-driven menu of the HyprDebian desktop, for Hyprland
+// and other compositors with wlr-layer-shell. It reads the menu as JSON from stdin (see menu.hpp)
 // and prints the value of the option chosen on stdout.
 //
 //   echo '{"banner": "Power off system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | hd-menu
 //
 // The arrows, Tab, Page Up, Page Down, Home and End move the selection,
-// Enter chooses and Escape cancels. It exits with 0 after a choice, with 1
-// when the menu is closed without one or another hd-menu is already open,
-// and with 2 on an error.
+// Enter chooses and Escape or q cancels; held keys repeat. It exits with 0
+// after a choice, with 1 when the menu is closed without one or another
+// hd-menu is already open, and with 2 on an error.
 //
 // The parts: theme.cpp reads the hd-theme from /etc/hyprdebian/config.json,
 // menu.cpp reads the menu, renderer.cpp draws it with cairo, window.cpp puts
@@ -41,8 +41,15 @@ public:
 
     void draw(cairo_t* cr, int width, int height) override { renderer_.draw(cr, width, height, menu_); }
 
-    void key(uint32_t key) override
+    void key(uint32_t key, xkb_keysym_t sym) override
     {
+        // q goes by the letter of the keyboard layout, with or without Shift
+        // or Caps Lock.
+        if (xkb_keysym_to_lower(sym) == XKB_KEY_q) {
+            result_ = 1;
+            window_->quit();
+            return;
+        }
         const int last = static_cast<int>(menu_.options.size()) - 1;
         int selected = menu_.selected;
         switch (key) {
