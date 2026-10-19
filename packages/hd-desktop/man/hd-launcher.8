@@ -14,7 +14,8 @@ from the
 .I .desktop
 files in
 .I /usr/share/applications
-and its subdirectories.
+and its subdirectories, and the items added in
+.IR /etc/hyprdebian/config.json .
 .PP
 An application is in the menu when its
 .I .desktop
@@ -34,22 +35,29 @@ or
 .BR NotShowIn ,
 has its
 .B TryExec
-installed, when it has one, and is not in the exclusion list.
+installed, when it has one, and is not left out by the key
+.B hd-launcher
+(see CONFIGURATION).
 .PP
 The menu is 40% of the width and the height of the output; the options that
 do not fit scroll.
-Every application is an option: its
+Every application and every item added is an option, with its
 .B Name
-is the label and its desktop file ID the value, such as
-.IR firefox.desktop ;
-the ID of a file in a subdirectory is its path below
+or
+.B name
+as the label.
+The value is the command line that starts it as a systemd user unit of its
+own, quoted for the shell, which the launcher runs with
+.BR "sh \-c" :
+.B uwsm app \-\-
+with the desktop file ID of an application, such as
+.IR firefox.desktop ,
+or the command of an item added.
+The ID of a file in a subdirectory is its path below
 .I /usr/share/applications
 with \- for /.
-A launcher starts it with
-.BR "uwsm app \-\- <ID>" .
-The options are sorted on the
-.BR Name ,
-in ascending order, without regard to case.
+The options are sorted on the label, in ascending order, without regard to
+case.
 .PP
 The icon of an application is looked up by its
 .B Icon
@@ -95,15 +103,51 @@ The key
 .B hd-launcher
 of
 .I /etc/hyprdebian/config.json
-is a list of the desktop file IDs to leave out of the menu; the
-.I .desktop
-at the end may be left out:
+leaves applications out of the menu and adds items of its own:
 .PP
 .RS
 .nf
-"hd-launcher": ["org.gnome.Meld.desktop", "debian-xterm"]
+"hd-launcher": {
+    "exclude": ["org.gnome.Meld.desktop", "debian-xterm"],
+    "add": [
+        {
+            "name": "Btop",
+            "command": ["kitty", "\-e", "btop"],
+            "icon": "utilities-system-monitor"
+        }
+    ]
+}
 .fi
 .RE
+.TP
+.B exclude
+Optional: the desktop file IDs to leave out; the
+.I .desktop
+at the end may be left out.
+.TP
+.B add
+Optional: the items to add, each an object with:
+.RS
+.TP
+.B name
+The label.
+.TP
+.B command
+The words of the command, a list of strings, run without a shell.
+For pipes, variables or
+.IR ~ ,
+use
+.BR "[\(dqsh\(dq, \(dq\-c\(dq, \(dq...\(dq]" .
+.TP
+.B icon
+Optional: the path of a PNG or SVG, or the name of an icon, looked up as the
+.B Icon
+of an application.
+An icon that is not found is reported and left out.
+.RE
+.PP
+Other members, or a key that is not such an object, are an error: the menu
+is not written.
 .SH FILES
 .TP
 .I /var/cache/hd-launcher/launcher.json
@@ -117,7 +161,7 @@ The PNGs rendered from SVG icons.
 The apt hook.
 .TP
 .I /etc/hyprdebian/config.json
-The exclusion list, in the key
+The applications to leave out and the items to add, in the key
 .BR hd-launcher ,
 and the
 .BR icon_size ,

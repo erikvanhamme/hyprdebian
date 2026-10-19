@@ -155,11 +155,11 @@ sorted on their names, with their icons; SVG icons are rendered to PNGs of
 the
 .B icon_size
 of the theme.
-The applications in the key
+The key
 .B hd-launcher
 of
-.IR /etc/hyprdebian/config.json ,
-a list of desktop file IDs, are left out.
+.I /etc/hyprdebian/config.json
+leaves applications out and adds items with a command of their own.
 The apt hook
 .I /etc/apt/apt.conf.d/90hd-launcher
 writes the menu again each time apt has run dpkg, and the installation of
@@ -168,7 +168,7 @@ the package writes it too.
 .B Super+Space
 opens the menu in
 .BR hd-menu (1),
-and starts the application chosen with
+and starts the application or item chosen with
 .BR "uwsm app \-\-" ,
 as a systemd user unit of its own.
 The other applications of the key bindings, such as the terminal, the

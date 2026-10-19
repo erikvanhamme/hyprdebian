@@ -116,9 +116,9 @@ The menus above and the application launcher use [hd-menu](hd-menu.md), which ha
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
 
 ## Application launcher
-`SUPER + SPACE` opens the application launcher: the menu `/var/cache/hd-launcher/launcher.json` in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application chosen is started with `uwsm app -- <ID>`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
+`SUPER + SPACE` opens the application launcher: the menu `/var/cache/hd-launcher/launcher.json` in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
 
-`hd-launcher`, in `/usr/sbin`, writes the menu as root from the `.desktop` files in `/usr/share/applications` and its subdirectories. An application is in it when its `.desktop` file is of the `Type` Application, has a `Name` and an `Exec`, is not `NoDisplay` or `Hidden`, is not left out for Hyprland by `OnlyShowIn` or `NotShowIn`, has its `TryExec` installed, when it has one, and is not in the exclusion list. Its `Name` is the label and its desktop file ID, such as `firefox.desktop`, the value; the options are sorted on the `Name`, in ascending order, without regard to case.
+`hd-launcher`, in `/usr/sbin`, writes the menu as root from the `.desktop` files in `/usr/share/applications` and its subdirectories. An application is in it when its `.desktop` file is of the `Type` Application, has a `Name` and an `Exec`, is not `NoDisplay` or `Hidden`, is not left out for Hyprland by `OnlyShowIn` or `NotShowIn`, has its `TryExec` installed, when it has one, and is not left out by the settings below. The items added in the settings are in it too. The label is the `Name` of an application or the `name` of an item. The value is the command line that starts it, quoted for the shell, which the launcher runs with `sh -c`: `uwsm app --` with the desktop file ID of an application, such as `firefox.desktop`, or the command of an item. The options are sorted on the label, in ascending order, without regard to case.
 
 The icon is looked up by the `Icon` of the application in the icon themes hicolor and Adwaita and in `/usr/share/pixmaps`, or taken from its path when it is one. A PNG is used as it is; an SVG is rendered to a PNG of the `icon_size` of the [theme](hd-theme.md) in `/var/cache/hd-launcher/icons`, only when the PNG there was not rendered from that SVG at that size.
 
@@ -129,9 +129,31 @@ sudo hd-launcher
 
 `hd-launcher --dry-run` prints the menu without writing it, as any user.
 
-The key `hd-launcher` of `/etc/hyprdebian/config.json` is a list of the desktop file IDs to leave out; the `.desktop` at the end may be left out:
+The key `hd-launcher` of `/etc/hyprdebian/config.json` leaves applications out and adds items of its own:
+```json
+"hd-launcher": {
+    "exclude": ["debian-xterm.desktop", "debian-uxterm.desktop", "uuctl.desktop"],
+    "add": [
+        {
+            "name": "Btop",
+            "command": ["kitty", "-e", "btop"],
+            "icon": "utilities-system-monitor"
+        }
+    ]
+}
 ```
-sudo hd-config-update hd-launcher '["org.gnome.Meld.desktop", "debian-xterm"]'
+
+| Member | | |
+| --- | --- | --- |
+| `exclude` | Optional | The desktop file IDs to leave out; the `.desktop` at the end may be left out. `hd-launcher --dry-run` shows the ID of every application. |
+| `add` | Optional | The items to add. |
+| `add[].name` | | The label. |
+| `add[].command` | | The words of the command, a list of strings, run without a shell. For pipes, variables or `~`, use `["sh", "-c", "..."]`. |
+| `add[].icon` | Optional | The path of a PNG or SVG, or the name of an icon, looked up as the `Icon` of an application. An icon that is not found is reported and left out. |
+
+Other members, or a key that is not such an object, are an error, and the menu is not written. Write the key with `hd-config-update`, then the menu:
+```
+sudo hd-config-update hd-launcher '{"exclude": ["debian-xterm"], "add": [{"name": "Btop", "command": ["kitty", "-e", "btop"]}]}'
 sudo hd-launcher
 ```
 
