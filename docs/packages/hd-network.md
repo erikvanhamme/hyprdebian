@@ -1,47 +1,32 @@
 ## Introduction
-The package `hd-network` renders the systemd-networkd files in `/etc/systemd/network` from the key `hd-network` in the hyprdebian configuration, `/etc/hyprdebian/config.json`. The settings are changed with `hd-network-iface` for wired and wifi interfaces and `hd-network-bridge` for bridges, which write them with `hd-config-update` (see [hd-config](hd-config.md)), then applied with `hd-network-render`. `hd-network` depends on `hd-config` for that.
+The package `hd-base` renders the systemd-networkd files in `/etc/systemd/network` from the key `hd-network` in the hyprdebian configuration, `/etc/hyprdebian/config.json`. The settings are changed with `hd-network-iface` for wired and wifi interfaces and `hd-network-bridge` for bridges, which write them with `hd-config-update` (see [hd-config](hd-config.md)), then applied with `hd-network-render`.
 
-Installing the package configures nothing: it does not set the key, and it does not run `hd-network-render`.
+Installing `hd-base` configures nothing: it does not set the key, and it does not run `hd-network-render`.
 
-The package also installs `/usr/lib/systemd/network/10-ethernet.link` and `20-wifi.link`, which name ethernet and wifi interfaces by their path, such as `enp3s0` and `wlp2s0`, and give them a persistent MAC address. They come before `99-default.link` of systemd, so its naming policy (onboard, slot, then path names) is not used for these interfaces. A file with the same name in `/etc/systemd/network` takes their place.
+`hd-base` also installs `/usr/lib/systemd/network/10-ethernet.link` and `20-wifi.link`, which name ethernet and wifi interfaces by their path, such as `enp3s0` and `wlp2s0`, and give them a persistent MAC address. They come before `99-default.link` of systemd, so its naming policy (onboard, slot, then path names) is not used for these interfaces. A file with the same name in `/etc/systemd/network` takes their place.
 
-The initramfs holds a copy of the `.link` files, so the interfaces get the same names from the start of the boot. Installing or upgrading the package activates the `update-initramfs` trigger of initramfs-tools, which rebuilds it once dpkg is done; this changes no settings.
+The initramfs holds a copy of the `.link` files, so the interfaces get the same names from the start of the boot. Installing or upgrading `hd-base` activates the `update-initramfs` trigger of initramfs-tools, which rebuilds it once dpkg is done; this changes no settings.
 
-The package comes with four man pages: `man hd-network` describes the settings, `man hd-network-iface` and `man hd-network-bridge` the commands that change them, and `man hd-network-render` the command that applies them.
+`hd-base` comes with four man pages for it: `man hd-network` describes the settings, `man hd-network-iface` and `man hd-network-bridge` the commands that change them, and `man hd-network-render` the command that applies them.
 
 ## Building the package
-The package is built from `packages/hd-network` in this repository:
+The network configuration is part of the package `hd-base`, built from `packages/hd-base`; see [hd-base](hd-base.md). The files involved are:
 ```
-cd packages/hd-network
-make deb
+packages/hd-base/hd-network-render
+packages/hd-base/hd-network-iface
+packages/hd-base/hd-network-bridge
+packages/hd-base/lib/hd_network.py
+packages/hd-base/deb/triggers
+packages/hd-base/templates/hd-network/header.j2
+packages/hd-base/templates/hd-network/bridge.netdev.j2
+packages/hd-base/templates/hd-network/interface.network.j2
+packages/hd-base/usr/lib/systemd/network/10-ethernet.link
+packages/hd-base/usr/lib/systemd/network/20-wifi.link
+packages/hd-base/man/hd-network.7
+packages/hd-base/man/hd-network-render.8
+packages/hd-base/man/hd-network-iface.8
+packages/hd-base/man/hd-network-bridge.8
 ```
-
-This builds `build/hd-network_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `python3-jinja2`, `systemd` and `hd-config`. Install it with:
-```
-sudo apt install ./build/hd-network_<version>_all.deb
-```
-
-The files involved are:
-```
-packages/hd-network/Makefile
-packages/hd-network/version.json
-packages/hd-network/hd-network-render
-packages/hd-network/hd-network-iface
-packages/hd-network/hd-network-bridge
-packages/hd-network/lib/hd_network.py
-packages/hd-network/deb/control
-packages/hd-network/deb/triggers
-packages/hd-network/templates/header.j2
-packages/hd-network/templates/bridge.netdev.j2
-packages/hd-network/templates/interface.network.j2
-packages/hd-network/link/10-ethernet.link
-packages/hd-network/link/20-wifi.link
-packages/hd-network/man/hd-network.7
-packages/hd-network/man/hd-network-render.8
-packages/hd-network/man/hd-network-iface.8
-packages/hd-network/man/hd-network-bridge.8
-```
-
 ## Settings
 The key `hd-network` holds a JSON object:
 ```

@@ -1,9 +1,9 @@
-.TH HD-NETWORK 7 "October 2026" "hd-network" "HyprDebian"
+.TH HD-NETWORK 7 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
 hd-network \- the hyprdebian network configuration
 .SH DESCRIPTION
 The package
-.B hd-network
+.B hd-base
 renders the
 .BR systemd-networkd (8)
 files in
@@ -199,6 +199,7 @@ share: reading, checking and writing the settings.
 .I /usr/lib/systemd/network/20-wifi.link
 Name ethernet and wifi interfaces by their path.
 .SH SEE ALSO
+.BR hd-base (7),
 .BR hd-network-iface (8),
 .BR hd-network-bridge (8),
 .BR hd-network-render (8),

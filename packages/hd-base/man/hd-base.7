@@ -2,12 +2,48 @@
 .SH NAME
 hd-base \- the hyprdebian base system
 .SH DESCRIPTION
-The meta package
+The package
 .B hd-base
 depends on the packages that every hyprdebian system has, so that they are
 installed with it and stay installed.
 Besides the settings below, a package it pulls in is set up the way that
 package does it.
+.PP
+It holds the parts that every hyprdebian system shares, each with a man page
+of its own:
+.TP
+.BR hd-config (7)
+The hyprdebian configuration,
+.IR /etc/hyprdebian/config.json ,
+where hyprdebian packages keep their settings under a key of their own,
+with
+.BR hd-config-update (8)
+and
+.BR hd-config-remove (8).
+.TP
+.BR hd-network (7)
+The network configuration:
+.BR hd-network-render (8)
+renders the
+.BR systemd-networkd (8)
+files from the key
+.BR hd-network ,
+in which
+.BR hd-network-iface (8)
+and
+.BR hd-network-bridge (8)
+change the interfaces and bridges, and the
+.I .link
+files that name ethernet and wifi interfaces by their path.
+.TP
+.BR hd-secboot (7)
+The Secure Boot keys of the owner, which the postinst generates in
+.I /etc/hyprdebian/secboot
+when they are not there yet,
+.BR hd-secboot-enroll (8),
+which enrolls them in the firmware, and
+.BR hd-secboot-check (8),
+which checks that Secure Boot is on.
 .PP
 It installs
 .BR hd-up (1),
@@ -171,9 +207,6 @@ The banners show it.
 .SH PACKAGES
 .TP
 .B hyprdebian
-.BR hd-network ,
-the network configuration; see
-.BR hd-network (7).
 .B python3
 and
 .BR sudo ,
@@ -181,9 +214,19 @@ for
 .BR hd-up (1);
 .BR python3-jinja2 ,
 for
-.BR hd-link-repo (8);
+.BR hd-link-repo (8)
+and
+.BR hd-network-render (8);
 .BR kbd ,
 for Num Lock on the console.
+.TP
+.B Secure Boot
+.BR openssl ,
+.B efitools
+and
+.BR sbsigntool ,
+which make the keys, enroll them and sign EFI files with them; see
+.BR hd-secboot (7).
 .TP
 .B Remote access and firewall
 .B openssh-server
@@ -245,6 +288,14 @@ and
 It conflicts with
 .BR zram-tools ,
 which would set up a second zram swap.
+It replaces
+.BR hd-config ,
+.B hd-network
+and
+.BR hd-secboot ,
+the packages that held the configuration, the network configuration and
+the Secure Boot keys before; an upgrade removes them, and the configuration
+and the keys stay.
 .PP
 .B firmware-linux
 and
@@ -273,6 +324,29 @@ Writes the login banner in
 .TP
 .I /usr/sbin/hd-link-repo
 Switches the HyprDebian repository and suite of apt.
+.TP
+.I /usr/sbin/hd-config-update
+.TQ
+.I /usr/sbin/hd-config-remove
+Change the hyprdebian configuration.
+.TP
+.I /usr/sbin/hd-network-render
+.TQ
+.I /usr/sbin/hd-network-iface
+.TQ
+.I /usr/sbin/hd-network-bridge
+Render and change the network configuration.
+.TP
+.I /usr/sbin/hd-secboot-enroll
+.TQ
+.I /usr/sbin/hd-secboot-check
+Enroll the Secure Boot keys and check that Secure Boot is on.
+.TP
+.I /etc/hyprdebian/config.json
+The hyprdebian configuration.
+.TP
+.I /etc/hyprdebian/secboot
+The Secure Boot keys.
 .TP
 .I /usr/share/hd-base/templates/hyprdebian.sources.j2
 The template of the apt source of
@@ -312,13 +386,20 @@ The sysctls for the zram swap.
 .TP
 .I /usr/lib/systemd/resolved.conf.d/00\-direct\-uplink.conf
 The config of systemd-resolved.
+.TP
+.I /usr/lib/systemd/network/10\-ethernet.link
+.TQ
+.I /usr/lib/systemd/network/20\-wifi.link
+Name the network interfaces by their path.
 .SH SEE ALSO
 .BR hd-up (1),
 .BR hd-reboot (1),
 .BR hd-sync-skel (1),
 .BR hd-issue (8),
 .BR hd-link-repo (8),
+.BR hd-config (7),
 .BR hd-network (7),
+.BR hd-secboot (7),
 .BR zram-generator.conf (5),
 .BR resolved.conf (5),
 .BR systemd.preset (5)

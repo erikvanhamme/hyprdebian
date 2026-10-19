@@ -377,7 +377,7 @@ def read_var(efivars, name):
 
 
 def secure_boot_state(efivars=EFIVARS):
-    """The state of Secure Boot, as hd-secboot-check of hd-secboot finds it: on, off, setup (off,
+    """The state of Secure Boot, as hd-secboot-check of hd-base finds it: on, off, setup (off,
     with the firmware in setup mode), unsupported (UEFI without Secure Boot) or legacy (not
     booted with UEFI)."""
     if not os.path.isdir(efivars):

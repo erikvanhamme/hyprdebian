@@ -39,7 +39,7 @@ pkg_enable_firewall() {
     in_target ufw logging off
 }
 
-# Configures the network with the commands of hd-network: the wired interface, and the wifi
+# Configures the network with the network commands of hd-base: the wired interface, and the wifi
 # interface with a higher route metric, so the wired one is preferred, both with DHCP. With wifi,
 # the boot does not wait for the network, which may not be in reach.
 pkg_network() {

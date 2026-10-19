@@ -18,7 +18,7 @@ cd packages/hd-dashboard
 make deb
 ```
 
-This builds `build/hd-dashboard_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`; the dashboard needs nothing beyond Python itself. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-dashboard.service` by hand after installing it: `sudo systemctl enable --now hd-dashboard.service`. Install it with:
+This builds `build/hd-dashboard_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-base`; the dashboard needs nothing beyond Python itself. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-dashboard.service` by hand after installing it: `sudo systemctl enable --now hd-dashboard.service`. Install it with:
 ```
 sudo apt install ./build/hd-dashboard_<version>_all.deb
 ```

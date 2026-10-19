@@ -10,7 +10,7 @@ The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the un
 
 `/usr/lib/hd-bootloader/update-esps` runs `hd-bootloader-update` for `/boot/efi` and, when it exists, `/boot/efi2`. The kernel and initramfs hooks of the package run it when a kernel or an initrd is installed or removed. All ESPs are checked before any is written; a missing one makes the hook, and with it the kernel package or apt, fail: a system with a missing drive should not be upgraded.
 
-The settings are the key `hd-bootloader` in the hyprdebian configuration, `/etc/hyprdebian/config.json` (see [hd-config](hd-config.md)). Both packages depend on `hd-config`.
+The settings are the key `hd-bootloader` in the hyprdebian configuration, `/etc/hyprdebian/config.json` (see [hd-config](hd-config.md)). Both packages depend on `hd-base`.
 
 The packages come with two man pages: `man hd-bootloader` describes the bootloader and its settings, `man hd-bootloader-update` the command that writes it to an ESP.
 
@@ -25,10 +25,10 @@ This builds `build/hd-bootloader-gfx_<version>_amd64.deb` and `build/hd-bootload
 
 | Package | Depends on |
 | --- | --- |
-| `hd-bootloader-gfx` | `python3`, `python3-pil`, `systemd-ukify`, `systemd-boot-efi`, `fontconfig`, `hd-config`, `hd-art`, `hd-fonts` |
-| `hd-bootloader-txt` | `python3`, `systemd-ukify`, `systemd-boot-efi`, `hd-config` |
+| `hd-bootloader-gfx` | `python3`, `python3-pil`, `systemd-ukify`, `systemd-boot-efi`, `fontconfig`, `hd-base`, `hd-art`, `hd-fonts` |
+| `hd-bootloader-txt` | `python3`, `systemd-ukify`, `systemd-boot-efi`, `hd-base` |
 
-Both recommend `dkms`, `openssl` and `sbsigntool`, and suggest `hd-secboot`. Install one of them with:
+Both recommend `dkms`. Install one of them with:
 ```
 sudo apt install ./build/hd-bootloader-gfx_<version>_amd64.deb
 ```
@@ -153,7 +153,7 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 Run it as root.
 
 ## Secure Boot
-The packages do not depend on `hd-secboot` (see [hd-secboot](hd-secboot.md)). When its keys are in `/etc/hyprdebian/secboot`, `hd-bootloader-update` signs the bootloader, `assets.efi` and the UKIs with the db key, using `sbsign`; a file that would not change is signed again when it does not verify with the db certificate, as after the keys were generated. Without the keys, the files are written unsigned, with a message saying so. The message of each file written says whether it is signed or unsigned.
+`hd-base` generates the Secure Boot keys of the owner in `/etc/hyprdebian/secboot` (see [hd-secboot](hd-secboot.md)). When the keys are there, `hd-bootloader-update` signs the bootloader, `assets.efi` and the UKIs with the db key, using `sbsign`; a file that would not change is signed again when it does not verify with the db certificate, as after the keys were generated. Without the keys, the files are written unsigned, with a message saying so. The message of each file written says whether it is signed or unsigned.
 
 ## Files
 | Path | Purpose |

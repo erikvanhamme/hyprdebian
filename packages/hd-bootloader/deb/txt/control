@@ -3,9 +3,8 @@ Version: @VERSION@
 Architecture: amd64
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd-ukify, systemd-boot-efi, hd-config
-Recommends: dkms, openssl, sbsigntool
-Suggests: hd-secboot
+Depends: python3, systemd-ukify, systemd-boot-efi, hd-base
+Recommends: dkms
 Provides: hd-bootloader
 Conflicts: hd-bootloader
 Replaces: hd-bootloader
@@ -21,5 +20,5 @@ Description: HyprDebian minimalist EFI bootloader, text-only
  menu and the DKMS MOK, which the bootloader hands to the kernel so that it
  loads the DKMS-built ZFS module under Secure Boot. The settings are the key
  hd-bootloader in /etc/hyprdebian/config.json. When the Secure Boot keys of
- hd-secboot are in /etc/hyprdebian/secboot, it signs the bootloader,
+ hd-base are in /etc/hyprdebian/secboot, it signs the bootloader,
  assets.efi and the UKIs with the db key, using sbsign.

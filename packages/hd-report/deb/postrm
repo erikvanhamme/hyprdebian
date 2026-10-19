@@ -25,7 +25,7 @@ fi
 deb-systemd-helper purge "${UNIT}" > /dev/null || true
 deb-systemd-helper unmask "${UNIT}" > /dev/null || true
 
-# hd-config may already be removed, see hd-config(7).
+# hd-base may already be removed, see hd-config(7).
 if [[ -x /usr/sbin/hd-config-remove ]]; then
     hd-config-remove "${CONFIG_KEY}"
 fi

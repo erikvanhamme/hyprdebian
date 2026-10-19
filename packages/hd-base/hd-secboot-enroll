@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Enrolls the Secure Boot keys in /etc/hyprdebian/secboot in the firmware.
 
-The package hd-secboot installs this as /usr/sbin/hd-secboot-enroll.
+The package hd-base installs this as /usr/sbin/hd-secboot-enroll.
 
     hd-secboot-enroll             add db and KEK to what the firmware has, then set PK
     hd-secboot-enroll --replace   replace db and KEK, then set PK
@@ -76,7 +76,7 @@ def main():
 
     for name, _ in VARIABLES:
         if not os.path.isfile(os.path.join(KEY_DIR, f"{name}.auth")):
-            fail(f"{os.path.join(KEY_DIR, name + '.auth')} does not exist. hd-secboot generates "
+            fail(f"{os.path.join(KEY_DIR, name + '.auth')} does not exist. hd-base generates "
                  f"the keys when it is installed and {KEY_DIR} does not exist yet.")
     if not os.path.isdir(EFIVARS):
         fail(f"{EFIVARS} does not exist: the system was not booted with UEFI.")

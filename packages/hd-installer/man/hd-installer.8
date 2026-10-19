@@ -201,8 +201,6 @@ and ZFS.
 It marks the other packages for the packages phase:
 .BR hd-base ,
 .BR hd-bootloader-txt ,
-.BR hd-secboot ,
-.BR hd-network ,
 and for wifi
 .BR iwd .
 .TP
@@ -218,7 +216,10 @@ configures the network with
 .BR hd-network-iface (8)
 and
 .BR hd-network-render (8),
-writes the bootloader to the EFI system partitions, signed with the keys of
+writes the bootloader to the EFI system partitions, signed with the Secure
+Boot keys of
+.BR hd-base ,
+see
 .BR hd-secboot (7),
 and adds the firmware boot entries.
 .TP

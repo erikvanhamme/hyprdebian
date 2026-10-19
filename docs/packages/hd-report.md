@@ -17,7 +17,7 @@ cd packages/hd-report
 make deb
 ```
 
-This builds `build/hd-report_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-config`, and suggests `hd-dashboard`. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-report.timer` by hand after installing it: `sudo systemctl enable --now hd-report.timer`. Install it with:
+This builds `build/hd-report_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-base`, and suggests `hd-dashboard`. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-report.timer` by hand after installing it: `sudo systemctl enable --now hd-report.timer`. Install it with:
 ```
 sudo apt install ./build/hd-report_<version>_all.deb
 ```
@@ -88,7 +88,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
 | HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.sources`. |
 | Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`. |
-| Secure Boot | The EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`, read as `hd-secboot-check` reads them, see [hd-secboot](hd-secboot.md#hd-secboot-check); `hd-report` does not need `hd-secboot` for it. |
+| Secure Boot | The EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`, read as `hd-secboot-check` reads them, see [hd-secboot](hd-secboot.md#hd-secboot-check). |
 | Boot time, load, CPUs, memory | `/proc`. |
 | Pools | `zpool list`, and the last completed scrub from the scan line of `zpool status`: the bytes it repaired, the errors it found and when it ended. A scrub that is running, paused or was canceled, and a resilver, leave it out. |
 | Arrays | The mdadm arrays in `/sys/block`, named as in `/dev/md`. |

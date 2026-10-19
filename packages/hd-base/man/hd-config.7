@@ -1,9 +1,9 @@
-.TH HD-CONFIG 7 "October 2026" "hd-config" "HyprDebian"
+.TH HD-CONFIG 7 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
 hd-config \- the hyprdebian configuration database
 .SH DESCRIPTION
 The package
-.B hd-config
+.B hd-base
 keeps the configuration of hyprdebian in one file,
 .IR /etc/hyprdebian/config.json .
 It holds a JSON object.
@@ -40,7 +40,7 @@ The file is made by the first
 the package itself installs no configuration.
 .SH USING IT FROM A PACKAGE
 A package that keeps its settings in the configuration depends on
-.B hd-config
+.B hd-base
 and sets its key in its postinst:
 .PP
 .RS
@@ -51,7 +51,7 @@ hd-config-update hd-example '{"enabled": true, "port": 8080}'
 .PP
 It removes the key in its postrm on a purge.
 By then
-.B hd-config
+.B hd-base
 may already be removed, so it checks first:
 .PP
 .RS
@@ -75,9 +75,10 @@ python3 \-c 'import json; print(json.load(open("/etc/hyprdebian/config.json"))["
 .I /etc/hyprdebian/config.json
 The configuration, a JSON object, readable for everyone.
 It is not a conffile: removing or purging
-.B hd-config
+.B hd-base
 keeps it.
 .SH SEE ALSO
+.BR hd-base (7),
 .BR hd-config-update (8),
 .BR hd-config-remove (8)
 .SH AUTHOR

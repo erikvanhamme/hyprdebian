@@ -1,21 +1,21 @@
-.TH HD-NETWORK-BRIDGE 8 "October 2026" "hd-network" "HyprDebian"
+.TH HD-NETWORK-IFACE 8 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
-hd-network-bridge \- add, change and remove bridges in the hyprdebian network settings
+hd-network-iface \- add, change and remove interfaces in the hyprdebian network settings
 .SH SYNOPSIS
-.B hd-network-bridge list
+.B hd-network-iface list
 .br
-.B hd-network-bridge show
+.B hd-network-iface show
 .I name
 .br
-.B hd-network-bridge set
+.B hd-network-iface set
 .I name
 .RI [ options ]
 .br
-.B hd-network-bridge remove
+.B hd-network-iface remove
 .I name
 .SH DESCRIPTION
-.B hd-network-bridge
-manages the bridges in the key
+.B hd-network-iface
+manages the wired and wifi interfaces in the key
 .B hd-network
 in
 .IR /etc/hyprdebian/config.json .
@@ -32,10 +32,6 @@ When the check fails, nothing is written.
 When no settings are left, the key is removed with
 .BR hd-config-remove (8).
 .PP
-Ports are added to a bridge with
-.BR hd-network-iface (8):
-.BI "hd-network-iface set " interface " \-\-bridge " name\fR.
-.PP
 It does not change the network itself: run
 .B hd-network-render
 afterwards.
@@ -47,32 +43,37 @@ are run as root.
 .SH COMMANDS
 .TP
 .B list
-List the bridges, one per line, with their MAC address, their ports and a
-summary of their settings.
+List the interfaces, one per line, with a summary of their settings.
 .TP
 .BI show " name"
-Show the settings of a bridge as JSON.
+Show the settings of an interface as JSON.
 .TP
 .BI set " name"
-Add a bridge, or change its settings.
-Settings that are not given stay as they are; a new bridge without options
-uses DHCP.
-A new bridge gets a random, locally administered MAC address, which is kept
-in the settings, so it never changes, also not when the machine-id changes.
+Add an interface, or change its settings.
+Settings that are not given stay as they are; a new interface without
+options uses DHCP.
+.I name
+is an interface name, such as
+.BR enp3s0 ,
+or a glob, such as
+.BR en* ;
+quote a glob so the shell does not expand it.
 .TP
 .BI remove " name"
-Remove a bridge from the settings.
-A bridge that still has ports is not removed; remove or change the ports
-with
-.B hd-network-iface
-first.
+Remove an interface from the settings.
 .SH OPTIONS
 These options are for
 .BR set .
 .TP
-.BI \-\-mac " mac"
-The MAC address of the bridge, such as
-.BR 52:54:00:12:34:56 .
+.BI \-\-bridge " bridge"
+Make the interface a port of
+.IR bridge ,
+which must be set up with
+.BR hd-network-bridge (8)
+first.
+A port has no addresses, so this drops the other settings of the interface,
+and cannot be combined with the options below.
+A wifi interface cannot be a port.
 .TP
 .B \-\-dhcp
 Get addresses with DHCPv4, IPv6 router advertisements and DHCPv6.
@@ -99,13 +100,18 @@ May be given more than once; replaces the DNS servers that were set.
 The metric of the routes; the default is 100.
 .TP
 .BI \-\-unset " setting"
-Return a setting to its default before the other options are applied:
+Return a setting to its default:
 .BR addresses ,
+.BR bridge ,
 .BR dhcp ,
 .BR dns ,
 .B gateway
 or
 .BR metric .
+Applied before the other options, so
+.B \-\-unset bridge
+followed by address options turns a port into an interface with addresses
+of its own.
 May be given more than once.
 .TP
 .BR \-h ", " \-\-help
@@ -117,28 +123,42 @@ Show a short help and exit.
 .I /etc/hyprdebian/config.json
 The configuration.
 .SH EXAMPLES
-A bridge for virtual machines with enp3s0 as its port, using DHCP:
+Use DHCP on every ethernet interface, and on the wifi interface with a
+higher metric:
 .PP
 .RS
 .nf
-hd-network-bridge set br0
-hd-network-iface set enp3s0 \-\-bridge br0
-hd-network-render
+hd-network-iface set 'en*'
+hd-network-iface set wlp2s0 \-\-metric 200
 .fi
 .RE
 .PP
-Remove it again, with enp3s0 back on DHCP:
+Give enp4s0 a static address:
 .PP
 .RS
 .nf
-hd-network-iface set enp3s0 \-\-unset bridge
-hd-network-bridge remove br0
-hd-network-render
+hd-network-iface set enp4s0 \-\-no\-dhcp \-\-address 192.168.1.10/24 \e
+    \-\-gateway 192.168.1.1 \-\-dns 192.168.1.1
 .fi
+.RE
+.PP
+Make enp3s0 a port of br0, and later give it DHCP again:
+.PP
+.RS
+.nf
+hd-network-iface set enp3s0 \-\-bridge br0
+hd-network-iface set enp3s0 \-\-unset bridge
+.fi
+.RE
+.PP
+Apply the changes:
+.PP
+.RS
+hd-network-render
 .RE
 .SH SEE ALSO
 .BR hd-network (7),
-.BR hd-network-iface (8),
+.BR hd-network-bridge (8),
 .BR hd-network-render (8),
 .BR hd-config-update (8)
 .SH AUTHOR

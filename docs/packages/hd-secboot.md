@@ -1,41 +1,26 @@
 ## Introduction
-The package `hd-secboot` lets a hyprdebian system boot under Secure Boot with keys of its owner, instead of, or next to, the keys of Microsoft that most firmware ships with. `hd-secboot-enroll` enrolls the keys in the firmware, and `hd-secboot-check` checks that Secure Boot is on.
+The package `hd-base` lets a hyprdebian system boot under Secure Boot with keys of its owner, instead of, or next to, the keys of Microsoft that most firmware ships with. `hd-secboot-enroll` enrolls the keys in the firmware, and `hd-secboot-check` checks that Secure Boot is on.
 
 It depends on the tools that make and use the keys, so they are installed with it and stay installed:
 - `openssl` makes the keys and their certificates;
 - `efitools` turns the certificates into EFI signature lists and signed updates, and enrolls them with `efi-updatevar`;
 - `sbsigntool` signs EFI files with `sbsign` and checks them with `sbverify`.
 
-On its first installation, it generates the keys in `/etc/hyprdebian/secboot`. When that directory already exists, on an upgrade, a reinstall or when the keys were put there by hand, the keys are kept: keys that are enrolled in the firmware are never replaced. Removing or purging the package keeps the keys as well.
+On its first installation, its postinst generates the keys in `/etc/hyprdebian/secboot`. When that directory already exists, on an upgrade, a reinstall or when the keys were put there by hand, the keys are kept: keys that are enrolled in the firmware are never replaced. Removing or purging the package keeps the keys as well.
 
-The package comes with three man pages: `man hd-secboot` describes the keys, `man hd-secboot-enroll` the command that enrolls them, and `man hd-secboot-check` the command that checks that Secure Boot is on.
+`hd-base` comes with three man pages for it: `man hd-secboot` describes the keys, `man hd-secboot-enroll` the command that enrolls them, and `man hd-secboot-check` the command that checks that Secure Boot is on.
 
 ## Building the package
-The package is built from `packages/hd-secboot` in this repository:
+The keys and their commands are part of the package `hd-base`, built from `packages/hd-base`; see [hd-base](hd-base.md). The files involved are:
 ```
-cd packages/hd-secboot
-make deb
+packages/hd-base/hd-secboot-enroll
+packages/hd-base/hd-secboot-check
+packages/hd-base/deb/postinst
+packages/hd-base/man/hd-secboot.7
+packages/hd-base/man/hd-secboot-enroll.8
+packages/hd-base/man/hd-secboot-check.8
+packages/hd-base/tests/test_secboot_check.py
 ```
-
-This builds `build/hd-secboot_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `openssl`, `efitools` and `sbsigntool`. Install it with:
-```
-sudo apt install ./build/hd-secboot_<version>_all.deb
-```
-
-The files involved are:
-```
-packages/hd-secboot/Makefile
-packages/hd-secboot/version.json
-packages/hd-secboot/hd-secboot-enroll
-packages/hd-secboot/hd-secboot-check
-packages/hd-secboot/deb/control
-packages/hd-secboot/deb/postinst
-packages/hd-secboot/man/hd-secboot.7
-packages/hd-secboot/man/hd-secboot-enroll.8
-packages/hd-secboot/man/hd-secboot-check.8
-packages/hd-secboot/tests/test_check.py
-```
-
 ## The keys
 There are three keys, all with the same owner GUID, a random UUID in `GUID.txt`:
 
@@ -105,9 +90,9 @@ hd-secboot-check [-q]
 With `-q` or `--quiet`, it says nothing and only sets the exit status. It exits with 0 when Secure Boot is on, 1 when it is not, and 2 on wrong arguments. `hd-report` sends the same state to the dashboard, which shows a system without Secure Boot as an error, see [hd-dashboard](hd-dashboard.md#issues).
 
 ## Tests
-The tests are in `packages/hd-secboot/tests`: the state `hd-secboot-check` finds in EFI variables in a temporary directory. They need nothing beyond Python:
+The tests are in `packages/hd-base/tests/test_secboot_check.py`: the state `hd-secboot-check` finds in EFI variables in a temporary directory. They need nothing beyond Python:
 ```
-cd packages/hd-secboot
+cd packages/hd-base
 make test
 ```
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """postinst of hd-base: masks the units that HyprDebian does not use, points /etc/resolv.conf at
-the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, and
-writes the login banner in /etc/issue.
+the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, writes
+the login banner in /etc/issue, and generates the Secure Boot keys.
 
 The units are masked on the first installation only, or on an upgrade from a version before
 MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
@@ -30,12 +30,23 @@ hd-link-repo, hd-issue and hd-report find it.
 /etc/issue of base-files is diverted to /etc/issue.debian, and hd-issue writes the HyprDebian
 banner in its place, on every installation and upgrade, so it shows the version that is installed.
 The postrm of a removal removes it and puts the one of base-files back.
+
+The Secure Boot keys in /etc/hyprdebian/secboot are generated when they are not there yet.
+Existing keys are never replaced, so an upgrade or a reinstall keeps keys that may already be
+enrolled in the firmware. The keys are the platform key (PK), the key exchange key (KEK) and the
+signature database key (db), all with the same owner GUID (GUID.txt). Each has its private key
+(.key), its certificate as PEM (.crt) for sbsign and as DER (.cer) for the key menus of firmware
+setups, an EFI signature list (.esl) and a signed update (.auth) for efi-updatevar or KeyTool: PK
+signs its own and that of KEK, KEK signs that of db. EFI files are signed with the db key. RSA 2048
+is the key size that the UEFI spec requires every firmware to support.
 """
 
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import uuid
 
 # The units that HyprDebian masks: the first boot setup, and rpcbind, which nfs-common pulls in
 # but which is not used.
@@ -72,6 +83,13 @@ RESOLV_CONF = "/etc/resolv.conf"
 STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]
 SERVERS_LINK = "../run/systemd/resolve/resolv.conf"
 SERVERS_FILE = "/run/systemd/resolve/resolv.conf"
+
+KEY_DIR = "/etc/hyprdebian/secboot"
+KEY_TMP_DIR = KEY_DIR + ".tmp"
+KEY_NAMES = ["PK", "KEK", "db"]
+# Each key is signed by the one named here: PK by itself, KEK by PK, db by KEK.
+KEY_SIGNER = {"PK": "PK", "KEK": "PK", "db": "KEK"}
+KEY_DAYS = 3650
 
 
 def mask_units():
@@ -133,6 +151,67 @@ def link_resolv_conf():
     print(f"Pointed {RESOLV_CONF} at {SERVERS_LINK}.")
 
 
+def run(*command):
+    subprocess.run(command, check=True)
+
+
+def hostname():
+    try:
+        with open("/etc/hostname", encoding="utf-8") as f:
+            name = f.read().strip()
+    except OSError:
+        name = ""
+    if name == "":
+        name = socket.gethostname()
+    return name
+
+
+def generate_keys_in(tmp):
+    guid = str(uuid.uuid4())
+    with open(os.path.join(tmp, "GUID.txt"), "w", encoding="utf-8") as f:
+        f.write(guid + "\n")
+
+    host = hostname()
+    for name in KEY_NAMES:
+        path = os.path.join(tmp, name)
+        run("openssl", "req", "-new", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256",
+            "-days", str(KEY_DAYS), "-subj", f"/CN=HyprDebian {host} Secure Boot {name}/",
+            "-keyout", f"{path}.key", "-out", f"{path}.crt")
+        run("openssl", "x509", "-in", f"{path}.crt", "-outform", "DER", "-out", f"{path}.cer")
+        run("cert-to-efi-sig-list", "-g", guid, f"{path}.crt", f"{path}.esl")
+
+    for name in KEY_NAMES:
+        path = os.path.join(tmp, name)
+        signer = os.path.join(tmp, KEY_SIGNER[name])
+        run("sign-efi-sig-list", "-g", guid, "-k", f"{signer}.key", "-c", f"{signer}.crt",
+            name, f"{path}.esl", f"{path}.auth")
+
+
+def generate_keys():
+    if os.path.exists(KEY_DIR):
+        print(f"Keeping the Secure Boot keys in {KEY_DIR}.")
+        return
+
+    # The keys are made in a directory of their own that only root can enter, and moved into
+    # place when they are all there, so a failure never leaves half a set of keys behind.
+    print(f"Generating the Secure Boot keys in {KEY_DIR}...", flush=True)
+    shutil.rmtree(KEY_TMP_DIR, ignore_errors=True)
+    os.makedirs(os.path.dirname(KEY_DIR), mode=0o755, exist_ok=True)
+    os.mkdir(KEY_TMP_DIR, mode=0o700)
+    old_umask = os.umask(0o077)
+    try:
+        generate_keys_in(KEY_TMP_DIR)
+    except (OSError, subprocess.CalledProcessError) as e:
+        shutil.rmtree(KEY_TMP_DIR, ignore_errors=True)
+        print(f"Error: Cannot generate the Secure Boot keys: {e}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        os.umask(old_umask)
+    for name in os.listdir(KEY_TMP_DIR):
+        os.chmod(os.path.join(KEY_TMP_DIR, name), 0o600)
+    os.rename(KEY_TMP_DIR, KEY_DIR)
+
+
 def main():
     # configure is the only action that installs the package; the abort-* actions undo a
     # failed upgrade or removal.
@@ -152,6 +231,7 @@ def main():
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)
     subprocess.run(["/usr/sbin/hd-issue"], check=True)
+    generate_keys()
 
 
 if __name__ == "__main__":

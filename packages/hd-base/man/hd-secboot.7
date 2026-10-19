@@ -1,9 +1,9 @@
-.TH HD-SECBOOT 7 "October 2026" "hd-secboot" "HyprDebian"
+.TH HD-SECBOOT 7 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
 hd-secboot \- the hyprdebian Secure Boot keys
 .SH DESCRIPTION
 The package
-.B hd-secboot
+.B hd-base
 lets a hyprdebian system boot under Secure Boot with keys of its owner,
 instead of, or next to, the keys of Microsoft that most firmware ships with.
 .BR hd-secboot-enroll (8)
@@ -115,6 +115,7 @@ has the keys enrolled; with them, anyone can.
 .I /etc/hyprdebian/secboot
 The keys.
 .SH SEE ALSO
+.BR hd-base (7),
 .BR hd-secboot-enroll (8),
 .BR hd-secboot-check (8),
 .BR efi-updatevar (1),

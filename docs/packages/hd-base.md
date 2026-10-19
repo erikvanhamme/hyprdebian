@@ -1,11 +1,18 @@
 ## Introduction
-The meta package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
+The package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
 
 It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
+It also holds the parts that every hyprdebian system shares, each with a page of its own:
+- [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, with `hd-config-update` and `hd-config-remove`;
+- [hd-network](hd-network.md): the network configuration, rendered into the systemd-networkd files by `hd-network-render` and changed with `hd-network-iface` and `hd-network-bridge`, and the `.link` files that name the network interfaces by their path;
+- [hd-secboot](hd-secboot.md): the Secure Boot keys of the owner, which the postinst generates in `/etc/hyprdebian/secboot` when they are not there yet, with `hd-secboot-enroll`, which enrolls them in the firmware, and `hd-secboot-check`, which checks that Secure Boot is on.
+
+These were the packages `hd-config`, `hd-network` and `hd-secboot` before. `hd-base` conflicts with them, replaces and provides them, so an upgrade removes them; the configuration and the keys stay.
+
 When a package becomes part of every hyprdebian system, it is added to the `Depends` of `hd-base`, to its man page and to this page.
 
-The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue` and `man hd-link-repo` the commands.
+The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue` and `man hd-link-repo` the commands. The man pages of the shared parts are listed on their pages.
 
 ## Building the package
 The package is built from `packages/hd-base` in this repository:
@@ -42,6 +49,7 @@ packages/hd-base/usr/lib/sysctl.d/50-zram.conf
 packages/hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
 packages/hd-base/deb/postinst
 packages/hd-base/deb/postrm
+packages/hd-base/deb/triggers
 packages/hd-base/deb/control
 packages/hd-base/man/hd-base.7
 packages/hd-base/man/hd-up.1
@@ -52,10 +60,15 @@ packages/hd-base/man/hd-issue.8
 packages/hd-base/man/hd-link-repo.8
 ```
 
+The files of the shared parts are listed on their pages: [hd-config](hd-config.md#building-the-package), [hd-network](hd-network.md#building-the-package) and [hd-secboot](hd-secboot.md#building-the-package).
+
+`make test` runs the tests in `packages/hd-base/tests`, see [hd-secboot](hd-secboot.md#tests).
+
 ## Packages
 | Group | Packages |
 | --- | --- |
-| hyprdebian | `hd-network`, the network configuration; see [hd-network](hd-network.md). `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo`; `kbd`, for Num Lock on the console. |
+| hyprdebian | `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo` and `hd-network-render`; `systemd`, for the network; `kbd`, for Num Lock on the console. |
+| Secure Boot | `openssl`, `efitools` and `sbsigntool`, which make the keys, enroll them and sign EFI files with them; see [hd-secboot](hd-secboot.md). |
 | Remote access and firewall | `openssh-server`, and `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
 | ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `build-essential` and `initramfs-tools` to build the ZFS module and the initrd. |
 | Firmware and boot | `firmware-linux` and `firmware-qlogic`; `efibootmgr` for the boot entries of the firmware. |
@@ -191,4 +204,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |
 | `/usr/lib/sysctl.d/50-zram.conf` | The sysctls for the zram swap. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
+| `/usr/sbin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
+| `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
+| `/usr/sbin/hd-secboot-*`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |

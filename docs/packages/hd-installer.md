@@ -150,11 +150,10 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_zfs_support` | Installs ZFS, with its module built by DKMS. |
 | `b_esp` | Mounts the EFI system partitions on `/boot/efi` and `/boot/efi2` in the new system. |
 | `b_bootloader` | Marks `hd-bootloader-txt` and `efibootmgr`. |
-| `b_secureboot` | Marks `hd-secboot`, which generates the Secure Boot keys. |
 | `b_systemd` | Marks `systemd-timesyncd` and `systemd-resolved`, and adds the user to `adm`, which may read the logs in the systemd journal. There is no syslog daemon. |
-| `b_utilities` | Marks `hd-base`. |
+| `b_utilities` | Marks `hd-base`, which also holds the network commands and generates the Secure Boot keys. |
 | `b_firewall` | Adds `pkg_enable_firewall`, which turns on ufw, which comes with hd-base. |
-| `b_network` | Marks `hd-network`, and for wifi `iwd` and `firmware-iwlwifi`. |
+| `b_network` | Marks `iwd` and `firmware-iwlwifi` for wifi, and adds `pkg_network`. |
 
 The packages phase installs every marked package in one `apt install`, then runs the steps that the base phase added to `pkg_post`:
 
@@ -164,7 +163,7 @@ The packages phase installs every marked package in one `apt install`, then runs
 | `pkg_enable_firewall` | Allows ssh in ufw, turns the firewall on and its logging off. ssh is allowed first, so an installation over ssh keeps its connection. |
 | `pkg_root_skel` | Copies `/etc/skel` into `/root`, so root gets the files of hd-base there, such as the aliases and the nano config, as the user does in `u_skel`. |
 | `pkg_network` | Sets the wired interface with `hd-network-iface set`, and the wifi interface with route metric 200, so wired is preferred; with wifi the boot does not wait for the network. Then renders the files with `hd-network-render` and enables `systemd-networkd`. |
-| `pkg_esps` | Writes the bootloader, its assets and the UKIs to the EFI system partitions with `update-esps` of the bootloader, signed with the Secure Boot keys of `hd-secboot`. |
+| `pkg_esps` | Writes the bootloader, its assets and the UKIs to the EFI system partitions with `update-esps` of the bootloader, signed with the Secure Boot keys of `hd-base`. |
 | `pkg_boot_entries` | Adds the firmware boot entries of the bootloader, `HyprDebian`, or `HyprDebian (primary)` and `HyprDebian (secondary)` on mirrored ESP disks. |
 
 ## User and cleanup

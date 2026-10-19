@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd, hd-config
+Depends: python3, systemd, hd-base
 Section: admin
 Priority: optional
 Description: HyprDebian dashboard

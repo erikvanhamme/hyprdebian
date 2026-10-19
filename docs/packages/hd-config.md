@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-config` keeps the configuration of hyprdebian in one file, `/etc/hyprdebian/config.json`. It holds a JSON object. Each hyprdebian package that has settings keeps them under a key of its own in that object, usually its package name:
+The package `hd-base` keeps the configuration of hyprdebian in one file, `/etc/hyprdebian/config.json`. It holds a JSON object. Each hyprdebian package that has settings keeps them under a key of its own in that object, usually its package name:
 ```
 {
     "hd-example": {
@@ -13,32 +13,17 @@ The file is changed with two commands, both run as root:
 - `hd-config-update` adds a key, or replaces its value;
 - `hd-config-remove` removes keys.
 
-The package comes with three man pages: `man hd-config` describes the configuration and how packages use it, `man hd-config-update` and `man hd-config-remove` the commands.
+`hd-base` comes with three man pages for it: `man hd-config` describes the configuration and how packages use it, `man hd-config-update` and `man hd-config-remove` the commands.
 
 ## Building the package
-The package is built from `packages/hd-config` in this repository:
+The commands are part of the package `hd-base`, built from `packages/hd-base`; see [hd-base](hd-base.md). The files involved are:
 ```
-cd packages/hd-config
-make deb
+packages/hd-base/hd-config-update
+packages/hd-base/hd-config-remove
+packages/hd-base/man/hd-config.7
+packages/hd-base/man/hd-config-update.8
+packages/hd-base/man/hd-config-remove.8
 ```
-
-This builds `build/hd-config_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3` only. Install it with:
-```
-sudo apt install ./build/hd-config_<version>_all.deb
-```
-
-The files involved are:
-```
-packages/hd-config/Makefile
-packages/hd-config/version.json
-packages/hd-config/hd-config-update
-packages/hd-config/hd-config-remove
-packages/hd-config/deb/control
-packages/hd-config/man/hd-config.7
-packages/hd-config/man/hd-config-update.8
-packages/hd-config/man/hd-config-remove.8
-```
-
 ## hd-config-update
 ```
 hd-config-update <key> [json]
@@ -72,15 +57,15 @@ Both commands exit with 0 on success, 1 on an error and 2 on wrong arguments. On
 ## How the file is written
 Both commands write the configuration as a whole to `/etc/hyprdebian/config.json.tmp` and move that into place, so the file is never seen half written. They hold a lock on `/etc/hyprdebian` while they change it, so two changes at the same time do not lose each other's work.
 
-The file is made by the first `hd-config-update`; the package itself installs no configuration. It is not a conffile: removing or purging `hd-config` keeps it.
+The file is made by the first `hd-config-update`; the package itself installs no configuration. It is not a conffile: removing or purging `hd-base` keeps it.
 
 ## Using it from a package
-A package that keeps its settings in the configuration depends on `hd-config` and sets its key in its postinst:
+A package that keeps its settings in the configuration depends on `hd-base` and sets its key in its postinst:
 ```
 hd-config-update hd-example '{"enabled": true, "port": 8080}'
 ```
 
-It removes the key in its postrm on a purge. By then `hd-config` may already be removed, so it checks first:
+It removes the key in its postrm on a purge. By then `hd-base` may already be removed, so it checks first:
 ```
 if [[ "${1:-}" == "purge" && -x /usr/sbin/hd-config-remove ]]; then
     hd-config-remove hd-example

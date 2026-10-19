@@ -25,7 +25,7 @@ cd packages/hd-qemu-kvm
 make deb
 ```
 
-This builds `build/hd-qemu-kvm_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `python3-debconf`, `debconf`, `hd-network`, `qemu-system-x86`, `qemu-utils`, `ovmf`, `libvirt-daemon-system`, `libvirt-clients` and `bridge-utils`. Install it with:
+This builds `build/hd-qemu-kvm_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `python3-debconf`, `debconf`, `hd-base`, `qemu-system-x86`, `qemu-utils`, `ovmf`, `libvirt-daemon-system`, `libvirt-clients` and `bridge-utils`. Install it with:
 ```
 sudo apt install ./build/hd-qemu-kvm_<version>_all.deb
 ```

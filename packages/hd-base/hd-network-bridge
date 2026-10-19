@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Adds, changes and removes bridges in the hyprdebian network settings.
 
-The package hd-network installs this as /usr/sbin/hd-network-bridge.
+The package hd-base installs this as /usr/sbin/hd-network-bridge.
 
     hd-network-bridge list                    list the bridges
     hd-network-bridge show <name>             show the settings of a bridge

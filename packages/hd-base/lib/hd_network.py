@@ -1,7 +1,7 @@
 """The settings of hd-network, shared by hd-network-render, hd-network-iface and
 hd-network-bridge.
 
-The package hd-network installs this as /usr/lib/hd-network/hd_network.py.
+The package hd-base installs this as /usr/lib/hd-network/hd_network.py.
 
 The settings are the key hd-network in /etc/hyprdebian/config.json. They are read from that
 file directly and written with hd-config-update, or removed with hd-config-remove when nothing

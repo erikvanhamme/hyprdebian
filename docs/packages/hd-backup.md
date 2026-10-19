@@ -26,7 +26,7 @@ cd packages/hd-backup
 make deb
 ```
 
-This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags`; building it needs `gcc` and `dpkg-dev`. It depends on `libc6`, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-config`, `zfsutils-linux`, `zstd`, `libvirt-clients` and `udev`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
+This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags`; building it needs `gcc` and `dpkg-dev`. It depends on `libc6`, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-base`, `zfsutils-linux`, `zstd`, `libvirt-clients` and `udev`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
 ```
 sudo apt install ./build/hd-backup_<version>_all.deb
 ```

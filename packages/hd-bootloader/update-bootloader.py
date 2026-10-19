@@ -81,7 +81,7 @@ here or in the module of the frontend, which should match. A key of another
 frontend is an error.
 
 When the Secure Boot keys of the system are in /etc/hyprdebian/secboot, as
-the package hd-secboot generates them, BOOTX64.EFI, assets.efi and the UKIs
+the package hd-base generates them, BOOTX64.EFI, assets.efi and the UKIs
 are signed with the db key (--db-key and --db-cert) by sbsign, before they
 replace the files on the ESP. A file whose contents would not change is
 still signed again when it does not verify with the db certificate, as after

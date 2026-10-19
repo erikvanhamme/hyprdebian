@@ -3,7 +3,8 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, python3-jinja2, sudo, kbd, hd-network,
+Depends: python3, python3-jinja2, sudo, kbd, systemd,
+ openssl, efitools, sbsigntool,
  openssh-server, kitty-terminfo, ufw,
  zfs-dkms, zfsutils-linux, zfs-initramfs, build-essential, initramfs-tools,
  firmware-linux, firmware-qlogic, efibootmgr,
@@ -12,15 +13,16 @@ Depends: python3, python3-jinja2, sudo, kbd, hd-network,
  eza, fzf, nfs-common, psmisc, net-tools, pciutils, usbutils, acpi,
  bash-completion, git, git-delta, ack, command-not-found, man-db, apt-file,
  systemd-zram-generator
-Conflicts: zram-tools
-Section: metapackages
+Conflicts: zram-tools, hd-config, hd-network, hd-secboot
+Replaces: hd-config, hd-network, hd-secboot
+Provides: hd-config, hd-network, hd-secboot
+Section: admin
 Priority: optional
 Description: HyprDebian base system
  Depends on the packages that every hyprdebian system has, so that they are
- installed with it and stay installed: the network configuration of
- hd-network, the SSH server and the firewall, ZFS with the tools to build its
- module, the firmware, the console, name resolution, and the
- command line tools.
+ installed with it and stay installed: the SSH server and the firewall, ZFS
+ with the tools to build its module, the firmware, the console, name
+ resolution, the Secure Boot tools, and the command line tools.
  .
  It also installs hd-up, which upgrades the system after a ZFS snapshot,
  hd-reboot and hd-poweroff, which work on a desktop and without one,
@@ -36,3 +38,17 @@ Description: HyprDebian base system
  shows the version and the suite, written in
  /etc/issue by hd-issue. hd-link-repo switches the HyprDebian repository and
  suite that apt gets the hd-* packages from.
+ .
+ It keeps the hyprdebian configuration in /etc/hyprdebian/config.json, where
+ hyprdebian packages write their settings under a key of their own with
+ hd-config-update and hd-config-remove. It renders the systemd-networkd
+ files from the key hd-network with hd-network-render; hd-network-iface and
+ hd-network-bridge change the interfaces and bridges in it. It names
+ ethernet and wifi interfaces by their path, such as enp3s0, also in the
+ initramfs.
+ .
+ On its first installation it generates the Secure Boot keys of the owner in
+ /etc/hyprdebian/secboot: PK, KEK and db, each with its certificate, EFI
+ signature list and signed update. Existing keys are never replaced.
+ hd-secboot-enroll enrolls them in the firmware, and hd-secboot-check checks
+ that Secure Boot is on.

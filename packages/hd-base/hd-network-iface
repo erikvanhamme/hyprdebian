@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Adds, changes and removes wired and wifi interfaces in the hyprdebian network settings.
 
-The package hd-network installs this as /usr/sbin/hd-network-iface.
+The package hd-base installs this as /usr/sbin/hd-network-iface.
 
     hd-network-iface list                     list the interfaces
     hd-network-iface show <name>              show the settings of an interface

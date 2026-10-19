@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Checks that Secure Boot is on.
 
-The package hd-secboot installs this as /usr/sbin/hd-secboot-check.
+The package hd-base installs this as /usr/sbin/hd-secboot-check.
 
     hd-secboot-check       say whether Secure Boot is on
     hd-secboot-check -q    say nothing, only set the exit status

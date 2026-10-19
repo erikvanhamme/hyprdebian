@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Adds a key to the hyprdebian configuration, or replaces its value.
 
-The package hd-config installs this as /usr/bin/hd-config-update.
+The package hd-base installs this as /usr/sbin/hd-config-update.
 
     hd-config-update <key> <json>   set <key> to the JSON value <json>
     hd-config-update <key>          set <key> to the JSON value read from stdin

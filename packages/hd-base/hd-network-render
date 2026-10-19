@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Renders the systemd-networkd files from the hyprdebian configuration.
 
-The package hd-network installs this as /usr/sbin/hd-network-render.
+The package hd-base installs this as /usr/sbin/hd-network-render.
 
     hd-network-render             write the files and reload systemd-networkd
     hd-network-render --dry-run   show what would change, change nothing

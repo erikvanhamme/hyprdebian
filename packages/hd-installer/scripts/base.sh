@@ -229,7 +229,7 @@ b_esp() {
 
 # The base system gets the text-only bootloader. Its postinst
 # does not write the ESPs: pkg_esps does that once all packages are installed, with the DKMS MOK
-# that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-secboot. pkg_boot_entries
+# that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-base. pkg_boot_entries
 # then adds its firmware boot entries.
 b_bootloader() {
     add_packages hd-bootloader-txt
@@ -237,12 +237,6 @@ b_bootloader() {
     add_packages efibootmgr
 
     add_dependencies "pkg_post" "pkg_esps" "pkg_boot_entries"
-}
-
-# The Secure Boot keys of the owner, which hd-secboot generates when it is installed. The
-# bootloader signs its files with them.
-b_secureboot() {
-    add_packages hd-secboot
 }
 
 b_systemd() {
@@ -253,7 +247,9 @@ b_systemd() {
 }
 
 # The packages of every HyprDebian system are the dependencies of hd-base, which also installs the
-# files in /etc/skel that root gets in pkg_root_skel and the user in u_skel.
+# files in /etc/skel that root gets in pkg_root_skel and the user in u_skel, the network commands
+# that pkg_network uses, and generates the Secure Boot keys that the bootloader signs its files
+# with.
 b_utilities() {
     add_packages hd-base
 
@@ -265,11 +261,9 @@ b_firewall() {
     add_dependencies "pkg_post" "pkg_enable_firewall"
 }
 
-# The network is configured with the hd-network-* commands once hd-network is installed, see
+# The network is configured with the hd-network-* commands of hd-base once it is installed, see
 # pkg_network. Wifi needs iwd, which also handles the login on the wifi network.
 b_network() {
-    add_packages hd-network
-
     if [[ "${Q_WIFI}" == "true" ]]; then
         add_packages iwd firmware-iwlwifi
     fi
@@ -294,7 +288,6 @@ add_dependencies "b_main" \
     "b_zfs_support" \
     "b_esp" \
     "b_bootloader" \
-    "b_secureboot" \
     "b_systemd" \
     "b_utilities" \
     "b_firewall" \

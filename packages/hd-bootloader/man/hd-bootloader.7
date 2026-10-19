@@ -158,10 +158,12 @@ hd-config-update hd-bootloader < bootloader.json
 .fi
 .RE
 .SH SECURE BOOT
-The packages do not depend on
+.B hd-base
+generates the Secure Boot keys of the owner in
+.IR /etc/hyprdebian/secboot ;
+see
 .BR hd-secboot (7).
-When its keys are in
-.IR /etc/hyprdebian/secboot ,
+When the keys are there,
 .B hd-bootloader-update
 signs the bootloader,
 .I assets.efi

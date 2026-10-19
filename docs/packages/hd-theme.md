@@ -14,7 +14,7 @@ cd packages/hd-theme
 make deb
 ```
 
-This builds `build/hd-theme_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `hd-config`, on `hd-art` and `hd-fonts` for the backgrounds and the font, on `python3-jinja2` for the templates, on `python3-cairo`, `python3-gi` and `gir1.2-pango-1.0` for the cards, and on `imv`, whose `imv-wayland` shows them. Install it with:
+This builds `build/hd-theme_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `hd-base`, on `hd-art` and `hd-fonts` for the backgrounds and the font, on `python3-jinja2` for the templates, on `python3-cairo`, `python3-gi` and `gir1.2-pango-1.0` for the cards, and on `imv`, whose `imv-wayland` shows them. Install it with:
 ```
 sudo apt install ./build/hd-theme_<version>_all.deb
 ```

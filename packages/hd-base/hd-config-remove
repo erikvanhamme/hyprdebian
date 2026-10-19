@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Removes keys from the hyprdebian configuration.
 
-The package hd-config installs this as /usr/bin/hd-config-remove.
+The package hd-base installs this as /usr/sbin/hd-config-remove.
 
     hd-config-remove <key>...   remove these keys and their values
 
