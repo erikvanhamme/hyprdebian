@@ -10,7 +10,7 @@
     "border": 3,
     "radius": 12,
     "gap": 6,
-    "icon_size": 64,
+    "icon_size": 48,
     "opacity": 0.9,
     "background": "emerald"
 }
