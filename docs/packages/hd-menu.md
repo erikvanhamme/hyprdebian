@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-menu` is a menu in the manner of wofi for the HyprDebian desktop. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of `/etc/hyprdebian/config.json`, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
+The package `hd-menu` is the keyboard-driven menu of the HyprDebian desktop. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of `/etc/hyprdebian/config.json`, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
 
 [hd-desktop](hd-desktop.md) depends on it, and uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher` writes in it.
 
