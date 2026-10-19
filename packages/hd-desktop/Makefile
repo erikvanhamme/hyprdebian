@@ -42,9 +42,11 @@
 #               greetd, writes it with hd-desktop-render, compiles the
 #               dconf database and writes the menu of the launcher with
 #               hd-launcher, and deb/postrm, which undoes the diversion on
-#               a removal and removes the menu on a purge. Raise the
-#               version in version.json for every package that is handed
-#               out.
+#               a removal and removes the menu on a purge. deb/preinst,
+#               deb/postinst and deb/postrm also remove the conffiles that
+#               the package no longer has, with dpkg-maintscript-helper
+#               rm_conffile. Raise the version in version.json for every
+#               package that is handed out.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -66,7 +68,7 @@ USR := $(shell find usr -type f)
 SUDOERS := etc/sudoers.d/hd-desktop
 # The commands, installed in /usr/bin.
 COMMANDS := hd-ask-poweroff hd-ask-reboot hd-mode-select hd-mount hd-unmount hd-volume-down \
-	hd-volume-mute hd-volume-up hd-wofi
+	hd-volume-mute hd-volume-up
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-desktop-render hd-launcher
 TEMPLATES := $(wildcard templates/*)
@@ -86,7 +88,7 @@ $(BUILD):
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
 $(DEB): version.json $(COMMANDS) hd-mount-helper $(SBIN_COMMANDS) $(TEMPLATES) $(ETC) $(USR) \
-		deb/control deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
+		deb/control deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(LIBEXEC_DIR) \
 		$(STAGE)$(TEMPLATE_DIR)
@@ -112,7 +114,7 @@ $(DEB): version.json $(COMMANDS) hd-mount-helper $(SBIN_COMMANDS) $(TEMPLATES) $
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
-	install -m 0755 deb/postinst deb/postrm $(STAGE)/DEBIAN/
+	install -m 0755 deb/preinst deb/postinst deb/postrm $(STAGE)/DEBIAN/
 	dpkg-deb --root-owner-group --build $(STAGE) $@
 
 clean:

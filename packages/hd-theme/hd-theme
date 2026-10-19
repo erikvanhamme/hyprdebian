@@ -24,13 +24,12 @@ program, next to its own config in the home directory of the user:
     ~/.config/hypr/hd-theme-hyprlock.conf   sourced by hyprlock.conf
     ~/.config/hypr/hd-theme-hyprpaper.conf  sourced by hyprpaper.conf
     ~/.config/mako/hd-theme                 included by the config of mako
-    ~/.config/wofi/hd-theme.css             imported by style.css of wofi
 
 The configs of the programs themselves are the user's and are never changed; the configs that
 hd-desktop puts in /etc/skel use the theme files. A config that does not refer to its theme file
 is reported. A theme file is only written when it changes, and only then is the program reloaded,
 unless --no-reload is given: Hyprland with hyprctl, hyprpaper by a restart of its user service,
-kitty with SIGUSR1 and mako with makoctl. hyprlock and wofi read their configs when they start.
+kitty with SIGUSR1 and mako with makoctl. hyprlock reads its config when it starts.
 
 Every theme has a card, a PNG rendered by hd-theme-card, in /var/cache/hd-theme/cards/<name>.png.
 --list opens imv-wayland on that directory. --add, --delete, --select and --cards are refused
@@ -78,7 +77,6 @@ TARGETS = [
      "hd-theme-hyprpaper.conf", "hyprpaper"),
     ("mako.j2", ".config/mako/hd-theme", ".config/mako/config", "~/.config/mako/hd-theme",
      "mako"),
-    ("wofi.css.j2", ".config/wofi/hd-theme.css", ".config/wofi/style.css", "hd-theme.css", None),
 ]
 
 

@@ -130,10 +130,6 @@ the image of the background that fits the monitors of Hyprland.
 .I ~/.config/mako/hd-theme
 The config of mako has
 .BR include=~/.config/mako/hd-theme .
-.TP
-.I ~/.config/wofi/hd-theme.css
-style.css has
-.BR "@import url(\(dqhd-theme.css\(dq);" .
 .PP
 The configs themselves belong to the user and are never changed; the ones
 that
@@ -150,7 +146,7 @@ reloaded: Hyprland with
 .BR hyprctl ,
 hyprpaper by a restart of its user service, kitty with SIGUSR1 and mako with
 .BR makoctl .
-hyprlock and wofi read their configs when they start.
+hyprlock reads its config when it starts.
 .SH EXAMPLES
 .nf
 cp /etc/hyprdebian/themes/default.json meadow.json

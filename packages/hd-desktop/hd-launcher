@@ -14,7 +14,7 @@ whose TryExec, when they have one, is installed. The key hd-launcher of
 /etc/hyprdebian/config.json is a list of desktop file IDs to leave out as well, such as
 "org.gnome.Settings.desktop"; the .desktop at the end may be left out.
 
-Every application is an option of the menu: its Name is the label and its desktop file ID the
+The menu is 40% of the width and the height of the output. Every application is an option of it: its Name is the label and its desktop file ID the
 value, which a launcher starts with "uwsm app -- <ID>". The options are sorted on the Name, in
 ascending order, without regard to case. The icon of an application is looked up by its Icon in the
 icon themes hicolor and Adwaita and in /usr/share/pixmaps, or taken from its path when it is one. A
@@ -44,6 +44,9 @@ CACHE_DIR = "/var/cache/hd-launcher"
 ICON_THEMES = ["/usr/share/icons/hicolor", "/usr/share/icons/Adwaita"]
 PIXMAPS = "/usr/share/pixmaps"
 BANNER = "Applications"
+# The size of the menu, as a percentage of the output.
+WIDTH = "40%"
+HEIGHT = "40%"
 
 # The default of hd-menu when the theme has no icon_size.
 ICON_SIZE = 64
@@ -305,7 +308,7 @@ def build_menu(config, icon_dir, dry_run):
         options.append(option)
     options.sort(key=lambda o: (o["label"].casefold(), o["label"], o["value"]))
     used = {o["icon"] for o in options if o.get("icon", "").startswith(icon_dir + "/")}
-    return {"banner": BANNER, "options": options}, used
+    return {"banner": BANNER, "width": WIDTH, "height": HEIGHT, "options": options}, used
 
 
 def remove_unused(icon_dir, used):

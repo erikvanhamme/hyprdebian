@@ -2,8 +2,15 @@
 # postrm of hd-desktop: a removal removes the greetd config that hd-desktop-render wrote and puts
 # back the one of greetd, which the postinst diverted. A purge also removes the compiled dconf
 # database of the dark theme when its source in /etc/dconf/db/local.d is gone, and the menu of the
-# launcher that hd-launcher wrote. Written for sh, as python3 may be gone by then.
+# launcher that hd-launcher wrote. It also finishes the removal of the conffiles that hd-desktop no
+# longer has, as the preinst and the postinst. Written for sh, as python3 may be gone by then.
 set -e
+
+# Keep these the same as in the preinst and the postinst.
+OBSOLETE_SINCE=0.10~
+for conffile in /etc/skel/.config/wofi/config /etc/skel/.config/wofi/style.css; do
+    dpkg-maintscript-helper rm_conffile "$conffile" "$OBSOLETE_SINCE" hd-desktop -- "$@"
+done
 
 GREETD_CONFIG=/etc/greetd/config.toml
 DCONF_DB=/etc/dconf/db/local

@@ -14,6 +14,6 @@ Description: HyprDebian theme engine
  .
  hd-theme adds, deletes and selects themes as root. Every user lists them
  with it, and applies the selected theme with it: that writes the theme files
- of kitty, Hyprland, hyprlock, hyprpaper, mako and wofi in their home
+ of kitty, Hyprland, hyprlock, hyprpaper and mako in their home
  directory. hd-theme-card renders a theme into a card, a PNG that
  hd-theme --list shows in imv-wayland.

@@ -10,7 +10,7 @@ hd-desktop/etc/skel/.config/hypr/hyprland.lua
 | Keys | Action |
 | --- | --- |
 | `SUPER + RETURN` | Open a terminal (kitty) |
-| `SUPER + SPACE` | Open the application launcher (wofi) |
+| `SUPER + SPACE` | Open the application launcher ([hd-menu](../packages/hd-menu.md)) |
 | `SUPER + B` | Open the browser (firefox) |
 | `SUPER + C` | Open VSCodium |
 | `SUPER + A` | Open the audio mixer (wiremix) in a terminal |

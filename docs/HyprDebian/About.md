@@ -17,7 +17,7 @@ Hyprdebian is intended to have only 1 user.
 
 - **Compositor:** **Hyprland** (Wayland) providing a dynamic, tiled workspace environment.
 - **Terminal Emulator:** **kitty**, configured as the primary interface for both local commands and terminal application workflows.
-- **Application Launcher:** **wofi** for lightweight, key-driven application launching and dynamic menu prompts.
+- **Application Launcher:** **hd-menu**, the menu of HyprDebian, for key-driven application launching and the menu prompts.
 - **Notification Daemon:** **mako** for minimal desktop notifications.
 
 ## Audio & Networking

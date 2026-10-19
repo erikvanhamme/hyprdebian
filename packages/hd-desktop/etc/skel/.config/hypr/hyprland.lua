@@ -31,6 +31,15 @@ hl.monitor({
 local terminal    = "kitty"
 local browser     = "firefox"
 
+-- Applications are started with uwsm app, each as a systemd user unit of its own: its own
+-- cgroup, its output in the journal and a clean stop at the logout. Short commands and the menus
+-- are started as they are.
+local app         = "uwsm app -- "
+
+-- The menu of the application launcher, written by hd-launcher. hd-menu prints the desktop file
+-- ID of the application chosen, and exits with 1 when the menu is closed without a choice.
+local launcher    = [[if id=$(hd-menu < /var/cache/hd-launcher/launcher.json); then uwsm app -- "$id"; fi]]
+
 
 -------------------
 ---- AUTOSTART ----
@@ -219,19 +228,19 @@ hl.device({
 local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
-hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(terminal))
+hl.bind(mainMod .. " + RETURN", hl.dsp.exec_cmd(app .. terminal))
 local closeWindowBind = hl.bind(mainMod .. " + W", hl.dsp.window.close())
-hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
+hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(app .. browser))
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
-hl.bind(mainMod .. " + C", hl.dsp.exec_cmd("codium"))
-hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd("/usr/bin/hd-wofi --show drun"))
-hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(terminal .. " -e wiremix"))
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(app .. "codium"))
+hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(launcher))
+hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(app .. terminal .. " -e wiremix"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd([[ notify-send "`date`" ]]))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/bin/hd-ask-reboot"))
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/bin/hd-ask-poweroff"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("/usr/bin/hd-mount"))
 hl.bind(mainMod .. " + U", hl.dsp.exec_cmd("/usr/bin/hd-unmount"))
-hl.bind(mainMod .. " + Y", hl.dsp.exec_cmd("kitty -o confirm_os_window_close=0 -e hd-yazi"))
+hl.bind(mainMod .. " + Y", hl.dsp.exec_cmd(app .. "kitty -o confirm_os_window_close=0 -e hd-yazi"))
 hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("/usr/bin/hd-mode-select"))
 
 -- Move focus with mainMod + arrow keys

@@ -2,7 +2,7 @@
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
 - Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown;
 - greetd, which logs the user in to Hyprland at the boot;
-- kitty, wofi, [hd-menu](hd-menu.md), [hd-theme](hd-theme.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
+- kitty, [hd-menu](hd-menu.md), [hd-theme](hd-theme.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
 - nwg-look with the GTK and Qt themes, the wallpapers of [hd-art](hd-art.md) and the fonts of [hd-fonts](hd-fonts.md);
 - yazi, and the applications audacious, mpv, imv, firefox and meld.
 
@@ -10,9 +10,9 @@ It recommends the screensaver of [hd-screensaver](hd-screensaver.md), which hypr
 
 It also recommends the boot splash of [hd-plymouth](hd-plymouth.md), which looks like the lock screen of hyprlock and asks for the password of an encrypted ZFS dataset.
 
-It also installs the files that new users get in their home directory, the commands that the key bindings run, the dark theme for GTK applications and the sudoers rule of the mount menus.
+It also installs the files that new users get in their home directory, the commands that the key bindings run, the menu of the application launcher, the dark theme for GTK applications and the sudoers rule of the mount menus.
 
-The package comes with the man pages `man 7 hd-desktop` and `man hd-desktop-render`.
+The package comes with the man pages `man 7 hd-desktop`, `man hd-desktop-render` and `man hd-launcher`.
 
 ## Building the package
 The package is built from `packages/hd-desktop` in this repository:
@@ -34,6 +34,7 @@ packages/hd-desktop/deb/control
 packages/hd-desktop/deb/postinst
 packages/hd-desktop/deb/postrm
 packages/hd-desktop/hd-desktop-render
+packages/hd-desktop/hd-launcher
 packages/hd-desktop/templates/greetd.toml.j2
 packages/hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd-mount-helper,
 hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
@@ -41,6 +42,7 @@ packages/hd-desktop/etc/...
 packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
 packages/hd-desktop/man/hd-desktop.7
 packages/hd-desktop/man/hd-desktop-render.8
+packages/hd-desktop/man/hd-launcher.8
 ```
 
 ## Booting into Hyprland
@@ -71,13 +73,13 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/hypr/hyprland.lua` | The config of Hyprland, with the [key bindings](../HyprDebian/Key%20Bindings.md). |
 | `~/.config/hypr/hypridle.conf` | The screensaver of [hd-screensaver](hd-screensaver.md) after 2 minutes, hyprlock after 4, and the monitors off after that. |
 | `~/.config/hypr/hyprlock.conf`, `hyprpaper.conf` | The lock screen and the wallpaper. |
-| `~/.config/kitty`, `mako`, `wofi`, `mpv` | The terminal, the notifications, the launcher and the media player. |
+| `~/.config/kitty`, `mako`, `mpv` | The terminal, the notifications and the media player. |
 | `~/.config/alsa`, `pipewire` | The sound. |
 | `~/.config/nwg-look`, `~/.local/share/nwg-look` | The GTK theme and font, applied by `nwg-look -a` when Hyprland starts. |
 | `~/.config/VSCodium` | The settings of VSCodium. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
-The configs of Hyprland, hyprlock, hyprpaper, kitty, mako and wofi take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
+The configs of Hyprland, hyprlock, hyprpaper, kitty and mako take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
 
 The installation of the package also gives these files to the user who is logged in to Hyprland, the one that `hd-desktop-render --print-user` prints, when that user exists: it copies the files of `/etc/skel` that are missing from their home directory, as that user, with `cp -a --update=none`. Files that the user has are kept. This is done on the first installation, and on an upgrade from a version before 0.3, which did not do it; later upgrades do not copy again, so a file that the user removed stays away. When the installer runs, the user does not exist yet, and the installer copies `/etc/skel` itself.
 
@@ -95,15 +97,36 @@ The key bindings run these commands, in `/usr/bin`:
 | `hd-mode-select` | Choose the resolution and refresh rate of a monitor with [hd-menu](hd-menu.md). |
 | `hd-mount`, `hd-unmount` | Mount a drive or an `/etc/fstab` entry, a drive on `/mnt/<user>/<n>`, and unmount it again, with [hd-menu](hd-menu.md). |
 | `hd-volume-up`, `hd-volume-down`, `hd-volume-mute` | Change the volume of the default output and show it in a notification. |
-| `hd-wofi` | Run wofi with the given arguments, unless a wofi of `hd-wofi` is already open; then it exits with 1. The launcher opens with it, so a second press of its key binding opens no second launcher. The menus above use [hd-menu](hd-menu.md), which has a lock of its own. |
+
+The menus above and the application launcher use [hd-menu](hd-menu.md), which has a lock of its own, so a second press of a key binding opens no second menu.
 
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
+
+## Application launcher
+`SUPER + SPACE` opens the application launcher: the menu `/var/cache/hd-launcher/launcher.json` in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application chosen is started with `uwsm app -- <ID>`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
+
+`hd-launcher`, in `/usr/sbin`, writes the menu as root from the `.desktop` files in `/usr/share/applications` and its subdirectories. An application is in it when its `.desktop` file is of the `Type` Application, has a `Name` and an `Exec`, is not `NoDisplay` or `Hidden`, is not left out for Hyprland by `OnlyShowIn` or `NotShowIn`, has its `TryExec` installed, when it has one, and is not in the exclusion list. Its `Name` is the label and its desktop file ID, such as `firefox.desktop`, the value; the options are sorted on the `Name`, in ascending order, without regard to case.
+
+The icon is looked up by the `Icon` of the application in the icon themes hicolor and Adwaita and in `/usr/share/pixmaps`, or taken from its path when it is one. A PNG is used as it is; an SVG is rendered to a PNG of the `icon_size` of the [theme](hd-theme.md) in `/var/cache/hd-launcher/icons`, only when the PNG there was not rendered from that SVG at that size.
+
+The apt hook `/etc/apt/apt.conf.d/90hd-launcher` runs `hd-launcher` each time apt has run dpkg: after an installation, an upgrade or a removal. A failure is reported but does not fail apt. The installation of the package runs it too. After another theme is selected, with another `icon_size`, run it again:
+```
+sudo hd-launcher
+```
+
+`hd-launcher --dry-run` prints the menu without writing it, as any user.
+
+The key `hd-launcher` of `/etc/hyprdebian/config.json` is a list of the desktop file IDs to leave out; the `.desktop` at the end may be left out:
+```
+sudo hd-config-update hd-launcher '["org.gnome.Meld.desktop", "debian-xterm"]'
+sudo hd-launcher
+```
 
 ## Dark theme
 `/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`.
 
 ## Removing the package
-Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files and the sudoers rule stay until the package is purged; the settings in `/etc/hyprdebian/config.json` stay.
+Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher`; the settings in `/etc/hyprdebian/config.json` stay.
 
 ## Files
 | Path | Purpose |
@@ -113,7 +136,10 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf` | Runs `hd-desktop-render` before greetd starts. |
 | `/etc/greetd/config.toml` | The greetd config, written by `hd-desktop-render`. |
 | `/etc/greetd/config.toml.greetd` | The config of the package greetd, diverted. |
-| `/etc/hyprdebian/config.json` | The settings, in the key `hd-desktop`. |
+| `/etc/hyprdebian/config.json` | The settings, in the keys `hd-desktop` and `hd-launcher`. |
+| `/usr/sbin/hd-launcher` | Writes the menu of the application launcher. |
+| `/var/cache/hd-launcher/launcher.json`, `/var/cache/hd-launcher/icons` | The menu of the application launcher and the PNGs rendered from SVG icons. |
+| `/etc/apt/apt.conf.d/90hd-launcher` | Runs `hd-launcher` each time apt has run dpkg. |
 | `/var/log/hyprland.log` | The output of Hyprland. |
 | `/usr/bin/hd-*` | The commands of the key bindings. |
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |

@@ -52,7 +52,7 @@ A theme is a JSON object with all of these members, and no others:
     "radius": 10,
     "gap": 4,
     "opacity": 0.8,
-    "icon_size": 64,
+    "icon_size": 48,
     "background": "emerald"
 }
 ```
@@ -112,11 +112,10 @@ hd-theme --apply
 | `~/.config/hypr/hd-theme-hyprlock.conf` | `source` in `hyprlock.conf`, which uses its variables `$hd_font`, `$hd_highlight`, `$hd_normal`, `$hd_light`, `$hd_dark`, `$hd_border`, `$hd_radius` and `$hd_background` |
 | `~/.config/hypr/hd-theme-hyprpaper.conf` | `source` in `hyprpaper.conf`, which uses its variable `$hd_background`, the image of the background that fits the monitors of Hyprland |
 | `~/.config/mako/hd-theme` | `include=~/.config/mako/hd-theme` in the config of mako |
-| `~/.config/wofi/hd-theme.css` | `@import url("hd-theme.css");` in `style.css` of wofi |
 
 The configs themselves belong to the user and are never changed; the ones that [hd-desktop](hd-desktop.md) puts in `/etc/skel` use the theme files. A config that does not use its theme file is reported. Settings after the line that uses the theme file take the place of the theme.
 
-A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock and wofi read their configs when they start. `--no-reload` writes the theme files and reloads nothing.
+A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock reads its config when it starts. `--no-reload` writes the theme files and reloads nothing.
 
 A new user has no theme files until they run `hd-theme --apply`. Until then, Hyprland and kitty use their own defaults for what the theme sets, and hyprlock and hyprpaper miss the variables of the theme.
 

@@ -18,7 +18,7 @@ Feel free to experiment with it.
 5.  No pointy-clicky GUI's for any configuration. Nano is your configuration tool.
 6.  Automatic login to graphical session. See [hd-desktop](docs/packages/hd-desktop.md).
 7.  Keyboard shortcuts for the commonly used tools.
-8.  Wofi launcher for the other tools.
+8.  An application launcher for the other tools, with hd-menu.
 9.  Basic notification system using mako.
 10. Optional printing support through cups, configured via the cups web interface. See [hd-cups](docs/packages/hd-cups.md).
 11. Some laptop friendly optimization.
@@ -32,7 +32,7 @@ Feel free to experiment with it.
 - **Base:** Debian unstable (sid), with extra packages from the local hyprdebian repository.
 - **Storage:** ZFS on root with native encryption, on a single drive or mirrored over two drives. The installer takes an `@install` snapshot of the boot and root datasets.
 - **Session:** systemd, with uwsm managing the Hyprland session and greetd for the login.
-- **Desktop:** Hyprland, with kitty as terminal, wofi as launcher and mako for notifications.
+- **Desktop:** Hyprland, with kitty as terminal, hd-menu as launcher and menus, and mako for notifications.
 - **Audio:** PipeWire, with wiremix as mixer.
 - **Network:** systemd-networkd, with iwd for wifi.
 

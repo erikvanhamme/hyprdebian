@@ -2,7 +2,7 @@
 """postinst of hd-desktop: diverts /etc/greetd/config.toml of greetd, writes the greetd config of
 HyprDebian in its place with hd-desktop-render, compiles the dconf database of the dark theme,
 copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
-with hd-launcher.
+with hd-launcher. It also finishes the removal of the conffiles that hd-desktop no longer has.
 
 greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
@@ -23,6 +23,11 @@ installer runs, the user does not exist yet, and the installer copies /etc/skel 
 The apt hook of hd-launcher writes the menu after every run of dpkg by apt, but not when the
 package is installed with dpkg alone, so the postinst writes it too. A menu that cannot be written
 does not fail the installation.
+
+The conffiles in OBSOLETE_CONFFILES are removed with dpkg-maintscript-helper rm_conffile, which the
+preinst, the postinst and the postrm all run with their arguments. dpkg cannot remove their
+directory at the unpack, while they are still there, so the postinst removes it when it is empty;
+otherwise new users would get it from /etc/skel.
 """
 
 import os
@@ -33,6 +38,13 @@ import sys
 GREETD_CONFIG = "/etc/greetd/config.toml"
 GREETD_CONFIG_DIVERTED = "/etc/greetd/config.toml.greetd"
 SKEL_DIR = "/etc/skel"
+
+# The conffiles that hd-desktop no longer has, and the version that removed them, with ~ so that
+# its prereleases count. Keep them the same as in the preinst and the postrm.
+OBSOLETE_CONFFILES = ["/etc/skel/.config/wofi/config", "/etc/skel/.config/wofi/style.css"]
+OBSOLETE_SINCE = "0.10~"
+# The directories of the obsolete conffiles, removed when they are empty.
+OBSOLETE_DIRS = ["/etc/skel/.config/wofi"]
 
 # The first version of hd-desktop that copies /etc/skel to the home directory of the user.
 SKEL_SINCE = "0.3"
@@ -68,7 +80,21 @@ def copy_skel():
     print(f"Copied the files of {SKEL_DIR} that {user} did not have to {home}.")
 
 
+def remove_obsolete_conffiles():
+    for conffile in OBSOLETE_CONFFILES:
+        subprocess.run(["dpkg-maintscript-helper", "rm_conffile", conffile, OBSOLETE_SINCE,
+                        "hd-desktop", "--", *sys.argv[1:]], check=True)
+
+
+def remove_obsolete_dirs():
+    for directory in OBSOLETE_DIRS:
+        if os.path.isdir(directory) and not os.listdir(directory):
+            os.rmdir(directory)
+
+
 def main():
+    remove_obsolete_conffiles()
+
     # configure is the only action that installs the package; the abort-* actions undo a
     # failed upgrade or removal.
     if len(sys.argv) < 2 or sys.argv[1] != "configure":
@@ -76,6 +102,8 @@ def main():
 
     # The version that was configured before, empty on the first installation.
     previous = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    remove_obsolete_dirs()
 
     divert(GREETD_CONFIG, GREETD_CONFIG_DIVERTED)
     subprocess.run(["/usr/sbin/hd-desktop-render"], check=True)

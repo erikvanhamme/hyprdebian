@@ -1,0 +1,13 @@
+#!/bin/sh
+# preinst of hd-desktop: the first step of removing the conffiles that hd-desktop no longer has,
+# with dpkg-maintscript-helper rm_conffile; the postinst and the postrm do the other steps. A
+# conffile that the user changed is kept, as <conffile>.dpkg-bak. Since 0.10, wofi is gone: its
+# config in /etc/skel too.
+set -e
+
+# The version of hd-desktop that removed the conffiles, with ~ so that its prereleases count.
+OBSOLETE_SINCE=0.10~
+
+for conffile in /etc/skel/.config/wofi/config /etc/skel/.config/wofi/style.css; do
+    dpkg-maintscript-helper rm_conffile "$conffile" "$OBSOLETE_SINCE" hd-desktop -- "$@"
+done
