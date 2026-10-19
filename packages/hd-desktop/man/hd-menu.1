@@ -1,0 +1,151 @@
+.TH HD-MENU 1 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-menu \- a menu for the HyprDebian desktop
+.SH SYNOPSIS
+.B hd-menu
+.RI < menu.json
+.SH DESCRIPTION
+.B hd-menu
+shows a menu in the middle of the screen, chosen from with the keyboard,
+and prints the value of the option chosen on stdout.
+It takes no arguments; it reads the menu as JSON from stdin.
+.PP
+It draws on a wlr-layer-shell surface over the whole output, so it needs a
+Wayland compositor with wlr-layer-shell, such as Hyprland.
+The menu has the keyboard to itself while it is open.
+Only one
+.B hd-menu
+is open at a time: another one exits at once with 1.
+.SH THE MENU
+.nf
+{
+    "banner": "Reboot system?",
+    "width": 500,
+    "options": [
+        {"label": "No", "default": true},
+        {"label": "Yes", "value": "yes", "icon": "/usr/share/icons/reboot.svg"}
+    ]
+}
+.fi
+.TP
+.B banner
+Optional: a line of text at the top of the menu.
+.TP
+.B width
+Optional: the width of the menu, in logical pixels (a number) or as a
+percentage of the output (a string such as \(dq50%\(dq).
+Without it, the menu is just wide enough for the banner and the options.
+.TP
+.B height
+Optional: the height of the menu, likewise.
+Without it, the menu is just high enough for the banner and all options.
+.TP
+.B options
+The options, in this order; at least one.
+Each is an object with:
+.RS
+.TP
+.B label
+The text shown.
+.TP
+.B value
+Optional: what
+.B hd-menu
+prints when the option is chosen; the label when there is none.
+.TP
+.B icon
+Optional: the path of a PNG or SVG
+.RB ( .svg " or " .svgz )
+image, shown left of the label at the
+.B icon_size
+of the theme.
+An icon that cannot be loaded is left out, with a message on stderr.
+.TP
+.B default
+Optional: true for the option selected at the start; the first option when
+none has it.
+.RE
+.PP
+Other members are ignored.
+The menu is never larger than the output; options that do not fit scroll.
+.PP
+The Font Awesome glyphs of the Nerd Font of
+.BR hd-fonts ,
+such as \e\&uf00c (a check mark) and \e\&uf00d (a cross), can be written as
+escapes in a label.
+.SH KEYS
+.TP
+.BR Up ", " Down ", " Tab
+Select the previous or next option.
+.TP
+.BR "Page Up" ", " "Page Down" ", " Home ", " End
+Move a page, or to the first or the last option.
+.TP
+.B Enter
+Choose the selected option.
+.TP
+.B Escape
+Close the menu without a choice.
+.SH THE THEME
+.B hd-menu
+draws the menu in the
+.B hd-theme
+of
+.IR /etc/hyprdebian/config.json ,
+which
+.BR hd-config-update (8)
+sets: the font and its
+.BR font-size-big ,
+the colours
+.B dark
+(the background, at
+.BR opacity ),
+.B light
+(the text),
+.B normal
+(the selected option and the divider) and
+.B highlight
+(the border), the
+.B border
+width, the corner
+.B radius
+and the
+.BR icon_size .
+A setting that is missing has its default; when the file cannot be read, the
+whole theme has.
+.SH EXIT STATUS
+.TP
+.B 0
+An option was chosen; its value is on stdout.
+.TP
+.B 1
+The menu was closed without a choice, or another
+.B hd-menu
+is open.
+.TP
+.B 2
+An error: arguments, invalid JSON on stdin, a menu without options, or no
+Wayland compositor with wlr-layer-shell.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The theme, in
+.BR hd-theme .
+.TP
+.IR /run/user/ UID /hd-menu.lock
+The lock that keeps a second
+.B hd-menu
+from opening.
+.SH EXAMPLES
+Ask before a reboot:
+.PP
+.nf
+choice=$(echo \(aq{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}]}\(aq | hd-menu)
+if [[ "$choice" == "Yes" ]]; then
+    hd-reboot
+fi
+.fi
+.SH SEE ALSO
+.BR hd-desktop (7),
+.BR hd-config-update (8),
+.BR hd-reboot (1)

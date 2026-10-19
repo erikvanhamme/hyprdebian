@@ -2,17 +2,23 @@
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
 - Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown;
 - greetd, which logs the user in to Hyprland at the boot;
-- kitty, [hd-menu](hd-menu.md), [hd-theme](hd-theme.md), mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
-- nwg-look with the GTK and Qt themes, the wallpapers of [hd-art](hd-art.md) and the fonts of [hd-fonts](hd-fonts.md);
+- kitty, mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
+- nwg-look with the GTK and Qt themes, and plymouth;
 - yazi, and the applications audacious, mpv, imv, firefox and meld.
 
-It recommends the screensaver of [hd-screensaver](hd-screensaver.md), which hypridle starts after 2 minutes. Without it, hypridle only locks the screen and turns the monitors off: the command line that starts the screensaver ends in `|| true`, so hypridle logs no failed command.
+It holds the parts of the desktop, each with a page of its own:
+- [hd-art](hd-art.md): the wallpapers;
+- [hd-fonts](hd-fonts.md): JetBrains Mono with the icons of Nerd Fonts;
+- [hd-menu](hd-menu.md): the keyboard-driven menu of the key bindings and the application launcher;
+- [hd-theme](hd-theme.md): the theme engine;
+- [hd-screensaver](hd-screensaver.md): the screensaver, which hypridle starts after 2 minutes;
+- [hd-plymouth](hd-plymouth.md): the boot splash, which looks like the lock screen of hyprlock and asks for the password of an encrypted ZFS dataset.
 
-It also recommends the boot splash of [hd-plymouth](hd-plymouth.md), which looks like the lock screen of hyprlock and asks for the password of an encrypted ZFS dataset.
+These were the packages `hd-art`, `hd-fonts`, `hd-menu`, `hd-theme`, `hd-screensaver` and `hd-plymouth` before. `hd-desktop` conflicts with them, replaces and provides them, so an upgrade removes them; the themes, the selected theme and the theme files of the users stay.
 
 It also installs the files that new users get in their home directory, the commands that the key bindings run, the menu of the application launcher, the dark theme for GTK applications and the sudoers rule of the mount menus.
 
-The package comes with the man pages `man 7 hd-desktop`, `man hd-desktop-render` and `man hd-launcher`.
+The package comes with the man pages `man 7 hd-desktop`, `man hd-desktop-render` and `man hd-launcher`. The man pages of the parts are listed on their pages.
 
 ## Building the package
 The package is built from `packages/hd-desktop` in this repository:
@@ -21,16 +27,21 @@ cd packages/hd-desktop
 make deb
 ```
 
-This builds `build/hd-desktop_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It needs the HyprDebian repository for `hd-base`, `hd-art`, `hd-fonts`, `wiremix` and `yazi`. Install it with:
+This builds `build/hd-desktop_<version>_<arch>.deb`. Its version is the version of HyprDebian, from `version.json` in the root of this repository, as for [hd-base](hd-base.md); hd-desktop has no version of its own. It depends on `hd-base` of exactly the same version, so the desktop and the base system always come from the same release. hd-menu is compiled in a container, so the package is for the architecture of the build computer; see [hd-menu](hd-menu.md#building-the-package). The fonts are downloaded on the first build; see [hd-fonts](hd-fonts.md#building-the-package). Install it with:
 ```
-sudo apt install ./build/hd-desktop_<version>_all.deb
+sudo apt install ./build/hd-desktop_<version>_<arch>.deb
 ```
+
+It needs the HyprDebian repository for `hd-base`, `wiremix` and `yazi`.
 
 The files involved are:
 ```
 packages/hd-desktop/Makefile
-packages/hd-desktop/version.json
+version.json
 packages/hd-desktop/deb/control
+packages/hd-desktop/deb/copyright
+packages/hd-desktop/deb/triggers
+packages/hd-desktop/deb/preinst
 packages/hd-desktop/deb/postinst
 packages/hd-desktop/deb/postrm
 packages/hd-desktop/hd-desktop-render
@@ -44,6 +55,8 @@ packages/hd-desktop/man/hd-desktop.7
 packages/hd-desktop/man/hd-desktop-render.8
 packages/hd-desktop/man/hd-launcher.8
 ```
+
+The files of the parts are listed on their pages.
 
 ## Booting into Hyprland
 greetd runs on tty7 and logs the user in to Hyprland at the boot, without a password, with `uwsm start hyprland.desktop`. The output of Hyprland goes to `/var/log/hyprland.log`, which belongs to the user. greetd does this once per boot: after a logout from Hyprland, it switches to the console on tty1 and stops.

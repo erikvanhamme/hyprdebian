@@ -1,0 +1,165 @@
+.TH HD-THEME 1 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-theme \- add, delete, list, select and apply the themes of HyprDebian
+.SH SYNOPSIS
+.B hd-theme \-\-list
+.br
+.B hd-theme \-\-add
+.I file
+.br
+.B hd-theme \-\-delete
+.I name
+.br
+.B hd-theme \-\-select
+.I name
+.br
+.B hd-theme \-\-apply
+.RB [ \-\-no\-reload ]
+.br
+.B hd-theme \-\-cards
+.SH DESCRIPTION
+.B hd-theme
+manages the themes in
+.IR /etc/hyprdebian/themes ,
+see
+.BR hd-theme (7),
+and applies the selected theme to the desktop of the user who runs it.
+.BR \-\-add ,
+.BR \-\-delete ,
+.B \-\-select
+and
+.B \-\-cards
+are refused when not run as root.
+.B \-\-list
+and
+.B \-\-apply
+are run by any user.
+.SH OPTIONS
+.TP
+.B \-\-list
+Print the names of the themes, with
+.B *
+before the selected one, and open
+.BR imv-wayland (1)
+on the directory of the cards, starting at the card of the selected theme.
+Without a Wayland display, only the names are printed.
+.TP
+.BI \-\-add " file"
+Add the theme in
+.IR file .
+Its name is the name of the file without
+.IR .json :
+lower case letters, digits,
+.B \-
+and
+.BR _ .
+A theme of that name is replaced.
+The theme is checked, and its card is rendered with
+.BR hd-theme-card (1);
+when either fails, nothing is added.
+A member
+.B name
+in the file is left out.
+When the theme replaces the selected one, it is selected again.
+.TP
+.BI \-\-delete " name"
+Delete a theme and its card.
+The selected theme cannot be deleted.
+.TP
+.BI \-\-select " name"
+Make
+.I name
+the theme of the system: copy it, with its name, to the key
+.B hd-theme
+of
+.I /etc/hyprdebian/config.json
+with
+.BR hd-config-update (8).
+Programs that read that file themselves, such as
+.BR hd-menu (1),
+use it at once.
+The desktops of the users do not change until each user runs
+.BR "hd-theme \-\-apply" .
+.TP
+.B \-\-apply
+Write the theme files of the desktop programs in the home directory of the
+user, from the selected theme, and reload the programs whose theme file
+changed; see
+.B APPLYING
+below.
+.TP
+.B \-\-no\-reload
+With
+.BR \-\-apply :
+write the theme files, reload nothing.
+.TP
+.B \-\-cards
+Render the cards of all themes again, and remove the cards of themes that are
+gone.
+.SH APPLYING
+.B \-\-apply
+makes the theme files from the jinja2 templates in
+.IR /usr/share/hd-theme/templates .
+Each one is used by the config of its program:
+.TP
+.I ~/.config/kitty/hd-theme.conf
+kitty.conf has
+.BR "include hd-theme.conf" .
+.TP
+.I ~/.config/hypr/hd-theme.lua
+hyprland.lua has
+.BR "pcall(require, \(dqhd-theme\(dq)" .
+.TP
+.I ~/.config/hypr/hd-theme-hyprlock.conf
+hyprlock.conf sources it and uses its variables
+.BR $hd_font ,
+.BR $hd_highlight ,
+.BR $hd_normal ,
+.BR $hd_light ,
+.BR $hd_dark ,
+.BR $hd_border ,
+.B $hd_radius
+and
+.BR $hd_background .
+.TP
+.I ~/.config/hypr/hd-theme-hyprpaper.conf
+hyprpaper.conf sources it and uses its variable
+.BR $hd_background ,
+the image of the background that fits the monitors of Hyprland.
+.TP
+.I ~/.config/mako/hd-theme
+The config of mako has
+.BR include=~/.config/mako/hd-theme .
+.PP
+The configs themselves belong to the user and are never changed; the ones
+that
+.B hd-desktop
+puts in
+.I /etc/skel
+use the theme files.
+A config that does not use its theme file is reported.
+Settings after the line that uses the theme file take the place of the
+theme.
+.PP
+A theme file is only written when it changes, and only then its program is
+reloaded: Hyprland with
+.BR hyprctl ,
+hyprpaper by a restart of its user service, kitty with SIGUSR1 and mako with
+.BR makoctl .
+hyprlock reads its config when it starts.
+.SH EXAMPLES
+.nf
+cp /etc/hyprdebian/themes/default.json meadow.json
+editor meadow.json
+sudo hd-theme \-\-add meadow.json
+hd-theme \-\-list
+sudo hd-theme \-\-select meadow
+hd-theme \-\-apply
+.fi
+.SH SEE ALSO
+.BR hd-theme (7),
+.BR hd-theme-card (1),
+.BR hd-config (7),
+.BR imv-wayland (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

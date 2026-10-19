@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 """postinst of hd-desktop: diverts /etc/greetd/config.toml of greetd, writes the greetd config of
-HyprDebian in its place with hd-desktop-render, compiles the dconf database of the dark theme,
+HyprDebian in its place with hd-desktop-render, diverts /etc/plymouth/plymouthd.conf of plymouth
+and puts the config of the boot splash in its place, compiles the dconf database of the dark theme,
+renders the cards of the themes and selects the theme default when no theme is selected yet,
 copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
 with hd-launcher. It also finishes the removal of the conffiles that hd-desktop no longer has.
 
@@ -8,6 +10,16 @@ greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greet
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
 on every installation and upgrade, and before every start of greetd. The postrm of a removal
 removes it and puts the one of greetd back.
+
+plymouth ships /etc/plymouth/plymouthd.conf as a conffile. It is diverted to
+/etc/plymouth/plymouthd.conf.plymouth, so dpkg keeps the one of plymouth there, and the config of
+the boot splash, which makes hyprdebian the theme of plymouth, is copied over it on every
+installation and upgrade. The postrm of a removal removes it and puts the one of plymouth back. The
+initramfs holds the theme: the package activates the trigger update-initramfs of initramfs-tools,
+which rebuilds it once dpkg is done, with the theme that this config names.
+
+The theme files in the home directories are not written here: each user runs hd-theme --apply
+for that.
 
 greetd enables greetd.service on its own installation. When the installer runs, the user does not
 exist yet; hd-desktop-render then writes a config that logs nobody in, and writes it again with
@@ -30,14 +42,22 @@ directory at the unpack, while they are still there, so the postinst removes it 
 otherwise new users would get it from /etc/skel.
 """
 
+import json
 import os
 import pwd
+import shutil
 import subprocess
 import sys
 
 GREETD_CONFIG = "/etc/greetd/config.toml"
 GREETD_CONFIG_DIVERTED = "/etc/greetd/config.toml.greetd"
 SKEL_DIR = "/etc/skel"
+PLYMOUTH_CONFIG = "/etc/plymouth/plymouthd.conf"
+PLYMOUTH_CONFIG_DIVERTED = "/etc/plymouth/plymouthd.conf.plymouth"
+HD_PLYMOUTH_CONFIG = "/usr/share/hd-plymouth/plymouthd.conf"
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+THEME_KEY = "hd-theme"
+DEFAULT_THEME = "default"
 
 # The conffiles that hd-desktop no longer has, and the version that removed them, with ~ so that
 # its prereleases count. Keep them the same as in the preinst and the postrm.
@@ -80,6 +100,17 @@ def copy_skel():
     print(f"Copied the files of {SKEL_DIR} that {user} did not have to {home}.")
 
 
+def theme_selected():
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except (FileNotFoundError, ValueError):
+        return False
+    if not isinstance(config, dict) or not isinstance(config.get(THEME_KEY), dict):
+        return False
+    return "name" in config[THEME_KEY]
+
+
 def remove_obsolete_conffiles():
     for conffile in OBSOLETE_CONFFILES:
         subprocess.run(["dpkg-maintscript-helper", "rm_conffile", conffile, OBSOLETE_SINCE,
@@ -107,9 +138,15 @@ def main():
 
     divert(GREETD_CONFIG, GREETD_CONFIG_DIVERTED)
     subprocess.run(["/usr/sbin/hd-desktop-render"], check=True)
+    divert(PLYMOUTH_CONFIG, PLYMOUTH_CONFIG_DIVERTED)
+    shutil.copyfile(HD_PLYMOUTH_CONFIG, PLYMOUTH_CONFIG)
+    print(f"Made hyprdebian the theme of plymouth in {PLYMOUTH_CONFIG}.")
     # The system database local of /etc/dconf/profile/user holds the dark theme of
     # /etc/dconf/db/local.d.
     subprocess.run(["dconf", "update"], check=True)
+    subprocess.run(["/usr/bin/hd-theme", "--cards"], check=True)
+    if not theme_selected():
+        subprocess.run(["/usr/bin/hd-theme", "--select", DEFAULT_THEME], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
     if subprocess.run(["/usr/sbin/hd-launcher"]).returncode != 0:

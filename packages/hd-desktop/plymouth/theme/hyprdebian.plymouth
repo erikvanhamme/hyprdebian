@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=HyprDebian
+Description=The lock screen of hyprlock on the HyprDebian wallpaper
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/hyprdebian
+ScriptFile=/usr/share/plymouth/themes/hyprdebian/hyprdebian.script

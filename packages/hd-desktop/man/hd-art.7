@@ -1,0 +1,56 @@
+.TH HD-ART 7 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-art \- the hyprdebian wallpapers
+.SH DESCRIPTION
+The package
+.B hd-desktop
+holds the wallpapers of hyprdebian: the Emerald wallpaper of Debian 12,
+rendered to PNG at four sizes.
+They are only the wallpapers; they have no commands and no settings.
+.PP
+The wallpapers are in
+.IR /usr/share/backgrounds/hyprdebian :
+.PP
+.RS
+.nf
+emerald\-3840x2160.png    4K UHD, 16:9
+emerald\-3440x1440.png    ultrawide, 21:9
+emerald\-1920x1080.png    full HD, 16:9
+emerald\-1024x768.png     4:3
+.fi
+.RE
+.PP
+The 3440x1440 wallpaper is rendered from the middle band of the 3840x2160
+SVG.
+.SH USING THE WALLPAPERS
+Pick the wallpaper that matches the resolution of the monitor, or the next
+larger one.
+To show it on the desktop with
+.BR hyprpaper (1),
+name it in
+.IR ~/.config/hypr/hyprpaper.conf :
+.PP
+.RS
+.nf
+path = /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
+.fi
+.RE
+.SH COPYRIGHT
+The wallpapers are PNG renders of the Emerald theme SVGs from the Debian
+package
+.BR desktop-base ,
+by Juliette Taka Belin, under the GPL, version 2 or later.
+See
+.IR /usr/share/doc/hd-desktop/copyright .
+.SH FILES
+.TP
+.I /usr/share/backgrounds/hyprdebian/emerald\-*.png
+The wallpapers.
+.TP
+.I /usr/share/doc/hd-desktop/copyright
+The copyright and license of the wallpapers.
+.SH SEE ALSO
+.BR hd-desktop (7),
+.BR hyprpaper (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

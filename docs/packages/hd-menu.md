@@ -1,41 +1,31 @@
 ## Introduction
-The package `hd-menu` is the keyboard-driven menu of the HyprDebian desktop. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of `/etc/hyprdebian/config.json`, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
+`hd-menu` is the keyboard-driven menu of the HyprDebian desktop, in the package `hd-desktop`. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of `/etc/hyprdebian/config.json`, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
 
-[hd-desktop](hd-desktop.md) depends on it, and uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher` writes in it.
+[hd-desktop](hd-desktop.md) uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher` writes in it.
 
 Only one `hd-menu` is open at a time: a lock in `/run/user/<uid>/hd-menu.lock` makes a second one exit at once with 1.
 
-The package comes with the man page `man 1 hd-menu`.
+`hd-desktop` comes with the man page `man 1 hd-menu`.
 
 ## Building the package
-The package is built from `packages/hd-menu` in this repository:
-```
-cd packages/hd-menu
-make deb
-```
+hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). Its source is in `packages/hd-desktop/menu`. `make deb` of hd-desktop compiles it in a `debian:unstable` container, with `make all` of `menu/Makefile`, and puts the libraries the binary links to, as `dpkg-shlibdeps` finds them, in the Depends of `hd-desktop`, which is therefore built for the architecture of the build computer.
 
-This compiles hd-menu in a `debian:unstable` container and builds `build/hd-menu_<version>_<arch>.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. Its Depends are the libraries the binary links to, as `dpkg-shlibdeps` finds them; it recommends `hd-fonts`, for the font of the theme. Install it with:
-```
-sudo apt install ./build/hd-menu_<version>_<arch>.deb
-```
-
-To try a change without a package, `make all` builds `build/hd-menu` on the computer itself, which then needs the -dev packages:
+To try a change without a package, `make all` in `menu/` builds `build/hd-menu` there, on the computer itself, which then needs the -dev packages:
 ```
 sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libcairo2-dev librsvg2-dev
+cd packages/hd-desktop/menu
 make all
 echo '{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu
 ```
 
 The files involved are:
 ```
-packages/hd-menu/Makefile
-packages/hd-menu/version.json
-packages/hd-menu/build-hd-menu.sh
-packages/hd-menu/deb/control
-packages/hd-menu/deb/copyright
-packages/hd-menu/man/hd-menu.1
-packages/hd-menu/protocols/wlr-layer-shell-unstable-v1.xml
-packages/hd-menu/src/
+packages/hd-desktop/menu/Makefile
+packages/hd-desktop/menu/build-hd-menu.sh
+packages/hd-desktop/menu/protocols/wlr-layer-shell-unstable-v1.xml
+packages/hd-desktop/menu/src/
+packages/hd-desktop/man/hd-menu.1
+packages/hd-desktop/deb/copyright
 ```
 
 wlr-layer-shell is not in a Debian package, so `protocols/` has a copy of it from wlr-protocols.

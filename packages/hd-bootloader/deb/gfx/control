@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: amd64
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, python3-pil, systemd-ukify, systemd-boot-efi, fontconfig, hd-base, hd-art, hd-fonts
+Depends: python3, python3-pil, systemd-ukify, systemd-boot-efi, fontconfig, hd-base, hd-desktop
 Recommends: dkms
 Provides: hd-bootloader
 Conflicts: hd-bootloader
@@ -13,8 +13,7 @@ Priority: optional
 Description: HyprDebian minimalist EFI bootloader, graphical
  A small UEFI bootloader that shows a menu of the unified kernel images (UKIs)
  of the most recent kernels, each in a normal and a ZFS recovery profile, on
- the HyprDebian wallpaper of hd-art, in the JetBrains Mono Nerd Font of
- hd-fonts.
+ the HyprDebian wallpaper of hd-desktop, in its JetBrains Mono Nerd Font.
  .
  hd-bootloader-update builds the UKIs and writes them, the bootloader and
  assets.efi to an EFI system partition. assets.efi holds the settings, the

@@ -1,0 +1,40 @@
+.TH HD-THEME-CARD 1 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-theme-card \- render a HyprDebian theme into a card
+.SH SYNOPSIS
+.B hd-theme-card
+.I theme.json card.png
+.SH DESCRIPTION
+.B hd-theme-card
+renders the theme in
+.I theme.json
+into
+.IR card.png :
+its colours and their roles, the font at its three sizes, icons, the
+geometry of a corner with its border and radius, and windows, a menu and
+workspaces as they look in the theme, on its background.
+.PP
+The theme file is a theme as described in
+.BR hd-theme (7),
+or a configuration with the key
+.BR hd-theme ,
+such as
+.IR /etc/hyprdebian/config.json .
+The name of the theme is its member
+.BR name ,
+else the name of the file without
+.IR .json .
+The background is the image of its family that fits a screen of 1920x1080.
+.PP
+.BR hd-theme (1)
+renders the card of every theme to
+.IR /var/cache/hd-theme/cards/<name>.png .
+.SH EXAMPLES
+.nf
+hd-theme-card /etc/hyprdebian/config.json card.png
+.fi
+.SH SEE ALSO
+.BR hd-theme (7),
+.BR hd-theme (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

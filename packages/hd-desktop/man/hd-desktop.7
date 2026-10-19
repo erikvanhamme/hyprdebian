@@ -6,23 +6,53 @@ The package
 .B hd-desktop
 depends on the packages of the HyprDebian desktop, so that they are installed
 with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle and
-hyprlock, greetd, kitty,
-.BR hd-menu (1),
-mako, PipeWire with wiremix, the screenshot
-tools grim, slurp and swappy, nwg-look with the GTK and Qt themes, the
-wallpapers of
-.BR hd-art (7),
-the fonts of
-.BR hd-fonts (7),
-yazi, and the applications audacious, mpv, imv, firefox and meld.
-It recommends the screensaver of
-.BR hd-screensaver (7),
-which hypridle starts after 2 minutes; without it, hypridle only locks the
-screen.
-It also recommends the boot splash of
-.BR hd-plymouth (7),
-which looks like the lock screen of hyprlock and asks for the password of
-an encrypted ZFS dataset.
+hyprlock, greetd, kitty, mako, PipeWire with wiremix, the screenshot tools
+grim, slurp and swappy, nwg-look with the GTK and Qt themes, plymouth, yazi,
+and the applications audacious, mpv, imv, firefox and meld.
+.PP
+Its version is the version of HyprDebian, as of
+.BR hd-base (7),
+and it depends on
+.B hd-base
+of the same version, so the desktop and the base system are always of the
+same release.
+.PP
+It holds the parts of the desktop, each with a man page of its own:
+.TP
+.BR hd-art (7)
+The wallpapers, in
+.IR /usr/share/backgrounds/hyprdebian .
+.TP
+.BR hd-fonts (7)
+JetBrains Mono with the icons of Nerd Fonts.
+.TP
+.BR hd-menu (1)
+The keyboard-driven menu of the key bindings and the application launcher.
+.TP
+.BR hd-theme (7)
+The theme engine: the themes of the system, and
+.BR hd-theme (1),
+which selects them and applies them to the desktop programs of a user.
+.TP
+.BR hd-screensaver (7)
+The screensaver, which hypridle starts after 2 minutes.
+.TP
+.BR hd-plymouth (7)
+The boot splash, which looks like the lock screen of hyprlock and asks for
+the password of an encrypted ZFS dataset.
+.PP
+These were the packages
+.BR hd-art ,
+.BR hd-fonts ,
+.BR hd-menu ,
+.BR hd-theme ,
+.B hd-screensaver
+and
+.B hd-plymouth
+before.
+.B hd-desktop
+conflicts with them, replaces and provides them, so an upgrade removes them;
+the themes, the selected theme and the theme files of the users stay.
 .SH BOOTING INTO HYPRLAND
 greetd runs on tty7 and logs a user in to Hyprland at the boot, without a
 password, with
@@ -185,10 +215,13 @@ before greetd starts.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
 .BR hd-launcher (8),
+.BR hd-art (7),
+.BR hd-fonts (7),
+.BR hd-menu (1),
+.BR hd-theme (7),
 .BR hd-screensaver (7),
 .BR hd-plymouth (7),
 .BR hd-base (7),
 .BR hd-config (7),
-.BR hd-theme (7),
 .BR greetd (1),
 .BR Hyprland (1)

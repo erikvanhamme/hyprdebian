@@ -46,8 +46,8 @@
 #               deb/postinst, which stores the default settings in the key
 #               hd-bootloader of /etc/hyprdebian/config.json with
 #               hd-config-update. It does not update the ESPs. The gfx
-#               package depends on hd-art for the wallpaper and on hd-fonts
-#               for the font; the txt package needs neither. Raise the
+#               package depends on hd-desktop for the wallpaper and the
+#               font; the txt package needs neither. Raise the
 #               version in version.json for every package that is handed
 #               out.
 #   make deb-path
@@ -83,7 +83,7 @@ CORE_SCRIPTS := update-bootloader.py mkuki.py
 SCRIPTS_graphical := graphical.py text2png.py png2bin.py menubox.py
 SCRIPTS_text := text.py
 SCRIPTS := $(CORE_SCRIPTS) $(foreach frontend,$(FRONTENDS),$(SCRIPTS_$(frontend)))
-# The wallpaper that deb/gfx/defaults.json names, as the package hd-art
+# The wallpaper that deb/gfx/defaults.json names, as the package hd-desktop
 # installs it.
 WALLPAPER := /usr/share/backgrounds/hyprdebian/emerald-1920x1080.png
 # What update-bootloader.py reads for a frontend, besides its config.
@@ -181,7 +181,7 @@ $(ESP_STAMP): $(BUILD)/bootx64-$(ESP_FRONTEND).efi $(ASSETS_STUB) $(ESP_SOURCES)
 	touch $@
 
 $(WALLPAPER):
-	@echo "$@ is missing: install the package hd-art" >&2
+	@echo "$@ is missing: install the package hd-desktop" >&2
 	@exit 1
 
 image: $(IMAGE)

@@ -1,35 +1,19 @@
 ## Introduction
-The package `hd-screensaver` is the screensaver of the HyprDebian desktop. It shows a text with random effects of terminal text effects (`tte`) in a full screen kitty window on every monitor. [hd-desktop](hd-desktop.md) recommends it, so it is installed with the desktop unless recommends are left out.
+The package `hd-desktop` holds the screensaver of the HyprDebian desktop. It shows a text with random effects of terminal text effects (`tte`) in a full screen kitty window on every monitor. See [hd-desktop](hd-desktop.md).
 
-hypridle starts it after 2 minutes without input, and stops it before it locks the screen with hyprlock, by `~/.config/hypr/hypridle.conf` of `hd-desktop`. It also stops on a key press, or when another window gets the focus. Without the package, hypridle skips the screensaver and only locks the screen.
+hypridle starts it after 2 minutes without input, and stops it before it locks the screen with hyprlock, by `~/.config/hypr/hypridle.conf` of `hd-desktop`. It also stops on a key press, or when another window gets the focus.
 
-The package comes with the man page `man 7 hd-screensaver`.
+`hd-desktop` comes with the man page `man 7 hd-screensaver`.
 
 ## Building the package
-The package is built from `packages/hd-screensaver` in this repository:
+The screensaver is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). It needs `hyprland`, `kitty`, `python3-terminaltexteffects`, `jq` and `procps`. The files involved are:
 ```
-cd packages/hd-screensaver
-make deb
+packages/hd-desktop/hd-launch-screensaver
+packages/hd-desktop/hd-cmd-screensaver
+packages/hd-desktop/hd-kill-screensaver
+packages/hd-desktop/screensaver.txt
+packages/hd-desktop/man/hd-screensaver.7
 ```
-
-This builds `build/hd-screensaver_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `hyprland`, `kitty`, `python3-terminaltexteffects`, `jq` and `procps`. Install it with:
-```
-sudo apt install ./build/hd-screensaver_<version>_all.deb
-```
-
-The files involved are:
-```
-packages/hd-screensaver/Makefile
-packages/hd-screensaver/version.json
-packages/hd-screensaver/deb/control
-packages/hd-screensaver/hd-launch-screensaver
-packages/hd-screensaver/hd-cmd-screensaver
-packages/hd-screensaver/hd-kill-screensaver
-packages/hd-screensaver/screensaver.txt
-packages/hd-screensaver/man/hd-screensaver.7
-```
-
-The commands came with `hd-desktop` before 0.2; the package replaces those versions, so an upgrade moves them over.
 
 ## Commands
 | Command | |

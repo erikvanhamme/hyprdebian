@@ -1,0 +1,40 @@
+#!/bin/sh
+# initramfs-tools hook of hd-desktop: puts the fonts of the boot splash in
+# the initramfs, when the theme of plymouth is hyprdebian. The hook of
+# plymouth, which runs first, copies the theme with the wallpaper, and only
+# the default fonts.
+set -e
+
+PREREQ="plymouth"
+
+prereqs()
+{
+    echo "$PREREQ"
+}
+
+case "$1" in
+    prereqs)
+        prereqs
+        exit 0
+        ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+FONT_DIR=/usr/share/fonts/truetype/jetbrains-mono-nerd
+FONTS="JetBrainsMonoNerdFontMono-Medium.ttf JetBrainsMonoNerdFontMono-MediumItalic.ttf"
+
+if [ "$(/usr/sbin/plymouth-set-default-theme 2> /dev/null)" != "hyprdebian" ]; then
+    exit 0
+fi
+
+for font in $FONTS; do
+    if [ -f "$FONT_DIR/$font" ]; then
+        copy_file font "$FONT_DIR/$font"
+    else
+        echo "W: hd-plymouth: $FONT_DIR/$font is missing, the boot splash uses the default font."
+    fi
+done
+
+# The cache of the fonts that the hook of plymouth made does not have them.
+fc-cache -s -y "$DESTDIR" > /dev/null 2>&1

@@ -1,39 +1,29 @@
 ## Introduction
-The package `hd-theme` is the theme engine of HyprDebian. There is one theme for the whole system; there are no themes per user. The themes are JSON files in `/etc/hyprdebian/themes`, one per theme, and the file name is the name of the theme. The theme that is selected is copied, with its name, to the key `hd-theme` of `/etc/hyprdebian/config.json` of [hd-config](hd-config.md), where other packages read it, such as [hd-menu](hd-menu.md).
+`hd-theme` is the theme engine of HyprDebian, in the package `hd-desktop`. There is one theme for the whole system; there are no themes per user. The themes are JSON files in `/etc/hyprdebian/themes`, one per theme, and the file name is the name of the theme. The theme that is selected is copied, with its name, to the key `hd-theme` of `/etc/hyprdebian/config.json` of [hd-config](hd-config.md), where other packages read it, such as [hd-menu](hd-menu.md).
 
 It has two commands:
 - `hd-theme` adds, deletes, lists and selects themes, and with `--apply` writes the theme files of the desktop programs in the home directory of the user who runs it, from the selected theme. Adding, deleting, selecting and rendering the cards need root; listing and applying are for every user. Nothing applies a theme on its own: selecting a theme does not change the desktops until each user runs `hd-theme --apply`;
 - `hd-theme-card` renders a theme into a card, a PNG that shows its colours, fonts, icons, geometry and how the desktop looks in it.
 
-[hd-desktop](hd-desktop.md) depends on it. The package comes with the man pages `man 7 hd-theme`, which describes the themes, `man 1 hd-theme` and `man hd-theme-card`.
+[hd-desktop](hd-desktop.md) comes with the man pages `man 7 hd-theme`, which describes the themes, `man 1 hd-theme` and `man hd-theme-card`.
 
 ## Building the package
-The package is built from `packages/hd-theme` in this repository:
-```
-cd packages/hd-theme
-make deb
-```
+The theme engine is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). It needs the wallpapers and the font of `hd-desktop`, `python3-jinja2` for the templates, `python3-cairo`, `python3-gi` and `gir1.2-pango-1.0` for the cards, and `imv`, whose `imv-wayland` shows them.
 
-This builds `build/hd-theme_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `hd-base`, on `hd-art` and `hd-fonts` for the backgrounds and the font, on `python3-jinja2` for the templates, on `python3-cairo`, `python3-gi` and `gir1.2-pango-1.0` for the cards, and on `imv`, whose `imv-wayland` shows them. Install it with:
-```
-sudo apt install ./build/hd-theme_<version>_all.deb
-```
-
-The package comes with the themes `default` and `sand`. The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
+`hd-desktop` comes with the themes `default` and `sand`. The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
 
 The files involved are:
 ```
-packages/hd-theme/Makefile
-packages/hd-theme/version.json
-packages/hd-theme/hd-theme
-packages/hd-theme/hd-theme-card
-packages/hd-theme/themes/default.json
-packages/hd-theme/themes/sand.json
-packages/hd-theme/templates/
-packages/hd-theme/deb/control
-packages/hd-theme/deb/postinst
-packages/hd-theme/deb/postrm
-packages/hd-theme/man/
+packages/hd-desktop/hd-theme
+packages/hd-desktop/hd-theme-card
+packages/hd-desktop/themes/default.json
+packages/hd-desktop/themes/sand.json
+packages/hd-desktop/templates/hd-theme/
+packages/hd-desktop/deb/postinst
+packages/hd-desktop/deb/postrm
+packages/hd-desktop/man/hd-theme.7
+packages/hd-desktop/man/hd-theme.1
+packages/hd-desktop/man/hd-theme-card.1
 ```
 
 ## Themes

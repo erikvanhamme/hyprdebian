@@ -1,9 +1,14 @@
 #!/bin/sh
-# postrm of hd-desktop: a removal removes the greetd config that hd-desktop-render wrote and puts
-# back the one of greetd, which the postinst diverted. A purge also removes the compiled dconf
-# database of the dark theme when its source in /etc/dconf/db/local.d is gone, and the menu of the
-# launcher that hd-launcher wrote. It also finishes the removal of the conffiles that hd-desktop no
-# longer has, as the preinst and the postinst. Written for sh, as python3 may be gone by then.
+# postrm of hd-desktop: a removal removes the greetd config that hd-desktop-render wrote and the
+# config of plymouth that the postinst wrote, and puts back the ones of greetd and plymouth, which
+# the postinst diverted; the trigger update-initramfs then rebuilds the initramfs without the boot
+# splash. It also removes the cards of the themes in /var/cache/hd-theme. A purge also removes the
+# compiled dconf database of the dark theme when its source in /etc/dconf/db/local.d is gone, the
+# menu of the launcher that hd-launcher wrote, and the key hd-theme from
+# /etc/hyprdebian/config.json. The themes that were added stay in /etc/hyprdebian/themes, and the
+# theme files stay in the home directories. It also finishes the removal of the conffiles that
+# hd-desktop no longer has, as the preinst and the postinst. Written for sh, as python3 may be
+# gone by then.
 set -e
 
 # Keep these the same as in the preinst and the postinst.
@@ -13,6 +18,8 @@ for conffile in /etc/skel/.config/wofi/config /etc/skel/.config/wofi/style.css; 
 done
 
 GREETD_CONFIG=/etc/greetd/config.toml
+PLYMOUTH_CONFIG=/etc/plymouth/plymouthd.conf
+THEME_CACHE=/var/cache/hd-theme
 DCONF_DB=/etc/dconf/db/local
 DCONF_SOURCE=/etc/dconf/db/local.d
 LAUNCHER_CACHE=/var/cache/hd-launcher
@@ -23,6 +30,12 @@ if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; 
         dpkg-divert --package hd-desktop --remove --rename --divert "$GREETD_CONFIG.greetd" \
             "$GREETD_CONFIG"
     fi
+    if [ "$(dpkg-divert --listpackage "$PLYMOUTH_CONFIG")" = "hd-desktop" ]; then
+        rm -f "$PLYMOUTH_CONFIG"
+        dpkg-divert --package hd-desktop --remove --rename --divert "$PLYMOUTH_CONFIG.plymouth" \
+            "$PLYMOUTH_CONFIG"
+    fi
+    rm -rf "$THEME_CACHE"
     if [ -d /run/systemd/system ]; then
         systemctl daemon-reload || true
     fi
@@ -36,4 +49,9 @@ if [ -z "$(ls -A "$DCONF_SOURCE" 2> /dev/null)" ]; then
     rm -f "$DCONF_DB"
 fi
 
-rm -rf "$LAUNCHER_CACHE"
+rm -rf "$LAUNCHER_CACHE" "$THEME_CACHE"
+
+# hd-base may already be removed, see hd-config(7).
+if [ -x /usr/sbin/hd-config-remove ]; then
+    hd-config-remove hd-theme
+fi

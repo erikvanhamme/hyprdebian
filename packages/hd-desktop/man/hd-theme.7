@@ -1,0 +1,132 @@
+.TH HD-THEME 7 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-theme \- the theme engine of HyprDebian
+.SH DESCRIPTION
+HyprDebian has one theme for the whole system; there are no themes per user.
+The themes are JSON files in
+.IR /etc/hyprdebian/themes ,
+one per theme, named
+.IR <name>.json .
+The theme that is selected is copied, with its name, to the key
+.B hd-theme
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+Programs and packages read the theme there, such as
+.BR hd-menu (1).
+.PP
+.BR hd-theme (1)
+adds, deletes, lists and selects themes, and with
+.B \-\-apply
+writes the theme files of the desktop programs in the home directory of a
+user from the selected theme; each user runs that after a theme is selected.
+.BR hd-theme-card (1)
+renders a theme into a card, a PNG that shows it.
+.SH THEMES
+A theme is a JSON object with all of these members, and no others:
+.PP
+.RS
+.nf
+{
+    "font": "JetBrainsMono NFM Medium",
+    "font-size-big": 24,
+    "font-size-normal": 18,
+    "font-size-small": 14,
+    "highlight": "#ff6600",
+    "normal": "#0066cc",
+    "dark": "#071422",
+    "light": "#e6edf5",
+    "border": 4,
+    "radius": 10,
+    "gap": 4,
+    "opacity": 0.8,
+    "icon_size": 48,
+    "background": "emerald"
+}
+.fi
+.RE
+.TP
+.B font
+The font of all text, a fontconfig family and style.
+.TP
+.BR font-size-big ", " font-size-normal ", " font-size-small
+The sizes of text, in points: banners and input fields, menus and
+notifications, terminals and small labels.
+.TP
+.B dark
+The background of bars, menus and windows, drawn at
+.BR opacity .
+.TP
+.B normal
+The background of the selected item, unfocused borders and dividers.
+.TP
+.B highlight
+Focus only: the outline of the focused window, menu or input field.
+Never a fill behind text.
+.TP
+.B light
+All text, also on
+.BR normal .
+.TP
+.B border
+The width of borders, in pixels.
+.TP
+.B radius
+The outer radius of the corners of windows and menus, in pixels, at least
+.BR border .
+Anything inside a border has the inner radius,
+.B radius
+minus
+.BR border .
+.TP
+.B gap
+The distance between windows, in pixels.
+.TP
+.B opacity
+The opacity of
+.BR dark ,
+from 0 to 1.
+Text and borders stay opaque.
+.TP
+.B icon_size
+The size of icons, in pixels.
+.TP
+.B background
+A family of images in
+.IR /usr/share/backgrounds/hyprdebian ,
+named
+.IR <family>-<width>x<height>.png .
+A screen shows the smallest one that covers it, else the largest.
+.PP
+In
+.IR config.json ,
+the key
+.B hd-theme
+also has the member
+.BR name ,
+the name of the theme.
+.SH FILES
+.TP
+.I /etc/hyprdebian/themes/<name>.json
+The themes.
+The themes
+.I default
+and
+.I sand
+come with hd-desktop.
+.TP
+.I /etc/hyprdebian/config.json
+The key
+.B hd-theme
+holds the selected theme.
+.TP
+.I /var/cache/hd-theme/cards/<name>.png
+The cards of the themes.
+.SH SEE ALSO
+.BR hd-theme (1),
+.BR hd-theme-card (1),
+.BR hd-config (7),
+.BR hd-menu (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

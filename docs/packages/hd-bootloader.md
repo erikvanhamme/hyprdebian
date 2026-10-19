@@ -3,7 +3,7 @@ The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the un
 
 | Package | Frontend |
 | --- | --- |
-| `hd-bootloader-gfx` | The graphical frontend: the menu on the wallpaper of `hd-art`, in the JetBrains Mono Nerd Font of `hd-fonts`. |
+| `hd-bootloader-gfx` | The graphical frontend: the menu on the wallpaper of `hd-desktop`, in its JetBrains Mono Nerd Font. |
 | `hd-bootloader-txt` | The text frontend: the menu on the text console of the firmware. |
 
 `hd-bootloader-update` builds the UKIs and writes them, the bootloader and `assets.efi` to an EFI system partition (ESP). `assets.efi` holds the settings, the menu and the DKMS MOK, which the bootloader hands to the kernel so that it loads the DKMS-built ZFS module under Secure Boot.
@@ -25,7 +25,7 @@ This builds `build/hd-bootloader-gfx_<version>_amd64.deb` and `build/hd-bootload
 
 | Package | Depends on |
 | --- | --- |
-| `hd-bootloader-gfx` | `python3`, `python3-pil`, `systemd-ukify`, `systemd-boot-efi`, `fontconfig`, `hd-base`, `hd-art`, `hd-fonts` |
+| `hd-bootloader-gfx` | `python3`, `python3-pil`, `systemd-ukify`, `systemd-boot-efi`, `fontconfig`, `hd-base`, `hd-desktop` |
 | `hd-bootloader-txt` | `python3`, `systemd-ukify`, `systemd-boot-efi`, `hd-base` |
 
 Both recommend `dkms`. Install one of them with:

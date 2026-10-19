@@ -1,7 +1,7 @@
 ## Introduction
 This page lists what a computer needs to build HyprDebian from this repository: the packages with `make all`, their tests with `make test`, the live ISO with `make iso`, and the tools around them. Every build runs as a normal user; none needs root, but the Docker builds need a user that may run docker.
 
-The builds are made for amd64. `hd-backup`, `hd-menu`, `orcaslicer` and the packages compiled from Rust take the architecture of the build computer or are amd64 only, and the AppImage of OrcaSlicer is run on the build computer to unpack it.
+The builds are made for amd64. `hd-backup`, `hd-desktop`, `orcaslicer` and the packages compiled from Rust take the architecture of the build computer or are amd64 only, and the AppImage of OrcaSlicer is run on the build computer to unpack it.
 
 ## In short
 On a Debian trixie or unstable amd64 computer, this installs everything the package builds and the tests need:
@@ -33,12 +33,11 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 ### Per package
 | Package | Needs | Why |
 | --- | --- | --- |
-| `hd-art`, `hd-base`, `hd-cups`, `hd-dashboard`, `hd-desktop`, `hd-docker`, `hd-installer`, `hd-plymouth`, `hd-qemu-kvm`, `hd-repo`, `hd-report`, `hd-screensaver`, `hd-theme` | Only the tools above. | They only stage scripts, configs and man pages. |
+| `hd-base`, `hd-cups`, `hd-dashboard`, `hd-docker`, `hd-installer`, `hd-qemu-kvm`, `hd-repo`, `hd-report` | Only the tools above. | They only stage scripts, configs and man pages. |
 | `hd-backup` | `gcc`, `libc6-dev`, `dpkg-buildflags` (dpkg-dev), `strip` (binutils); all in build-essential | Compiles `blockwrite` from `blockwrite.c` with the hardening flags of Debian, and strips it. |
 | `hd-bootloader` | `clang++` (clang), `lld-link` (lld), the headers in `/usr/include/efi` (gnu-efi) | Compiles the EFI bootloader for the target `x86_64-unknown-windows` and links it as a PE32+ image. Only the headers of gnu-efi are used. Works with gnu-efi 3.0 (trixie) and 4.0. |
-| `hd-fonts` | `wget`, `unzip`, ca-certificates, internet access | Downloads the JetBrains Mono zip of Nerd Fonts 3.4.0 from GitHub once, checks its sha256 and unpacks the fonts. |
 | `orcaslicer` | `wget`, ca-certificates, internet access, an amd64 computer | Downloads the OrcaSlicer 2.4.2 AppImage from GitHub once, checks its sha256 and unpacks it by running it with `--appimage-extract`, which needs no FUSE. |
-| `hd-menu` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, internet access | Compiles hd-menu in a `debian:unstable` container, pulled every time. The container installs its own build tools and the -dev packages of wayland, cairo and librsvg. The package gets the architecture of the build computer. `make all` in its directory, which builds it without a package to try it, needs those -dev packages on the computer itself. |
+| `hd-desktop` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, `wget`, `unzip`, ca-certificates, internet access | Compiles hd-menu in a `debian:unstable` container, pulled every time. The container installs its own build tools and the -dev packages of wayland, cairo and librsvg. The package gets the architecture of the build computer. `make all` in `menu/`, which builds hd-menu without a package to try it, needs those -dev packages on the computer itself. Downloads the JetBrains Mono zip of Nerd Fonts 3.4.0 from GitHub once, checks its sha256 and unpacks the fonts. |
 | `ouch`, `wiremix`, `yazi` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, internet access | Compiles the release in a `debian:trixie` container, pulled every time. The container installs its own build tools and the latest stable Rust toolchain with rustup, and clones the sources from GitHub. The packages get the architecture of the build computer. |
 
 The downloads and the compiled releases are kept in `build/` of their package directory, so later builds reuse them until `make clean`.
@@ -69,7 +68,7 @@ live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), whic
 | The UKI stub | systemd-boot-efi | The UKIs. |
 | `PIL` | python3-pil | The graphical frontend draws its assets. |
 | `fc-match` | fontconfig | Finds the font of the graphical frontend. |
-| The wallpaper and the font | hd-art, hd-fonts | The graphical frontend; not for `ESP_PACKAGE=txt`. |
+| The wallpaper and the font | hd-desktop | The graphical frontend; not for `ESP_PACKAGE=txt`. |
 | Kernels and initrds in `/boot` | | The UKIs of the 4 most recent kernels. |
 | `sbsign`, `sbverify` | sbsigntool | Only when there are Secure Boot keys to sign with. |
 | `mkfs.fat` | dosfstools | `make image`. |
