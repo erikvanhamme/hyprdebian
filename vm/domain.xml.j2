@@ -1,13 +1,15 @@
 <!-- The libvirt domain of a HyprDebian vm, rendered by provision-vm.py. UEFI with secure boot
      enabled and no keys enrolled, so the firmware starts in setup mode; libvirt picks the firmware
      and makes the nvram, the uuid and the MAC address. It boots from the zvol, and from the live
-     ISO while the zvol is still empty. The virtio gpu has 3D acceleration (virgl on
-     virtio-vga-gl; libvirt keeps a virtio device it once picked, so it is named here), which
-     programs that draw with the GPU, such as hyprpaper, need. qemu renders it with egl-headless
-     on the GPU that shows the console, as frames handed from one GPU to another come out
-     scrambled, and hands spice plain frames: spice with OpenGL stalls the virtio gpu until the
-     client has drawn each frame. It has no serial console, as a console on a serial port keeps
-     the boot splash from showing. -->
+     ISO while the zvol is still empty. A vm with a GPU (rendernode set) has a virtio gpu with 3D
+     acceleration (virgl on virtio-vga-gl; libvirt keeps a virtio device it once picked, so it is
+     named here), which programs that draw with the GPU, such as hyprpaper, need. qemu renders it
+     with egl-headless on the GPU that shows the console, as frames handed from one GPU to another
+     come out scrambled, and hands spice plain frames: spice with OpenGL stalls the virtio gpu
+     until the client has drawn each frame. A vm without a GPU has the default graphics of
+     libvirt, spice and a virtio gpu without 3D acceleration, so it can be moved to a server that
+     has no GPU. It has no serial console, as a console on a serial port keeps the boot splash
+     from showing. -->
 <domain type='kvm'>
   <name>{{ name }}</name>
   <memory unit='GiB'>{{ memory }}</memory>
@@ -72,6 +74,7 @@
       <listen type='address'/>
       <image compression='off'/>
     </graphics>
+{%- if rendernode %}
     <graphics type='egl-headless'>
       <gl rendernode='{{ rendernode }}'/>
     </graphics>
@@ -80,6 +83,11 @@
         <acceleration accel3d='yes'/>
       </model>
     </video>
+{%- else %}
+    <video>
+      <model type='virtio' heads='1' primary='yes'/>
+    </video>
+{%- endif %}
     <watchdog model='itco' action='reset'/>
     <memballoon model='virtio'/>
     <rng model='virtio'>

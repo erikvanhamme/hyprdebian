@@ -82,6 +82,8 @@ live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), whic
 - A network bridge, `br0` by default.
 - The live ISO in `livecd/out/hyprdebian-live-amd64.iso`.
 
+`make switch-vm-gpu` runs `vm/switch-vm-gpu.py`, which switches a vm between running with and without a GPU. It needs `python3` and `virsh` with a running libvirtd.
+
 ## Uploading to the repository: make update-repo
 `make update-repo` builds every package, then runs `update-repo/update-repo.py`, which needs:
 - Everything `make all` needs.

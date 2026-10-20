@@ -24,7 +24,8 @@ The questions:
 | Number of cpus | 1 up to the number of cpus of the computer. | 2 |
 | Memory of the vm | 4, 8, 16 or 32 GiB, by number. | 4 GiB |
 | Network bridge | A network bridge of the computer. | `br0` |
-| GPU that renders the vm | One of the GPUs of the computer, by number, as its render node in `/dev/dri/by-path`. Pick the GPU of the monitor that shows the console: frames handed from another GPU come out scrambled. Not asked when the computer has one GPU. | The GPU with a monitor connected, otherwise the first. |
+| Graphics of the vm | With a GPU (3D acceleration, rendered on a GPU of the computer) or without a GPU (the default graphics of libvirt, so the vm can be moved to a server without a GPU), by number. With a GPU cannot be picked when the computer has no GPU with a render node. | With a GPU, or without one when the computer has none. |
+| GPU that renders the vm | One of the GPUs of the computer, by number, as its render node in `/dev/dri/by-path`. Pick the GPU of the monitor that shows the console: frames handed from another GPU come out scrambled. Only asked for a vm with a GPU, and not when the computer has one GPU. | The GPU with a monitor connected, otherwise the first. |
 
 It then shows the answers and asks whether to define and start the vm; anything but `y` changes nothing. Open the console of the vm, for example with:
 ```
@@ -35,13 +36,27 @@ and install HyprDebian with `sudo hd-installer` (see [Live cd](../Livecd/Overvie
 
 `python3 vm/provision-vm.py --dry-run` asks the same questions, but only prints the domain XML.
 
+## Switching between with and without a GPU
+```
+make switch-vm-gpu
+```
+
+lists the vms in libvirt, each with its state and whether it runs with a GPU, and asks which one to switch:
+- A vm with a GPU gets the default graphics: the `egl-headless` graphics and the 3D acceleration of its virtio gpu are removed. Do this before moving it to a server without a GPU.
+- A vm without a GPU gets 3D acceleration, rendered with `egl-headless` on a GPU of the computer, as for a provisioned vm with a GPU. It asks for the GPU in the same way, and fails when the computer has no GPU with a render node.
+
+It then asks whether to switch; anything but `y` changes nothing. It only changes the definition of the vm: a running vm keeps its graphics until it is shut down and started again (a reboot from inside the vm is not enough). The rest of the definition is kept as it is.
+
+`python3 vm/switch-vm-gpu.py --dry-run` asks the same questions, but only prints the new domain XML.
+
 ## The vm
 The domain is rendered from the jinja2 template `vm/domain.xml.j2`:
 - UEFI firmware with secure boot enabled and no keys enrolled. libvirt picks the firmware (`OVMF_CODE_4M.secboot.fd`) and makes the nvram from the empty varstore (`OVMF_VARS_4M.fd`), so the firmware starts in setup mode: secure boot is not enforced until keys are enrolled.
 - The q35 machine, with the cpu of the host passed through and SMM, which secure boot needs.
 - The zvol as a virtio disk with discard, booted first, and the live ISO as a cdrom, booted when the zvol is still empty.
 - A virtio network card on the bridge, the qemu guest agent channel, spice graphics with a virtio gpu, a watchdog, a memory balloon and a random number generator.
-- 3D acceleration for the virtio gpu (virgl, `virtio-vga-gl`), which programs that draw with the GPU, such as hyprpaper, need. Without it Mesa falls back to software rendering, and hyprpaper crashes. qemu renders it with `egl-headless` on the chosen GPU and hands spice plain frames, so the console needs no OpenGL in the client. Spice with OpenGL is not used: it stalls the virtio gpu until the client has drawn each frame, and Mesa in the vm then finds no virgl.
+- With a GPU: 3D acceleration for the virtio gpu (virgl, `virtio-vga-gl`), which programs that draw with the GPU, such as hyprpaper, need. Without it Mesa falls back to software rendering, and hyprpaper crashes. qemu renders it with `egl-headless` on the chosen GPU and hands spice plain frames, so the console needs no OpenGL in the client. Spice with OpenGL is not used: it stalls the virtio gpu until the client has drawn each frame, and Mesa in the vm then finds no virgl.
+- Without a GPU: the default graphics of libvirt, spice with a virtio gpu without 3D acceleration. The vm needs no GPU on the computer it runs on, so it can be moved to a server without one. Programs that draw with the GPU fall back to software rendering, which hyprpaper does not survive.
 - No serial console: a console on a serial port keeps the boot splash from showing.
 
 libvirt makes the uuid, the MAC address and the PCI addresses.
@@ -50,5 +65,7 @@ The files involved are:
 ```
 Makefile
 vm/provision-vm.py
+vm/switch-vm-gpu.py
+vm/vmcommon.py
 vm/domain.xml.j2
 ```

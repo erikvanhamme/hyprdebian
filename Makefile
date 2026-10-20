@@ -10,9 +10,13 @@
 #   make clean      remove build/ and run make clean in every package
 #                   directory
 #   make provision-vm
-#                   ask for the name, zvol, cpus, memory, bridge and GPU of a
-#                   vm, then define it in libvirt and start it from the live cd
-#                   (vm/provision-vm.py); make the zvol first
+#                   ask for the name, zvol, cpus, memory, bridge and GPU (or
+#                   none) of a vm, then define it in libvirt and start it from
+#                   the live cd (vm/provision-vm.py); make the zvol first
+#   make switch-vm-gpu
+#                   ask for a vm in libvirt and switch it between running with
+#                   a GPU (3D acceleration) and without one (the default
+#                   graphics), asking for the GPU (vm/switch-vm-gpu.py)
 #   make iso        build every package, then the live ISO with them in
 #                   livecd/ (livecd/Makefile): hd-installer installed on the
 #                   live system, and every package as the local repository
@@ -46,7 +50,7 @@ OUT := build
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
-.PHONY: all test clean iso provision-vm update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean iso provision-vm switch-vm-gpu update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -72,6 +76,9 @@ clean:
 
 provision-vm:
 	python3 vm/provision-vm.py
+
+switch-vm-gpu:
+	python3 vm/switch-vm-gpu.py
 
 # Prints each package of the package directories in PACKAGES as
 # <repos>:build/<package>.deb, one per line, for update-repo.py and the live cd.
