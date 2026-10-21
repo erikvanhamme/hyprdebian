@@ -2,25 +2,44 @@
 .SH NAME
 hd-theme \- the theme engine of HyprDebian
 .SH DESCRIPTION
-HyprDebian has one theme for the whole system; there are no themes per user.
 The themes are JSON files in
 .IR /etc/hyprdebian/themes ,
 one per theme, named
 .IR <name>.json .
-The theme that is selected is copied, with its name, to the key
+A theme that is selected is copied, with its name, to the key
+.B hd-theme
+of a configuration, see
+.BR hd-config (7).
+There are two:
+.TP
+the theme of the system
+in
+.IR /etc/hyprdebian/config.json ,
+selected by root.
+It is the theme of the system itself, of new users and of every user who
+has no theme of their own.
+.TP
+the theme of a user
+in
+.IR ~/.config/hyprdebian/config.json ,
+selected by that user.
+.PP
+Programs of the desktop, such as
+.BR hd-menu (1),
+read the theme of the user who runs them: the key
 .B hd-theme
 of
+.I ~/.config/hyprdebian/config.json
+when it is there, else that of
 .IR /etc/hyprdebian/config.json ,
-see
-.BR hd-config (7).
-Programs and packages read the theme there, such as
-.BR hd-menu (1).
+else defaults of their own.
+Root uses the theme of the system.
 .PP
 .BR hd-theme (1)
 adds, deletes, lists and selects themes, and with
 .B \-\-apply
 writes the theme files of the desktop programs in the home directory of a
-user from the selected theme; each user runs that after a theme is selected.
+user from the theme of that user; each user runs that after a theme is selected.
 .BR hd-theme-card (1)
 renders a theme into a card, a PNG that shows it.
 .SH THEMES
@@ -119,7 +138,12 @@ come with hd-desktop.
 .I /etc/hyprdebian/config.json
 The key
 .B hd-theme
-holds the selected theme.
+holds the theme of the system.
+.TP
+.I ~/.config/hyprdebian/config.json
+The key
+.B hd-theme
+holds the theme of the user, when they selected one.
 .TP
 .I /var/cache/hd-theme/cards/<name>.png
 The cards of the themes.

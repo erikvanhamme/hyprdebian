@@ -17,15 +17,16 @@
 #                                             systemctl
 #                 /usr/bin/hd-sync-skel       brings the files of /etc/skel
 #                                             into the home directory
+#                 /usr/bin/hd-config-update   adds a key to the
+#                                             configuration or replaces its
+#                                             value: of the system for root,
+#                                             of the user for other users
+#                 /usr/bin/hd-config-remove   removes keys from that
+#                                             configuration
 #                 /usr/sbin/hd-issue          writes the login banner in
 #                                             /etc/issue
 #                 /usr/sbin/hd-link-repo      switches the HyprDebian
 #                                             repository and suite of apt
-#                 /usr/sbin/hd-config-update  adds a key to the
-#                                             configuration or replaces its
-#                                             value
-#                 /usr/sbin/hd-config-remove  removes keys from the
-#                                             configuration
 #                 /usr/sbin/hd-network-render renders the files in
 #                                             /etc/systemd/network
 #                 /usr/sbin/hd-network-iface  adds, changes and removes
@@ -96,9 +97,9 @@ STAGE := $(BUILD)/deb
 ETC := $(shell find etc -type f)
 USR := $(shell find usr -type f)
 # The commands, installed in /usr/bin.
-COMMANDS := hd-up hd-reboot hd-poweroff hd-sync-skel
+COMMANDS := hd-up hd-reboot hd-poweroff hd-sync-skel hd-config-update hd-config-remove
 # The commands for root, installed in /usr/sbin.
-SBIN_COMMANDS := hd-issue hd-link-repo hd-config-update hd-config-remove hd-network-render \
+SBIN_COMMANDS := hd-issue hd-link-repo hd-network-render \
 	hd-network-iface hd-network-bridge hd-secboot-enroll hd-secboot-check
 # The jinja2 templates of hd-link-repo.
 TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
@@ -110,7 +111,7 @@ NETWORK_LIB_DIR := /usr/lib/hd-network
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
 MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
 	man/hd-issue.8 man/hd-link-repo.8 \
-	man/hd-config.7 man/hd-config-update.8 man/hd-config-remove.8 \
+	man/hd-config.7 man/hd-config-update.1 man/hd-config-remove.1 \
 	man/hd-network.7 man/hd-network-render.8 man/hd-network-iface.8 man/hd-network-bridge.8 \
 	man/hd-secboot.7 man/hd-secboot-enroll.8 man/hd-secboot-check.8
 

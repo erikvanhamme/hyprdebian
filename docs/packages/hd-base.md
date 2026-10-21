@@ -4,7 +4,7 @@ The package `hd-base` depends on the packages that every hyprdebian system has, 
 It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
 It also holds the parts that every hyprdebian system shares, each with a page of its own:
-- [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, with `hd-config-update` and `hd-config-remove`;
+- [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, and that of each user in `~/.config/hyprdebian/config.json`, with `hd-config-update` and `hd-config-remove`;
 - [hd-network](hd-network.md): the network configuration, rendered into the systemd-networkd files by `hd-network-render` and changed with `hd-network-iface` and `hd-network-bridge`, and the `.link` files that name the network interfaces by their path;
 - [hd-secboot](hd-secboot.md): the Secure Boot keys of the owner, which the postinst generates in `/etc/hyprdebian/secboot` when they are not there yet, with `hd-secboot-enroll`, which enrolls them in the firmware, and `hd-secboot-check`, which checks that Secure Boot is on.
 
@@ -204,7 +204,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |
 | `/usr/lib/sysctl.d/50-zram.conf` | The sysctls for the zram swap. |
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
-| `/usr/sbin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
+| `/usr/bin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
 | `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
 | `/usr/sbin/hd-secboot-*`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |

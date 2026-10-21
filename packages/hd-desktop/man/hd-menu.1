@@ -97,11 +97,15 @@ in Hyprland, so that holding Down keeps moving the selection.
 .B hd-menu
 draws the menu in the
 .B hd-theme
-of
-.IR /etc/hyprdebian/config.json ,
-which
+of the configuration of the user,
+.IR ~/.config/hyprdebian/config.json ,
+or, when that has none, of the configuration of the system,
+.IR /etc/hyprdebian/config.json ;
+when neither has it, it uses defaults of its own, and run as root it only
+reads the configuration of the system.
 .BR hd-theme (1)
-sets when a theme is selected: the font and its
+sets the key when a theme is selected.
+The theme gives the font and its
 .BR font-size-big ,
 the colours
 .B dark
@@ -141,9 +145,14 @@ An error: arguments, invalid JSON on stdin, a menu without options, or no
 Wayland compositor with wlr-layer-shell.
 .SH FILES
 .TP
-.I /etc/hyprdebian/config.json
-The theme, in
+.I ~/.config/hyprdebian/config.json
+The theme of the user, in
 .BR hd-theme .
+.TP
+.I /etc/hyprdebian/config.json
+The theme of the system, in
+.BR hd-theme ,
+when the user has none.
 .TP
 .IR /run/user/ UID /hd-menu.lock
 The lock that keeps a second

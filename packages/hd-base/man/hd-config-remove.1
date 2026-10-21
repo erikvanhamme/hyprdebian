@@ -1,4 +1,4 @@
-.TH HD-CONFIG-REMOVE 8 "October 2026" "hd-base" "HyprDebian"
+.TH HD-CONFIG-REMOVE 1 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
 hd-config-remove \- remove keys from the hyprdebian configuration
 .SH SYNOPSIS
@@ -9,8 +9,7 @@ hd-config-remove \- remove keys from the hyprdebian configuration
 .B hd-config-remove
 removes each
 .I key
-and its value from the JSON object in
-.IR /etc/hyprdebian/config.json .
+and its value from the JSON object of the configuration.
 Only keys of that object itself are removed; it does not reach into the
 values.
 The other keys stay as they are.
@@ -18,14 +17,16 @@ See
 .BR hd-config (7)
 for how the configuration is used.
 .PP
-A key that is not in the configuration is skipped, and when
-.I /etc/hyprdebian/config.json
-does not exist, nothing is done.
+Who runs it decides which configuration it changes.
+Run as root, it is the configuration of the system,
+.IR /etc/hyprdebian/config.json ;
+run as any other user, it is the configuration of that user,
+.IR ~/.config/hyprdebian/config.json .
+.PP
+A key that is not in the configuration is skipped, and when the configuration does not exist, nothing is done.
 Neither is an error, so a package can remove its keys whether or not it ever
 set them.
 When none of the keys is there, the file is not written.
-.PP
-Run it as root.
 .SH OPTIONS
 .TP
 .BR \-h ,\  \-\-help
@@ -40,7 +41,10 @@ On an error the file is left as it was.
 .SH FILES
 .TP
 .I /etc/hyprdebian/config.json
-The configuration.
+The configuration of the system, which root changes.
+.TP
+.I ~/.config/hyprdebian/config.json
+The configuration of a user, which that user changes.
 .SH EXAMPLES
 Remove the settings of hd-example:
 .PP
@@ -49,6 +53,6 @@ hd-config-remove hd-example
 .RE
 .SH SEE ALSO
 .BR hd-config (7),
-.BR hd-config-update (8)
+.BR hd-config-update (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

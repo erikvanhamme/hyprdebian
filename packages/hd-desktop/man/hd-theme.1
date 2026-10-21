@@ -25,15 +25,27 @@ see
 .BR hd-theme (7),
 and applies the selected theme to the desktop of the user who runs it.
 .BR \-\-add ,
-.BR \-\-delete ,
-.B \-\-select
+.B \-\-delete
 and
 .B \-\-cards
 are refused when not run as root.
-.B \-\-list
+.BR \-\-list ,
+.B \-\-select
 and
 .B \-\-apply
 are run by any user.
+.PP
+Who runs it decides which theme
+.BR \-\-list ,
+.B \-\-select
+and
+.B \-\-apply
+work on.
+For root, it is the theme of the system, in
+.IR /etc/hyprdebian/config.json .
+For any other user, it is the theme of that user, in
+.IR ~/.config/hyprdebian/config.json ,
+or the theme of the system while the user has none.
 .SH OPTIONS
 .TP
 .B \-\-list
@@ -42,6 +54,7 @@ Print the names of the themes, with
 before the selected one, and open
 .BR imv-wayland (1)
 on the directory of the cards, starting at the card of the selected theme.
+For a user who is not root, the theme of the system is marked as such.
 Without a Wayland display, only the names are printed.
 .TP
 .BI \-\-add " file"
@@ -60,26 +73,34 @@ when either fails, nothing is added.
 A member
 .B name
 in the file is left out.
-When the theme replaces the selected one, it is selected again.
+When the theme replaces the theme of the system, it is selected again for
+the system; users who selected it themselves keep the old copy until they
+select it again.
 .TP
 .BI \-\-delete " name"
 Delete a theme and its card.
-The selected theme cannot be deleted.
+The theme of the system cannot be deleted.
+Users who selected it themselves keep their copy.
 .TP
 .BI \-\-select " name"
-Make
-.I name
-the theme of the system: copy it, with its name, to the key
+Copy the theme
+.IR name ,
+with its name, to the key
 .B hd-theme
-of
-.I /etc/hyprdebian/config.json
-with
-.BR hd-config-update (8).
-Programs that read that file themselves, such as
+of a configuration with
+.BR hd-config-update (1).
+Run as root, it becomes the theme of the system, in
+.IR /etc/hyprdebian/config.json ,
+which users without a theme of their own get.
+Run as any other user, it becomes the theme of that user, in
+.IR ~/.config/hyprdebian/config.json .
+Programs that read the theme themselves, such as
 .BR hd-menu (1),
 use it at once.
-The desktops of the users do not change until each user runs
+The desktops do not change until each user runs
 .BR "hd-theme \-\-apply" .
+A user goes back to the theme of the system with
+.BR "hd-config-remove hd-theme" .
 .TP
 .B \-\-apply
 Write the theme files of the desktop programs in the home directory of the
@@ -156,10 +177,20 @@ hd-theme \-\-list
 sudo hd-theme \-\-select meadow
 hd-theme \-\-apply
 .fi
+.PP
+A theme for one user only, and back to the theme of the system:
+.PP
+.nf
+hd-theme \-\-select sand
+hd-theme \-\-apply
+hd-config-remove hd-theme
+hd-theme \-\-apply
+.fi
 .SH SEE ALSO
 .BR hd-theme (7),
 .BR hd-theme-card (1),
 .BR hd-config (7),
+.BR hd-config-remove (1),
 .BR imv-wayland (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

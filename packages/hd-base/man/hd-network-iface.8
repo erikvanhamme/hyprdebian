@@ -27,10 +27,10 @@ It reads all the network settings, makes the change, checks the result the
 same way
 .BR hd-network-render (8)
 does, and writes it with
-.BR hd-config-update (8).
+.BR hd-config-update (1).
 When the check fails, nothing is written.
 When no settings are left, the key is removed with
-.BR hd-config-remove (8).
+.BR hd-config-remove (1).
 .PP
 It does not change the network itself: run
 .B hd-network-render
@@ -160,6 +160,6 @@ hd-network-render
 .BR hd-network (7),
 .BR hd-network-bridge (8),
 .BR hd-network-render (8),
-.BR hd-config-update (8)
+.BR hd-config-update (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

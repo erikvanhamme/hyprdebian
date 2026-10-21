@@ -43,8 +43,10 @@ Description: HyprDebian desktop
     v3.4.0, in /usr/share/fonts/truetype/jetbrains-mono-nerd;
   - hd-menu, the keyboard-driven menu, which reads a menu as JSON from stdin
     and prints the value of the option chosen;
-  - the theme engine hd-theme, with the themes in /etc/hyprdebian/themes and
-    the selected one in the key hd-theme of /etc/hyprdebian/config.json;
+  - the theme engine hd-theme, with the themes in /etc/hyprdebian/themes,
+    the theme of the system in the key hd-theme of
+    /etc/hyprdebian/config.json and the theme of a user in that key of
+    ~/.config/hyprdebian/config.json;
   - the screensaver, a text with the random effects of terminal text effects
     on every monitor, which hypridle starts after 2 minutes;
   - the plymouth theme hyprdebian, which looks like the lock screen of

@@ -1,4 +1,4 @@
-.TH HD-CONFIG-UPDATE 8 "October 2026" "hd-base" "HyprDebian"
+.TH HD-CONFIG-UPDATE 1 "October 2026" "hd-base" "HyprDebian"
 .SH NAME
 hd-config-update \- add a key to the hyprdebian configuration or replace its value
 .SH SYNOPSIS
@@ -9,9 +9,7 @@ hd-config-update \- add a key to the hyprdebian configuration or replace its val
 .B hd-config-update
 sets
 .I key
-in the JSON object in
-.I /etc/hyprdebian/config.json
-to the JSON value
+in the JSON object of the configuration to the JSON value
 .IR json .
 When the key is not there yet, it is added; when it is, its old value is
 replaced as a whole.
@@ -20,18 +18,19 @@ See
 .BR hd-config (7)
 for how the configuration is used.
 .PP
+Who runs it decides which configuration it changes.
+Run as root, it is the configuration of the system,
+.IR /etc/hyprdebian/config.json ;
+run as any other user, it is the configuration of that user,
+.IR ~/.config/hyprdebian/config.json .
+.PP
 Without
 .IR json ,
 the value is read from standard input.
 .PP
-When
-.I /etc/hyprdebian/config.json
-does not exist yet, it is made, and
-.I /etc/hyprdebian
+When the configuration does not exist yet, it is made, and its directory
 with it.
 The file is written with mode 0644.
-.PP
-Run it as root.
 .SH OPTIONS
 .TP
 .BR \-h ,\  \-\-help
@@ -54,7 +53,10 @@ On an error the file is left as it was.
 .SH FILES
 .TP
 .I /etc/hyprdebian/config.json
-The configuration.
+The configuration of the system, which root changes.
+.TP
+.I ~/.config/hyprdebian/config.json
+The configuration of a user, which that user changes.
 .SH EXAMPLES
 Set the settings of hd-example:
 .PP
@@ -75,6 +77,6 @@ hd-config-update hd-example < settings.json
 .RE
 .SH SEE ALSO
 .BR hd-config (7),
-.BR hd-config-remove (8)
+.BR hd-config-remove (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

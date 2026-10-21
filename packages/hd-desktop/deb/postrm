@@ -6,7 +6,7 @@
 # compiled dconf database of the dark theme when its source in /etc/dconf/db/local.d is gone, the
 # menu of the launcher that hd-launcher wrote, and the key hd-theme from
 # /etc/hyprdebian/config.json. The themes that were added stay in /etc/hyprdebian/themes, and the
-# theme files stay in the home directories. It also finishes the removal of the conffiles that
+# themes of the users and the theme files stay in the home directories. It also finishes the removal of the conffiles that
 # hd-desktop no longer has, as the preinst and the postinst. Written for sh, as python3 may be
 # gone by then.
 set -e
@@ -52,6 +52,6 @@ fi
 rm -rf "$LAUNCHER_CACHE" "$THEME_CACHE"
 
 # hd-base may already be removed, see hd-config(7).
-if [ -x /usr/sbin/hd-config-remove ]; then
+if [ -x /usr/bin/hd-config-remove ]; then
     hd-config-remove hd-theme
 fi

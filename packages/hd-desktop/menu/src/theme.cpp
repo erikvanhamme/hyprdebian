@@ -7,7 +7,11 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <pwd.h>
 #include <sstream>
+#include <string>
+#include <unistd.h>
+#include <vector>
 
 namespace {
 
@@ -26,20 +30,40 @@ bool parse_color(const std::string& text, Color& color)
     return true;
 }
 
-} // namespace
+const char* const SYSTEM_CONFIG = "/etc/hyprdebian/config.json";
 
-Theme load_theme(const std::string& path)
+// The configurations in which the theme is looked up, first to last: for root
+// the one of the system, for other users their own and then the one of the
+// system, as hd-theme does.
+std::vector<std::string> config_files()
 {
-    Theme theme;
+    if (geteuid() == 0) {
+        return {SYSTEM_CONFIG};
+    }
+    const passwd* user = getpwuid(getuid());
+    if (user == nullptr || user->pw_dir == nullptr) {
+        return {SYSTEM_CONFIG};
+    }
+    return {std::string(user->pw_dir) + "/.config/hyprdebian/config.json", SYSTEM_CONFIG};
+}
+
+// Reads the key hd-theme of the configuration in path into theme. False when
+// the file does not exist, has no such key, or cannot be read.
+bool read_theme(const std::string& path, Theme& theme)
+{
+    if (access(path.c_str(), F_OK) != 0) {
+        return false;
+    }
     std::ifstream file(path);
     if (!file) {
-        std::cerr << "hd-menu: cannot read " << path << ", using the default theme\n";
-        return theme;
+        std::cerr << "hd-menu: cannot read " << path << "\n";
+        return false;
     }
     std::stringstream text;
     text << file.rdbuf();
 
     // The members of hd-theme, by type.
+    bool found = false;
     std::map<std::string, std::string> strings;
     std::map<std::string, double> numbers;
     try {
@@ -49,6 +73,7 @@ Theme load_theme(const std::string& path)
                 reader.skip();
                 return;
             }
+            found = true;
             reader.object([&](const std::string& field) {
                 const char c = reader.peek();
                 if (c == '"') {
@@ -62,8 +87,11 @@ Theme load_theme(const std::string& path)
         });
         reader.end();
     } catch (const std::exception& e) {
-        std::cerr << "hd-menu: " << path << ": " << e.what() << ", using the default theme\n";
-        return Theme();
+        std::cerr << "hd-menu: " << path << ": " << e.what() << "\n";
+        return false;
+    }
+    if (!found) {
+        return false;
     }
 
     if (strings.count("font") != 0 && !strings["font"].empty()) {
@@ -91,5 +119,19 @@ Theme load_theme(const std::string& path)
     if (numbers.count("opacity") != 0) {
         theme.opacity = std::clamp(numbers["opacity"], 0.0, 1.0);
     }
-    return theme;
+    return true;
+}
+
+} // namespace
+
+Theme load_theme()
+{
+    for (const std::string& path : config_files()) {
+        Theme theme;
+        if (read_theme(path, theme)) {
+            return theme;
+        }
+    }
+    std::cerr << "hd-menu: no hd-theme in the configuration, using the default theme\n";
+    return Theme();
 }

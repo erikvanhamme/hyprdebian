@@ -1,8 +1,9 @@
 # Compiles hd-menu, the keyboard-driven menu of the HyprDebian desktop: a C++
 # program that draws the menu itself, with cairo and librsvg, on a
 # wlr-layer-shell surface of the compositor, in the colours, font, border and
-# radius of the hd-theme key of /etc/hyprdebian/config.json. It reads the menu
-# as JSON from stdin; src/menu.hpp and ../man/hd-menu.1 describe it.
+# radius of the hd-theme key of ~/.config/hyprdebian/config.json, else of
+# /etc/hyprdebian/config.json. It reads the menu as JSON from stdin;
+# src/menu.hpp and ../man/hd-menu.1 describe it.
 #
 # make deb of ../Makefile runs build-hd-menu.sh in a container, which runs
 # make all here, and puts hd-menu in the package hd-desktop.

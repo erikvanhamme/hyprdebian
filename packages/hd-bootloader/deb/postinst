@@ -18,7 +18,7 @@ import sys
 
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 CONFIG_KEY = "hd-bootloader"
-CONFIG_UPDATE = "/usr/sbin/hd-config-update"
+CONFIG_UPDATE = "/usr/bin/hd-config-update"
 DEFAULTS_FILE = "/usr/share/hd-bootloader/defaults.json"
 UPDATE_ESPS = "/usr/lib/hd-bootloader/update-esps"
 # The frontend of a config without the key frontend, as in update-bootloader.py.

@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: amd64
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd-ukify, systemd-boot-efi, hd-base
+Depends: python3, systemd-ukify, systemd-boot-efi, hd-base (>= 1.22)
 Recommends: dkms
 Provides: hd-bootloader
 Conflicts: hd-bootloader

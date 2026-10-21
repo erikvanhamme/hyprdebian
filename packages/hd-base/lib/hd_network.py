@@ -18,8 +18,8 @@ import sys
 
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 CONFIG_KEY = "hd-network"
-CONFIG_UPDATE = "/usr/sbin/hd-config-update"
-CONFIG_REMOVE = "/usr/sbin/hd-config-remove"
+CONFIG_UPDATE = "/usr/bin/hd-config-update"
+CONFIG_REMOVE = "/usr/bin/hd-config-remove"
 
 DEFAULT_METRIC = 100
 # An interface name, or a glob that matches interface names.

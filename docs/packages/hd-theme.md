@@ -1,8 +1,12 @@
 ## Introduction
-`hd-theme` is the theme engine of HyprDebian, in the package `hd-desktop`. There is one theme for the whole system; there are no themes per user. The themes are JSON files in `/etc/hyprdebian/themes`, one per theme, and the file name is the name of the theme. The theme that is selected is copied, with its name, to the key `hd-theme` of `/etc/hyprdebian/config.json` of [hd-config](hd-config.md), where other packages read it, such as [hd-menu](hd-menu.md).
+`hd-theme` is the theme engine of HyprDebian, in the package `hd-desktop`. The themes are JSON files in `/etc/hyprdebian/themes`, one per theme, and the file name is the name of the theme. A theme that is selected is copied, with its name, to the key `hd-theme` of a configuration of [hd-config](hd-config.md). There are two:
+- the theme of the system, in `/etc/hyprdebian/config.json`, selected by root. It is the theme of the system itself, of new users and of every user who has no theme of their own;
+- the theme of a user, in `~/.config/hyprdebian/config.json`, selected by that user.
+
+Programs of the desktop, such as [hd-menu](hd-menu.md), read the theme of the user who runs them: the key `hd-theme` of `~/.config/hyprdebian/config.json` when it is there, else that of `/etc/hyprdebian/config.json`, else defaults of their own. Root uses the theme of the system.
 
 It has two commands:
-- `hd-theme` adds, deletes, lists and selects themes, and with `--apply` writes the theme files of the desktop programs in the home directory of the user who runs it, from the selected theme. Adding, deleting, selecting and rendering the cards need root; listing and applying are for every user. Nothing applies a theme on its own: selecting a theme does not change the desktops until each user runs `hd-theme --apply`;
+- `hd-theme` adds, deletes, lists and selects themes, and with `--apply` writes the theme files of the desktop programs in the home directory of the user who runs it, from the selected theme. Adding, deleting and rendering the cards need root; listing, selecting and applying are for every user, and work on the theme of the system for root and on the theme of the user for other users. Nothing applies a theme on its own: selecting a theme does not change the desktops until each user runs `hd-theme --apply`;
 - `hd-theme-card` renders a theme into a card, a PNG that shows its colours, fonts, icons, geometry and how the desktop looks in it.
 
 [hd-desktop](hd-desktop.md) comes with the man pages `man 7 hd-theme`, which describes the themes, `man 1 hd-theme` and `man hd-theme-card`.
@@ -68,19 +72,21 @@ In `config.json`, the key `hd-theme` also has the member `name`, the name of the
 ```
 hd-theme --list                 print the themes and show their cards in imv-wayland
 hd-theme --add <file>           add the theme in <file>, or replace the one with its name
-hd-theme --delete <name>        delete a theme; not the selected one
-hd-theme --select <name>        make <name> the theme of the system
+hd-theme --delete <name>        delete a theme; not the theme of the system
+hd-theme --select <name>        make <name> the theme of the system, or of the user
 hd-theme --apply [--no-reload]  apply the selected theme to the desktop of the user
 hd-theme --cards                render the cards of all themes again
 ```
 
-`--add` takes the name of the theme from the file name without `.json`: lower case letters, digits, `-` and `_`. It checks the theme and renders its card before it adds it; when either fails, nothing is added. When it replaces the selected theme, it selects it again.
+`--add` takes the name of the theme from the file name without `.json`: lower case letters, digits, `-` and `_`. It checks the theme and renders its card before it adds it; when either fails, nothing is added. When it replaces the theme of the system, it selects it again for the system; users who selected it themselves keep the old copy until they select it again. `--delete` refuses the theme of the system; users who selected it themselves keep their copy.
 
-`--select` writes the theme to `config.json` with `hd-config-update`. Programs that read `config.json` themselves, such as hd-menu, use the new theme at once; the desktop programs only after the user runs `hd-theme --apply`.
+`--select` writes the theme to a configuration with `hd-config-update`, which picks it by who runs it: run as root, the theme becomes the theme of the system in `/etc/hyprdebian/config.json`; run as any other user, the theme of that user in `~/.config/hyprdebian/config.json`. Programs that read the theme themselves, such as hd-menu, use the new theme at once; the desktop programs only after the user runs `hd-theme --apply`. A user goes back to the theme of the system with `hd-config-remove hd-theme`.
 
-`--add`, `--delete`, `--select` and `--cards` are refused when not run as root. `--list` and `--apply` are for every user.
+`--apply` applies the theme of the user who runs it, or the theme of the system while they have none; root applies the theme of the system.
 
-`--list` prints the themes, with `*` before the selected one, and opens `imv-wayland -n <card> /var/cache/hd-theme/cards`, where the cards are, starting at the card of the selected theme.
+`--add`, `--delete` and `--cards` are refused when not run as root. `--list`, `--select` and `--apply` are for every user.
+
+`--list` prints the themes, with `*` before the selected one; for users other than root, it marks the theme of the system as well. It opens `imv-wayland -n <card> /var/cache/hd-theme/cards`, where the cards are, starting at the card of the selected theme.
 
 To make a theme of your own:
 ```
@@ -89,6 +95,14 @@ editor meadow.json
 sudo hd-theme --add meadow.json
 hd-theme --list
 sudo hd-theme --select meadow
+hd-theme --apply
+```
+
+To use a theme for yourself only, and to go back to the theme of the system:
+```
+hd-theme --select sand
+hd-theme --apply
+hd-config-remove hd-theme
 hd-theme --apply
 ```
 

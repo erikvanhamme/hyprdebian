@@ -4,9 +4,12 @@ hd-config \- the hyprdebian configuration database
 .SH DESCRIPTION
 The package
 .B hd-base
-keeps the configuration of hyprdebian in one file,
-.IR /etc/hyprdebian/config.json .
-It holds a JSON object.
+keeps the configuration of hyprdebian in
+.IR /etc/hyprdebian/config.json ,
+the configuration of the system.
+Every user may also have a configuration of their own, in
+.IR ~/.config/hyprdebian/config.json .
+Each holds a JSON object.
 Each hyprdebian package that has settings keeps them under a key of its
 own in that object, usually its package name:
 .PP
@@ -21,23 +24,35 @@ own in that object, usually its package name:
 .fi
 .RE
 .PP
-The file is changed with two commands, both run as root:
+The files are changed with two commands:
 .TP
-.BR hd-config-update (8)
+.BR hd-config-update (1)
 adds a key, or replaces its value.
 .TP
-.BR hd-config-remove (8)
+.BR hd-config-remove (1)
 removes keys.
+.PP
+Both change the configuration of the system when root runs them, and the
+configuration of the user who runs them otherwise.
+.PP
+Most settings are of the system, and only the configuration of the system is
+read for them.
+A program that also reads the configuration of the user says so; it reads
+the key there first and, when the configuration of the user does not have
+it, in the configuration of the system.
+The key
+.B hd-theme
+of
+.BR hd-theme (7)
+is read that way.
 .PP
 Both write the file as a whole to a temporary file next to it and move that
 into place, so the file is never seen half written.
-They hold a lock on
-.I /etc/hyprdebian
-while they change it, so two changes at the same time do not lose each
+They hold a lock on the directory of the file while they change it, so two changes at the same time do not lose each
 other's work.
-The file is made by the first
-.BR hd-config-update ;
-the package itself installs no configuration.
+A file is made by the first
+.B hd-config-update
+that writes it; the package itself installs no configuration.
 .SH USING IT FROM A PACKAGE
 A package that keeps its settings in the configuration depends on
 .B hd-base
@@ -56,7 +71,7 @@ may already be removed, so it checks first:
 .PP
 .RS
 .nf
-if [ "$1" = "purge" ] && [ \-x /usr/sbin/hd-config-remove ]; then
+if [ "$1" = "purge" ] && [ \-x /usr/bin/hd-config-remove ]; then
     hd-config-remove hd-example
 fi
 .fi
@@ -73,13 +88,17 @@ python3 \-c 'import json; print(json.load(open("/etc/hyprdebian/config.json"))["
 .SH FILES
 .TP
 .I /etc/hyprdebian/config.json
-The configuration, a JSON object, readable for everyone.
+The configuration of the system, a JSON object, readable for everyone.
 It is not a conffile: removing or purging
 .B hd-base
 keeps it.
+.TP
+.I ~/.config/hyprdebian/config.json
+The configuration of a user, a JSON object.
 .SH SEE ALSO
 .BR hd-base (7),
-.BR hd-config-update (8),
-.BR hd-config-remove (8)
+.BR hd-config-update (1),
+.BR hd-config-remove (1),
+.BR hd-theme (7)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

@@ -2,8 +2,11 @@
  * @file theme.hpp
  * @brief The look of the menu.
  *
- * The theme is the "hd-theme" key of /etc/hyprdebian/config.json, which
- * hd-config-update sets. Every field that is missing keeps its default.
+ * The theme is the "hd-theme" key of the configuration of the user,
+ * ~/.config/hyprdebian/config.json, or, when that has none, of the
+ * configuration of the system, /etc/hyprdebian/config.json; hd-theme --select
+ * sets them. Root only reads the one of the system. Every field that is
+ * missing keeps its default.
  */
 #pragma once
 
@@ -57,13 +60,15 @@ struct Theme {
 };
 
 /**
- * @brief Reads the theme.
+ * @brief Reads the theme of the user who runs hd-menu.
  *
- * Fields that are missing or invalid keep their default; an invalid colour
- * is reported on stderr.
+ * The first configuration that has the key "hd-theme" gives the theme. A
+ * configuration that does not exist, or has no such key, is skipped
+ * quietly; one that cannot be read or is not valid JSON is skipped with a
+ * message on stderr. Fields that are missing or invalid keep their default;
+ * an invalid colour is reported on stderr.
  *
- * @param path The configuration file with the key "hd-theme".
- * @return The theme, or the defaults, with a message on stderr, when the
- *         file cannot be read or is not valid JSON.
+ * @return The theme, or the defaults, with a message on stderr, when no
+ *         configuration has one.
  */
-Theme load_theme(const std::string& path = "/etc/hyprdebian/config.json");
+Theme load_theme();

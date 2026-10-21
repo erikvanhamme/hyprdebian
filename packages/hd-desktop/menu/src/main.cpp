@@ -9,7 +9,7 @@
 // after a choice, with 1 when the menu is closed without one or another
 // hd-menu is already open, and with 2 on an error.
 //
-// The parts: theme.cpp reads the hd-theme from /etc/hyprdebian/config.json,
+// The parts: theme.cpp reads the hd-theme of the user, or of the system,
 // menu.cpp reads the menu, renderer.cpp draws it with cairo, window.cpp puts
 // the drawing on the screen and gets the keys, and the App here ties them
 // together.

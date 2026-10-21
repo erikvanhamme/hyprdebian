@@ -15,11 +15,13 @@ of its own:
 .BR hd-config (7)
 The hyprdebian configuration,
 .IR /etc/hyprdebian/config.json ,
-where hyprdebian packages keep their settings under a key of their own,
+where hyprdebian packages keep their settings under a key of their own, and
+the configuration of each user in
+.IR ~/.config/hyprdebian/config.json ,
 with
-.BR hd-config-update (8)
+.BR hd-config-update (1)
 and
-.BR hd-config-remove (8).
+.BR hd-config-remove (1).
 .TP
 .BR hd-network (7)
 The network configuration:
@@ -318,17 +320,18 @@ Brings the files of
 .I /etc/skel
 into the home directory.
 .TP
+.I /usr/bin/hd-config-update
+.TQ
+.I /usr/bin/hd-config-remove
+Change the hyprdebian configuration: of the system for root, of the user for
+other users.
+.TP
 .I /usr/sbin/hd-issue
 Writes the login banner in
 .IR /etc/issue .
 .TP
 .I /usr/sbin/hd-link-repo
 Switches the HyprDebian repository and suite of apt.
-.TP
-.I /usr/sbin/hd-config-update
-.TQ
-.I /usr/sbin/hd-config-remove
-Change the hyprdebian configuration.
 .TP
 .I /usr/sbin/hd-network-render
 .TQ

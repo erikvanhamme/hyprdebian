@@ -5,16 +5,24 @@ The package hd-desktop installs this as /usr/bin/hd-theme.
 
     hd-theme --list                 print the themes and show their cards in imv-wayland
     hd-theme --add <file>           add the theme in <file>, or replace the one with its name
-    hd-theme --delete <name>        delete a theme; not the selected one
-    hd-theme --select <name>        make <name> the theme of the system
+    hd-theme --delete <name>        delete a theme; not the theme of the system
+    hd-theme --select <name>        make <name> the theme of the system, or of the user
     hd-theme --apply [--no-reload]  apply the selected theme to the desktop of the user
     hd-theme --cards                render the cards of all themes again
 
 A theme is a JSON object in /etc/hyprdebian/themes/<name>.json; the file name is the name of the
-theme. There is one theme for the whole system: the one selected is copied, with its name, to the
-key hd-theme of /etc/hyprdebian/config.json, where hd-menu and other packages read it.
-Selecting a theme does not change the desktops of the users: each user runs hd-theme --apply for
-their own desktop.
+theme. A selected theme is copied, with its name, to the key hd-theme of a configuration, with
+hd-config-update. There are two kinds:
+
+    the theme of the system   in /etc/hyprdebian/config.json, selected by root; the theme of the
+                              users that have none of their own
+    the theme of a user       in ~/.config/hyprdebian/config.json, selected by that user
+
+Who runs hd-theme decides which one --select, --apply and --list work on: root the theme of the
+system, any other user their own theme, or the theme of the system while they have none. hd-menu
+and the other programs of the desktop look up the theme in the same way. A user goes back to the
+theme of the system with hd-config-remove hd-theme. Selecting a theme does not change the
+desktops: each user runs hd-theme --apply for their own desktop.
 
 --apply writes, from the jinja2 templates in /usr/share/hd-theme/templates, one theme file per
 program, next to its own config in the home directory of the user:
@@ -32,8 +40,8 @@ unless --no-reload is given: Hyprland with hyprctl, hyprpaper by a restart of it
 kitty with SIGUSR1 and mako with makoctl. hyprlock reads its config when it starts.
 
 Every theme has a card, a PNG rendered by hd-theme-card, in /var/cache/hd-theme/cards/<name>.png.
---list opens imv-wayland on that directory. --add, --delete, --select and --cards are refused
-when not run as root; --list and --apply are run by any user.
+--list opens imv-wayland on that directory. --add, --delete and --cards are refused when not run
+as root; --list, --select and --apply are run by any user.
 """
 
 import argparse
@@ -47,7 +55,8 @@ import tempfile
 
 import jinja2
 
-CONFIG_FILE = "/etc/hyprdebian/config.json"
+SYSTEM_CONFIG = "/etc/hyprdebian/config.json"
+USER_CONFIG = ".config/hyprdebian/config.json"
 CONFIG_KEY = "hd-theme"
 THEME_DIR = "/etc/hyprdebian/themes"
 CARD_DIR = "/var/cache/hd-theme/cards"
@@ -89,9 +98,28 @@ def warn(message):
     print(f"Warning: {message}", file=sys.stderr)
 
 
+def is_root():
+    return os.geteuid() == 0
+
+
 def need_root(action):
-    if os.geteuid() != 0:
+    if not is_root():
         fail(f"hd-theme {action} is run as root.")
+
+
+def own_config():
+    """The configuration that hd-config-update writes for whoever runs hd-theme: that of the
+    system for root, that of the user for other users."""
+    if is_root():
+        return SYSTEM_CONFIG
+    return os.path.join(pwd.getpwuid(os.getuid()).pw_dir, USER_CONFIG)
+
+
+def config_files():
+    """The configurations in which the theme is looked up, first to last."""
+    if is_root():
+        return [SYSTEM_CONFIG]
+    return [own_config(), SYSTEM_CONFIG]
 
 
 def is_number(value):
@@ -187,26 +215,49 @@ def load_theme(name):
     return check_theme(read_json(path), path)
 
 
-def selected_theme():
-    """The selected theme, from the configuration."""
-    config = read_json(CONFIG_FILE)
+def config_theme(path):
+    """The theme in the key hd-theme of a configuration, or None when the configuration or the key
+    is not there."""
+    if not os.path.exists(path):
+        return None
+    config = read_json(path)
     if not isinstance(config, dict) or not isinstance(config.get(CONFIG_KEY), dict):
-        fail(f"{CONFIG_FILE} has no theme in the key {CONFIG_KEY}; select one with hd-theme "
-             "--select.")
+        return None
     return config[CONFIG_KEY]
+
+
+def selected_theme():
+    """The selected theme: the first that config_files() has."""
+    for path in config_files():
+        theme = config_theme(path)
+        if theme is not None:
+            return theme
+    fail(f"{' and '.join(config_files())} have no theme in the key {CONFIG_KEY}; select one with "
+         "hd-theme --select.")
+
+
+def theme_name(theme):
+    """The name of a selected theme, or None."""
+    if theme is None:
+        return None
+    name = theme.get("name")
+    if not isinstance(name, str):
+        return None
+    return name
 
 
 def selected_name():
     """The name of the selected theme, or None."""
-    if not os.path.exists(CONFIG_FILE):
-        return None
-    config = read_json(CONFIG_FILE)
-    if not isinstance(config, dict) or not isinstance(config.get(CONFIG_KEY), dict):
-        return None
-    name = config[CONFIG_KEY].get("name")
-    if not isinstance(name, str):
-        return None
-    return name
+    for path in config_files():
+        theme = config_theme(path)
+        if theme is not None:
+            return theme_name(theme)
+    return None
+
+
+def system_name():
+    """The name of the theme of the system, or None."""
+    return theme_name(config_theme(SYSTEM_CONFIG))
 
 
 def write_json(path, value):
@@ -233,13 +284,19 @@ def render_card(theme_file, card):
 
 
 def select(name):
+    """Copies the theme to the configuration of whoever runs hd-theme, with hd-config-update,
+    which picks the same configuration as own_config()."""
     theme = load_theme(name)
     result = subprocess.run(["hd-config-update", CONFIG_KEY],
                             input=json.dumps({"name": name, **theme}), text=True)
     if result.returncode != 0:
-        fail(f"Could not write the theme to {CONFIG_FILE}.")
-    print(f"Selected the theme {name}. Run hd-theme --apply as each user to apply it to their "
-          "desktop.")
+        fail(f"Could not write the theme to {own_config()}.")
+    if is_root():
+        print(f"Selected the theme {name} for the system. Users that have no theme of their own "
+              "get it when they run hd-theme --apply.")
+    else:
+        print(f"Selected the theme {name} for you. Run hd-theme --apply to apply it to your "
+              "desktop.")
 
 
 def run(command):
@@ -401,9 +458,15 @@ def list_themes():
         print(f"There are no themes in {THEME_DIR}.")
         return
     selected = selected_name()
+    system = system_name()
     for name in names:
         mark = "*" if name == selected else " "
-        note = "" if os.path.exists(card_path(name)) else "  (no card; sudo hd-theme --cards)"
+        note = ""
+        # Users see which theme is that of the system; for root it is the selected one.
+        if not is_root() and name == system:
+            note += "  (theme of the system)"
+        if not os.path.exists(card_path(name)):
+            note += "  (no card; sudo hd-theme --cards)"
         print(f"{mark} {name}{note}")
     cards = [card_path(n) for n in names if os.path.exists(card_path(n))]
     if not cards:
@@ -442,7 +505,8 @@ def add(path):
         print(f"Replaced the theme {name}.")
     else:
         print(f"Added the theme {name}.")
-    if name == selected_name():
+    # Users that selected it keep their copy until they select it again.
+    if name == system_name():
         select(name)
 
 
@@ -450,8 +514,9 @@ def delete(name):
     check_name(name)
     if not os.path.exists(theme_path(name)):
         fail(f"There is no theme {name}.")
-    if name == selected_name():
-        fail(f"{name} is the selected theme; select another one first.")
+    # Users that selected it keep their copy in their own configuration.
+    if name == system_name():
+        fail(f"{name} is the theme of the system; select another one first.")
     os.remove(theme_path(name))
     if os.path.exists(card_path(name)):
         os.remove(card_path(name))
@@ -487,7 +552,8 @@ def main():
                          "replace the theme of that name")
     actions.add_argument("--delete", metavar="NAME", help="delete a theme")
     actions.add_argument("--select", metavar="NAME",
-                         help="make NAME the theme of the system")
+                         help="make NAME the theme of the system when run as root, else the "
+                         "theme of the user")
     actions.add_argument("--apply", action="store_true",
                          help="apply the selected theme to the desktop of the user")
     actions.add_argument("--cards", action="store_true",
@@ -514,7 +580,6 @@ def main():
         need_root("--delete")
         delete(args.delete)
     elif args.select is not None:
-        need_root("--select")
         check_name(args.select)
         select(args.select)
 

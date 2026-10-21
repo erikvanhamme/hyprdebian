@@ -1,23 +1,29 @@
 #!/usr/bin/python3
 """Adds a key to the hyprdebian configuration, or replaces its value.
 
-The package hd-base installs this as /usr/sbin/hd-config-update.
+The package hd-base installs this as /usr/bin/hd-config-update.
 
     hd-config-update <key> <json>   set <key> to the JSON value <json>
     hd-config-update <key>          set <key> to the JSON value read from stdin
 
-The configuration is the JSON object in /etc/hyprdebian/config.json. The key is a key of that
-object; its old value, if any, is replaced as a whole. The file is made when it does not exist
-yet. Run it as root.
+The configuration is a JSON object. Run as root, it is the configuration of the system in
+/etc/hyprdebian/config.json; run as any other user, it is the configuration of that user in
+~/.config/hyprdebian/config.json. The key is a key of that object; its old value, if any, is
+replaced as a whole. The file is made when it does not exist yet.
 """
 
 import argparse
 import fcntl
 import json
 import os
+import pwd
 import sys
 
-CONFIG_DIR = "/etc/hyprdebian"
+# Root works on the configuration of the system, every other user on their own.
+if os.geteuid() == 0:
+    CONFIG_DIR = "/etc/hyprdebian"
+else:
+    CONFIG_DIR = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".config", "hyprdebian")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 
 
@@ -60,8 +66,6 @@ def main():
     parser.add_argument("json", nargs="?",
                         help="the value as JSON text; read from stdin when left out")
     args = parser.parse_args()
-    if os.geteuid() != 0:
-        fail("This script must be run as root.")
 
     key = args.key
     if key == "":

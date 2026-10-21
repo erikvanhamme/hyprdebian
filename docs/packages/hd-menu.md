@@ -1,5 +1,5 @@
 ## Introduction
-`hd-menu` is the keyboard-driven menu of the HyprDebian desktop, in the package `hd-desktop`. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of `/etc/hyprdebian/config.json`, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
+`hd-menu` is the keyboard-driven menu of the HyprDebian desktop, in the package `hd-desktop`. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of the user, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
 
 [hd-desktop](hd-desktop.md) uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher` writes in it.
 
@@ -55,7 +55,7 @@ wlr-layer-shell is not in a Debian package, so `protocols/` has a copy of it fro
 The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter chooses and Escape or `q` closes the menu without a choice. `q` is the key with the letter q in the keyboard layout, with or without Shift. A key that is held repeats at the rate and after the delay of the compositor, `input:repeat_rate` and `input:repeat_delay` in Hyprland, so that holding Down keeps moving the selection.
 
 ## The theme
-`hd-menu` takes its look from the `hd-theme` key of `/etc/hyprdebian/config.json` of [hd-config](hd-config.md), which [hd-theme](hd-theme.md) sets when a theme is selected:
+`hd-menu` takes its look from the `hd-theme` key of the configuration of the user, `~/.config/hyprdebian/config.json`, and when that has none, of the configuration of the system, `/etc/hyprdebian/config.json`, of [hd-config](hd-config.md); [hd-theme](hd-theme.md) sets them when a theme is selected. When neither has the key, it uses defaults of its own. Run as root, it only reads the configuration of the system:
 
 | Setting | Used for |
 | --- | --- |
@@ -82,5 +82,6 @@ A setting that is missing has its default; when the file cannot be read, the who
 | Path | Purpose |
 | --- | --- |
 | `/usr/bin/hd-menu` | The menu. |
-| `/etc/hyprdebian/config.json` | The theme, in `hd-theme`. |
+| `~/.config/hyprdebian/config.json` | The theme of the user, in `hd-theme`. |
+| `/etc/hyprdebian/config.json` | The theme of the system, in `hd-theme`, when the user has none. |
 | `/run/user/<uid>/hd-menu.lock` | The lock that keeps a second `hd-menu` from opening. |
