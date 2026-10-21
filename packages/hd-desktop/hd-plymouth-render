@@ -1,0 +1,426 @@
+#!/usr/bin/python3
+"""Renders the boot splash of HyprDebian, the plymouth theme hyprdebian, in the theme of the system.
+
+The package hd-desktop installs this as /usr/sbin/hd-plymouth-render.
+
+    hd-plymouth-render                      render the splash
+    hd-plymouth-render --update-initramfs   render it, and rebuild the initramfs when it changed
+
+The theme is the key hd-theme of /etc/hyprdebian/config.json, the theme of the system that
+hd-theme --select sets as root; the themes of the users are not used. A member that is missing or
+not valid takes the value of the theme default, which is also used without a theme.
+
+The plymouth script cannot read the theme at boot, so it is rendered into the files of the theme,
+in /var/lib/hd-plymouth/theme, which /usr/share/plymouth/themes/hyprdebian/hyprdebian.plymouth
+names as its ImageDir and ScriptFile:
+
+    hyprdebian.script       from the jinja2 template in /usr/share/hd-plymouth/templates, with the
+                            colours, the font and the sizes of the theme
+    field-input.png         the input field, with the fill in dark at opacity, rounded at radius,
+    field-check.png         and an outline of border pixels in highlight, and in the yellow and
+    field-fail.png          the red of hyprlock for checking and for a wrong password
+    dot.png                 a dot in light
+    background.png          a link to the image of the family background that best fits the
+                            largest connected monitor: the smallest that covers it, else the
+                            largest; without a monitor, a screen of 1920x1080
+
+/var/lib/hd-plymouth/fonts lists the files of the fonts of the splash, one per line, as fc-match
+finds them, for the hook hd-plymouth of initramfs-tools, which puts them and the theme in the
+initramfs. That hook runs this first, so every initramfs has the splash of the theme of the system
+at that moment. A file is only written when it changes. --update-initramfs runs
+update-initramfs -u -k all when a file changed and plymouth uses the theme hyprdebian; hd-theme
+--select does that. Run it as root.
+"""
+
+import argparse
+import json
+import math
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+import cairo
+import gi
+import jinja2
+
+gi.require_version("Pango", "1.0")
+from gi.repository import Pango  # noqa: E402
+
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+THEME_KEY = "hd-theme"
+TEMPLATE_DIR = "/usr/share/hd-plymouth/templates"
+TEMPLATE = "hyprdebian.script.j2"
+STATE_DIR = "/var/lib/hd-plymouth"
+THEME_DIR = os.path.join(STATE_DIR, "theme")
+FONTS_FILE = os.path.join(STATE_DIR, "fonts")
+BACKGROUNDS = "/usr/share/backgrounds/hyprdebian"
+PLYMOUTH_THEME = "hyprdebian"
+
+# The theme default of hd-desktop, for the members that the theme of the system lacks.
+DEFAULTS = {
+    "font": "JetBrainsMono NFM Medium",
+    "font-size-normal": 18,
+    "font-size-small": 14,
+    "highlight": "#ff6600",
+    "dark": "#071422",
+    "light": "#e6edf5",
+    "border": 4,
+    "radius": 10,
+    "opacity": 0.8,
+    "background": "emerald",
+}
+COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+# The input field of hyprlock.conf: its size, and check_color and fail_color, which it leaves at
+# the defaults of hyprlock.
+FIELD_WIDTH = 650
+FIELD_HEIGHT = 100
+CHECK_COLOR = "#cc8822"
+FAIL_COLOR = "#cc2222"
+# The dot is drawn large; the script scales it to a quarter of the height of the field.
+DOT_SIZE = 100
+# The screen that the background must cover when no monitor is connected.
+SCREEN = (1920, 1080)
+DRM = "/sys/class/drm"
+
+# The weights of Pango by their nick, as fontconfig names them.
+FC_WEIGHTS = {
+    "thin": "thin", "ultralight": "extralight", "light": "light", "semilight": "semilight",
+    "book": "book", "normal": "regular", "medium": "medium", "semibold": "semibold",
+    "bold": "bold", "ultrabold": "extrabold", "heavy": "black", "ultraheavy": "extrablack",
+}
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def warn(message):
+    print(f"Warning: {message}", file=sys.stderr)
+
+
+def is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def valid(key, value):
+    """True when value is a valid value of the member key of a theme."""
+    if key == "font" or key == "background":
+        return isinstance(value, str) and value != ""
+    if key in ("highlight", "dark", "light"):
+        return isinstance(value, str) and COLOR.match(value) is not None
+    if key in ("font-size-normal", "font-size-small"):
+        return is_number(value) and value > 0
+    if key in ("border", "radius"):
+        return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    if key == "opacity":
+        return is_number(value) and 0 <= value <= 1
+    return False
+
+
+def system_theme():
+    """The theme of the system, with the defaults for what it lacks, and its name."""
+    theme = None
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
+                config = json.load(f)
+        except (OSError, ValueError) as e:
+            warn(f"Cannot read {CONFIG_FILE}: {e}; using the theme default.")
+            config = {}
+        if isinstance(config, dict) and isinstance(config.get(THEME_KEY), dict):
+            theme = config[THEME_KEY]
+    if theme is None:
+        return dict(DEFAULTS), "default"
+    result = {}
+    for key, default in DEFAULTS.items():
+        if key in theme and valid(key, theme[key]):
+            result[key] = theme[key]
+        else:
+            if key in theme:
+                warn(f"{key} of the key {THEME_KEY} of {CONFIG_FILE} is not valid; using "
+                     f"{default!r}.")
+            result[key] = default
+    name = theme.get("name")
+    if not isinstance(name, str):
+        name = "unnamed"
+    return result, name
+
+
+def rgb(color):
+    """#rrggbb as red, green and blue from 0 to 1."""
+    return tuple(int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+
+
+def channels(color):
+    """#rrggbb as the members red, green and blue of a colour of the script."""
+    red, green, blue = rgb(color)
+    return {"red": f"{red:.4f}", "green": f"{green:.4f}", "blue": f"{blue:.4f}"}
+
+
+def script_string(text):
+    """text as a string of the plymouth script, in double quotes."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def monitor_size():
+    """The largest width and height of the preferred modes of the connected monitors, or None."""
+    width = height = 0
+    try:
+        connectors = os.listdir(DRM)
+    except OSError:
+        return None
+    for connector in connectors:
+        path = os.path.join(DRM, connector)
+        try:
+            with open(os.path.join(path, "status"), encoding="ascii") as f:
+                if f.read().strip() != "connected":
+                    continue
+            with open(os.path.join(path, "modes"), encoding="ascii") as f:
+                mode = f.readline().strip()
+        except OSError:
+            continue
+        match = re.fullmatch(r"(\d+)x(\d+)\D*", mode)
+        if match:
+            width = max(width, int(match[1]))
+            height = max(height, int(match[2]))
+    if width == 0 or height == 0:
+        return None
+    return width, height
+
+
+def find_background(family, screen):
+    """The image of the family that best fits the screen: the smallest that covers it, else the
+    largest; None when the family has no images."""
+    found = []
+    try:
+        names = os.listdir(BACKGROUNDS)
+    except OSError:
+        names = []
+    for name in names:
+        match = re.fullmatch(re.escape(family) + r"-(\d+)x(\d+)\.png", name)
+        if match:
+            found.append((int(match[1]), int(match[2]), os.path.join(BACKGROUNDS, name)))
+    if not found:
+        return None
+    covering = [f for f in found if f[0] >= screen[0] and f[1] >= screen[1]]
+    if covering:
+        return min(covering, key=lambda f: f[0] * f[1])[2]
+    return max(found, key=lambda f: f[0] * f[1])[2]
+
+
+def rounded_rectangle(context, x, y, width, height, radius):
+    radius = max(0, min(radius, width / 2, height / 2))
+    context.new_sub_path()
+    context.arc(x + width - radius, y + radius, radius, -math.pi / 2, 0)
+    context.arc(x + width - radius, y + height - radius, radius, 0, math.pi / 2)
+    context.arc(x + radius, y + height - radius, radius, math.pi / 2, math.pi)
+    context.arc(x + radius, y + radius, radius, math.pi, 3 * math.pi / 2)
+    context.close_path()
+
+
+def png_bytes(surface):
+    with tempfile.NamedTemporaryFile(suffix=".png") as f:
+        surface.write_to_png(f.name)
+        return f.read()
+
+
+def field_png(theme, outline):
+    """The input field: the fill in dark at opacity, rounded at radius, and an outline of border
+    pixels in the colour outline, opaque; the inner corners have radius minus border."""
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, FIELD_WIDTH, FIELD_HEIGHT)
+    context = cairo.Context(surface)
+    border = min(theme["border"], FIELD_HEIGHT // 2)
+    radius = theme["radius"]
+    inner_radius = max(radius - border, 0)
+    rounded_rectangle(context, border, border, FIELD_WIDTH - 2 * border,
+                      FIELD_HEIGHT - 2 * border, inner_radius)
+    context.set_source_rgba(*rgb(theme["dark"]), theme["opacity"])
+    context.fill()
+    if border > 0:
+        # The outline is the ring between the outer and the inner shape.
+        context.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
+        rounded_rectangle(context, 0, 0, FIELD_WIDTH, FIELD_HEIGHT, radius)
+        rounded_rectangle(context, border, border, FIELD_WIDTH - 2 * border,
+                          FIELD_HEIGHT - 2 * border, inner_radius)
+        context.set_source_rgba(*rgb(outline), 1)
+        context.fill()
+    return png_bytes(surface)
+
+
+def dot_png(theme):
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, DOT_SIZE, DOT_SIZE)
+    context = cairo.Context(surface)
+    context.arc(DOT_SIZE / 2, DOT_SIZE / 2, DOT_SIZE / 2, 0, 2 * math.pi)
+    context.set_source_rgba(*rgb(theme["light"]), 1)
+    context.fill()
+    return png_bytes(surface)
+
+
+def font_file(description):
+    """The file of the font of a Pango font description, as fc-match finds it, or None."""
+    font = Pango.FontDescription.from_string(description)
+    pattern = font.get_family() or "monospace"
+    weight = FC_WEIGHTS.get(font.get_weight().value_nick)
+    if weight is not None:
+        pattern += f":weight={weight}"
+    if font.get_style() == Pango.Style.ITALIC:
+        pattern += ":slant=italic"
+    elif font.get_style() == Pango.Style.OBLIQUE:
+        pattern += ":slant=oblique"
+    try:
+        result = subprocess.run(["fc-match", "-f", "%{file}", pattern], capture_output=True,
+                                text=True)
+    except OSError:
+        return None
+    if result.returncode != 0 or result.stdout == "":
+        return None
+    return result.stdout
+
+
+def size(points):
+    """A size of the theme in points, as Pango reads it in a font description."""
+    if float(points).is_integer():
+        return str(int(points))
+    return str(points)
+
+
+def render_script(values):
+    templates = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+                                   undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
+    templates.filters["script_string"] = script_string
+    try:
+        return templates.get_template(TEMPLATE).render(values).encode("utf-8")
+    except jinja2.TemplateError as e:
+        fail(f"Cannot render {TEMPLATE}: {e}")
+
+
+def write_file(path, data):
+    """Writes data to path when it differs; True when it was written."""
+    try:
+        with open(path, "rb") as f:
+            if f.read() == data:
+                return False
+    except FileNotFoundError:
+        pass
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+    return True
+
+
+def write_link(path, target):
+    """Points the link path at target when it does not; True when it was changed."""
+    if os.path.islink(path) and os.readlink(path) == target:
+        return False
+    tmp = path + ".tmp"
+    if os.path.lexists(tmp):
+        os.remove(tmp)
+    os.symlink(target, tmp)
+    os.replace(tmp, path)
+    return True
+
+
+def render():
+    """Renders the splash; True when a file changed."""
+    theme, name = system_theme()
+    fonts = [
+        f"{theme['font']} {size(theme['font-size-normal'])}",
+        f"{theme['font']} Italic {size(theme['font-size-normal'])}",
+        f"{theme['font']} {size(theme['font-size-small'])}",
+    ]
+    values = {
+        "name": name,
+        "field_width": FIELD_WIDTH,
+        "field_height": FIELD_HEIGHT,
+        "light": channels(theme["light"]),
+        "dark": channels(theme["dark"]),
+        "font": fonts[0],
+        "font_italic": fonts[1],
+        "font_small": fonts[2],
+    }
+    files = {
+        "hyprdebian.script": render_script(values),
+        "field-input.png": field_png(theme, theme["highlight"]),
+        "field-check.png": field_png(theme, CHECK_COLOR),
+        "field-fail.png": field_png(theme, FAIL_COLOR),
+        "dot.png": dot_png(theme),
+    }
+
+    os.makedirs(THEME_DIR, mode=0o755, exist_ok=True)
+    changed = False
+    for file, data in files.items():
+        if write_file(os.path.join(THEME_DIR, file), data):
+            changed = True
+
+    background = os.path.join(THEME_DIR, "background.png")
+    image = find_background(theme["background"], monitor_size() or SCREEN)
+    if image is None:
+        warn(f"There is no background {theme['background']} in {BACKGROUNDS}; the splash shows "
+             "the colour dark.")
+        if os.path.lexists(background):
+            os.remove(background)
+            changed = True
+    elif write_link(background, image):
+        changed = True
+
+    # The files that are no longer part of the splash.
+    for file in os.listdir(THEME_DIR):
+        if file not in files and file != "background.png":
+            os.remove(os.path.join(THEME_DIR, file))
+            changed = True
+
+    font_files = []
+    for description in fonts:
+        path = font_file(description)
+        if path is None:
+            warn(f"fc-match finds no file for the font {description}.")
+        elif path not in font_files:
+            font_files.append(path)
+    if write_file(FONTS_FILE, "".join(f + "\n" for f in font_files).encode("utf-8")):
+        changed = True
+
+    if changed:
+        print(f"Rendered the boot splash in the theme {name} in {THEME_DIR}.")
+    return changed
+
+
+def plymouth_theme():
+    try:
+        result = subprocess.run(["plymouth-set-default-theme"], capture_output=True, text=True)
+    except OSError:
+        return None
+    return result.stdout.strip()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Render the boot splash of HyprDebian in {THEME_DIR}, in the theme of the "
+        f"system in {CONFIG_FILE}.")
+    parser.add_argument("--update-initramfs", action="store_true",
+                        help="rebuild the initramfs of all kernels when the splash changed")
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        fail("Run hd-plymouth-render as root.")
+
+    changed = render()
+    if not args.update_initramfs:
+        return
+    if not changed:
+        print("The boot splash did not change; the initramfs is not rebuilt.")
+        return
+    if plymouth_theme() != PLYMOUTH_THEME:
+        print(f"plymouth does not use the theme {PLYMOUTH_THEME}; the initramfs is not rebuilt.")
+        return
+    print("Rebuilding the initramfs with the new boot splash.")
+    if subprocess.run(["update-initramfs", "-u", "-k", "all"]).returncode != 0:
+        fail("update-initramfs failed.")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The warning icon of hd-launcher-cache, for the menu without a cache: a yellow triangle with an
+     exclamation mark. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <path d="M32 6 L60 56 H4 Z" fill="#f5c211" stroke="#c88800" stroke-width="3" stroke-linejoin="round"/>
+  <rect x="29" y="22" width="6" height="20" rx="3" fill="#1e1e1e"/>
+  <circle cx="32" cy="48.5" r="3.5" fill="#1e1e1e"/>
+</svg>

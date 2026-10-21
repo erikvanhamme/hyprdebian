@@ -12,13 +12,13 @@ It holds the parts of the desktop, each with a page of its own:
 - [hd-menu](hd-menu.md): the keyboard-driven menu of the key bindings and the application launcher;
 - [hd-theme](hd-theme.md): the theme engine;
 - [hd-screensaver](hd-screensaver.md): the screensaver, which hypridle starts after 2 minutes;
-- [hd-plymouth](hd-plymouth.md): the boot splash, which looks like the lock screen of hyprlock and asks for the password of an encrypted ZFS dataset.
+- [hd-plymouth](hd-plymouth.md): the boot splash, which looks like the lock screen of hyprlock in the theme of the system and asks for the password of an encrypted ZFS dataset.
 
 These were the packages `hd-art`, `hd-fonts`, `hd-menu`, `hd-theme`, `hd-screensaver` and `hd-plymouth` before. `hd-desktop` conflicts with them, replaces and provides them, so an upgrade removes them; the themes, the selected theme and the theme files of the users stay.
 
 It also installs the files that new users get in their home directory, the commands that the key bindings run, the menu of the application launcher, the dark theme for GTK applications and the sudoers rule of the mount menus.
 
-The package comes with the man pages `man 7 hd-desktop`, `man hd-desktop-render` and `man hd-launcher`. The man pages of the parts are listed on their pages.
+The package comes with the man pages `man 7 hd-desktop`, `man hd-desktop-render` and `man hd-launcher-cache`. The man pages of the parts are listed on their pages.
 
 ## Building the package
 The package is built from `packages/hd-desktop` in this repository:
@@ -45,15 +45,16 @@ packages/hd-desktop/deb/preinst
 packages/hd-desktop/deb/postinst
 packages/hd-desktop/deb/postrm
 packages/hd-desktop/hd-desktop-render
-packages/hd-desktop/hd-launcher
+packages/hd-desktop/hd-launcher-cache
 packages/hd-desktop/templates/greetd.toml.j2
 packages/hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd-mount-helper,
 hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
 packages/hd-desktop/etc/...
 packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
+packages/hd-desktop/usr/share/hd-desktop/icons/warning.svg
 packages/hd-desktop/man/hd-desktop.7
 packages/hd-desktop/man/hd-desktop-render.8
-packages/hd-desktop/man/hd-launcher.8
+packages/hd-desktop/man/hd-launcher-cache.1
 ```
 
 The files of the parts are listed on their pages.
@@ -116,20 +117,37 @@ The menus above and the application launcher use [hd-menu](hd-menu.md), which ha
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
 
 ## Application launcher
-`SUPER + SPACE` opens the application launcher: the menu `/var/cache/hd-launcher/launcher.json` in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
+`SUPER + SPACE` opens the application launcher: the menu that `hd-launcher-cache` prints, in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
 
-`hd-launcher`, in `/usr/sbin`, writes the menu as root from the `.desktop` files in `/usr/share/applications` and its subdirectories. An application is in it when its `.desktop` file is of the `Type` Application, has a `Name` and an `Exec`, is not `NoDisplay` or `Hidden`, is not left out for Hyprland by `OnlyShowIn` or `NotShowIn`, has its `TryExec` installed, when it has one, and is not left out by the settings below. The items added in the settings are in it too. The label is the `Name` of an application or the `name` of an item. The value is the command line that starts it, quoted for the shell, which the launcher runs with `sh -c`: `uwsm app --` with the desktop file ID of an application, such as `firefox.desktop`, or the command of an item. The options are sorted on the label, in ascending order, without regard to case.
+`hd-launcher-cache`, in `/usr/bin`, works for whoever runs it:
 
-The icon is looked up by the `Icon` of the application in the icon themes hicolor and Adwaita and in `/usr/share/pixmaps`, or taken from its path when it is one. A PNG is used as it is; an SVG is rendered to a PNG of the `icon_size` of the [theme](hd-theme.md) in `/var/cache/hd-launcher/icons`, only when the PNG there was not rendered from that SVG at that size.
+| | Root | Other users |
+| --- | --- | --- |
+| Settings, the keys `hd-launcher` and `hd-theme` | `/etc/hyprdebian/config.json` | `~/.config/hyprdebian/config.json` when it has the key, else `/etc/hyprdebian/config.json` |
+| Cache | `/var/cache/hd-launcher` | `~/.cache/hd-launcher` |
 
-The apt hook `/etc/apt/apt.conf.d/90hd-launcher` runs `hd-launcher` each time apt has run dpkg: after an installation, an upgrade or a removal. A failure is reported but does not fail apt. The installation of the package runs it too. After another theme is selected, with another `icon_size`, run it again:
 ```
-sudo hd-launcher
+hd-launcher-cache              print the menu for hd-menu
+hd-launcher-cache --update     write the menu and its icons in the cache
+hd-launcher-cache --update-all as root: write the cache of the system and of every user in the group users
+hd-launcher-cache --dry-run    print the menu that --update would write, write nothing
 ```
 
-`hd-launcher --dry-run` prints the menu without writing it, as any user.
+Without arguments, it prints the menu in the cache of the user, else the one in the cache of the system. When neither has one, it prints a menu with the single option `No cache` and a warning icon, `/usr/share/hd-desktop/icons/warning.svg`, which does nothing when chosen. Root only looks in the cache of the system. The key binding in `~/.config/hypr/hyprland.lua` pipes it into `hd-menu`.
 
-The key `hd-launcher` of `/etc/hyprdebian/config.json` leaves applications out and adds items of its own:
+`--update` writes the menu from the `.desktop` files in `/usr/share/applications` and its subdirectories. An application is in it when its `.desktop` file is of the `Type` Application, has a `Name` and an `Exec`, is not `NoDisplay` or `Hidden`, is not left out for Hyprland by `OnlyShowIn` or `NotShowIn`, has its `TryExec` installed, when it has one, and is not left out by the settings below. The items added in the settings are in it too. The label is the `Name` of an application or the `name` of an item. The value is the command line that starts it, quoted for the shell, which the launcher runs with `sh -c`: `uwsm app --` with the desktop file ID of an application, such as `firefox.desktop`, or the command of an item. The options are sorted on the label, in ascending order, without regard to case.
+
+The icon is looked up by the `Icon` of the application in the icon themes hicolor and Adwaita and in `/usr/share/pixmaps`, or taken from its path when it is one. A PNG is used as it is; an SVG is rendered to a PNG of the `icon_size` of the [theme](hd-theme.md) in `icons` of the cache, only when the PNG there was not rendered from that SVG at that size.
+
+`--update-all`, for root only, writes the cache of the system and then runs `hd-launcher-cache --update` with `runuser` as each user whose primary or supplementary group is `users` and whose home directory exists, so each cache belongs to its user and is made from the settings of that user. A user whose cache cannot be written is reported; the others are still written.
+
+The apt hook `/etc/apt/apt.conf.d/90hd-launcher` runs `hd-launcher-cache --update-all` each time apt has run dpkg: after an installation, an upgrade or a removal, so the menus of the system and of the users follow the applications. A failure is reported but does not fail apt. The installation of the package runs it too. The cache of a user who is not in the group `users` is only written when that user runs `hd-launcher-cache --update`. After another theme is selected, with another `icon_size`, or after the settings changed, run it again:
+```
+sudo hd-launcher-cache --update
+hd-launcher-cache --update
+```
+
+The key `hd-launcher` of the configuration leaves applications out and adds items of its own:
 ```json
 "hd-launcher": {
     "exclude": ["debian-xterm.desktop", "debian-uxterm.desktop", "uuctl.desktop"],
@@ -145,23 +163,25 @@ The key `hd-launcher` of `/etc/hyprdebian/config.json` leaves applications out a
 
 | Member | | |
 | --- | --- | --- |
-| `exclude` | Optional | The desktop file IDs to leave out; the `.desktop` at the end may be left out. `hd-launcher --dry-run` shows the ID of every application. |
+| `exclude` | Optional | The desktop file IDs to leave out; the `.desktop` at the end may be left out. `hd-launcher-cache --dry-run` shows the ID of every application. |
 | `add` | Optional | The items to add. |
 | `add[].name` | | The label. |
 | `add[].command` | | The words of the command, a list of strings, run without a shell. For pipes, variables or `~`, use `["sh", "-c", "..."]`. |
 | `add[].icon` | Optional | The path of a PNG or SVG, or the name of an icon, looked up as the `Icon` of an application. An icon that is not found is reported and left out. |
 
-Other members, or a key that is not such an object, are an error, and the menu is not written. Write the key with `hd-config-update`, then the menu:
+Other members, or a key that is not such an object, are an error, and the menu is not written. Write the key with `hd-config-update`, then the menu; with sudo for the system, without for yourself only:
 ```
 sudo hd-config-update hd-launcher '{"exclude": ["debian-xterm"], "add": [{"name": "Btop", "command": ["kitty", "-e", "btop"]}]}'
-sudo hd-launcher
+sudo hd-launcher-cache --update
+hd-config-update hd-launcher '{"exclude": ["debian-xterm"]}'
+hd-launcher-cache --update
 ```
 
 ## Dark theme
 `/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`.
 
 ## Removing the package
-Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher`; the settings in `/etc/hyprdebian/config.json` stay.
+Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher-cache`; the settings in `/etc/hyprdebian/config.json` and the caches and settings of the users in their home directories stay.
 
 ## Files
 | Path | Purpose |
@@ -172,9 +192,12 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/etc/greetd/config.toml` | The greetd config, written by `hd-desktop-render`. |
 | `/etc/greetd/config.toml.greetd` | The config of the package greetd, diverted. |
 | `/etc/hyprdebian/config.json` | The settings, in the keys `hd-desktop` and `hd-launcher`. |
-| `/usr/sbin/hd-launcher` | Writes the menu of the application launcher. |
-| `/var/cache/hd-launcher/launcher.json`, `/var/cache/hd-launcher/icons` | The menu of the application launcher and the PNGs rendered from SVG icons. |
-| `/etc/apt/apt.conf.d/90hd-launcher` | Runs `hd-launcher` each time apt has run dpkg. |
+| `~/.config/hyprdebian/config.json` | The settings of a user, in the key `hd-launcher`. |
+| `/usr/bin/hd-launcher-cache` | Writes and prints the menu of the application launcher. |
+| `/var/cache/hd-launcher/launcher.json`, `/var/cache/hd-launcher/icons` | The menu of the application launcher of the system and the PNGs rendered from SVG icons. |
+| `~/.cache/hd-launcher/launcher.json`, `~/.cache/hd-launcher/icons` | The same, of a user. |
+| `/usr/share/hd-desktop/icons/warning.svg` | The icon of the menu without a cache. |
+| `/etc/apt/apt.conf.d/90hd-launcher` | Runs `hd-launcher-cache --update-all` each time apt has run dpkg. |
 | `/var/log/hyprland.log` | The output of Hyprland. |
 | `/usr/bin/hd-*` | The commands of the key bindings. |
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |

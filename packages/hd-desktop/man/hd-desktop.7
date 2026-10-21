@@ -142,12 +142,14 @@ The menus above and the application launcher use
 which has a lock of its own, so a second press of a key binding opens no
 second menu.
 .SH APPLICATION LAUNCHER
-.BR hd-launcher (8)
-writes the menu of the application launcher,
-.IR /var/cache/hd-launcher/launcher.json ,
-the input of
+.BR hd-launcher-cache (1)
+writes the menu of the application launcher, the input of
 .BR hd-menu (1),
-from the
+in
+.I /var/cache/hd-launcher
+for root and in
+.I ~/.cache/hd-launcher
+for other users, from the
 .I .desktop
 files in
 .IR /usr/share/applications ,
@@ -157,16 +159,25 @@ the
 of the theme.
 The key
 .B hd-launcher
-of
-.I /etc/hyprdebian/config.json
+of the configuration of the user,
+.IR ~/.config/hyprdebian/config.json ,
+or else of the system,
+.IR /etc/hyprdebian/config.json ,
 leaves applications out and adds items with a command of their own.
 The apt hook
 .I /etc/apt/apt.conf.d/90hd-launcher
-writes the menu again each time apt has run dpkg, and the installation of
-the package writes it too.
+writes the menus of the system and of every user in the group
+.B users
+again each time apt has run dpkg, with
+.BR "hd-launcher-cache \-\-update\-all" ,
+and the installation of the package writes them too; a user can write their
+own at any time with
+.BR "hd-launcher-cache \-\-update" .
 .PP
 .B Super+Space
-opens the menu in
+opens the menu that
+.B hd-launcher-cache
+prints, of the user, else of the system, in
 .BR hd-menu (1),
 and starts the application or item chosen with
 .BR "uwsm app \-\-" ,
@@ -189,7 +200,8 @@ The files in
 .IR /etc/skel ,
 the sudoers rule, the apt hook and the menu of the launcher stay until the
 package is purged; the apt hook does nothing without
-.BR hd-launcher .
+.BR hd-launcher-cache .
+The menus of the users stay in their home directories.
 .SH FILES
 .TP
 .I /etc/greetd/config.toml
@@ -203,7 +215,9 @@ and
 .BR hd-launcher .
 .TP
 .I /var/cache/hd-launcher
-The menu of the launcher and its icons.
+.TQ
+.I ~/.cache/hd-launcher
+The menu of the launcher and its icons, of the system and of a user.
 .TP
 .I /var/log/hyprland.log
 The output of Hyprland.
@@ -214,7 +228,7 @@ Runs
 before greetd starts.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
-.BR hd-launcher (8),
+.BR hd-launcher-cache (1),
 .BR hd-art (7),
 .BR hd-fonts (7),
 .BR hd-menu (1),

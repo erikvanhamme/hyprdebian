@@ -50,10 +50,13 @@ Description: HyprDebian desktop
   - the screensaver, a text with the random effects of terminal text effects
     on every monitor, which hypridle starts after 2 minutes;
   - the plymouth theme hyprdebian, which looks like the lock screen of
-    hyprlock and asks for the password of an encrypted ZFS dataset. The
-    package makes it the theme of plymouth and conflicts with desktop-base,
-    whose themes it replaces.
+    hyprlock in the theme of the system, rendered by hd-plymouth-render, and
+    asks for the password of an encrypted ZFS dataset. The package makes it
+    the theme of plymouth and conflicts with desktop-base, whose themes it
+    replaces.
  .
- hd-launcher writes the menu of the application launcher, the input of
+ hd-launcher-cache writes the menu of the application launcher, the input of
  hd-menu, from the .desktop files in /usr/share/applications, in
- /var/cache/hd-launcher; an apt hook runs it each time apt has run dpkg.
+ /var/cache/hd-launcher for root and in ~/.cache/hd-launcher for other users,
+ and prints it for the launcher; an apt hook writes the one of the system
+ and those of the users in the group users each time apt has run dpkg.

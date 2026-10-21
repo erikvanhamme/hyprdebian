@@ -1,7 +1,7 @@
 ## Introduction
 `hd-menu` is the keyboard-driven menu of the HyprDebian desktop, in the package `hd-desktop`. It reads a menu as JSON from stdin, shows it in the middle of the screen in the hd-theme of the user, and prints the value of the option chosen on stdout. It is a C++ program that draws the menu itself, with cairo and librsvg, on a wlr-layer-shell surface, so it needs Hyprland or another compositor with wlr-layer-shell.
 
-[hd-desktop](hd-desktop.md) uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher` writes in it.
+[hd-desktop](hd-desktop.md) uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher-cache` prints in it.
 
 Only one `hd-menu` is open at a time: a lock in `/run/user/<uid>/hd-menu.lock` makes a second one exit at once with 1.
 

@@ -36,10 +36,10 @@ local browser     = "firefox"
 -- are started as they are.
 local app         = "uwsm app -- "
 
--- The menu of the application launcher, written by hd-launcher. hd-menu prints the command line
--- of the option chosen, which starts it with uwsm app, and exits with 1 when the menu is closed
--- without a choice.
-local launcher    = [[if cmd=$(hd-menu < /var/cache/hd-launcher/launcher.json); then sh -c "$cmd"; fi]]
+-- The menu of the application launcher, printed by hd-launcher-cache from the cache of the user,
+-- else of the system. hd-menu prints the command line of the option chosen, which starts it with
+-- uwsm app, and exits with 1 when the menu is closed without a choice.
+local launcher    = [[if cmd=$(hd-launcher-cache | hd-menu); then sh -c "$cmd"; fi]]
 
 
 -------------------

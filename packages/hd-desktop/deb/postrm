@@ -4,11 +4,12 @@
 # the postinst diverted; the trigger update-initramfs then rebuilds the initramfs without the boot
 # splash. It also removes the cards of the themes in /var/cache/hd-theme. A purge also removes the
 # compiled dconf database of the dark theme when its source in /etc/dconf/db/local.d is gone, the
-# menu of the launcher that hd-launcher wrote, and the key hd-theme from
+# menu of the launcher that hd-launcher-cache wrote in the cache of the system, the boot splash
+# that hd-plymouth-render wrote in /var/lib/hd-plymouth, and the key hd-theme from
 # /etc/hyprdebian/config.json. The themes that were added stay in /etc/hyprdebian/themes, and the
-# themes of the users and the theme files stay in the home directories. It also finishes the removal of the conffiles that
-# hd-desktop no longer has, as the preinst and the postinst. Written for sh, as python3 may be
-# gone by then.
+# themes of the users, the theme files and the caches of the launcher of the users stay in the
+# home directories. It also finishes the removal of the conffiles that hd-desktop no longer has,
+# as the preinst and the postinst. Written for sh, as python3 may be gone by then.
 set -e
 
 # Keep these the same as in the preinst and the postinst.
@@ -20,6 +21,7 @@ done
 GREETD_CONFIG=/etc/greetd/config.toml
 PLYMOUTH_CONFIG=/etc/plymouth/plymouthd.conf
 THEME_CACHE=/var/cache/hd-theme
+PLYMOUTH_STATE=/var/lib/hd-plymouth
 DCONF_DB=/etc/dconf/db/local
 DCONF_SOURCE=/etc/dconf/db/local.d
 LAUNCHER_CACHE=/var/cache/hd-launcher
@@ -49,7 +51,7 @@ if [ -z "$(ls -A "$DCONF_SOURCE" 2> /dev/null)" ]; then
     rm -f "$DCONF_DB"
 fi
 
-rm -rf "$LAUNCHER_CACHE" "$THEME_CACHE"
+rm -rf "$LAUNCHER_CACHE" "$THEME_CACHE" "$PLYMOUTH_STATE"
 
 # hd-base may already be removed, see hd-config(7).
 if [ -x /usr/bin/hd-config-remove ]; then

@@ -1,21 +1,56 @@
-.TH HD-LAUNCHER 8 "October 2026" "hd-desktop" "HyprDebian"
+.TH HD-LAUNCHER-CACHE 1 "October 2026" "hd-desktop" "HyprDebian"
 .SH NAME
-hd-launcher \- write the menu of the application launcher
+hd-launcher-cache \- write and print the menu of the application launcher
 .SH SYNOPSIS
-.B hd-launcher
-.RB [ \-n | \-\-dry\-run ]
+.B hd-launcher-cache
+.br
+.B hd-launcher-cache
+.BR \-u | \-\-update
+.br
+.B hd-launcher-cache
+.BR \-a | \-\-update\-all
+.br
+.B hd-launcher-cache
+.BR \-n | \-\-dry\-run
 .SH DESCRIPTION
-.B hd-launcher
-writes the menu of the application launcher of the HyprDebian desktop,
-.IR /var/cache/hd-launcher/launcher.json ,
-the input of
+.B hd-launcher-cache
+writes the menu of the application launcher of the HyprDebian desktop, the
+input of
 .BR hd-menu (1),
-from the
+in a cache, from the
 .I .desktop
 files in
 .I /usr/share/applications
-and its subdirectories, and the items added in
-.IR /etc/hyprdebian/config.json .
+and its subdirectories, and the key
+.B hd-launcher
+of the configuration (see CONFIGURATION).
+Without arguments, it prints the menu for the launcher.
+.PP
+Who runs it decides which settings and which cache it uses.
+Root uses the configuration of the system,
+.IR /etc/hyprdebian/config.json ,
+and the cache of the system,
+.IR /var/cache/hd-launcher .
+Any other user uses the keys
+.B hd-launcher
+and
+.B hd-theme
+of their own configuration,
+.IR ~/.config/hyprdebian/config.json ,
+when it has them, else those of the configuration of the system, and their
+own cache,
+.IR ~/.cache/hd-launcher .
+.PP
+Without arguments, it prints the menu in the cache of the user, else the one
+in the cache of the system.
+When neither cache has a menu, it prints a menu with the single option
+.B No cache
+and a warning icon, which does nothing when chosen.
+Root only looks in the cache of the system.
+The key binding of the launcher in
+.I ~/.config/hypr/hyprland.lua
+pipes it into
+.BR hd-menu .
 .PP
 An application is in the menu when its
 .I .desktop
@@ -68,42 +103,60 @@ A PNG is used as it is.
 An SVG is rendered to a PNG of the
 .B icon_size
 of the
-.B hd-theme
-of
-.IR /etc/hyprdebian/config.json ,
+.BR hd-theme ,
 64 without one, in
-.IR /var/cache/hd-launcher/icons ;
-only when the PNG there was not rendered from that SVG at that size.
+.I icons
+of the cache; only when the PNG there was not rendered from that SVG at that size.
 The icons of applications that are gone or left out are removed.
 .PP
 The apt hook
 .I /etc/apt/apt.conf.d/90hd-launcher
 runs
-.B hd-launcher
-each time apt has run dpkg: after an installation, an upgrade or a removal.
+.B hd-launcher-cache \-\-update\-all
+as root each time apt has run dpkg: after an installation, an upgrade or a
+removal, so the menus of the system and of the users in the group
+.B users
+follow the applications.
 A failure is reported but does not fail apt.
 The installation of
 .BR hd-desktop (7)
 runs it too.
+The cache of a user who is not in the group
+.B users
+is only written when that user runs
+.BR "hd-launcher-cache \-\-update" .
 After another theme is selected, with another
 .BR icon_size ,
-run it again.
-.PP
-Run it as root.
+or after the settings changed, run it again.
 .SH OPTIONS
 .TP
 .BR \-h ,\  \-\-help
 Show a short help and exit.
 .TP
+.BR \-u ,\  \-\-update
+Write the menu and its icons in the cache: of the system for root, of the
+user for other users.
+.TP
+.BR \-a ,\  \-\-update\-all
+Run as root only: write the cache of the system, then run
+.B hd-launcher-cache \-\-update
+with
+.BR runuser (1)
+as each user whose primary or supplementary group is
+.B users
+and whose home directory exists, so each cache belongs to its user and is
+made from the settings of that user.
+A user whose cache cannot be written is reported, the others are still
+written, and the exit status is 1.
+.TP
 .BR \-n ,\  \-\-dry\-run
-Print the menu that would be written, write nothing; it may be run by any
-user.
+Print the menu that
+.B \-\-update
+would write, write nothing.
 .SH CONFIGURATION
 The key
 .B hd-launcher
-of
-.I /etc/hyprdebian/config.json
-leaves applications out of the menu and adds items of its own:
+of the configuration leaves applications out of the menu and adds items of its own:
 .PP
 .RS
 .nf
@@ -151,24 +204,35 @@ is not written.
 .SH FILES
 .TP
 .I /var/cache/hd-launcher/launcher.json
+.TQ
+.I ~/.cache/hd-launcher/launcher.json
 The menu, for
-.BR hd-menu (1).
+.BR hd-menu (1),
+of the system and of the user.
 .TP
 .I /var/cache/hd-launcher/icons
+.TQ
+.I ~/.cache/hd-launcher/icons
 The PNGs rendered from SVG icons.
+.TP
+.I /usr/share/hd-desktop/icons/warning.svg
+The icon of the menu without a cache.
 .TP
 .I /etc/apt/apt.conf.d/90hd-launcher
 The apt hook.
 .TP
 .I /etc/hyprdebian/config.json
-The applications to leave out and the items to add, in the key
+.TQ
+.I ~/.config/hyprdebian/config.json
+The configuration of the system and of the user: the applications to leave
+out and the items to add, in the key
 .BR hd-launcher ,
 and the
 .BR icon_size ,
 in the key
 .BR hd-theme .
 .SH EXIT STATUS
-0 when the menu was written, 1 on an error.
+0 when the menu was written or printed, 1 on an error.
 .SH SEE ALSO
 .BR hd-desktop (7),
 .BR hd-menu (1),

@@ -1,0 +1,132 @@
+.TH HD-PLYMOUTH-RENDER 8 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-plymouth-render \- render the boot splash of HyprDebian in the theme of the system
+.SH SYNOPSIS
+.B hd-plymouth-render
+.RB [ \-\-update\-initramfs ]
+.SH DESCRIPTION
+.B hd-plymouth-render
+renders the boot splash of HyprDebian, the
+.BR plymouth (8)
+theme
+.B hyprdebian
+of
+.BR hd-plymouth (7),
+in the theme of the system: the key
+.B hd-theme
+of
+.IR /etc/hyprdebian/config.json ,
+which
+.B hd-theme \-\-select
+sets as root; see
+.BR hd-theme (7).
+The themes of the users are not used.
+A member that is missing or not valid takes the value of the theme
+.BR default ,
+which is also used when the system has no theme.
+.PP
+The script of plymouth cannot read the theme at boot, so it is rendered
+into the files of the plymouth theme, in
+.IR /var/lib/hd-plymouth/theme ,
+which
+.I /usr/share/plymouth/themes/hyprdebian/hyprdebian.plymouth
+names as its
+.B ImageDir
+and
+.BR ScriptFile :
+.TP
+.I hyprdebian.script
+The script, from the jinja2 template in
+.IR /usr/share/hd-plymouth/templates ,
+with the font of the theme at
+.B font-size-normal
+in the field and
+.B font-size-small
+below it, the colour
+.B light
+for all text and
+.B dark
+behind the background.
+.TP
+.IR field-input.png ", " field-check.png ", " field-fail.png
+The input field of 650 by 100 pixels, as in hyprlock.conf: the fill in
+.B dark
+at
+.BR opacity ,
+with corners of
+.BR radius ,
+and an outline of
+.B border
+pixels in
+.BR highlight ,
+and in the yellow and the red of hyprlock while a password is checked and
+after a wrong one.
+The inner corners have the radius minus the border.
+.TP
+.I dot.png
+The dot of a typed character, in
+.BR light .
+.TP
+.I background.png
+A link to the image of the family
+.B background
+in
+.I /usr/share/backgrounds/hyprdebian
+that best fits the largest connected monitor: the smallest that covers it,
+else the largest.
+Without a connected monitor, it fits a screen of 1920x1080.
+.PP
+.I /var/lib/hd-plymouth/fonts
+lists the files of the fonts of the splash, as
+.BR fc-match (1)
+finds them.
+.PP
+A file is only written when it changes.
+The hook
+.I /usr/share/initramfs-tools/hooks/hd-plymouth
+runs
+.B hd-plymouth-render
+before it puts the splash and its fonts in the initramfs, so every initramfs
+has the splash in the theme of the system at that moment.
+The installation of hd-desktop runs it too.
+.PP
+Run it as root.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.B \-\-update\-initramfs
+When a file changed and plymouth uses the theme
+.BR hyprdebian ,
+rebuild the initramfs of all kernels with
+.BR "update-initramfs \-u \-k all" ;
+hd-bootloader then rebuilds its UKIs.
+.B hd-theme \-\-select
+runs it with this option as root.
+.SH EXIT STATUS
+0 when the splash was rendered, and with
+.B \-\-update\-initramfs
+the initramfs rebuilt when needed; 1 on an error.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The theme of the system, in the key
+.BR hd-theme .
+.TP
+.I /usr/share/hd-plymouth/templates/hyprdebian.script.j2
+The template of the script.
+.TP
+.I /var/lib/hd-plymouth/theme
+The rendered files of the plymouth theme.
+.TP
+.I /var/lib/hd-plymouth/fonts
+The files of the fonts, for the initramfs.
+.SH SEE ALSO
+.BR hd-plymouth (7),
+.BR hd-theme (1),
+.BR hd-theme (7),
+.BR plymouth (8),
+.BR update-initramfs (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

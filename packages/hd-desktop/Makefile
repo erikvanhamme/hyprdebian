@@ -23,10 +23,15 @@
 #                 /usr/libexec/hd-desktop/hd-mount-helper
 #                                             mounts and unmounts for the
 #                                             mount menus, run with sudo
+#                 /usr/bin/hd-launcher-cache  writes the menu of the
+#                                             launcher in the cache of the
+#                                             system or of the user, and
+#                                             prints it for the launcher
 #                 /usr/sbin/hd-desktop-render writes /etc/greetd/config.toml
-#                 /usr/sbin/hd-launcher       writes the menu of the
-#                                             launcher in
-#                                             /var/cache/hd-launcher
+#                 /usr/sbin/hd-plymouth-render
+#                                             renders the boot splash in the
+#                                             theme of the system in
+#                                             /var/lib/hd-plymouth
 #                 /usr/share/hd-desktop/templates/greetd.toml.j2
 #                                             the template of that config
 #                 /usr/share/hd-theme/templates/
@@ -51,16 +56,21 @@
 #                                             not the Propo and NL families
 #                 /usr/share/plymouth/themes/hyprdebian/
 #                                             the plymouth theme in
-#                                             plymouth/theme/, and
-#                                             background.png, a link to the
-#                                             wallpaper $(WALLPAPER)
+#                                             plymouth/theme/, which names
+#                                             the files that
+#                                             hd-plymouth-render writes
+#                 /usr/share/hd-plymouth/templates/
+#                                             the jinja2 template of the
+#                                             plymouth script, in
+#                                             templates/hd-plymouth/
 #                 /usr/share/hd-plymouth/plymouthd.conf
 #                                             the config of plymouthd that
 #                                             names the theme
 #                 /usr/share/initramfs-tools/hooks/hd-plymouth
 #                                             the hook in plymouth/initramfs/,
-#                                             which puts the fonts of the
-#                                             theme in the initramfs
+#                                             which renders the splash and
+#                                             puts it and its fonts in the
+#                                             initramfs
 #                 /etc/...                    the files in etc/, at the
 #                                             same path, conffiles: the
 #                                             files new users get in
@@ -68,7 +78,7 @@
 #                                             for dconf, the sudoers
 #                                             rule of the mount menus and
 #                                             the apt hook that runs
-#                                             hd-launcher
+#                                             hd-launcher-cache
 #                 /etc/skel/.icons
 #                 /etc/skel/Pictures/Screenshots
 #                                             empty directories for new
@@ -77,7 +87,9 @@
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the drop-in that
 #                                             runs hd-desktop-render before
-#                                             greetd starts
+#                                             greetd starts, and the
+#                                             warning icon of
+#                                             hd-launcher-cache
 #                 /usr/share/doc/hd-desktop/copyright
 #                                             deb/copyright
 #                 /usr/share/doc/hd-desktop/nerd-fonts/OFL.txt
@@ -95,10 +107,12 @@
 #               /etc/plymouth/plymouthd.conf of plymouth and copies the
 #               config of the boot splash in its place, compiles the dconf
 #               database, renders the cards of the themes and selects the
-#               theme default when none is selected, and writes the menu of
-#               the launcher with hd-launcher, and deb/postrm, which undoes
-#               the diversions and removes the cards on a removal, and
-#               removes the menu and the key hd-theme on a purge.
+#               theme default when none is selected, renders the boot splash
+#               with hd-plymouth-render, and writes the menu of the launcher
+#               with hd-launcher-cache, and deb/postrm, which undoes the
+#               diversions and removes the cards on a removal, and
+#               removes the menu, the rendered boot splash and the key
+#               hd-theme on a purge.
 #               deb/preinst, deb/postinst and deb/postrm also remove the
 #               conffiles that the package no longer has, with
 #               dpkg-maintscript-helper rm_conffile. fontconfig refreshes its
@@ -108,11 +122,6 @@
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
-#   make images render the images of the input field of the boot splash in
-#               plymouth/theme/ again with ImageMagick: the dot, a black
-#               pixel for the fill and a pixel of each outline colour.
-#               They are kept in the repository, so make deb does not need
-#               ImageMagick.
 #   make clean  remove build/, also the compiled hd-menu and the downloaded
 #               zip of the fonts, and menu/build/ of make all in menu/
 
@@ -140,14 +149,14 @@ SUDOERS := etc/sudoers.d/hd-desktop
 # The commands, installed in /usr/bin.
 COMMANDS := hd-ask-poweroff hd-ask-reboot hd-mode-select hd-mount hd-unmount hd-volume-down \
 	hd-volume-mute hd-volume-up hd-theme hd-theme-card hd-launch-screensaver hd-cmd-screensaver \
-	hd-kill-screensaver
+	hd-kill-screensaver hd-launcher-cache
 # The commands for root, installed in /usr/sbin.
-SBIN_COMMANDS := hd-desktop-render hd-launcher
+SBIN_COMMANDS := hd-desktop-render hd-plymouth-render
 TEMPLATES := $(wildcard templates/*.j2)
 # The man pages, named <page>.<section>.
-MANPAGES := man/hd-desktop.7 man/hd-desktop-render.8 man/hd-launcher.8 man/hd-art.7 \
+MANPAGES := man/hd-desktop.7 man/hd-desktop-render.8 man/hd-launcher-cache.1 man/hd-art.7 \
 	man/hd-fonts.7 man/hd-menu.1 man/hd-theme.7 man/hd-theme.1 man/hd-theme-card.1 \
-	man/hd-screensaver.7 man/hd-plymouth.7
+	man/hd-screensaver.7 man/hd-plymouth.7 man/hd-plymouth-render.8
 
 # The theme engine: the templates of the theme files, and the themes.
 THEME_TEMPLATE_DIR := /usr/share/hd-theme/templates
@@ -175,17 +184,14 @@ ZIP := $(BUILD)/JetBrainsMono-$(NERD_FONTS_VERSION).zip
 # styles. The pattern of the first does not match the files of the second.
 FONT_FILES := 'JetBrainsMonoNerdFont-*.ttf' 'JetBrainsMonoNerdFontMono-*.ttf'
 
-# The boot splash: the plymouth theme, its config and the initramfs hook for its fonts.
+# The boot splash: the plymouth theme, the template of its script, its config and the initramfs
+# hook that renders it and puts it in the initramfs.
 PLYMOUTH_THEME_DIR := /usr/share/plymouth/themes/hyprdebian
 PLYMOUTH_SHARE_DIR := /usr/share/hd-plymouth
+PLYMOUTH_TEMPLATE_DIR := $(PLYMOUTH_SHARE_DIR)/templates
 HOOK_DIR := /usr/share/initramfs-tools/hooks
-# The background of the theme. The hook of plymouth copies the theme into
-# the initramfs, with the wallpaper that the link points to.
-WALLPAPER := $(BACKGROUNDS)/emerald-1920x1080.png
 PLYMOUTH_THEME := $(wildcard plymouth/theme/*)
-# Writes PNGs without time stamps, so the same render gives the same file.
-MAGICK := magick
-PNG_OPTIONS := -strip -define png:exclude-chunks=date,time
+PLYMOUTH_TEMPLATES := $(wildcard templates/hd-plymouth/*.j2)
 
 # The menu, compiled in a container. The desktop needs Hyprland, so it is only for unstable; the
 # binary needs the libraries of the release it is compiled on.
@@ -194,7 +200,7 @@ MENU := $(BUILD)/menu
 MENU_SOURCES := menu/Makefile menu/build-hd-menu.sh $(wildcard menu/src/*) \
 	$(wildcard menu/protocols/*)
 
-.PHONY: deb deb-path images clean
+.PHONY: deb deb-path clean
 
 deb: $(DEB)
 
@@ -231,14 +237,15 @@ $(ZIP): | $(BUILD)
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
 $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper $(SBIN_COMMANDS) $(TEMPLATES) \
-		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) \
+		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE) $(BUILD)/zip
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(LIBEXEC_DIR) \
 		$(STAGE)$(TEMPLATE_DIR) $(STAGE)$(THEME_TEMPLATE_DIR) $(STAGE)$(THEME_DIR) \
 		$(STAGE)$(SCREENSAVER_DIR) $(STAGE)$(BACKGROUNDS) $(STAGE)$(FONTS) $(STAGE)$(FONTS_DOC) \
-		$(STAGE)$(PLYMOUTH_THEME_DIR) $(STAGE)$(PLYMOUTH_SHARE_DIR) $(STAGE)$(HOOK_DIR)
+		$(STAGE)$(PLYMOUTH_THEME_DIR) $(STAGE)$(PLYMOUTH_SHARE_DIR) $(STAGE)$(PLYMOUTH_TEMPLATE_DIR) \
+		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -s -m 0755 $(MENU)/hd-menu $(STAGE)/usr/bin/
 	install -m 0755 hd-mount-helper $(STAGE)$(LIBEXEC_DIR)/
@@ -255,7 +262,7 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper $(SBIN_COMMAN
 	install -m 0644 $(BUILD)/zip/*.ttf $(STAGE)$(FONTS)/
 	install -m 0644 $(BUILD)/zip/OFL.txt $(BUILD)/zip/README.md $(STAGE)$(FONTS_DOC)/
 	install -m 0644 $(PLYMOUTH_THEME) $(STAGE)$(PLYMOUTH_THEME_DIR)/
-	ln -s $(WALLPAPER) $(STAGE)$(PLYMOUTH_THEME_DIR)/background.png
+	install -m 0644 $(PLYMOUTH_TEMPLATES) $(STAGE)$(PLYMOUTH_TEMPLATE_DIR)/
 	install -m 0644 plymouth/plymouthd.conf $(STAGE)$(PLYMOUTH_SHARE_DIR)/
 	install -m 0755 plymouth/initramfs/hd-plymouth $(STAGE)$(HOOK_DIR)/
 	for file in $(ETC); do \
@@ -282,19 +289,6 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper $(SBIN_COMMAN
 	install -m 0644 deb/triggers $(STAGE)/DEBIAN/
 	install -m 0755 deb/preinst deb/postinst deb/postrm $(STAGE)/DEBIAN/
 	dpkg-deb --root-owner-group --build $(STAGE) $@
-
-# The colours are those of the input field in hyprlock.conf in etc/skel: font_color for the dot,
-# black for inner_color, whose opacity the theme sets, outer_color for the outline, and the
-# defaults of hyprlock for check_color and fail_color. The dot is drawn at four times its size and
-# scaled down, for smooth edges; the theme scales it again to a quarter of the height of the
-# field.
-images:
-	$(MAGICK) -size 100x100 xc:none -fill 'rgb(0,102,204)' -draw 'circle 49.5,49.5 49.5,0' \
-		-resize 25x25 $(PNG_OPTIONS) plymouth/theme/dot.png
-	$(MAGICK) -size 1x1 xc:'rgb(0,0,0)' $(PNG_OPTIONS) plymouth/theme/fill.png
-	$(MAGICK) -size 1x1 xc:'rgb(255,102,0)' $(PNG_OPTIONS) plymouth/theme/outline.png
-	$(MAGICK) -size 1x1 xc:'rgb(204,136,34)' $(PNG_OPTIONS) plymouth/theme/outline-check.png
-	$(MAGICK) -size 1x1 xc:'rgb(204,34,34)' $(PNG_OPTIONS) plymouth/theme/outline-fail.png
 
 clean:
 	rm -rf $(BUILD)

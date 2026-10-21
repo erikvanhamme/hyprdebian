@@ -6,12 +6,14 @@ hd-theme \- add, delete, list, select and apply the themes of HyprDebian
 .br
 .B hd-theme \-\-add
 .I file
+.RB [ \-\-no\-initramfs ]
 .br
 .B hd-theme \-\-delete
 .I name
 .br
 .B hd-theme \-\-select
 .I name
+.RB [ \-\-no\-initramfs ]
 .br
 .B hd-theme \-\-apply
 .RB [ \-\-no\-reload ]
@@ -74,7 +76,7 @@ A member
 .B name
 in the file is left out.
 When the theme replaces the theme of the system, it is selected again for
-the system; users who selected it themselves keep the old copy until they
+the system, with the boot splash; users who selected it themselves keep the old copy until they
 select it again.
 .TP
 .BI \-\-delete " name"
@@ -101,6 +103,14 @@ The desktops do not change until each user runs
 .BR "hd-theme \-\-apply" .
 A user goes back to the theme of the system with
 .BR "hd-config-remove hd-theme" .
+.IP
+The boot splash of
+.BR hd-plymouth (7)
+uses the theme of the system.
+Selected as root, the theme is rendered into the splash with
+.BR "hd-plymouth-render \-\-update\-initramfs" ,
+which rebuilds the initramfs of all kernels when the splash changed; that
+takes a while.
 .TP
 .B \-\-apply
 Write the theme files of the desktop programs in the home directory of the
@@ -113,6 +123,14 @@ below.
 With
 .BR \-\-apply :
 write the theme files, reload nothing.
+.TP
+.B \-\-no\-initramfs
+With
+.B \-\-select
+or
+.B \-\-add
+as root: render the boot splash, but do not rebuild the initramfs.
+The next rebuild, such as for a new kernel, takes the new splash.
 .TP
 .B \-\-cards
 Render the cards of all themes again, and remove the cards of themes that are
@@ -191,6 +209,7 @@ hd-theme \-\-apply
 .BR hd-theme-card (1),
 .BR hd-config (7),
 .BR hd-config-remove (1),
+.BR hd-plymouth-render (8),
 .BR imv-wayland (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

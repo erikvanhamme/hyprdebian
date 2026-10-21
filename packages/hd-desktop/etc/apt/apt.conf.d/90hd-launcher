@@ -1,7 +1,8 @@
-// Writes the menu of the application launcher of hd-desktop again, with hd-launcher, each time apt
-// has run dpkg: after an installation, an upgrade or a removal. A failure is reported but does not
-// fail apt, as the packages are installed by then. The check for hd-launcher keeps this file from
+// Writes the menu of the application launcher of hd-desktop again, with hd-launcher-cache
+// --update-all, in the cache of the system and of every user in the group users, each time apt has
+// run dpkg: after an installation, an upgrade or a removal. A failure is reported but does not fail
+// apt, as the packages are installed by then. The check for hd-launcher-cache keeps this file from
 // failing after hd-desktop is removed and before it is purged.
 DPkg::Post-Invoke {
-    "if [ -x /usr/sbin/hd-launcher ]; then if ! /usr/sbin/hd-launcher; then echo 'hd-launcher: could not write the menu of the launcher.' >&2; fi; fi";
+    "if [ -x /usr/bin/hd-launcher-cache ]; then if ! /usr/bin/hd-launcher-cache --update-all; then echo 'hd-launcher-cache: could not write the menu of the launcher.' >&2; fi; fi";
 };

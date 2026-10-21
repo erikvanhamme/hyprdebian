@@ -1,8 +1,12 @@
 #!/bin/sh
-# initramfs-tools hook of hd-desktop: puts the fonts of the boot splash in
-# the initramfs, when the theme of plymouth is hyprdebian. The hook of
-# plymouth, which runs first, copies the theme with the wallpaper, and only
-# the default fonts.
+# initramfs-tools hook of hd-desktop: puts the boot splash in the theme of
+# the system in the initramfs, when the theme of plymouth is hyprdebian. It
+# renders the splash with hd-plymouth-render into /var/lib/hd-plymouth/theme
+# first, and copies that directory to the same path in the initramfs, with
+# the background that background.png links to, as hyprdebian.plymouth names
+# it as its ImageDir and ScriptFile. It also puts the fonts that
+# /var/lib/hd-plymouth/fonts lists in the initramfs, as the hook of plymouth
+# only takes the default fonts.
 set -e
 
 PREREQ="plymouth"
@@ -21,20 +25,39 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
-FONT_DIR=/usr/share/fonts/truetype/jetbrains-mono-nerd
-FONTS="JetBrainsMonoNerdFontMono-Medium.ttf JetBrainsMonoNerdFontMono-MediumItalic.ttf"
+THEME_DIR=/var/lib/hd-plymouth/theme
+FONTS_FILE=/var/lib/hd-plymouth/fonts
+THEMES=/usr/share/plymouth/themes
 
 if [ "$(/usr/sbin/plymouth-set-default-theme 2> /dev/null)" != "hyprdebian" ]; then
     exit 0
 fi
 
-for font in $FONTS; do
-    if [ -f "$FONT_DIR/$font" ]; then
-        copy_file font "$FONT_DIR/$font"
-    else
-        echo "W: hd-plymouth: $FONT_DIR/$font is missing, the boot splash uses the default font."
-    fi
-done
+if ! /usr/sbin/hd-plymouth-render; then
+    echo "W: hd-plymouth: hd-plymouth-render failed, the initramfs gets the boot splash as it was rendered before."
+fi
+if [ ! -f "$THEME_DIR/hyprdebian.script" ]; then
+    echo "W: hd-plymouth: $THEME_DIR has no boot splash, plymouth falls back to its text splash."
+    exit 0
+fi
+
+mkdir -p "$DESTDIR$THEME_DIR"
+cp -r --dereference "$THEME_DIR/." "$DESTDIR$THEME_DIR"
+# The hook of plymouth copies an ImageDir outside the theme to a directory
+# of that name in the themes, which nothing reads.
+if [ ! -e "$THEMES/$(basename "$THEME_DIR")" ]; then
+    rm -rf "${DESTDIR:?}$THEMES/$(basename "$THEME_DIR")"
+fi
+
+if [ -f "$FONTS_FILE" ]; then
+    while IFS= read -r font; do
+        if [ -f "$font" ]; then
+            copy_file font "$font"
+        else
+            echo "W: hd-plymouth: the font $font is missing, the boot splash uses the default font."
+        fi
+    done < "$FONTS_FILE"
+fi
 
 # The cache of the fonts that the hook of plymouth made does not have them.
 fc-cache -s -y "$DESTDIR" > /dev/null 2>&1

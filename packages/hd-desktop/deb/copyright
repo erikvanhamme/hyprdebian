@@ -51,7 +51,7 @@ Files: usr/share/backgrounds/hyprdebian/emerald-*.png
 Copyright: 2014-2022, Juliette Taka Belin <juliette.belin@logilab.fr>
 License: GPL-2+
 
-Files: usr/share/plymouth/themes/hyprdebian/hyprdebian.script
+Files: usr/share/hd-plymouth/templates/hyprdebian.script.j2
 Copyright: 2009, Canonical Ltd.
            2010-2021, Aurélien Couderc <coucouf@debian.org>
            2014-2022, Juliette Taka <juliette.belin@logilab.fr>

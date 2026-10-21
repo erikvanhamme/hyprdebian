@@ -1,17 +1,35 @@
 #!/usr/bin/python3
-"""Writes the menu of the application launcher of the HyprDebian desktop, the input of hd-menu.
+"""Writes the menu of the application launcher of the HyprDebian desktop, the input of hd-menu,
+and prints it for the launcher.
 
-The package hd-desktop installs this as /usr/sbin/hd-launcher. Its apt hook,
-/etc/apt/apt.conf.d/90hd-launcher, runs it each time apt has run dpkg, so the menu follows the
-applications that are installed, upgraded and removed.
+The package hd-desktop installs this as /usr/bin/hd-launcher-cache. Its apt hook,
+/etc/apt/apt.conf.d/90hd-launcher, runs it as root with --update-all each time apt has run dpkg, so
+the menus of the system and of the users follow the applications that are installed, upgraded and
+removed.
 
-    hd-launcher              write /var/cache/hd-launcher/launcher.json and its icons
-    hd-launcher --dry-run    print the menu that would be written, write nothing
+    hd-launcher-cache                print the menu for hd-menu
+    hd-launcher-cache --update       write the menu and its icons in the cache
+    hd-launcher-cache --update-all   as root: write the cache of the system and of every user in
+                                     the group users
+    hd-launcher-cache --dry-run      print the menu that --update would write, write nothing
+
+Who runs it decides which settings and which cache it uses. Root uses the configuration of the
+system, /etc/hyprdebian/config.json, and the cache of the system, /var/cache/hd-launcher. Any other
+user uses their own configuration, ~/.config/hyprdebian/config.json, for each key that it has, and
+the configuration of the system for the others, and their own cache, ~/.cache/hd-launcher.
+--update-all runs --update as root and then, with runuser, as each user whose primary or
+supplementary group is users and whose home directory exists, so each cache belongs to its user and
+is made from the settings of that user. A user whose cache cannot be written is reported, and the
+others are still written.
+
+Without arguments, it prints the menu in the cache of the user, else the one in the cache of the
+system, else a menu with the single option "No cache" and a warning icon, which does nothing. The
+key binding of the launcher in hyprland.lua pipes it into hd-menu.
 
 The applications are the .desktop files in /usr/share/applications and its subdirectories, of the
 type Application, that are not hidden, not left out for Hyprland by OnlyShowIn or NotShowIn, and
-whose TryExec, when they have one, is installed. The key hd-launcher of
-/etc/hyprdebian/config.json leaves out applications and adds items of its own:
+whose TryExec, when they have one, is installed. The key hd-launcher of the configuration leaves out
+applications and adds items of its own:
 
     "hd-launcher": {
         "exclude": ["org.gnome.Meld.desktop", "debian-xterm"],
@@ -32,17 +50,20 @@ it, which the launcher runs with sh -c: "uwsm app -- <ID>" for an application an
 label, in ascending order, without regard to case. The icon of an application is looked up by its
 Icon in the icon themes hicolor and Adwaita and in /usr/share/pixmaps, or taken from its path when it
 is one. A PNG is used as it is; an SVG is rendered to a PNG of the icon_size of the hd-theme in
-/var/cache/hd-launcher/icons, only when the PNG there was not rendered from that SVG at that size.
-Icons of applications that are gone are removed. Run it as root.
+icons/ of the cache, only when the PNG there was not rendered from that SVG at that size. Icons of
+applications that are gone are removed. The key hd-theme is looked up as the key hd-launcher.
 """
 
 import argparse
 import configparser
+import grp
 import json
 import os
+import pwd
 import re
 import shlex
 import shutil
+import subprocess
 import sys
 
 import cairo
@@ -51,11 +72,19 @@ import gi
 gi.require_version("Rsvg", "2.0")
 from gi.repository import GLib, Rsvg  # noqa: E402
 
-CONFIG_FILE = "/etc/hyprdebian/config.json"
+SYSTEM_CONFIG = "/etc/hyprdebian/config.json"
+USER_CONFIG = ".config/hyprdebian/config.json"
 CONFIG_KEY = "hd-launcher"
 THEME_KEY = "hd-theme"
 APPLICATIONS = "/usr/share/applications"
-CACHE_DIR = "/var/cache/hd-launcher"
+SYSTEM_CACHE = "/var/cache/hd-launcher"
+USER_CACHE = ".cache/hd-launcher"
+MENU_FILE = "launcher.json"
+# The users whose caches --update-all writes: the members of this group.
+USERS_GROUP = "users"
+COMMAND = "/usr/bin/hd-launcher-cache"
+# The icon of the menu without a cache.
+WARNING_ICON = "/usr/share/hd-desktop/icons/warning.svg"
 ICON_THEMES = ["/usr/share/icons/hicolor", "/usr/share/icons/Adwaita"]
 PIXMAPS = "/usr/share/pixmaps"
 BANNER = "Applications"
@@ -86,17 +115,51 @@ def warn(message):
     print(f"Warning: {message}", file=sys.stderr)
 
 
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
+def is_root():
+    return os.geteuid() == 0
+
+
+def home():
+    return pwd.getpwuid(os.getuid()).pw_dir
+
+
+def config_files():
+    """The configurations in which a key is looked up, first to last: for root the one of the
+    system, for other users their own and then the one of the system."""
+    if is_root():
+        return [SYSTEM_CONFIG]
+    return [os.path.join(home(), USER_CONFIG), SYSTEM_CONFIG]
+
+
+def cache_dirs():
+    """The caches in which the menu is looked up, first to last; the first is the one that
+    --update writes."""
+    if is_root():
+        return [SYSTEM_CACHE]
+    return [os.path.join(home(), USER_CACHE), SYSTEM_CACHE]
+
+
+def load_config(path):
+    if not os.path.exists(path):
         return {}
     try:
-        with open(CONFIG_FILE, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             config = json.load(f)
     except (OSError, ValueError) as e:
-        fail(f"Cannot read {CONFIG_FILE}: {e}")
+        fail(f"Cannot read {path}: {e}")
     if not isinstance(config, dict):
-        fail(f"{CONFIG_FILE} does not hold a JSON object.")
+        fail(f"{path} does not hold a JSON object.")
     return config
+
+
+def lookup(key, default):
+    """The value of a key in the first configuration that has it, and the path of that
+    configuration; the default and None when none has it."""
+    for path in config_files():
+        config = load_config(path)
+        if key in config:
+            return config[key], path
+    return default, None
 
 
 def is_text(value):
@@ -119,15 +182,15 @@ def check_item(item, where):
         fail(f"The icon of {where} is not a path or the name of an icon.")
 
 
-def launcher_settings(config):
+def launcher_settings():
     """The desktop file IDs to leave out, with .desktop at the end, and the items to add."""
-    where = f"the key {CONFIG_KEY} of {CONFIG_FILE}"
-    settings = config.get(CONFIG_KEY, {})
+    settings, source = lookup(CONFIG_KEY, {})
+    where = f"the key {CONFIG_KEY} of {source}"
     if not isinstance(settings, dict):
-        fail(f"The key {CONFIG_KEY} of {CONFIG_FILE} is not a JSON object with exclude and add.")
+        fail(f"The key {CONFIG_KEY} of {source} is not a JSON object with exclude and add.")
     unknown = [k for k in settings if k not in SETTINGS]
     if unknown:
-        fail(f"The key {CONFIG_KEY} of {CONFIG_FILE} has unknown members {', '.join(unknown)}.")
+        fail(f"The key {CONFIG_KEY} of {source} has unknown members {', '.join(unknown)}.")
     excluded = settings.get("exclude", [])
     if not isinstance(excluded, list) or not all(is_text(e) for e in excluded):
         fail(f"The exclude of {where} is not a list of desktop file IDs.")
@@ -146,8 +209,8 @@ def launcher_settings(config):
     return ids, added
 
 
-def icon_size(config):
-    theme = config.get(THEME_KEY)
+def icon_size():
+    theme, _ = lookup(THEME_KEY, None)
     if not isinstance(theme, dict):
         return ICON_SIZE
     size = theme.get("icon_size")
@@ -356,10 +419,10 @@ def added_icon_name(number, name):
     return f"add-{number}-" + re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-").lower()
 
 
-def build_menu(config, icon_dir, dry_run):
+def build_menu(icon_dir, dry_run):
     """The menu of hd-menu, and the PNGs in icon_dir that it uses."""
-    excluded, added = launcher_settings(config)
-    size = icon_size(config)
+    excluded, added = launcher_settings()
+    size = icon_size()
     if not dry_run:
         os.makedirs(icon_dir, mode=0o755, exist_ok=True)
 
@@ -401,27 +464,97 @@ def write_json(path, value):
     os.replace(tmp, path)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description=f"Write the menu of the application launcher, {CACHE_DIR}/launcher.json, "
-        f"from the .desktop files in {APPLICATIONS} and the key {CONFIG_KEY} of {CONFIG_FILE}.")
-    parser.add_argument("-n", "--dry-run", action="store_true",
-                        help="print the menu that would be written, write nothing")
-    args = parser.parse_args()
-    if not args.dry_run and os.geteuid() != 0:
-        fail("Run hd-launcher as root.")
+def print_menu(menu):
+    json.dump(menu, sys.stdout, indent=4, ensure_ascii=False)
+    print()
 
-    icon_dir = os.path.join(CACHE_DIR, "icons")
-    menu, used = build_menu(load_config(), icon_dir, args.dry_run)
-    if args.dry_run:
-        json.dump(menu, sys.stdout, indent=4, ensure_ascii=False)
-        print()
+
+def show():
+    """Prints the menu of the first cache that has one, else the menu without a cache."""
+    for cache in cache_dirs():
+        try:
+            with open(os.path.join(cache, MENU_FILE), encoding="utf-8") as f:
+                text = f.read()
+        except FileNotFoundError:
+            continue
+        except (OSError, UnicodeDecodeError) as e:
+            warn(f"Cannot read {os.path.join(cache, MENU_FILE)}: {e}")
+            continue
+        sys.stdout.write(text)
+        return
+    # The launcher runs the value with sh -c; true does nothing.
+    print_menu({"banner": BANNER, "options": [
+        {"label": "No cache", "value": "true", "icon": WARNING_ICON}]})
+
+
+def update(dry_run):
+    """Writes the menu and its icons in the cache of whoever runs this, or prints it."""
+    cache = cache_dirs()[0]
+    icon_dir = os.path.join(cache, "icons")
+    menu, used = build_menu(icon_dir, dry_run)
+    if dry_run:
+        print_menu(menu)
         return
 
     remove_unused(icon_dir, used)
-    launcher = os.path.join(CACHE_DIR, "launcher.json")
+    launcher = os.path.join(cache, MENU_FILE)
     write_json(launcher, menu)
-    print(f"hd-launcher: wrote {launcher} with {len(menu['options'])} applications.")
+    print(f"hd-launcher-cache: wrote {launcher} with {len(menu['options'])} applications.")
+
+
+def group_users():
+    """The users whose primary or supplementary group is USERS_GROUP, sorted, as pwd entries."""
+    try:
+        group = grp.getgrnam(USERS_GROUP)
+    except KeyError:
+        return []
+    members = set(group.gr_mem)
+    users = {}
+    for user in pwd.getpwall():
+        if user.pw_gid == group.gr_gid or user.pw_name in members:
+            users[user.pw_name] = user
+    return [users[name] for name in sorted(users)]
+
+
+def update_all():
+    """Writes the cache of the system, then that of every user in USERS_GROUP, as that user."""
+    if not is_root():
+        fail("hd-launcher-cache --update-all is run as root.")
+    update(False)
+    failed = []
+    for user in group_users():
+        if not os.path.isdir(user.pw_dir):
+            warn(f"The home directory {user.pw_dir} of {user.pw_name} does not exist; its cache "
+                 "is not written.")
+            continue
+        result = subprocess.run(["runuser", "-u", user.pw_name, "--", COMMAND, "--update"])
+        if result.returncode != 0:
+            failed.append(user.pw_name)
+    if failed:
+        fail(f"Could not write the cache of {', '.join(failed)}.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Print the menu of the application launcher for hd-menu, from the cache of "
+        f"the user or else of the system, or write it in the cache from the .desktop files in "
+        f"{APPLICATIONS} and the key {CONFIG_KEY} of the configuration.")
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument("-u", "--update", action="store_true",
+                         help=f"write the menu and its icons in {cache_dirs()[0]}")
+    actions.add_argument("-a", "--update-all", action="store_true",
+                         help=f"as root: write the cache of the system and of every user in the "
+                         f"group {USERS_GROUP}")
+    actions.add_argument("-n", "--dry-run", action="store_true",
+                         help="print the menu that --update would write, write nothing")
+    args = parser.parse_args()
+
+    if args.update_all:
+        update_all()
+    elif args.update or args.dry_run:
+        update(args.dry_run)
+    else:
+        show()
 
 
 if __name__ == "__main__":

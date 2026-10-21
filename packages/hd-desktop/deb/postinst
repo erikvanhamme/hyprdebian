@@ -3,8 +3,8 @@
 HyprDebian in its place with hd-desktop-render, diverts /etc/plymouth/plymouthd.conf of plymouth
 and puts the config of the boot splash in its place, compiles the dconf database of the dark theme,
 renders the cards of the themes and selects the theme default when no theme is selected yet,
-copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
-with hd-launcher. It also finishes the removal of the conffiles that hd-desktop no longer has.
+renders the boot splash in the theme of the system with hd-plymouth-render, copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
+with hd-launcher-cache. It also finishes the removal of the conffiles that hd-desktop no longer has.
 
 greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
@@ -16,7 +16,10 @@ plymouth ships /etc/plymouth/plymouthd.conf as a conffile. It is diverted to
 the boot splash, which makes hyprdebian the theme of plymouth, is copied over it on every
 installation and upgrade. The postrm of a removal removes it and puts the one of plymouth back. The
 initramfs holds the theme: the package activates the trigger update-initramfs of initramfs-tools,
-which rebuilds it once dpkg is done, with the theme that this config names.
+which rebuilds it once dpkg is done, with the theme that this config names. The hook hd-plymouth
+renders the splash again for that; the postinst renders it too, so the splash of a shutdown, which
+plymouthd shows from the root file system, has it at once. hd-theme --select runs without
+rebuilding the initramfs here, as the trigger does that.
 
 The theme files in the home directories are not written here: each user runs hd-theme --apply
 for that.
@@ -32,9 +35,10 @@ upgrade from a version before SKEL_SINCE, which did not do it, so a file that th
 does not come back on later upgrades. It runs as the user, so the files belong to them. When the
 installer runs, the user does not exist yet, and the installer copies /etc/skel itself.
 
-The apt hook of hd-launcher writes the menu after every run of dpkg by apt, but not when the
-package is installed with dpkg alone, so the postinst writes it too. A menu that cannot be written
-does not fail the installation.
+The apt hook of hd-launcher-cache writes the menu in the caches of the system and of the users in
+the group users after every run of dpkg by apt, but not when the package is installed with dpkg
+alone, so the postinst writes them too. A menu that cannot be written does not fail the
+installation.
 
 The conffiles in OBSOLETE_CONFFILES are removed with dpkg-maintscript-helper rm_conffile, which the
 preinst, the postinst and the postrm all run with their arguments. dpkg cannot remove their
@@ -146,10 +150,12 @@ def main():
     subprocess.run(["dconf", "update"], check=True)
     subprocess.run(["/usr/bin/hd-theme", "--cards"], check=True)
     if not theme_selected():
-        subprocess.run(["/usr/bin/hd-theme", "--select", DEFAULT_THEME], check=True)
+        subprocess.run(["/usr/bin/hd-theme", "--select", DEFAULT_THEME, "--no-initramfs"],
+                       check=True)
+    subprocess.run(["/usr/sbin/hd-plymouth-render"], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
-    if subprocess.run(["/usr/sbin/hd-launcher"]).returncode != 0:
+    if subprocess.run(["/usr/bin/hd-launcher-cache", "--update-all"]).returncode != 0:
         print("Could not write the menu of the launcher.", file=sys.stderr)
     if not os.path.isdir("/run/systemd/system"):
         return

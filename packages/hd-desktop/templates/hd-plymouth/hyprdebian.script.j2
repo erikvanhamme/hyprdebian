@@ -1,5 +1,9 @@
 #  hyprdebian.script - the boot splash of HyprDebian, for the script plugin
 #
+#  Written by hd-plymouth-render from the theme {{ name }} of the system, in
+#  /etc/hyprdebian/config.json. Do not change this file: hd-plymouth-render
+#  writes it again.
+#
 #  Copyright (C) 2009 Canonical Ltd.
 #  Copyright © 2010-2021 Aurélien Couderc <coucouf@debian.org>
 #  Copyright © 2014-2022 Juliette Taka <juliette.belin@logilab.fr>
@@ -20,42 +24,37 @@
 #  script plugin by Charlie Brej <cbrej@cs.man.ac.uk>.
 #
 #  The splash looks like the lock screen of hyprlock, as configured in
-#  ~/.config/hypr/hyprlock.conf of hd-desktop: the wallpaper of hd-desktop,
-#  and for a password, such as the one of an encrypted ZFS dataset, an
-#  input field with a translucent black fill, an orange outline and blue
-#  dots. While the
+#  ~/.config/hypr/hyprlock.conf of hd-desktop, in the theme of the system:
+#  its background, and for a password, such as the one of an encrypted ZFS
+#  dataset, a rounded input field with the colour dark of the theme at its
+#  opacity as the fill, an outline in highlight and dots in light. While the
 #  password is checked the outline turns yellow, and when the same prompt
 #  comes back, the password was wrong: the outline turns red and the field
-#  says how many attempts failed.
+#  says how many attempts failed. The field, with its fill, outline and
+#  corners, is an image per state, which hd-plymouth-render draws.
 
 
 #------------------------------- Constants -----------------------------------------
-# The input field of hyprlock.conf: size, outline_thickness, the opacity
-# of the black inner_color, and the relative dots_size and dots_spacing of
-# hyprlock.
-FIELD.width = 650;
-FIELD.height = 100;
-FIELD.outline = 4;
-FIELD.fill_opacity = 0.8;
+# The input field of hyprlock.conf: its size, and the relative dots_size
+# and dots_spacing of hyprlock. The images of the field have this size.
+FIELD.width = {{ field_width }};
+FIELD.height = {{ field_height }};
 DOTS_SIZE = 0.25;
 DOTS_SPACING = 0.15;
 # The space between the dots and the outline, relative to the height.
 DOTS_MARGIN = 0.5;
 
-# font_color of hyprlock.conf, rgb(0, 102, 204), and the white of the
-# other text.
-font_colour.red = 0.0;
-font_colour.green = 0.4;
-font_colour.blue = 0.8;
-text_colour.red = 1.0;
-text_colour.green = 1.0;
-text_colour.blue = 1.0;
+# font_color of hyprlock.conf, light of the theme, for all text.
+text_colour.red = {{ light.red }};
+text_colour.green = {{ light.green }};
+text_colour.blue = {{ light.blue }};
 
-# The fonts, of hd-desktop. The initramfs-tools hook hd-plymouth puts
-# them in the initramfs.
-FONT = "JetBrainsMono NFM Medium 18";
-FONT_ITALIC = "JetBrainsMono NFM Medium Italic 18";
-FONT_SMALL = "JetBrainsMono NFM Medium 13";
+# The font of the theme, at font-size-normal in the field and
+# font-size-small below it. The initramfs-tools hook hd-plymouth puts the
+# files of the fonts in the initramfs.
+FONT = {{ font | script_string }};
+FONT_ITALIC = {{ font_italic | script_string }};
+FONT_SMALL = {{ font_small | script_string }};
 
 PLACEHOLDER_TEXT = "Enter Password";
 FAIL_TEXT = "Wrong password";
@@ -90,10 +89,9 @@ screen.y = Window.GetY ();
 screen.width = Window.GetWidth ();
 screen.height = Window.GetHeight ();
 
-# The colour of the Emerald wallpaper, for where the wallpaper does not
-# load.
-Window.SetBackgroundTopColor (0.02, 0.279, 0.3608);
-Window.SetBackgroundBottomColor (0.02, 0.279, 0.3608);
+# dark of the theme, for where the background does not load.
+Window.SetBackgroundTopColor ({{ dark.red }}, {{ dark.green }}, {{ dark.blue }});
+Window.SetBackgroundBottomColor ({{ dark.red }}, {{ dark.green }}, {{ dark.blue }});
 
 # The wallpaper, scaled to cover the screen and centered, so a screen
 # with another aspect ratio crops it.
@@ -111,52 +109,36 @@ if (background.image) {
 
 
 #----------------------------- Input field -----------------------------------------
-# The field is centered, and narrower on a screen that is too small for it.
+# The field is centered, and narrower on a screen that is too small for it;
+# its images are then scaled to that width.
 field.width = Math.Min (FIELD.width, screen.width - 32);
 field.height = FIELD.height;
 field.x = screen.x + Math.Int ((screen.width - field.width) / 2);
 field.y = screen.y + Math.Int ((screen.height - field.height) / 2);
 
-# The fill is an image of one black pixel, scaled to the field, under the
-# outline.
-fill = Sprite (Image ("fill.png").Scale (field.width, field.height));
-fill.SetPosition (field.x, field.y, 9);
-
-# The outline is four bars, scaled from an image of one pixel of its
-# colour: outer_color of hyprlock.conf, and check_color and fail_color,
-# which hyprlock.conf leaves at the defaults of hyprlock.
-fun OutlineImages (filename) {
-    local.pixel = Image (filename);
-    local.images.horizontal = local.pixel.Scale (field.width, FIELD.outline);
-    local.images.vertical = local.pixel.Scale (FIELD.outline, field.height - 2 * FIELD.outline);
-    return local.images;
+# The field is one sprite, with an image per state: the fill and the
+# rounded outline in outer_color of hyprlock.conf, and in check_color and
+# fail_color, which hyprlock.conf leaves at the defaults of hyprlock.
+fun FieldImage (filename) {
+    local.image = Image (filename);
+    if (local.image.GetWidth () != field.width)
+        local.image = local.image.Scale (field.width, field.height);
+    return local.image;
 }
 
-outline_input = OutlineImages ("outline.png");
-outline_check = OutlineImages ("outline-check.png");
-outline_fail = OutlineImages ("outline-fail.png");
+field_input = FieldImage ("field-input.png");
+field_check = FieldImage ("field-check.png");
+field_fail = FieldImage ("field-fail.png");
 
-outline.top = Sprite ();
-outline.top.SetPosition (field.x, field.y, 10);
-outline.bottom = Sprite ();
-outline.bottom.SetPosition (field.x, field.y + field.height - FIELD.outline, 10);
-outline.left = Sprite ();
-outline.left.SetPosition (field.x, field.y + FIELD.outline, 10);
-outline.right = Sprite ();
-outline.right.SetPosition (field.x + field.width - FIELD.outline, field.y + FIELD.outline, 10);
+field.sprite = Sprite ();
+field.sprite.SetPosition (field.x, field.y, 10);
 
-fun SetOutline (images) {
-    outline.top.SetImage (images.horizontal);
-    outline.bottom.SetImage (images.horizontal);
-    outline.left.SetImage (images.vertical);
-    outline.right.SetImage (images.vertical);
+fun SetField (image) {
+    field.sprite.SetImage (image);
 }
 
-fun SetOutlineOpacity (opacity) {
-    outline.top.SetOpacity (opacity);
-    outline.bottom.SetOpacity (opacity);
-    outline.left.SetOpacity (opacity);
-    outline.right.SetOpacity (opacity);
+fun SetFieldOpacity (opacity) {
+    field.sprite.SetOpacity (opacity);
 }
 
 # The dots, centered in the field, as many as fit between the margins.
@@ -192,13 +174,12 @@ fun ShowFieldText (image) {
 }
 
 fun HideField () {
-    fill.SetOpacity (0);
-    SetOutlineOpacity (0);
+    SetFieldOpacity (0);
     ShowDots (0);
     field_text.SetOpacity (0);
 }
 
-SetOutline (outline_input);
+SetField (field_input);
 HideField ();
 
 
@@ -312,21 +293,20 @@ fun display_password_callback (prompt, bullets) {
     global.state = "input";
 
     # The prompt only tells the questions apart; the field does not show it.
-    fill.SetOpacity (FIELD.fill_opacity);
     ShowDots (bullets);
     if (bullets > 0) {
-        SetOutline (outline_input);
+        SetField (field_input);
         field_text.SetOpacity (0);
     }
     else if (global.attempts > 0) {
-        SetOutline (outline_fail);
-        ShowFieldText (ImageFromText (FAIL_TEXT + " (" + global.attempts + ")", font_colour, FONT_ITALIC));
+        SetField (field_fail);
+        ShowFieldText (ImageFromText (FAIL_TEXT + " (" + global.attempts + ")", text_colour, FONT_ITALIC));
     }
     else {
-        SetOutline (outline_input);
-        ShowFieldText (ImageFromText (PLACEHOLDER_TEXT, font_colour, FONT));
+        SetField (field_input);
+        ShowFieldText (ImageFromText (PLACEHOLDER_TEXT, text_colour, FONT));
     }
-    SetOutlineOpacity (1);
+    SetFieldOpacity (1);
 }
 
 Plymouth.SetDisplayPasswordFunction (display_password_callback);
@@ -342,7 +322,7 @@ fun display_normal_callback () {
     global.state = "check";
     global.prompt_ended = 1;
     global.check_frames = 0;
-    SetOutline (outline_check);
+    SetField (field_check);
     field_text.SetOpacity (0);
 }
 

@@ -14,10 +14,25 @@ It looks like the lock screen of
 .BR hyprlock (1),
 as
 .I ~/.config/hypr/hyprlock.conf
-of hd-desktop sets it up: the Emerald wallpaper of
+of hd-desktop sets it up, in the theme of the system of
+.BR hd-theme (7):
+the background of the theme from
 .BR hd-art (7),
-scaled to cover the screen, and, when the boot asks for a password, an input
-field in the middle with a black fill of 80% opacity and an orange outline.
+scaled to cover the screen, and, when the boot asks for a password, a rounded
+input field in the middle with the colour
+.B dark
+at its
+.B opacity
+as the fill and an outline in
+.BR highlight .
+.PP
+The script of plymouth cannot read the theme, so
+.BR hd-plymouth-render (8)
+renders the files of the plymouth theme from it into
+.IR /var/lib/hd-plymouth/theme .
+Selecting the theme of the system with
+.B hd-theme \-\-select
+as root renders them again and rebuilds the initramfs.
 .PP
 The theme is based on the theme emerald of the Debian package
 .BR desktop-base .
@@ -28,15 +43,16 @@ dataset with plymouth when the splash shows, up to three times.
 The field does not show the prompt of the question.
 The empty field says
 .IR "Enter Password" ;
-every key press adds a blue dot.
+every key press adds a dot in the colour
+.BR light .
 After Enter, the outline turns yellow while the password is checked, and
 the field hides after about two seconds.
 When the same prompt comes back, the password was wrong: the outline turns
 red and the field says how many attempts failed, until the next key press.
 .PP
-The text is in JetBrains Mono of
-.BR hd-fonts (7).
-The hook hd-plymouth for initramfs-tools puts its fonts in the
+The text is in the font of the theme, in the colour
+.BR light .
+The hook hd-plymouth for initramfs-tools puts its font files in the
 initramfs, as the hook of plymouth only takes the default fonts.
 .SH SETTING THE THEME
 plymouth reads its theme from
@@ -48,9 +64,18 @@ The settings that it leaves out come from
 .IR /usr/share/plymouth/plymouthd.defaults .
 Removing the package puts the one of plymouth back.
 .PP
-The initramfs holds the theme.
+The initramfs holds the splash.
+The hook hd-plymouth renders it with
+.BR hd-plymouth-render (8)
+and copies
+.I /var/lib/hd-plymouth/theme
+to the same path in the initramfs, with the background that
+.I background.png
+links to.
 Installing, upgrading or removing the package has initramfs-tools rebuild
 it, and hd-bootloader then rebuilds its UKIs.
+The splash of a shutdown or reboot, which plymouthd shows from the root file
+system, uses the same files.
 .PP
 The splash shows when the kernel command line has
 .BR splash ,
@@ -60,14 +85,22 @@ The bootloader passes its resolution with
 so the splash starts at that resolution.
 .SH FILES
 .TP
-.I /usr/share/plymouth/themes/hyprdebian/
-The theme: the script, the images of the input field: the dot, the fill and
-the outline colours, and
+.I /usr/share/plymouth/themes/hyprdebian/hyprdebian.plymouth
+The theme, which names the files in
+.IR /var/lib/hd-plymouth/theme .
+.TP
+.I /var/lib/hd-plymouth/theme/
+The files that
+.BR hd-plymouth-render (8)
+renders: the script, the input field in each state, the dot and
 .IR background.png ,
-a link to
-.I /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
-of
-.BR hd-art (7).
+a link to the background.
+.TP
+.I /var/lib/hd-plymouth/fonts
+The font files that the hook puts in the initramfs.
+.TP
+.I /usr/share/hd-plymouth/templates/hyprdebian.script.j2
+The template of the script.
 .TP
 .I /usr/share/hd-plymouth/plymouthd.conf
 The config of plymouthd that the package copies to
@@ -77,11 +110,13 @@ The config of plymouthd that the package copies to
 The config of plymouth, diverted.
 .TP
 .I /usr/share/initramfs-tools/hooks/hd-plymouth
-Puts the fonts of the theme in the initramfs.
+Renders the splash and puts it and its fonts in the initramfs.
 .TP
 .I /usr/share/doc/hd-desktop/copyright
 The copyright and license of the theme.
 .SH SEE ALSO
+.BR hd-plymouth-render (8),
+.BR hd-theme (7),
 .BR plymouth (8),
 .BR plymouth-set-default-theme (1),
 .BR hyprlock (1),
