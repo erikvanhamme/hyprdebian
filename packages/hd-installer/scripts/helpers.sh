@@ -1,6 +1,8 @@
 #!/bin/bash
 # General helpers: asking questions and logging. Every answer is stored in its variable and saved
-# in the config, and on a rerun the saved answer is offered as the default.
+# in the config, and on a rerun the saved answer is offered as the default. A question that the
+# answers file answers is not asked: its answer is checked as a typed one would be, and an answer
+# that is not valid fails the question.
 
 # Reads a line of text into a variable, without saving it.
 # Usage: read_answer <variable> <prompt> <offered>
@@ -117,6 +119,12 @@ ask() {
     local prompt="$2"
     local default="$3"
 
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        set_answer "${var_name}" "${ANSWERS[${var_name}]}"
+        return 0
+    fi
+
     read_answer "${var_name}" "${prompt}" "${!var_name:-${default}}" || return 1
     set_answer "${var_name}" "${!var_name}"
 }
@@ -133,6 +141,16 @@ ask_valid() {
     local check="$4"
     local message="$5"
     local offered="${!var_name:-${default}}"
+
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        if ! "${check}" "${ANSWERS[${var_name}]}"; then
+            echo "Error: ${message}" >&2
+            return 1
+        fi
+        set_answer "${var_name}" "${ANSWERS[${var_name}]}"
+        return 0
+    fi
 
     while true; do
         read_answer "${var_name}" "${prompt}" "${offered}" || return 1
@@ -153,6 +171,17 @@ ask_password() {
     local var_name="$1"
     local prompt="$2"
     local pw1 pw2
+
+    if answered "${var_name}"; then
+        echo "${prompt}: (answers file)"
+        if (( ${#ANSWERS[${var_name}]} < 8 )); then
+            echo "Error: The password must be at least 8 characters." >&2
+            return 1
+        fi
+        printf -v "${var_name}" "%s" "${ANSWERS[${var_name}]}"
+        export -n "${var_name}"
+        return 0
+    fi
 
     while true; do
         if ! read -rsp "${prompt}: " pw1; then
@@ -216,6 +245,18 @@ ask_options() {
     fi
     default_idx="${current_idx:-${default_idx:-1}}"
 
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        for (( i = 0; i < count; i++ )); do
+            if [[ "${options[i]}" == "${ANSWERS[${var_name}]}" ]]; then
+                set_answer "${var_name}" "${options[i]}"
+                return 0
+            fi
+        done
+        echo "Error: The answer of ${var_name} must be one of: ${options[*]}." >&2
+        return 1
+    fi
+
     for (( i = 0; i < count; i++ )); do
         printf "%2d) %s\n" "$((i + 1))" "${options[i]}"
     done
@@ -247,6 +288,12 @@ ask_yes_no() {
     local prompt="$2"
     local default="$3"
     local current input choices
+
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        set_answer "${var_name}" "${ANSWERS[${var_name}]}"
+        return 0
+    fi
 
     case "${!var_name:-}" in
         true) current="y" ;;

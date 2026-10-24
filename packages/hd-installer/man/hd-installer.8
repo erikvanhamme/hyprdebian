@@ -4,6 +4,8 @@ hd-installer \- install HyprDebian
 .SH SYNOPSIS
 .B hd-installer
 .RB [ \-\-reset ]
+.RB [ \-\-answers
+.IR file ]
 .SH DESCRIPTION
 .B hd-installer
 installs HyprDebian on the disks of this computer, from a live system.
@@ -138,6 +140,114 @@ which stays the same when the kernel names the disks in another order.
 Each is shown with its kernel name, size and model.
 A disk that is already picked for the other side of a mirror stays in the
 list, so the numbers do not change, but cannot be picked again.
+.SH ANSWERS FILE
+With
+.BR \-\-answers ,
+the answers come from a JSON file, for an installation without questions,
+such as that of a virtual machine.
+The host name is the name of the file without its extension, such as
+.B test
+for
+.IR test.json .
+Every other answer is a key of the JSON object; a question that the file
+does not answer is asked as usual.
+An answer of the file is checked as a typed one would be, and an answer that
+is not valid stops the installation.
+An unknown key, or a key given twice, is an error.
+.TP
+.B suite
+The suite, a string.
+.TP
+.B encrypt
+.B true
+or
+.BR false .
+.TP
+.B system_disks
+A list of one disk, or two for a mirror.
+A disk may be named by any path, such as
+.IR /dev/vdb ;
+the installer stores its name in
+.IR /dev/disk/by-id .
+.TP
+.B swap
+The swap size in GiB, a whole number.
+.TP
+.B esp_disks
+A list of one disk, or two for a mirror, for the EFI system partitions.
+.TP
+.BR user ", " password ", " fullname
+Strings.
+The file holds the password in plain text; keep it readable only by root.
+Leave it out to have it asked.
+.TP
+.B domain
+The domain; the FQDN is the host name, a dot and the domain.
+.TP
+.B iface
+The wired interface, by its path name, such as
+.BR enp1s0 .
+.TP
+.B wifi
+.B false
+for no wifi, or the wifi interface by its path name.
+.TP
+.B wipe
+.B true
+confirms the wipe of every disk picked;
+.B false
+aborts.
+.TP
+.B debconf
+A list of lines for
+.BR debconf\-set\-selections (1),
+each
+.IR "owner question type value" ,
+such as
+.BR "tzdata tzdata/Areas select Europe" .
+They are set in the new system before its packages are installed, so apt
+does not ask them, and the locales, the time zone, the keyboard and the
+console font are configured without questions for the packages that have
+selections:
+.BR locales ,
+.BR tzdata ,
+.B keyboard\-configuration
+and
+.BR console\-setup .
+The debconf questions without a selection are asked as usual.
+.PP
+An example:
+.PP
+.RS
+.nf
+{
+    "suite": "unstable",
+    "encrypt": false,
+    "system_disks": ["/dev/vda"],
+    "swap": 2,
+    "esp_disks": ["/dev/vda"],
+    "user": "rsq",
+    "password": "changeme",
+    "fullname": "Erik Van Hamme",
+    "domain": "example.org",
+    "iface": "enp1s0",
+    "wifi": false,
+    "wipe": true,
+    "debconf": [
+        "locales locales/locales_to_be_generated multiselect en_US.UTF\-8 UTF\-8",
+        "locales locales/default_environment_locale select en_US.UTF\-8",
+        "tzdata tzdata/Areas select Europe",
+        "tzdata tzdata/Zones/Europe select Brussels",
+        "keyboard\-configuration keyboard\-configuration/xkb\-keymap select be",
+        "console\-setup console\-setup/charmap47 select UTF\-8"
+    ]
+}
+.fi
+.RE
+.PP
+The path of the file is kept with the answers, so a rerun without
+.B \-\-answers
+reads the same file again, as the password is never saved.
 .SH PHASES
 .TP
 .B questions
@@ -196,7 +306,8 @@ and
 It binds the local repository of the live cd into
 .I /run
 of the new system and adds it as a trusted apt source, adds the Debian
-repositories, asks the locales, the time zone and the keyboard, and installs the kernel
+repositories, sets the debconf selections of the answers file, asks the
+locales, the time zone and the keyboard, and installs the kernel
 and ZFS.
 It marks the other packages for the packages phase:
 .BR hd-base ,
@@ -258,6 +369,12 @@ keeps a copy of the mounts, which would keep the pool busy.
 .B \-\-reset
 Forget the answers and the finished tasks, and start over.
 .TP
+.BI \-\-answers " file"
+Take the answers from the JSON file, named
+.IR "host name" .json,
+see
+.BR "ANSWERS FILE" .
+.TP
 .BR \-h ", " \-\-help
 Show a short help and exit.
 .SH EXIT STATUS
@@ -266,7 +383,8 @@ arguments.
 .SH FILES
 .TP
 .I /tmp/hd-installer/config
-The answers, and the tasks that the answers added.
+The answers, the path of the answers file, and the tasks that the answers
+added.
 .TP
 .I /tmp/hd-installer/*.done
 The finished tasks.

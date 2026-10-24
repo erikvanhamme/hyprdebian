@@ -84,6 +84,8 @@ The installer installs the base system, the same on every computer. For a deskto
 
 See [hd-installer](docs/packages/hd-installer.md#questions) for all the questions and their default answers.
 
+For an installation without questions, such as that of a virtual machine, give the answers in a JSON file named after the host, with `sudo hd-installer --answers <host>.json`. See [Answers file](docs/packages/hd-installer.md#answers-file).
+
 ### When the installer fails
 
 The installer can be started again after a failure. Tasks that completed before are skipped, and the installation continues with the task that failed. Fix the cause and run `sudo hd-installer` again.

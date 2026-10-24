@@ -180,17 +180,43 @@ b_apt_init() {
     in_target apt update
 }
 
+# The debconf selections of the answers file, set in the new system before the packages that ask
+# them are installed. apt does not ask a question that is set; b_console reconfigures the packages
+# it asks without questions.
+b_debconf() {
+    if ! answered DEBCONF; then
+        return 0
+    fi
+
+    printf '%s\n' "${ANSWERS[DEBCONF]}" | in_target debconf-set-selections
+}
+
+# The locales, the time zone, the keyboard and the console font. A package with debconf selections
+# in the answers file is configured with them, without questions.
 b_console() {
+    local package
+
     in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration \
         console-setup || return 1
 
-    in_target dpkg-reconfigure locales || return 1
+    for package in locales tzdata keyboard-configuration console-setup; do
+        if ! debconf_answered "${package}"; then
+            in_target dpkg-reconfigure "${package}" || return 1
+            continue
+        fi
 
-    in_target dpkg-reconfigure tzdata || return 1
-
-    in_target dpkg-reconfigure keyboard-configuration || return 1
-
-    in_target dpkg-reconfigure console-setup
+        # The configuration of tzdata and locales prefers these files over debconf, so they are
+        # written again from the selections.
+        case "${package}" in
+            tzdata)
+                rm -f "${TARGET_DIR}/etc/localtime" "${TARGET_DIR}/etc/timezone" || return 1
+                ;;
+            locales)
+                rm -f "${TARGET_DIR}/etc/locale.gen" || return 1
+                ;;
+        esac
+        in_target dpkg-reconfigure -f noninteractive "${package}" || return 1
+    done
 }
 
 b_buildtools() {
@@ -290,6 +316,7 @@ add_dependencies "b_main" \
     "b_mount_unit" \
     "b_live_repo" \
     "b_apt_init" \
+    "b_debconf" \
     "b_console" \
     "b_buildtools" \
     "b_kernel" \

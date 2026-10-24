@@ -76,6 +76,24 @@ ask_disk() {
         return 1
     fi
 
+    # The answers file may name the disk by any path, such as /dev/vdb; it is stored by its name
+    # in the list.
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        if [[ -n "${picked}" ]] && same_disk "${ANSWERS[${var_name}]}" "${picked}"; then
+            echo "Error: The disk ${ANSWERS[${var_name}]} of ${var_name} is already picked." >&2
+            return 1
+        fi
+        for (( i = 0; i < ${#disks[@]}; i++ )); do
+            if same_disk "${disks[i]}" "${ANSWERS[${var_name}]}"; then
+                set_answer "${var_name}" "${disks[i]}"
+                return 0
+            fi
+        done
+        echo "Error: ${ANSWERS[${var_name}]} of ${var_name} is not a disk of this computer." >&2
+        return 1
+    fi
+
     for (( i = 0; i < ${#disks[@]}; i++ )); do
         if [[ -n "${picked}" ]] && same_disk "${disks[i]}" "${picked}"; then
             continue

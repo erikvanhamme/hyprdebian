@@ -10,6 +10,8 @@
 #                                             scripts/
 #                 /usr/lib/hd-installer/version.json
 #                                             its version, for the banner
+#                 /usr/lib/hd-installer/answers.py
+#                                             the reader of the answers file
 #                 /usr/lib/hd-installer/render.py
 #                 /usr/lib/hd-installer/templates/
 #                                             the jinja2 templates of the
@@ -57,13 +59,13 @@ $(BUILD):
 # The package is built from a staged root in build/deb. The installer finds
 # scripts/ and version.json next to itself, also through the link. dpkg-deb
 # makes all files owned by root.
-$(DEB): version.json hd-installer render.py $(SCRIPTS) $(TEMPLATES) $(DEPLOY) deb/control \
+$(DEB): version.json hd-installer answers.py render.py $(SCRIPTS) $(TEMPLATES) $(DEPLOY) deb/control \
 		$(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)$(LIB_DIR)/scripts $(STAGE)/usr/sbin
 	install -m 0755 hd-installer $(STAGE)$(LIB_DIR)/
 	install -m 0644 $(SCRIPTS) $(STAGE)$(LIB_DIR)/scripts/
-	install -m 0644 version.json render.py $(STAGE)$(LIB_DIR)/
+	install -m 0644 version.json answers.py render.py $(STAGE)$(LIB_DIR)/
 	for file in $(TEMPLATES) $(DEPLOY); do \
 		install -D -m 0644 $$file $(STAGE)$(LIB_DIR)/$$file; \
 	done

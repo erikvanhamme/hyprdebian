@@ -3,6 +3,9 @@
 #
 #     hd-installer           run the installation, or continue it after a failure
 #     hd-installer --reset   forget the answers and the finished tasks, then start over
+#     hd-installer --answers <file>
+#                            take the answers from a JSON file, named <host name>.json, and ask
+#                            only the questions it does not answer (scripts/answers.sh)
 #
 # The installation is a tree of tasks (scripts/dependencies.sh) in phases. Each phase is a file
 # in scripts/ whose tasks are dependencies of the task install_root. The answers and the
@@ -16,6 +19,7 @@ SCRIPTS_DIR="${INSTALLER_DIR}/scripts"
 # Source functions and constants.
 source "${SCRIPTS_DIR}/constants.sh"
 source "${SCRIPTS_DIR}/config.sh"
+source "${SCRIPTS_DIR}/answers.sh"
 source "${SCRIPTS_DIR}/defaults.sh"
 source "${SCRIPTS_DIR}/dependencies.sh"
 source "${SCRIPTS_DIR}/helpers.sh"
@@ -25,10 +29,12 @@ source "${SCRIPTS_DIR}/helpers-network.sh"
 source "${SCRIPTS_DIR}/helpers-user.sh"
 
 usage() {
-    echo "Usage: hd-installer [--reset]"
+    echo "Usage: hd-installer [--reset] [--answers <file>]"
     echo
     echo "Installs HyprDebian on the disks of this computer. A rerun continues where the last"
     echo "run stopped; --reset forgets the answers and the finished tasks in ${STATE_DIR} first."
+    echo "--answers takes the answers from a JSON file named <host name>.json; the questions it"
+    echo "does not answer are asked."
 }
 
 # The version of the installer, from version.json next to this script.
@@ -41,10 +47,22 @@ installer_version() {
 
 # Command line.
 reset=false
+answers=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --reset)
             reset=true
+            ;;
+        --answers)
+            if [[ $# -lt 2 ]]; then
+                usage >&2
+                exit 2
+            fi
+            answers="$2"
+            shift
+            ;;
+        --answers=*)
+            answers="${1#--answers=}"
             ;;
         -h|--help)
             usage
@@ -74,8 +92,11 @@ echo "=== HyprDebian installer $(installer_version) ==="
 mkdir -p "${STATE_DIR}"
 declare -A TASK_DEPS
 
-# Load the configuration.
+# Load the configuration, then the answers file, given or saved by an earlier run.
 load_config
+if ! load_answers "${answers}"; then
+    exit 1
+fi
 
 # Installation task. It is not named install, which would hide the install command from every
 # task.

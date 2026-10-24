@@ -31,8 +31,10 @@ The files involved are:
 packages/hd-installer/Makefile
 packages/hd-installer/version.json
 packages/hd-installer/hd-installer
+packages/hd-installer/answers.py
 packages/hd-installer/scripts/constants.sh
 packages/hd-installer/scripts/config.sh
+packages/hd-installer/scripts/answers.sh
 packages/hd-installer/scripts/defaults.sh
 packages/hd-installer/scripts/dependencies.sh
 packages/hd-installer/scripts/helpers.sh
@@ -47,10 +49,10 @@ packages/hd-installer/man/hd-installer.8
 
 ## Running the installer
 ```
-hd-installer [--reset]
+hd-installer [--reset] [--answers <file>]
 ```
 
-Run it as root. A task runs once: when it succeeds it is marked done, and a rerun skips it. After a failure, fix the cause and run `hd-installer` again; it continues where it stopped, and offers the answers given before. `--reset` forgets the answers and the finished tasks, and starts over.
+Run it as root. A task runs once: when it succeeds it is marked done, and a rerun skips it. After a failure, fix the cause and run `hd-installer` again; it continues where it stopped, and offers the answers given before. `--reset` forgets the answers and the finished tasks, and starts over. `--answers` takes the answers from a JSON file, see [Answers file](#answers-file).
 
 It exits with 0 when the installation is done, 1 when a task failed and 2 on wrong arguments.
 
@@ -61,6 +63,7 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 | --- | --- |
 | `scripts/constants.sh` | The mount point of the new system, the local repository of the live cd and where it is bound in the new system, the numbers of the partitions, the state directory, the directories of the disk names and of the network interfaces, and the colors. |
 | `scripts/config.sh` | `load_config` and `save_config`: the answers and the task dependencies, kept in `/tmp/hd-installer/config` as variable assignments. |
+| `scripts/answers.sh` | `load_answers`, which reads the answers file with `answers.py` into `ANSWERS`, by the variable of each question, and saves its path in the config; `answered`, which tells whether the file answers a question; `show_answer`, which shows such an answer in place of the question; and `debconf_answered`, which tells whether the file has debconf selections of a package. |
 | `scripts/defaults.sh` | The suites and the defaults of the questions. |
 | `scripts/dependencies.sh` | `add_dependencies`, `execute_task` and `always_run`: the tree of tasks, each marked done in `/tmp/hd-installer/<task>.done`. |
 | `scripts/helpers.sh` | Asking questions: `ask`, which asks for a line of text; `ask_valid`, which asks until a check function accepts the answer and only stores a valid one; `ask_password`, which asks for a password twice without showing or saving it; `ask_options`, which asks to pick one of a list of options; `ask_yes_no`, which asks a yes or no question and stores `true` or `false`; `confirm`, which asks to confirm something that cannot be undone, without a default and without saving the answer; and `set_answer`, which stores an answer that follows from earlier ones. Also `log_status`, which logs the start and end of a task; `add_packages`, which marks packages for the packages phase; `add_user_groups`, which adds groups for the user; `in_target`, which runs a command in the new system; `file_deploy`, which copies a file from `deploy/` into the new system; and `template_render`, which renders a template from `templates/` into the new system with `render.py`, with the answers except the password and the variables given. |
@@ -76,6 +79,7 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 | `scripts/packages.sh` | The packages phase, with the tasks `pkg_`. |
 | `scripts/user.sh` | The user phase, with the tasks `u_`. |
 | `scripts/cleanup.sh` | The cleanup phase, with the tasks `c_`. |
+| `answers.py` | Reads the answers file and prints its answers, by the variable of their question, separated by NUL characters. It checks the keys and the types of the values; the checks that need the computer or the shell are left to the helpers. |
 | `render.py` | Renders a jinja2 template with the variables of its environment. |
 | `templates/` | The templates of the files written in the new system, at their path there with `.j2`. |
 | `deploy/` | The files copied into the new system, at their path there. |
@@ -106,6 +110,58 @@ The EFI system partitions are asked apart from the system, so they can go on oth
 Interfaces are picked by number, by their path name (`ID_NET_NAME_PATH` of udev), such as `enp3s0`, which is the name they get on the installed system; the live system may name them otherwise. Virtual interfaces, such as bridges, are left out. Each interface is shown with its name on the live system and its IPv4 addresses.
 
 Disks are picked by number from a list of the whole disks, by their name in `/dev/disk/by-id`, which stays the same when the kernel names the disks in another order; the variables hold the full path. A disk has several names there; the one with its model and serial number is shown, not the `wwn-` or `nvme-eui.` one. Partitions, device mapper and md devices, and devices that are not disks, such as optical drives, are left out. Each disk is shown with its kernel name, size and model. A disk that is already picked for the other side of a mirror stays in the list, so the numbers do not change, but cannot be picked again.
+
+## Answers file
+With `--answers <file>`, the answers come from a JSON file, for an installation without questions, such as that of a virtual machine. The host name is the name of the file without its extension: `test.json` installs the host `test`. Every other answer is a key of the JSON object. A question that the file does not answer is asked as usual, so a file can answer some questions and leave others, such as the password, to be typed.
+
+The ask helpers in `scripts/helpers.sh`, `helpers-disk.sh` and `helpers-network.sh` check whether the file answers their question. If it does, they show the answer with `(answers file)` in place of the question, check it as they would a typed one, and store it; an answer that is not valid fails the question, and with it the installation. `answers.py` rejects unknown keys, keys given twice and values of the wrong type before any question is asked.
+
+| Key | Questions | Value |
+| --- | --- | --- |
+| `suite` | `Q_SUITE` | `unstable` or `trixie`. |
+| `encrypt` | `Q_ENCRYPT` | `true` or `false`. |
+| `system_disks` | `Q_ROOT_REDUNDANT`, `Q_ROOT_DISK_A`, `Q_ROOT_DISK_B` | A list of one disk, or two for a mirror. A disk may be named by any path, such as `/dev/vdb`; it is stored by its name in `/dev/disk/by-id`. |
+| `swap` | `Q_SWAP` | The swap size in GiB, a whole number, 0 for no swap. |
+| `esp_disks` | `Q_ESP_REDUNDANT`, `Q_ESP_DISK_A`, `Q_ESP_DISK_B` | A list of one disk, or two for a mirror. |
+| `user` | `Q_USER` | The user name. |
+| `password` | `Q_PASSWORD` | The password, in plain text, at least 8 characters. Keep the file readable only by root, or leave the key out to have the password asked. |
+| `fullname` | `Q_FULLNAME` | The full name. |
+| | `Q_HOSTNAME` | Not a key: the name of the file without its extension. |
+| `domain` | `Q_FQDN` | The domain; the FQDN is the host name, a dot and the domain. |
+| `iface` | `Q_IFACE` | The wired interface, by its path name, such as `enp1s0`. |
+| `wifi` | `Q_WIFI`, `Q_WIFACE` | `false` for no wifi, or the wifi interface by its path name. |
+| `wipe` | the wipe | `true` confirms the wipe of every disk picked at once; `false` aborts. |
+| `debconf` | debconf | A list of lines for `debconf-set-selections`, each `owner question type value`. |
+
+The debconf selections are set in the new system by `b_debconf`, after the Debian repositories are added and before any package is installed but those of `debootstrap`. apt does not ask a question that is set. `b_console` configures `locales`, `tzdata`, `keyboard-configuration` and `console-setup` with `dpkg-reconfigure -f noninteractive` when the file has selections of the package, and asks them as before when it has none. `tzdata` prefers `/etc/localtime` and `/etc/timezone` over debconf, and `locales` prefers `/etc/locale.gen`, so those files are removed first and written again from the selections. Debconf questions without a selection are asked as usual.
+
+An example, `test.json`:
+```json
+{
+    "suite": "unstable",
+    "encrypt": false,
+    "system_disks": ["/dev/vda"],
+    "swap": 2,
+    "esp_disks": ["/dev/vda"],
+    "user": "rsq",
+    "password": "changeme",
+    "fullname": "Erik Van Hamme",
+    "domain": "example.org",
+    "iface": "enp1s0",
+    "wifi": false,
+    "wipe": true,
+    "debconf": [
+        "locales locales/locales_to_be_generated multiselect en_US.UTF-8 UTF-8",
+        "locales locales/default_environment_locale select en_US.UTF-8",
+        "tzdata tzdata/Areas select Europe",
+        "tzdata tzdata/Zones/Europe select Brussels",
+        "keyboard-configuration keyboard-configuration/xkb-keymap select be",
+        "console-setup console-setup/charmap47 select UTF-8"
+    ]
+}
+```
+
+The answers are read again on every run, as the password is never saved. The path of the file is saved in the config as `ANSWERS_FILE`, so a rerun without `--answers` reads the same file. A question that was answered on an earlier run is not asked again, so to change the answers of a file, start over with `--reset`.
 
 ## Disk, partition and filesystem
 The disk phase turns off the swap, stops the md arrays, unmounts everything below `/mnt` and exports the ZFS pools of the live system, such as those of an earlier attempt, then wipes every disk picked with `wipefs` and `sgdisk --zap-all`, and discards it with `blkdiscard`. A disk without discard, such as a hardware RAID volume, is not discarded.
@@ -144,7 +200,8 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_mount_unit` | Writes and enables the automount units of the EFI system partitions on `/boot/efi` and, on mirrored ESP disks, `/boot/efi2`, by their UUID. |
 | `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository or not the suite. |
 | `b_apt_init` | Adds the Debian repositories, with the updates and security repositories for a stable suite, then updates the package lists. |
-| `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font. |
+| `b_debconf` | Sets the debconf selections of the answers file, if any, in the new system. |
+| `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font; a package with debconf selections in the answers file is configured with them, without questions. |
 | `b_buildtools` | Installs the tools to build the ZFS module and the initramfs, which does not wait for a resume device. |
 | `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
 | `b_zfs_support` | Installs ZFS, with its module built by DKMS. |
@@ -193,7 +250,7 @@ When the installation is done, reboot into the new system. With encryption, the 
 ## Files
 | Path | Purpose |
 | --- | --- |
-| `/tmp/hd-installer/config` | The answers, and the tasks that the answers added. |
+| `/tmp/hd-installer/config` | The answers, the path of the answers file, and the tasks that the answers added. |
 | `/tmp/hd-installer/*.done` | The finished tasks. |
 | `/usr/lib/hd-installer` | The installer, its helpers and its phases. |
 | `/usr/sbin/hd-installer` | A link to `/usr/lib/hd-installer/hd-installer`. |

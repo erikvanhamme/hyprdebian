@@ -133,6 +133,11 @@ q_iface() {
 
     list_ifaces ifaces wired
     if (( ${#ifaces[@]} == 0 )); then
+        if answered Q_IFACE; then
+            echo "Error: The answers file names the wired interface ${ANSWERS[Q_IFACE]}, but" \
+                "there is none." >&2
+            return 1
+        fi
         echo "There is no wired interface."
         set_answer Q_IFACE ""
         return 0
@@ -150,6 +155,11 @@ q_wifi() {
 
     list_ifaces ifaces wifi
     if (( ${#ifaces[@]} == 0 )); then
+        if answered Q_WIFACE; then
+            echo "Error: The answers file names the wifi interface ${ANSWERS[Q_WIFACE]}, but" \
+                "there is none." >&2
+            return 1
+        fi
         echo "There is no wifi interface."
         set_answer Q_WIFI false
         set_answer Q_WIFACE ""
@@ -168,7 +178,7 @@ q_wifi() {
 }
 
 # Every disk picked for the system or the EFI system partition is wiped. Each must be confirmed
-# by typing the answer; the confirmation is not saved.
+# by typing the answer, or at once by wipe in the answers file; the confirmation is not saved.
 q_wipe() {
     local disks disk
 
@@ -178,6 +188,15 @@ q_wipe() {
     for disk in "${disks[@]}"; do
         printf '    %s\n        %s\n' "$(basename "${disk}")" "$(disk_info "${disk}")"
     done
+
+    if answered Q_WIPE; then
+        show_answer "Wipe them" "${ANSWERS[Q_WIPE]}"
+        if [[ "${ANSWERS[Q_WIPE]}" != "true" ]]; then
+            echo "Aborting." >&2
+            return 1
+        fi
+        return 0
+    fi
     for disk in "${disks[@]}"; do
         if ! confirm "All data on ${disk} will be destroyed. Continue"; then
             echo "Aborting." >&2

@@ -78,6 +78,19 @@ ask_iface() {
         return 1
     fi
 
+    if answered "${var_name}"; then
+        show_answer "${prompt}" "${ANSWERS[${var_name}]}"
+        for (( i = 0; i < ${#ifaces[@]}; i++ )); do
+            if [[ "${ifaces[i]}" == "${ANSWERS[${var_name}]}" ]]; then
+                set_answer "${var_name}" "${ifaces[i]}"
+                return 0
+            fi
+        done
+        echo "Error: ${ANSWERS[${var_name}]} of ${var_name} is not one of the ${kind}" \
+            "interfaces: ${ifaces[*]}." >&2
+        return 1
+    fi
+
     for (( i = 0; i < ${#ifaces[@]}; i++ )); do
         if [[ -n "${current}" && "${ifaces[i]}" == "${current}" ]]; then
             default_idx=$((i + 1))
