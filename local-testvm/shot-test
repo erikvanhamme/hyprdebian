@@ -1,0 +1,9 @@
+#!/bin/sh
+# Takes a screenshot of the Hyprland session of the test system with grim and copies it to the
+# file given: shot-test <file.png>. virsh screenshot does not work when the vm renders on the GPU.
+# A tool of the test vm, see .claude/skills/hyprdebian-test-vm.
+set -e
+here="$(dirname "$(readlink -f "$0")")"
+scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$here/hx" test:/tmp/hx
+"$here/ssh-test" 'export XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-1; grim /tmp/shot.png'
+scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR test:/tmp/shot.png "$1"

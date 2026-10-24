@@ -1,0 +1,3 @@
+#!/bin/sh
+# Prints the password of the test system from test.json next to this script, for SSH_ASKPASS.
+exec python3 -c 'import json, os, sys; print(json.load(open(os.path.join(os.path.dirname(sys.argv[1]), "test.json")))["password"])' "$(readlink -f "$0")"

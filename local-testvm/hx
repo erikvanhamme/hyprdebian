@@ -1,0 +1,8 @@
+#!/bin/sh
+# Runs a command in the Hyprland session of the test system: sh /tmp/hx '<command>', after
+# shot-test copied it there. Hyprland 0.56 takes Lua for dispatch. A tool of the test vm, see
+# .claude/skills/hyprdebian-test-vm.
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+export HYPRLAND_INSTANCE_SIGNATURE=$(ls $XDG_RUNTIME_DIR/hypr | head -1)
+cmd=$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')
+hyprctl dispatch "hl.dsp.exec_cmd(\"$cmd\")"

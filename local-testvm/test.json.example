@@ -1,0 +1,32 @@
+{
+    "suite": "unstable",
+    "encrypt": false,
+    "system_disks": [
+        "/dev/disk/by-id/virtio-vmdk-test"
+    ],
+    "swap": 2,
+    "esp_disks": [
+        "/dev/disk/by-id/virtio-vmdk-test"
+    ],
+    "user": "rsq",
+    "password": "<the password of the test user, at least 8 characters>",
+    "fullname": "Erik Van Hamme",
+    "domain": "rsq-online.ddns.net",
+    "iface": "enp1s0",
+    "wifi": false,
+    "wipe": true,
+    "debconf": [
+        "locales locales/locales_to_be_generated multiselect en_US.UTF-8 UTF-8",
+        "locales locales/default_environment_locale select en_US.UTF-8",
+        "tzdata tzdata/Areas select Europe",
+        "tzdata tzdata/Zones/Europe select Brussels",
+        "keyboard-configuration keyboard-configuration/model select Generic 105-key PC",
+        "keyboard-configuration keyboard-configuration/xkb-keymap select us",
+        "keyboard-configuration keyboard-configuration/variant select English (US)",
+        "console-setup console-setup/charmap47 select UTF-8",
+        "console-setup console-setup/codeset47 select Guess optimal character set",
+        "console-setup console-setup/fontface47 select TerminusBold",
+        "console-setup console-setup/fontsize-fb47 select 16x32 (framebuffer only)",
+        "console-setup console-setup/fontsize-text47 select 8x16"
+    ]
+}
