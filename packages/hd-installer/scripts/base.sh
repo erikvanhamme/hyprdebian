@@ -227,6 +227,13 @@ b_esp() {
     fi
 }
 
+# The firmware is what the hardware needs: hd-firmware of hd-base finds it in the new system, which
+# sees the devices of the live system through /sys, with the modules of its own kernel. It runs
+# before pkg_esps, so the UKIs that pkg_esps writes have the firmware in their initrd.
+b_firmware() {
+    add_dependencies "pkg_post" "pkg_firmware"
+}
+
 # The base system gets the text-only bootloader. Its postinst
 # does not write the ESPs: pkg_esps does that once all packages are installed, with the DKMS MOK
 # that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-base. pkg_boot_entries
@@ -262,10 +269,11 @@ b_firewall() {
 }
 
 # The network is configured with the hd-network-* commands of hd-base once it is installed, see
-# pkg_network. Wifi needs iwd, which also handles the login on the wifi network.
+# pkg_network. Wifi needs iwd, which also handles the login on the wifi network. The firmware of the
+# wifi card comes with the rest, see b_firmware.
 b_network() {
     if [[ "${Q_WIFI}" == "true" ]]; then
-        add_packages iwd firmware-iwlwifi
+        add_packages iwd
     fi
 
     add_dependencies "pkg_post" "pkg_network"
@@ -287,6 +295,7 @@ add_dependencies "b_main" \
     "b_kernel" \
     "b_zfs_support" \
     "b_esp" \
+    "b_firmware" \
     "b_bootloader" \
     "b_systemd" \
     "b_utilities" \

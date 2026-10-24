@@ -23,6 +23,11 @@ The message after a login is /etc/motd followed by the output of the scripts in
 prints the kernel again, is diverted to a name with a dot, which run-parts skips. base-files only
 writes /etc/motd when it is missing. The postrm of a removal puts 10-uname back.
 
+Versions before FIRMWARE_SINCE depended on all of the firmware of Debian, which is now marked as
+installed automatically and left for apt autoremove. An upgrade from such a version says to run
+hd-firmware --install first, which marks the firmware the hardware needs as installed by hand.
+The postinst runs inside apt, which holds the lock, so it cannot do that itself.
+
 Versions before SOURCES_SINCE named the apt source of hd-link-repo hyprdebian.local.sources. An
 upgrade from such a version renames it to hyprdebian.sources, unless that one already exists, so
 hd-link-repo, hd-issue and hd-report find it.
@@ -78,6 +83,9 @@ ISSUE_DIVERTED = "/etc/issue.debian"
 SOURCES = "/etc/apt/sources.list.d/hyprdebian.sources"
 SOURCES_OLD = "/etc/apt/sources.list.d/hyprdebian.local.sources"
 SOURCES_SINCE = "1.11"
+
+# The first version of hd-base that leaves the firmware to hd-firmware.
+FIRMWARE_SINCE = "1.23"
 
 RESOLV_CONF = "/etc/resolv.conf"
 STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]
@@ -227,6 +235,9 @@ def main():
         unmask_units()
     if previous != "" and older_than(previous, SOURCES_SINCE):
         rename_sources()
+    if previous != "" and older_than(previous, FIRMWARE_SINCE):
+        print("hd-base no longer depends on all of the firmware. Run hd-firmware --install "
+              "before apt autoremove, so the firmware this hardware needs stays installed.")
     link_resolv_conf()
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)

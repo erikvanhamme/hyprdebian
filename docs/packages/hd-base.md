@@ -1,7 +1,7 @@
 ## Introduction
 The package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
 
-It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
+It installs `hd-up`, which upgrades the system after a ZFS snapshot, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, `hd-firmware`, which finds and installs the firmware packages that the hardware needs, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
 It also holds the parts that every hyprdebian system shares, each with a page of its own:
 - [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, and that of each user in `~/.config/hyprdebian/config.json`, with `hd-config-update` and `hd-config-remove`;
@@ -12,7 +12,7 @@ These were the packages `hd-config`, `hd-network` and `hd-secboot` before. `hd-b
 
 When a package becomes part of every hyprdebian system, it is added to the `Depends` of `hd-base`, to its man page and to this page.
 
-The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue` and `man hd-link-repo` the commands. The man pages of the shared parts are listed on their pages.
+The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue`, `man hd-link-repo` and `man hd-firmware` the commands. The man pages of the shared parts are listed on their pages.
 
 ## Building the package
 The package is built from `packages/hd-base` in this repository:
@@ -36,6 +36,7 @@ packages/hd-base/hd-poweroff
 packages/hd-base/hd-sync-skel
 packages/hd-base/hd-issue
 packages/hd-base/hd-link-repo
+packages/hd-base/hd-firmware
 packages/hd-base/templates/hyprdebian.sources.j2
 packages/hd-base/etc/skel/.bash_aliases
 packages/hd-base/etc/skel/.gitconfig
@@ -58,11 +59,13 @@ packages/hd-base/man/hd-poweroff.1
 packages/hd-base/man/hd-sync-skel.1
 packages/hd-base/man/hd-issue.8
 packages/hd-base/man/hd-link-repo.8
+packages/hd-base/man/hd-firmware.8
+packages/hd-base/tests/test_firmware.py
 ```
 
 The files of the shared parts are listed on their pages: [hd-config](hd-config.md#building-the-package), [hd-network](hd-network.md#building-the-package) and [hd-secboot](hd-secboot.md#building-the-package).
 
-`make test` runs the tests in `packages/hd-base/tests`, see [hd-secboot](hd-secboot.md#tests).
+`make test` runs the tests in `packages/hd-base/tests`, see [hd-secboot](hd-secboot.md#tests) and [Firmware](#firmware).
 
 ## Packages
 | Group | Packages |
@@ -71,12 +74,33 @@ The files of the shared parts are listed on their pages: [hd-config](hd-config.m
 | Secure Boot | `openssl`, `efitools` and `sbsigntool`, which make the keys, enroll them and sign EFI files with them; see [hd-secboot](hd-secboot.md). |
 | Remote access and firewall | `openssh-server`, and `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
 | ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `build-essential` and `initramfs-tools` to build the ZFS module and the initrd. |
-| Firmware and boot | `firmware-linux` and `firmware-qlogic`; `efibootmgr` for the boot entries of the firmware. |
+| Boot | `efibootmgr` for the boot entries of the firmware. |
 | Console | `locales`, `keyboard-configuration`, `console-setup` and `ca-certificates`. |
 | System services | `systemd-resolved`, name resolution. The logs stay in the journal of systemd-journald; there is no syslog daemon. |
 | Command line tools | `eza`, `fzf`, `nfs-common`, `psmisc`, `net-tools`, `pciutils`, `usbutils`, `acpi`, `bash-completion`, `git`, `git-delta`, `ack`, `command-not-found`, `man-db`, `apt-file` and `systemd-zram-generator`. It conflicts with `zram-tools`, which would set up a second zram swap. |
 
-`firmware-linux` and `firmware-qlogic` are in the `non-free-firmware` component of Debian, which the apt sources must include.
+The firmware is not among them: each system needs other firmware, which `hd-firmware` finds from its hardware and installs, see [Firmware](#firmware).
+
+## Firmware
+`hd-firmware` lists the firmware packages that the hardware needs; `hd-firmware -v` also lists the drivers or the CPU that need each one, and `hd-firmware --install` installs them and marks them as installed by hand, so `apt autoremove` keeps them. The installer runs `hd-firmware --install` in the new system, which sees the devices of the live system through `/sys`, so a new system only gets the firmware of its own hardware. Run it again after adding hardware, such as a graphics card or a wifi adapter.
+
+It finds the firmware in three steps:
+1. The drivers: the kernel modules that match the `modalias` of each device in `/sys/bus`, with the modules they depend on (`modprobe --show-depends`), and the modules that are loaded.
+2. The firmware files that those modules declare (`modinfo -F firmware`).
+3. The packages that ship those files, from the Contents indexes of apt, which `apt-file update` downloads. They are read with `apt-get indextargets` and `apt-helper cat-file`.
+
+The microcode comes from the vendor of the CPU, `intel-microcode` or `amd64-microcode`. A virtual machine gets neither, as the host loads the microcode, also not when a driver declares firmware in them: `kvm_amd`, which matches a CPU with AMD-V, depends on `ccp`, whose SEV firmware is in `amd64-microcode` but only works on the security processor of a real host. By default it looks at the modules of the running kernel, or of the newest installed kernel when those of the running one are not installed, as in the installer; `--kernel` picks another.
+
+A module declares all the firmware it can load, not only that of the device at hand, so some packages are listed that the hardware does not use: `btusb` brings the firmware of the Intel, MediaTek and Realtek Bluetooth adapters, for instance. Firmware that a device keeps in its own flash, as many server network cards do, needs no package. Most firmware is in the `non-free-firmware` component of Debian, which the apt sources must include.
+
+Versions of `hd-base` before 1.23 depended on `firmware-linux` and `firmware-qlogic`. After an upgrade those are left for `apt autoremove`, and the postinst says so. Keep the firmware that the hardware needs first:
+```
+sudo apt-file update
+sudo hd-firmware --install
+sudo apt autoremove
+```
+
+The tests in `packages/hd-base/tests/test_firmware.py` cover the parts that read the output of `modprobe`, the Contents indexes and `/proc/cpuinfo`, and the microcode packages, which a virtual machine never gets.
 
 ## hd-up
 ```

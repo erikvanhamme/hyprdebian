@@ -1,0 +1,285 @@
+#!/usr/bin/python3
+"""Finds the firmware packages that the hardware of this system needs, and installs them.
+
+The package hd-base installs this as /usr/sbin/hd-firmware.
+
+    hd-firmware                   list the firmware packages the hardware needs
+    hd-firmware -v                also list, per package, what needs it
+    hd-firmware --install         install them, and mark them as installed by hand
+    hd-firmware --kernel <ver>    look at the modules of that kernel
+
+The drivers are the kernel modules that match the modalias of each device in /sys/bus, with the
+modules they depend on, and the modules that are loaded. The firmware is the files that those
+modules declare, which the Contents indexes of apt, downloaded by apt-file update, map to their
+packages. The microcode comes from the vendor of the CPU. A virtual machine gets no microcode
+package, also not one that a driver needs.
+
+The installer runs it in the new system, which sees the hardware of the live system through /sys.
+"""
+
+import argparse
+import fnmatch
+import glob
+import os
+import re
+import subprocess
+import sys
+
+MODULES_DIR = "/lib/modules"
+FIRMWARE_PREFIXES = ("usr/lib/firmware/", "lib/firmware/")
+COMPRESSIONS = (".zst", ".xz")
+MICROCODE = {
+    "GenuineIntel": "intel-microcode",
+    "AuthenticAMD": "amd64-microcode",
+}
+
+
+def fail(message):
+    print(f"hd-firmware: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def default_kernel():
+    """The running kernel when its modules are installed, otherwise the newest installed one. The
+    installer runs in the kernel of the live system, which the new system may not have."""
+    running = os.uname().release
+    if os.path.isdir(os.path.join(MODULES_DIR, running)):
+        return running
+    kernels = [k for k in os.listdir(MODULES_DIR)
+               if os.path.isfile(os.path.join(MODULES_DIR, k, "modules.dep"))]
+    if not kernels:
+        fail(f"No kernel modules in {MODULES_DIR}.")
+    return max(kernels, key=lambda k: [int(n) if n.isdigit() else n
+                                       for n in re.split(r"(\d+)", k)])
+
+
+def modaliases():
+    """The modaliases of the devices on every bus."""
+    aliases = set()
+    for path in glob.glob("/sys/bus/*/devices/*/modalias"):
+        try:
+            with open(path) as f:
+                alias = f.read().strip()
+        except OSError:
+            continue
+        if alias:
+            aliases.add(alias)
+    return sorted(aliases)
+
+
+def loaded_modules():
+    """The names of the modules that are loaded."""
+    try:
+        with open("/proc/modules") as f:
+            return [line.split()[0] for line in f if line.strip()]
+    except OSError:
+        return []
+
+
+def parse_show_depends(output):
+    """The modules in the output of modprobe --show-depends: the path of each module to insert and
+    the name of each one built into the kernel."""
+    modules = set()
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] in ("insmod", "builtin"):
+            modules.add(fields[1])
+    return modules
+
+
+def module_name(module):
+    """The name of a module from its path, or the name itself."""
+    name = os.path.basename(module)
+    name = re.sub(r"\.ko(\.\w+)?$", "", name)
+    return name.replace("-", "_")
+
+
+def drivers(kernel):
+    """The modules that the devices and the loaded modules need, with their dependencies. modprobe
+    warns about each alias without a module, which most are, so its stderr is dropped."""
+    names = modaliases() + loaded_modules()
+    if not names:
+        return set()
+    result = subprocess.run(["modprobe", "--all", "--show-depends", "--set-version", kernel,
+                             *names], capture_output=True, text=True)
+    return parse_show_depends(result.stdout)
+
+
+def module_firmware(kernel, module):
+    """The firmware files that a module declares, by their path below /lib/firmware."""
+    result = subprocess.run(["modinfo", "--set-version", kernel, "--field", "firmware", module],
+                            capture_output=True, text=True)
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def contents_files():
+    """The Contents indexes of apt for this architecture and for all architectures, that are
+    downloaded. apt keeps them compressed; the file name ends in Contents-<arch> before that."""
+    arch = subprocess.run(["dpkg", "--print-architecture"], capture_output=True, text=True,
+                          check=True).stdout.strip()
+    result = subprocess.run(["apt-get", "indextargets", "--format", "$(FILENAME)",
+                             "Identifier: Contents-deb"], capture_output=True, text=True,
+                            check=True)
+    files = []
+    for path in result.stdout.split():
+        name = re.sub(r"\.(lz4|gz|xz|zst|bz2|lzma)$", "", os.path.basename(path))
+        if name.endswith((f"Contents-{arch}", "Contents-all")) and os.path.exists(path):
+            files.append(path)
+    return files
+
+
+def firmware_path(path):
+    """The path of a file in a Contents index below /lib/firmware, without the compression, or None
+    when it is not firmware."""
+    for prefix in FIRMWARE_PREFIXES:
+        if path.startswith(prefix):
+            path = path[len(prefix):]
+            for compression in COMPRESSIONS:
+                if path.endswith(compression):
+                    return path[:-len(compression)]
+            return path
+    return None
+
+
+def parse_contents(lines, packages=None):
+    """Adds the firmware files of the lines of a Contents index to a dict of file to packages. A
+    line is a path, white space, and a comma-separated list of section/package."""
+    if packages is None:
+        packages = {}
+    for line in lines:
+        # Most lines are not firmware; this check is far cheaper than splitting each one.
+        if not line.startswith(FIRMWARE_PREFIXES):
+            continue
+        fields = line.rstrip("\n").rsplit(None, 1)
+        if len(fields) != 2:
+            continue
+        path = firmware_path(fields[0])
+        if path is None:
+            continue
+        names = [location.rsplit("/", 1)[-1] for location in fields[1].split(",")]
+        packages.setdefault(path, [])
+        for name in names:
+            if name not in packages[path]:
+                packages[path].append(name)
+    return packages
+
+
+def firmware_packages():
+    """The firmware files in the Contents indexes of apt, each with the packages that ship it."""
+    files = contents_files()
+    if not files:
+        fail("apt has no Contents indexes. Run apt-file update first.")
+    packages = {}
+    for path in files:
+        result = subprocess.run(["/usr/lib/apt/apt-helper", "cat-file", path],
+                                capture_output=True, text=True, check=True)
+        parse_contents(result.stdout.splitlines(), packages)
+    return packages
+
+
+def packages_for(firmware, packages):
+    """The packages that ship a firmware file, which may be a pattern with * or ?. Firmware that no
+    package ships, which some drivers declare, gives none."""
+    name = re.sub(r"\.(zst|xz)$", "", firmware)
+    if any(c in name for c in "*?["):
+        found = []
+        for path in fnmatch.filter(packages, name):
+            found += [p for p in packages[path] if p not in found]
+        return found
+    return packages.get(name, [])
+
+
+def cpu_info(path="/proc/cpuinfo"):
+    """The vendor of the CPU and whether it runs under a hypervisor."""
+    vendor = None
+    hypervisor = False
+    with open(path) as f:
+        for line in f:
+            key, _, value = line.partition(":")
+            key = key.strip()
+            if key == "vendor_id" and vendor is None:
+                vendor = value.strip()
+            elif key == "flags" and "hypervisor" in value.split():
+                hypervisor = True
+    return vendor, hypervisor
+
+
+def microcode_package(vendor, hypervisor):
+    """The microcode package of a CPU vendor. A virtual machine gets none: the host loads the
+    microcode."""
+    if hypervisor:
+        return None
+    return MICROCODE.get(vendor)
+
+
+def add_microcode(reasons, vendor, hypervisor):
+    """Adds the microcode package of the CPU to the packages that the drivers need. A virtual
+    machine gets no microcode package at all, also not one that a driver needs: kvm_amd, which
+    matches a CPU with AMD-V, depends on ccp, whose SEV firmware is in amd64-microcode but only
+    works on the security processor of a real host."""
+    if hypervisor:
+        return {package: needs for package, needs in reasons.items()
+                if package not in MICROCODE.values()}
+    microcode = microcode_package(vendor, hypervisor)
+    if microcode is not None:
+        reasons.setdefault(microcode, set()).add(f"CPU {vendor}")
+    return reasons
+
+
+def needed(kernel):
+    """The firmware packages the hardware needs, each with what needs it."""
+    packages = firmware_packages()
+    reasons = {}
+    for module in sorted(drivers(kernel)):
+        for firmware in module_firmware(kernel, module):
+            for package in packages_for(firmware, packages):
+                reasons.setdefault(package, set()).add(module_name(module))
+
+    vendor, hypervisor = cpu_info()
+    return add_microcode(reasons, vendor, hypervisor)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="List the firmware packages that the hardware of this system needs, or "
+                    "install them.")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="also list, per package, the drivers or the CPU that need it")
+    parser.add_argument("--install", action="store_true",
+                        help="install the packages, and mark them as installed by hand, so apt "
+                             "autoremove keeps them")
+    parser.add_argument("--kernel", metavar="VERSION",
+                        help="the kernel whose modules to look at; by default the running one, "
+                             "or the newest installed one when its modules are not installed")
+    args = parser.parse_args()
+
+    if args.install and os.geteuid() != 0:
+        fail("--install must run as root.")
+
+    kernel = args.kernel or default_kernel()
+    if not os.path.isdir(os.path.join(MODULES_DIR, kernel)):
+        fail(f"Kernel {kernel} has no modules in {MODULES_DIR}.")
+
+    reasons = needed(kernel)
+    for package in sorted(reasons):
+        if args.verbose:
+            print(f"{package}: {', '.join(sorted(reasons[package]))}")
+        else:
+            print(package)
+
+    if args.install and reasons:
+        # apt-get install marks a package that is already installed as a dependency as installed
+        # by hand.
+        result = subprocess.run(["apt-get", "install", "-y", *sorted(reasons)],
+                                env={**os.environ, "DEBIAN_FRONTEND": "noninteractive"})
+        return result.returncode
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError as e:
+        fail(f"{' '.join(e.cmd)} failed.")
+    except KeyboardInterrupt:
+        sys.exit(130)

@@ -1,0 +1,132 @@
+.TH HD-FIRMWARE 8 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-firmware \- find and install the firmware packages the hardware needs
+.SH SYNOPSIS
+.B hd-firmware
+.RB [ \-v ]
+.RB [ \-\-install ]
+.RB [ \-\-kernel
+.IR version ]
+.SH DESCRIPTION
+.B hd-firmware
+lists the firmware packages that the hardware of the system needs, and with
+.B \-\-install
+installs them.
+The installer,
+.BR hd-installer (8),
+runs it in the new system, so a new system only gets the firmware of its own
+hardware.
+Run it again after adding hardware, such as a graphics card or a wifi
+adapter.
+.PP
+It finds the firmware in three steps:
+.IP 1. 4
+The drivers: the kernel modules that match the
+.I modalias
+of each device in
+.IR /sys/bus ,
+with the modules they depend on, as
+.B modprobe \-\-show\-depends
+lists them, and the modules that are loaded.
+.IP 2. 4
+The firmware files that those modules declare, as
+.B modinfo \-F firmware
+lists them.
+.IP 3. 4
+The packages that ship those files, from the Contents indexes of apt, which
+.B apt\-file update
+downloads.
+.PP
+The microcode comes from the vendor of the CPU:
+.B intel\-microcode
+or
+.BR amd64\-microcode .
+A virtual machine gets neither, as the host loads the microcode, also not
+when a driver declares firmware in them:
+.BR kvm_amd ,
+which matches a CPU with AMD-V, depends on
+.BR ccp ,
+whose SEV firmware is in
+.B amd64\-microcode
+but only works on the security processor of a real host.
+.PP
+A module declares all the firmware it can load, not only that of the device
+at hand.
+Some packages are therefore listed that the hardware does not use; the
+Bluetooth driver
+.BR btusb ,
+for instance, brings the firmware of Intel, MediaTek and Realtek Bluetooth
+adapters.
+Firmware that a device keeps in its own flash, as many server network
+cards do, needs no package.
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-verbose
+Also list, after each package, the drivers or the CPU that need it.
+.TP
+.B \-\-install
+Install the packages with
+.BR apt\-get ,
+and mark them as installed by hand, so
+.B apt autoremove
+keeps them, also those that were installed already.
+It must run as root.
+.TP
+.BI \-\-kernel " version"
+Look at the modules of that kernel.
+By default the running kernel, or the newest installed kernel when the
+modules of the running one are not installed, as in the installer, which
+runs in the kernel of the live system.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 on success, 1 on an error, such as missing Contents indexes, 2 on wrong
+arguments.
+With
+.BR \-\-install ,
+the exit status of
+.BR apt\-get .
+.SH FILES
+.TP
+.I /sys/bus/*/devices/*/modalias
+The devices.
+.TP
+.I /proc/modules
+The loaded modules.
+.TP
+.I /proc/cpuinfo
+The vendor of the CPU, and the flag
+.B hypervisor
+of a virtual machine, which leaves out the microcode packages.
+.TP
+.I /var/lib/apt/lists/*Contents*
+The Contents indexes of apt.
+.SH EXAMPLES
+See what the hardware needs, and why:
+.PP
+.RS
+.nf
+hd-firmware \-v
+.fi
+.RE
+.PP
+Install it, after an upgrade from a version of
+.B hd-base
+before 1.23, which depended on all of the firmware, and remove the rest:
+.PP
+.RS
+.nf
+sudo apt\-file update
+sudo hd-firmware \-\-install
+sudo apt autoremove
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-base (7),
+.BR hd-installer (8),
+.BR apt\-file (1),
+.BR modprobe (8),
+.BR modinfo (8)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

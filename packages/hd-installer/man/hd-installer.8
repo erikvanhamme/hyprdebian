@@ -206,7 +206,9 @@ and for wifi
 .TP
 .B packages
 Installs the marked packages.
-Then it turns on the firewall,
+Then it installs the firmware that the hardware needs with
+.BR hd-firmware (8),
+turns on the firewall,
 .BR ufw (8),
 which lets in ssh, copies
 .I /etc/skel
@@ -280,6 +282,7 @@ from.
 .BR hd-bootloader (7),
 .BR hd-link-repo (8),
 .BR hd-network (7),
+.BR hd-firmware (8),
 .BR hd-secboot (7)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

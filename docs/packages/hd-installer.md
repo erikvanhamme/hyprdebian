@@ -149,16 +149,18 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
 | `b_zfs_support` | Installs ZFS, with its module built by DKMS. |
 | `b_esp` | Mounts the EFI system partitions on `/boot/efi` and `/boot/efi2` in the new system. |
+| `b_firmware` | Adds `pkg_firmware`, before `pkg_esps`, so the UKIs have the firmware in their initrd. |
 | `b_bootloader` | Marks `hd-bootloader-txt` and `efibootmgr`. |
 | `b_systemd` | Marks `systemd-timesyncd` and `systemd-resolved`, and adds the user to `adm`, which may read the logs in the systemd journal. There is no syslog daemon. |
 | `b_utilities` | Marks `hd-base`, which also holds the network commands and generates the Secure Boot keys. |
 | `b_firewall` | Adds `pkg_enable_firewall`, which turns on ufw, which comes with hd-base. |
-| `b_network` | Marks `iwd` and `firmware-iwlwifi` for wifi, and adds `pkg_network`. |
+| `b_network` | Marks `iwd` for wifi, and adds `pkg_network`. The firmware of the wifi card comes from `pkg_firmware`. |
 
 The packages phase installs every marked package in one `apt install`, then runs the steps that the base phase added to `pkg_post`:
 
 | Task | What it does |
 | --- | --- |
+| `pkg_firmware` | Installs the firmware packages that the hardware needs with `hd-firmware --install` of hd-base, which sees the devices of the live system through `/sys` and looks at the modules of the new kernel. It runs `pkg_utilities` first, for the Contents indexes of apt. |
 | `pkg_utilities` | Updates the indices of `apt-file` and `command-not-found`. |
 | `pkg_enable_firewall` | Allows ssh in ufw, turns the firewall on and its logging off. ssh is allowed first, so an installation over ssh keeps its connection. |
 | `pkg_root_skel` | Copies `/etc/skel` into `/root`, so root gets the files of hd-base there, such as the aliases and the nano config, as the user does in `u_skel`. |

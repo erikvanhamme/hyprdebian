@@ -24,6 +24,13 @@ pkg_utilities() {
     in_target update-command-not-found
 }
 
+# Installs the firmware packages that the hardware needs, which hd-firmware finds with the Contents
+# indexes that pkg_utilities downloaded. It marks them as installed by hand, so apt autoremove keeps
+# them.
+pkg_firmware() {
+    in_target hd-firmware --install --verbose
+}
+
 # Gives root the files in /etc/skel, such as the aliases and the nano config of hd-base, as the
 # user gets them in u_skel.
 pkg_root_skel() {
@@ -112,5 +119,7 @@ pkg_boot_entries() {
 
 add_dependencies "pkg_main" \
     "pkg_install" \
+
+add_dependencies "pkg_firmware" "pkg_utilities"
 
 add_dependencies "install_root" "pkg_pre" "pkg_main" "pkg_post"

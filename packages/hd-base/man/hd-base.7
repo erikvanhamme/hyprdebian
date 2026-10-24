@@ -59,7 +59,10 @@ in a Hyprland session and with
 .B systemctl
 otherwise,
 .BR hd-link-repo (8),
-which switches the HyprDebian repository and suite of apt, and the files
+which switches the HyprDebian repository and suite of apt,
+.BR hd-firmware (8),
+which finds and installs the firmware packages that the hardware needs, and
+the files
 that new users
 get in their home directory, from
 .IR /etc/skel ,
@@ -248,10 +251,7 @@ and
 .B initramfs-tools
 to build the ZFS module and the initrd.
 .TP
-.B Firmware and boot
-.B firmware-linux
-and
-.BR firmware-qlogic ;
+.B Boot
 .B efibootmgr
 for the boot entries of the firmware.
 .TP
@@ -299,12 +299,18 @@ the packages that held the configuration, the network configuration and
 the Secure Boot keys before; an upgrade removes them, and the configuration
 and the keys stay.
 .PP
-.B firmware-linux
-and
-.B firmware-qlogic
-are in the
+The firmware is not among them: each system needs other firmware, which
+.BR hd-firmware (8)
+finds from its hardware and installs.
+Most of it is in the
 .B non-free-firmware
 component of Debian, which the apt sources must include.
+On an upgrade from a version before 1.23, which depended on all of the
+firmware, run
+.B hd-firmware \-\-install
+before
+.BR "apt autoremove" ,
+so the firmware the hardware needs stays installed.
 .SH FILES
 .TP
 .I /usr/bin/hd-up
@@ -344,6 +350,9 @@ Render and change the network configuration.
 .TQ
 .I /usr/sbin/hd-secboot-check
 Enroll the Secure Boot keys and check that Secure Boot is on.
+.TP
+.I /usr/sbin/hd-firmware
+Finds and installs the firmware packages that the hardware needs.
 .TP
 .I /etc/hyprdebian/config.json
 The hyprdebian configuration.
@@ -400,6 +409,7 @@ Name the network interfaces by their path.
 .BR hd-sync-skel (1),
 .BR hd-issue (8),
 .BR hd-link-repo (8),
+.BR hd-firmware (8),
 .BR hd-config (7),
 .BR hd-network (7),
 .BR hd-secboot (7),
