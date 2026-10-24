@@ -289,8 +289,12 @@ is a folder of the root, as the bootloader reads the kernels from the EFI
 system partitions.
 .TP
 .B base
-Installs Debian with
+Installs the minimal base of Debian, the
+.B minbase
+variant of
 .BR debootstrap (8)
+with
+.BR systemd ,
 on the root, and writes the files that depend on the disks and the answers:
 .IR /etc/hostname ,
 .IR /etc/hosts ,
@@ -354,7 +358,8 @@ and
 .BR video .
 .TP
 .B cleanup
-Removes the apt source of the local repository of the live cd, takes the
+Removes the apt source of the local repository of the live cd, empties
+the cache of apt, takes the
 snapshot
 .B rpool/hyprdebian@install
 of the installed system, unmounts it and exports the pool, so the new

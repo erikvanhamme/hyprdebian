@@ -55,12 +55,16 @@
 #                                             mode, conffiles: the files
 #                                             new users get in /etc/skel,
 #                                             the PATH of /etc/profile.d,
-#                                             the apt preferences and the
-#                                             message after a login in
+#                                             the apt preferences, the apt
+#                                             config without translations,
+#                                             the files dpkg leaves out and
+#                                             the message after a login in
 #                                             /etc/update-motd.d
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the Num Lock
-#                                             drop-in of getty, the zram
+#                                             drop-in of getty, the timers
+#                                             that scrub and trim the ZFS
+#                                             pools, the zram
 #                                             swap, the sysctls for it,
 #                                             the resolved config, and the
 #                                             .link files that name network
@@ -71,9 +75,12 @@
 #               deb/postinst, which masks the units HyprDebian does not use,
 #               points /etc/resolv.conf at the name servers, empties
 #               /etc/motd, diverts 10-uname and /etc/issue of base-files,
-#               writes the login banner with hd-issue and generates the
+#               writes the login banner with hd-issue, generates the
 #               Secure Boot keys in /etc/hyprdebian/secboot when they are not
-#               there yet, and deb/postrm, which undoes the diversions on a
+#               there yet, removes the files that dpkg leaves out from the
+#               packages installed before it and enables the ZFS timers,
+#               deb/prerm, which stops the timers on a removal, deb/postrm,
+#               which undoes the diversions and masks the timers on a
 #               removal and unmasks the units on a purge, and deb/triggers,
 #               which has initramfs-tools rebuild the initramfs, so the .link
 #               files name the interfaces from the start of the boot. Add a
@@ -131,7 +138,7 @@ $(BUILD):
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
 $(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(TEMPLATES) $(NETWORK_TEMPLATES) \
-		lib/hd_network.py $(ETC) $(USR) deb/control deb/postinst deb/postrm deb/triggers \
+		lib/hd_network.py $(ETC) $(USR) deb/control deb/postinst deb/prerm deb/postrm deb/triggers \
 		$(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(TEMPLATE_DIR) \
@@ -159,7 +166,7 @@ $(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(TEMPLATES) $(NETWORK_TEMP
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
-	install -m 0755 deb/postinst deb/postrm $(STAGE)/DEBIAN/
+	install -m 0755 deb/postinst deb/prerm deb/postrm $(STAGE)/DEBIAN/
 	install -m 0644 deb/triggers $(STAGE)/DEBIAN/
 	dpkg-deb --root-owner-group --build $(STAGE) $@
 

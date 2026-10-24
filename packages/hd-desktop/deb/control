@@ -14,9 +14,9 @@ Depends: hd-base (= @VERSION@), @MENU_DEPENDS@,
  pipewire, wireplumber, pulseaudio-utils, wiremix, playerctl, brightnessctl,
  grim, slurp, swappy, wl-clipboard,
  nwg-look, qt5-gtk-platformtheme, qt6-gtk-platformtheme,
- hd-audacious, mpv, imv, firefox, meld, yazi
+ hd-audacious, mpv, imv, firefox, meld, yazi, git, git-delta
 Conflicts: desktop-base, hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
-Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
+Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth, hd-base (<< 1.26)
 Provides: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Section: x11
 Priority: optional
@@ -24,14 +24,16 @@ Description: HyprDebian desktop
  Depends on the packages of the HyprDebian desktop, so that they are
  installed with it and stay installed: Hyprland with uwsm, hyprpaper,
  hypridle and hyprlock, greetd, kitty, mako, PipeWire, the screenshot tools,
- the GTK and Qt themes, plymouth, and the desktop applications. It depends
+ the GTK and Qt themes, plymouth, git with delta, and the desktop
+ applications. It depends
  on hd-base of the same version, the HyprDebian version of both.
  .
  greetd logs the first user in to Hyprland on tty7 at the boot; the user is
  the key hd-desktop of /etc/hyprdebian/config.json, written into
  /etc/greetd/config.toml by hd-desktop-render. The package also installs the
  files that new users get in /etc/skel: the configs of Hyprland, hypridle,
- hyprlock, hyprpaper, kitty, mako, mpv, PipeWire and nwg-look, and the
+ hyprlock, hyprpaper, kitty, mako, mpv, PipeWire and nwg-look, the git config
+ with delta, and the
  commands that the key bindings run: the reboot and power off questions, the
  monitor mode menu, the mount menus and the volume keys. The users in the
  group sudo mount and unmount drives from the mount menus without a

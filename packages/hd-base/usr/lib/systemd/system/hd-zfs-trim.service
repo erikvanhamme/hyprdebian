@@ -1,0 +1,12 @@
+# Trims the ZFS pools with the script of zfsutils-linux, which /etc/cron.d/zfsutils-linux runs on a
+# system with cron. With the property org.debian:periodic-trim at its default, auto, it trims a
+# pool that is only on NVMe disks; enable trims the pool anyway, disable never. Installed by
+# hd-base.
+[Unit]
+Description=Trim the ZFS Pools
+Documentation=man:hd-base(7) man:zpool-trim(8)
+ConditionPathExists=/usr/lib/zfs-linux/trim
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/zfs-linux/trim

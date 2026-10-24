@@ -16,13 +16,17 @@ b_post() {
     return 0
 }
 
+# The base system is the minbase variant of debootstrap: the required packages and apt, without
+# the important ones, such as cron, dhcpcd and vim, which HyprDebian does not use. hd-base depends
+# on the ones it needs. systemd comes along, as b_mount_unit enables units with systemctl before
+# hd-base is installed.
 b_bootstrap() {
     mkdir -p "${TARGET_DIR}/run" || return 1
     mount -t tmpfs tmpfs "${TARGET_DIR}/run" || return 1
     mkdir -p "${TARGET_DIR}/run/lock" || return 1
     mkdir -p "${TARGET_DIR}/var/lib" || return 1
 
-    debootstrap --arch=amd64 --exclude=ifupdown --include=ca-certificates "${Q_SUITE}" \
+    debootstrap --arch=amd64 --variant=minbase --include=ca-certificates,systemd "${Q_SUITE}" \
         "${TARGET_DIR}" http://deb.debian.org/debian
 }
 
@@ -171,13 +175,14 @@ b_live_repo() {
         live_repo="${LIVE_REPO_TARGET}"
 }
 
-# The Debian repositories, next to the local repository of the live cd.
+# The Debian repositories, next to the local repository of the live cd. apt downloads no
+# translations, as hd-base sets for the installed system.
 b_apt_init() {
     template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
 
     rm -f "${TARGET_DIR}/etc/apt/sources.list" || return 1
 
-    in_target apt update
+    in_target apt -o Acquire::Languages=none update
 }
 
 # The debconf selections of the answers file, set in the new system before the packages that ask
@@ -219,11 +224,13 @@ b_console() {
     done
 }
 
-b_buildtools() {
+# initramfs-tools with zstd, so every initramfs is compressed with zstd from the start. The kernel
+# headers bring the compiler that DKMS builds the ZFS module with.
+b_initramfs() {
     # Deployed before the kernel is installed, so no initramfs ever waits for a resume device.
     file_deploy deploy/etc/initramfs-tools/conf.d/resume || return 1
 
-    in_target apt install -y build-essential initramfs-tools
+    in_target apt install -y initramfs-tools zstd
 }
 
 b_kernel() {
@@ -318,7 +325,7 @@ add_dependencies "b_main" \
     "b_apt_init" \
     "b_debconf" \
     "b_console" \
-    "b_buildtools" \
+    "b_initramfs" \
     "b_kernel" \
     "b_zfs_support" \
     "b_esp" \

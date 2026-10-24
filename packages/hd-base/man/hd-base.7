@@ -89,11 +89,6 @@ with
 and deletes them, and a history search on Ctrl-R with
 .BR fzf (1).
 .TP
-.I .gitconfig
-.BR delta (1)
-as the pager and diff filter of
-.BR git (1).
-.TP
 .I .config/nano/nanorc
 Indents with four spaces, remembers the search history, and colors the
 interface and the syntax.
@@ -116,6 +111,44 @@ runs the network,
 .BR os-prober ,
 and
 .BR turnstile .
+.TP
+.I /etc/apt/apt.conf.d/50hyprdebian\-languages
+Keeps apt from downloading the translations of the package descriptions,
+some 40 MB in
+.IR /var/lib/apt/lists ;
+that includes the English one, so
+.B apt show
+has no long descriptions.
+.TP
+.I /etc/dpkg/dpkg.cfg.d/hyprdebian\-excludes
+Has
+.BR dpkg (1)
+leave out of every package the documentation in
+.I /usr/share/doc
+but the copyright files, the translations in
+.IR /usr/share/locale ,
+the man pages in other languages
+than English and the info pages.
+The postinst removes these files from the packages that were installed
+before it, on the first installation and on an upgrade from a version
+before 1.26.
+.TP
+.I /usr/lib/systemd/system/hd\-zfs\-scrub.timer
+.TQ
+.I /usr/lib/systemd/system/hd\-zfs\-trim.timer
+Scrub the ZFS pools on the second Sunday of the month and trim them on the
+first, with the scripts of zfsutils-linux, as its cron job does on a system
+with cron, which HyprDebian does not have.
+A pool is left out when its property
+.B org.debian:periodic\-scrub
+or
+.B org.debian:periodic\-trim
+is
+.BR disable ;
+at the default,
+.BR auto ,
+only a pool that is only on NVMe disks is trimmed.
+The timers are enabled on the first installation.
 .TP
 .I /usr/lib/systemd/system/getty@.service.d/numlock.conf
 Turns Num Lock on for a console before its login prompt shows, with
@@ -210,6 +243,11 @@ for 1.0, which is also the version of
 .BR hd-base .
 The banners show it.
 .SH PACKAGES
+The installer starts from the minimal base of Debian, the
+.B minbase
+variant of
+.BR debootstrap (8),
+so these are all the packages besides the required ones of Debian.
 .TP
 .B hyprdebian
 .B python3
@@ -223,7 +261,16 @@ for
 and
 .BR hd-network-render (8);
 .BR kbd ,
-for Num Lock on the console.
+for Num Lock on the console;
+.BR kmod ,
+for
+.BR hd-firmware (8).
+.TP
+.B Init
+.BR systemd ,
+.B systemd-sysv
+and
+.BR udev .
 .TP
 .B Secure Boot
 .BR openssl ,
@@ -236,20 +283,35 @@ which make the keys, enroll them and sign EFI files with them; see
 .B Remote access and firewall
 .B openssh-server
 and
+.BR openssh-client ,
+the ssh server and client, which openssh-server no longer pulls in;
 .BR kitty-terminfo ,
 so that the kitty terminal works over ssh;
 .BR ufw ,
 the firewall.
+.TP
+.B Network
+.B iproute2
+and
+.BR iputils-ping ,
+with
+.BR linux-sysctl-defaults ,
+which lets every user ping;
+.BR netbase .
 .TP
 .B ZFS
 .BR zfs-dkms ,
 .B zfsutils-linux
 and
 .BR zfs-initramfs ;
-.B build-essential
-and
+.BR zfs-zed ,
+the event daemon that reports pool errors, resilvers and scrubs;
 .B initramfs-tools
-to build the ZFS module and the initrd.
+for the initrd, and
+.B zstd
+to compress it.
+DKMS builds the ZFS module with the compiler that the kernel headers bring
+along.
 .TP
 .B Boot
 .B efibootmgr
@@ -264,24 +326,25 @@ and
 .TP
 .B System services
 .BR systemd-resolved ,
-name resolution.
+name resolution;
+.B libpam-systemd
+and
+.BR libnss-systemd ,
+which register every login as a session of
+.BR systemd-logind (8),
+with its runtime directory and the user instance of systemd.
 The logs stay in the journal of
 .BR systemd-journald (8);
 there is no syslog daemon.
 .TP
 .B Command line tools
+.BR nano ,
+.BR less ,
+.BR procps ,
 .BR eza ,
 .BR fzf ,
-.BR nfs-common ,
 .BR psmisc ,
-.BR net-tools ,
-.BR pciutils ,
-.BR usbutils ,
-.BR acpi ,
 .BR bash-completion ,
-.BR git ,
-.BR git-delta ,
-.BR ack ,
 .BR command-not-found ,
 .BR man-db ,
 .B apt-file
@@ -311,6 +374,26 @@ firmware, run
 before
 .BR "apt autoremove" ,
 so the firmware the hardware needs stays installed.
+.PP
+Versions before 1.26 also depended on
+.BR build-essential ,
+.BR git ,
+.BR git-delta ,
+.BR nfs-common ,
+.BR net-tools ,
+.BR pciutils ,
+.BR usbutils ,
+.B acpi
+and
+.BR ack .
+After an upgrade
+.B apt autoremove
+removes them; mark the ones that are still used as installed by hand
+first, such as
+.B apt-mark manual nfs-common
+on a system that mounts NFS shares.
+git and delta come with
+.BR hd-desktop (7).
 .SH FILES
 .TP
 .I /usr/bin/hd-up
@@ -369,8 +452,6 @@ The version of HyprDebian, a conffile.
 .TP
 .I /etc/skel/.bash_aliases
 .TQ
-.I /etc/skel/.gitconfig
-.TQ
 .I /etc/skel/.config/nano/nanorc
 The files new users get, conffiles.
 .TP
@@ -383,6 +464,17 @@ a conffile.
 .TP
 .I /etc/apt/preferences.d/00\-block\-unwanted
 The packages apt never installs, a conffile.
+.TP
+.I /etc/apt/apt.conf.d/50hyprdebian\-languages
+No translations of the package descriptions, a conffile.
+.TP
+.I /etc/dpkg/dpkg.cfg.d/hyprdebian\-excludes
+The files dpkg leaves out, a conffile.
+.TP
+.I /usr/lib/systemd/system/hd\-zfs\-scrub.timer
+.TQ
+.I /usr/lib/systemd/system/hd\-zfs\-trim.timer
+The monthly scrub and trim of the ZFS pools, with their services.
 .TP
 .I /etc/update\-motd.d/00\-hyprdebian
 The banner after a login, a conffile.

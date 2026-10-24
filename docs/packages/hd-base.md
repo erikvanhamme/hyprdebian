@@ -39,12 +39,17 @@ packages/hd-base/hd-link-repo
 packages/hd-base/hd-firmware
 packages/hd-base/templates/hyprdebian.sources.j2
 packages/hd-base/etc/skel/.bash_aliases
-packages/hd-base/etc/skel/.gitconfig
 packages/hd-base/etc/skel/.config/nano/nanorc
 packages/hd-base/etc/profile.d/local-bin-path.sh
 packages/hd-base/etc/apt/preferences.d/00-block-unwanted
+packages/hd-base/etc/apt/apt.conf.d/50hyprdebian-languages
+packages/hd-base/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes
 packages/hd-base/etc/update-motd.d/00-hyprdebian
 packages/hd-base/usr/lib/systemd/system/getty@.service.d/numlock.conf
+packages/hd-base/usr/lib/systemd/system/hd-zfs-scrub.service
+packages/hd-base/usr/lib/systemd/system/hd-zfs-scrub.timer
+packages/hd-base/usr/lib/systemd/system/hd-zfs-trim.service
+packages/hd-base/usr/lib/systemd/system/hd-zfs-trim.timer
 packages/hd-base/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf
 packages/hd-base/usr/lib/sysctl.d/50-zram.conf
 packages/hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
@@ -68,18 +73,24 @@ The files of the shared parts are listed on their pages: [hd-config](hd-config.m
 `make test` runs the tests in `packages/hd-base/tests`, see [hd-secboot](hd-secboot.md#tests) and [Firmware](#firmware).
 
 ## Packages
+The installer starts from the minimal base of Debian, the `minbase` variant of debootstrap, so these are all the packages besides the required ones of Debian.
+
 | Group | Packages |
 | --- | --- |
-| hyprdebian | `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo` and `hd-network-render`; `systemd`, for the network; `kbd`, for Num Lock on the console. |
+| hyprdebian | `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo` and `hd-network-render`; `kbd`, for Num Lock on the console; `kmod`, for `hd-firmware`. |
+| Init | `systemd`, also for the network, `systemd-sysv` and `udev`. |
 | Secure Boot | `openssl`, `efitools` and `sbsigntool`, which make the keys, enroll them and sign EFI files with them; see [hd-secboot](hd-secboot.md). |
-| Remote access and firewall | `openssh-server`, and `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
-| ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `build-essential` and `initramfs-tools` to build the ZFS module and the initrd. |
+| Remote access and firewall | `openssh-server` and `openssh-client`, the ssh server and client, which `openssh-server` no longer pulls in; `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
+| Network | `iproute2` and `iputils-ping`, with `linux-sysctl-defaults`, which lets every user ping; `netbase`. |
+| ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `zfs-zed`, the event daemon that reports pool errors, resilvers and scrubs; `initramfs-tools` for the initrd, and `zstd` to compress it. DKMS builds the ZFS module with the compiler that the kernel headers bring along; there is no `build-essential`. |
 | Boot | `efibootmgr` for the boot entries of the firmware. |
 | Console | `locales`, `keyboard-configuration`, `console-setup` and `ca-certificates`. |
-| System services | `systemd-resolved`, name resolution. The logs stay in the journal of systemd-journald; there is no syslog daemon. |
-| Command line tools | `eza`, `fzf`, `nfs-common`, `psmisc`, `net-tools`, `pciutils`, `usbutils`, `acpi`, `bash-completion`, `git`, `git-delta`, `ack`, `command-not-found`, `man-db`, `apt-file` and `systemd-zram-generator`. It conflicts with `zram-tools`, which would set up a second zram swap. |
+| System services | `systemd-resolved`, name resolution; `libpam-systemd` and `libnss-systemd`, which register every login as a session of systemd-logind, with its runtime directory and the user instance of systemd. The logs stay in the journal of systemd-journald; there is no syslog daemon. |
+| Command line tools | `nano`, `less`, `procps`, `eza`, `fzf`, `psmisc`, `bash-completion`, `command-not-found`, `man-db`, `apt-file` and `systemd-zram-generator`. `command-not-found` names the package of a command that is not installed, from the Contents indexes that `apt-file` downloads, so both stay. It conflicts with `zram-tools`, which would set up a second zram swap. |
 
 The firmware is not among them: each system needs other firmware, which `hd-firmware` finds from its hardware and installs, see [Firmware](#firmware).
+
+Versions before 1.26 also depended on `build-essential`, `git`, `git-delta`, `nfs-common`, `net-tools`, `pciutils`, `usbutils`, `acpi` and `ack`. After an upgrade `apt autoremove` removes them, and the postinst says so; mark the ones that are still used as installed by hand first, such as `sudo apt-mark manual nfs-common` on a system that mounts NFS shares. git and delta come with [hd-desktop](hd-desktop.md).
 
 ## Firmware
 `hd-firmware` lists the firmware packages that the hardware needs; `hd-firmware -v` also lists the drivers or the CPU that need each one, and `hd-firmware --install` installs them and marks them as installed by hand, so `apt autoremove` keeps them. The installer runs `hd-firmware --install` in the new system, which sees the devices of the live system through `/sys`, so a new system only gets the firmware of its own hardware. Run it again after adding hardware, such as a graphics card or a wifi adapter.
@@ -178,12 +189,11 @@ sudo hd-link-repo http://repo.example/ --suite unstable
 ```
 
 ## Skel files
-New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades.
+New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades. Versions before 1.26 also had `.gitconfig`, with delta for git; [hd-desktop](hd-desktop.md) has it now, with git and delta.
 
 | File | Content |
 | --- | --- |
 | `.bash_aliases` | `ls` and `ll` with eza, `y` for yazi, `wav2flac`, which converts the `.wav` files below the current folder to `.flac` with ffmpeg and deletes them, and a history search on Ctrl-R with fzf. |
-| `.gitconfig` | delta as the pager and diff filter of git. |
 | `.config/nano/nanorc` | Indents with four spaces, remembers the search history, and colors the interface and the syntax. |
 
 ## System settings
@@ -191,6 +201,9 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 | --- | --- |
 | `/etc/profile.d/local-bin-path.sh` | Adds `~/.local/bin` to the `PATH` of login shells, when that folder exists. |
 | `/etc/apt/preferences.d/00-block-unwanted` | Keeps apt from installing `ifupdown`, as systemd-networkd runs the network, `os-prober` and `turnstile`. |
+| `/etc/apt/apt.conf.d/50hyprdebian-languages` | Keeps apt from downloading the translations of the package descriptions, some 40 MB in `/var/lib/apt/lists`. That includes the English one, so `apt show` has no long descriptions. |
+| `/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes` | Has dpkg leave out of every package the documentation in `/usr/share/doc` but the copyright files, the translations in `/usr/share/locale`, the man pages in other languages than English, and the info pages. |
+| `/usr/lib/systemd/system/hd-zfs-scrub.timer`, `hd-zfs-trim.timer` | Scrub the ZFS pools on the second Sunday of the month and trim them on the first, with `/usr/lib/zfs-linux/scrub` and `trim` of zfsutils-linux, as its cron job does on a system with cron, which HyprDebian does not have. A pool is left out when its property `org.debian:periodic-scrub` or `org.debian:periodic-trim` is `disable`; at the default, `auto`, only a pool that is only on NVMe disks is trimmed. |
 | `/usr/lib/systemd/system/getty@.service.d/numlock.conf` | Turns Num Lock on for a console before its login prompt shows, with `setleds`. When that fails, the login prompt still shows. |
 | `/etc/update-motd.d/00-hyprdebian` | Shows the HyprDebian banner after a login on the console or over ssh, with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages and the Debian version, the kernel, the uptime, the load, the memory, the health of the ZFS pools and the RAID arrays, and the failed units. |
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | A swap in compressed RAM, `/dev/zram0`, of a quarter of the RAM, compressed with zstd, with priority 16384, so it is used before the swap on disk. |
@@ -200,10 +213,12 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 The files below `/usr/lib` are the defaults of the package: to change one, add a file of the same name, or a later one, in the same folder below `/etc`.
 
 The postinst of the package:
-- masks `systemd-firstboot.service`, the setup of the first boot, and `rpcbind.socket` and `rpcbind.service`, which `nfs-common` pulls in but HyprDebian does not use. It does this on the first installation, and on an upgrade from a version before 0.2, so a unit that the admin unmasks again stays unmasked on upgrades. A purge unmasks them. An upgrade from a version before 1.1 unmasks `systemd-preset-all.service` and `systemd-machine-id-commit.service`, which those versions masked as well;
+- masks `systemd-firstboot.service`, the setup of the first boot, and `rpcbind.socket` and `rpcbind.service`, which `nfs-common` pulls in when it is installed, but which NFS version 4 does not need. It does this on the first installation, and on an upgrade from a version before 0.2, so a unit that the admin unmasks again stays unmasked on upgrades. A purge unmasks them. An upgrade from a version before 1.1 unmasks `systemd-preset-all.service` and `systemd-machine-id-commit.service`, which those versions masked as well;
 - on an upgrade from a version before 1.11, renames the apt source `/etc/apt/sources.list.d/hyprdebian.local.sources`, the name of those versions, to `hyprdebian.sources`, unless that one already exists;
 - points `/etc/resolv.conf` at `/run/systemd/resolve/resolv.conf`, the name servers themselves, in place of `stub-resolv.conf`, as there is no stub resolver. It only replaces the link that systemd-resolved made. When that file is missing, because systemd-resolved does not run, as in the chroot of the installer, it is made with the name servers of the old link, so names keep resolving until systemd-resolved starts;
 - diverts `/etc/issue` of base-files to `/etc/issue.debian` and runs `hd-issue`, see below, on every installation and upgrade. A removal of the package removes the banner of `hd-issue` and puts the one of base-files back;
+- removes the files that `hyprdebian-excludes` leaves out from the packages that were installed before hd-base, on the first installation and on an upgrade from a version before 1.26: dpkg only applies the excludes to the packages it installs after. It reads the rules of that file, and the last rule that matches a path decides, as for dpkg. Directories that are left empty go too;
+- enables `hd-zfs-scrub.timer` and `hd-zfs-trim.timer` on the first installation, by their preset, with the steps debhelper adds for a timer, and keeps the state the admin gave them over upgrades. The prerm stops them on a removal, and the postrm masks them, so a reinstall keeps their state; a purge forgets it;
 - empties `/etc/motd`, on the first installation like the masks, and diverts `/etc/update-motd.d/10-uname` of base-files to `10-uname.base-files`, which run-parts skips, as the banner already shows the kernel. A removal of the package puts it back. base-files only writes `/etc/motd` when it is missing.
 
 ## Services
@@ -220,9 +235,12 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/share/hd-base/templates/hyprdebian.sources.j2` | The template of the apt source of `hd-link-repo`. |
 | `/etc/hyprdebian/version.json` | The version of HyprDebian, `version.json` of the root of this repository, which is also the version of hd-base. The banners show it. A conffile. |
 | `/etc/issue` | The login banner, written by `hd-issue`. The one of base-files is diverted to `/etc/issue.debian`. |
-| `/etc/skel/.bash_aliases`, `/etc/skel/.gitconfig`, `/etc/skel/.config/nano/nanorc` | The files new users get, conffiles. |
+| `/etc/skel/.bash_aliases`, `/etc/skel/.config/nano/nanorc` | The files new users get, conffiles. |
 | `/etc/profile.d/local-bin-path.sh` | Adds `~/.local/bin` to the `PATH`, a conffile. |
 | `/etc/apt/preferences.d/00-block-unwanted` | The packages apt never installs, a conffile. |
+| `/etc/apt/apt.conf.d/50hyprdebian-languages` | No translations of the package descriptions, a conffile. |
+| `/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes` | The files dpkg leaves out, a conffile. |
+| `/usr/lib/systemd/system/hd-zfs-scrub.*`, `hd-zfs-trim.*` | The monthly scrub and trim of the ZFS pools. |
 | `/etc/update-motd.d/00-hyprdebian` | The banner after a login, a conffile. |
 | `/usr/lib/systemd/system/getty@.service.d/numlock.conf` | Num Lock on the console. |
 | `/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf` | The zram swap. |

@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 """postinst of hd-base: masks the units that HyprDebian does not use, points /etc/resolv.conf at
 the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, writes
-the login banner in /etc/issue, and generates the Secure Boot keys.
+the login banner in /etc/issue, generates the Secure Boot keys, removes the files that dpkg leaves
+out on HyprDebian from the packages installed before, and enables the timers that scrub and trim
+the ZFS pools.
 
 The units are masked on the first installation only, or on an upgrade from a version before
 MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
@@ -28,6 +30,11 @@ installed automatically and left for apt autoremove. An upgrade from such a vers
 hd-firmware --install first, which marks the firmware the hardware needs as installed by hand.
 The postinst runs inside apt, which holds the lock, so it cannot do that itself.
 
+Versions before DROPPED_SINCE also depended on the packages in DROPPED, which are now marked as
+installed automatically and left for apt autoremove. An upgrade from such a version names them and
+says to mark the ones that are still used as installed by hand first, such as nfs-common on a
+system that mounts NFS shares. git and git-delta come with hd-desktop now.
+
 Versions before SOURCES_SINCE named the apt source of hd-link-repo hyprdebian.local.sources. An
 upgrade from such a version renames it to hyprdebian.sources, unless that one already exists, so
 hd-link-repo, hd-issue and hd-report find it.
@@ -35,6 +42,17 @@ hd-link-repo, hd-issue and hd-report find it.
 /etc/issue of base-files is diverted to /etc/issue.debian, and hd-issue writes the HyprDebian
 banner in its place, on every installation and upgrade, so it shows the version that is installed.
 The postrm of a removal removes it and puts the one of base-files back.
+
+/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes has the files that dpkg leaves out of every package: the
+documentation, the translations, the man pages in other languages and the info pages. dpkg only
+applies it to the packages it installs after hd-base, so on the first installation, or an upgrade
+from a version before EXCLUDES_SINCE, which did not have it, the postinst removes those files from
+the packages that are installed, with the rules of that file: the last rule that matches a path
+decides, as for dpkg. Directories that are left empty go too.
+
+hd-zfs-scrub.timer and hd-zfs-trim.timer get the steps that debhelper adds for a timer: they are
+enabled on the first installation, by their preset, and keep the enabled state that the admin gave
+them over upgrades. The unmask undoes the mask of a removal, see the postrm.
 
 The Secure Boot keys in /etc/hyprdebian/secboot are generated when they are not there yet.
 Existing keys are never replaced, so an upgrade or a reinstall keeps keys that may already be
@@ -46,6 +64,7 @@ signs its own and that of KEK, KEK signs that of db. EFI files are signed with t
 is the key size that the UEFI spec requires every firmware to support.
 """
 
+import fnmatch
 import os
 import shutil
 import socket
@@ -54,7 +73,7 @@ import sys
 import uuid
 
 # The units that HyprDebian masks: the first boot setup, and rpcbind, which nfs-common pulls in
-# but which is not used.
+# when it is installed, but which NFS version 4 does not need.
 MASKED = [
     "systemd-firstboot.service",
     "rpcbind.socket",
@@ -86,6 +105,19 @@ SOURCES_SINCE = "1.11"
 
 # The first version of hd-base that leaves the firmware to hd-firmware.
 FIRMWARE_SINCE = "1.23"
+
+# The packages that versions before DROPPED_SINCE depended on, and no longer.
+DROPPED = ["build-essential", "git", "git-delta", "nfs-common", "net-tools", "pciutils",
+           "usbutils", "acpi", "ack"]
+DROPPED_SINCE = "1.26"
+
+# The files that dpkg leaves out, and the first version of hd-base that has them.
+EXCLUDES = "/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes"
+EXCLUDES_SINCE = "1.26"
+DPKG_INFO = "/var/lib/dpkg/info"
+
+# The timers of hd-base.
+TIMERS = ["hd-zfs-scrub.timer", "hd-zfs-trim.timer"]
 
 RESOLV_CONF = "/etc/resolv.conf"
 STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]
@@ -220,6 +252,71 @@ def generate_keys():
     os.rename(KEY_TMP_DIR, KEY_DIR)
 
 
+def exclude_rules():
+    """The rules of EXCLUDES, in order, as (excluded, pattern)."""
+    rules = []
+    with open(EXCLUDES, encoding="utf-8") as f:
+        for line in f:
+            option, sep, pattern = line.strip().partition("=")
+            if sep and option in ("path-exclude", "path-include"):
+                rules.append((option == "path-exclude", pattern))
+    return rules
+
+
+def excluded(path, rules):
+    """True when dpkg leaves the path out: the last rule that matches it decides. dpkg matches
+    with fnmatch, whose * also matches a /."""
+    result = False
+    for exclude, pattern in rules:
+        if fnmatch.fnmatchcase(path, pattern):
+            result = exclude
+    return result
+
+
+def remove_excluded():
+    """Removes the files of the installed packages that dpkg would leave out now, then the
+    directories of them that are left empty, deepest first."""
+    rules = exclude_rules()
+    paths = set()
+    for name in os.listdir(DPKG_INFO):
+        if name.endswith(".list"):
+            with open(os.path.join(DPKG_INFO, name), encoding="utf-8",
+                      errors="surrogateescape") as f:
+                paths.update(line.rstrip("\n") for line in f)
+
+    count = size = 0
+    directories = []
+    for path in paths:
+        if not excluded(path, rules):
+            continue
+        if os.path.isdir(path) and not os.path.islink(path):
+            directories.append(path)
+        elif os.path.lexists(path):
+            size += os.lstat(path).st_size
+            os.remove(path)
+            count += 1
+
+    for path in sorted(directories, key=len, reverse=True):
+        try:
+            os.rmdir(path)
+        except OSError:
+            pass
+    print(f"Removed {count} files ({size / 2**20:.0f} MiB) that dpkg leaves out, see {EXCLUDES}.")
+
+
+def enable_timers():
+    for unit in TIMERS:
+        subprocess.run(["deb-systemd-helper", "unmask", unit], stdout=subprocess.DEVNULL)
+        if subprocess.run(["deb-systemd-helper", "--quiet", "was-enabled", unit]).returncode == 0:
+            subprocess.run(["deb-systemd-helper", "enable", unit], stdout=subprocess.DEVNULL)
+        else:
+            subprocess.run(["deb-systemd-helper", "update-state", unit], stdout=subprocess.DEVNULL)
+
+    if not os.environ.get("DPKG_ROOT") and os.path.isdir("/run/systemd/system"):
+        subprocess.run(["systemctl", "--system", "daemon-reload"], check=True)
+        subprocess.run(["deb-systemd-invoke", "restart", *TIMERS], check=True)
+
+
 def main():
     # configure is the only action that installs the package; the abort-* actions undo a
     # failed upgrade or removal.
@@ -238,11 +335,18 @@ def main():
     if previous != "" and older_than(previous, FIRMWARE_SINCE):
         print("hd-base no longer depends on all of the firmware. Run hd-firmware --install "
               "before apt autoremove, so the firmware this hardware needs stays installed.")
+    if previous != "" and older_than(previous, DROPPED_SINCE):
+        print(f"hd-base no longer depends on {', '.join(DROPPED)}. apt autoremove removes them; "
+              "mark the ones you use as installed by hand first, such as apt-mark manual "
+              "nfs-common for NFS mounts.")
+    if previous == "" or older_than(previous, EXCLUDES_SINCE):
+        remove_excluded()
     link_resolv_conf()
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)
     subprocess.run(["/usr/sbin/hd-issue"], check=True)
     generate_keys()
+    enable_timers()
 
 
 if __name__ == "__main__":

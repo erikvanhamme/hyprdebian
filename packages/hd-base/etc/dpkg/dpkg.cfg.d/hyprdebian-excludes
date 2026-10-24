@@ -1,0 +1,10 @@
+# The files that dpkg leaves out of every package on HyprDebian, to keep the system small: the
+# documentation but the copyright files, the translations of the programs, the man pages in other
+# languages than English, and the info pages. The postinst of hd-base removes these files from the
+# packages that were installed before it. Installed by hd-base.
+path-exclude=/usr/share/doc/*
+path-include=/usr/share/doc/*/copyright
+path-exclude=/usr/share/locale/*
+path-exclude=/usr/share/man/*
+path-include=/usr/share/man/man[0-9]*
+path-exclude=/usr/share/info/*

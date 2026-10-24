@@ -3,15 +3,17 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, python3-jinja2, sudo, kbd, systemd,
+Depends: python3, python3-jinja2, sudo, kbd, systemd, systemd-sysv, udev, kmod,
  openssl, efitools, sbsigntool,
- openssh-server, kitty-terminfo, ufw,
- zfs-dkms, zfsutils-linux, zfs-initramfs, build-essential, initramfs-tools,
+ openssh-server, openssh-client, kitty-terminfo, ufw,
+ iproute2, iputils-ping, netbase, linux-sysctl-defaults,
+ zfs-dkms, zfsutils-linux, zfs-initramfs, zfs-zed,
+ initramfs-tools, zstd,
  efibootmgr,
  locales, keyboard-configuration, console-setup, ca-certificates,
- systemd-resolved,
- eza, fzf, nfs-common, psmisc, net-tools, pciutils, usbutils, acpi,
- bash-completion, git, git-delta, ack, command-not-found, man-db, apt-file,
+ systemd-resolved, libpam-systemd, libnss-systemd,
+ nano, less, procps,
+ eza, fzf, psmisc, bash-completion, command-not-found, man-db, apt-file,
  systemd-zram-generator
 Conflicts: zram-tools, hd-config, hd-network, hd-secboot
 Replaces: hd-config, hd-network, hd-secboot
@@ -20,15 +22,20 @@ Section: admin
 Priority: optional
 Description: HyprDebian base system
  Depends on the packages that every hyprdebian system has, so that they are
- installed with it and stay installed: the SSH server and the firewall, ZFS
- with the tools to build its module, the console, name
- resolution, the Secure Boot tools, and the command line tools.
+ installed with it and stay installed: systemd as init, the SSH server and
+ client and the firewall, the network tools, ZFS with its event daemon and
+ DKMS to build its module, the console, name resolution, the login sessions
+ of systemd, the Secure Boot tools, and the command line tools. It keeps the
+ system small: dpkg leaves out the documentation but the copyright files,
+ the translations and the man pages in other languages than English, and apt
+ downloads no translations of the package descriptions. Monthly timers scrub
+ and trim the ZFS pools.
  .
  It also installs hd-firmware, which finds and installs the firmware packages
  that the hardware needs, hd-up, which upgrades the system after a ZFS snapshot,
  hd-reboot and hd-poweroff, which work on a desktop and without one,
  and the files that new users get in their home directory: aliases for eza,
- fzf, yazi and ffmpeg, a git config with delta, and a nano config, with hd-sync-skel,
+ fzf, yazi and ffmpeg, and a nano config, with hd-sync-skel,
  which brings them into an existing home directory. It adds ~/.local/bin to
  the PATH, keeps ifupdown, os-prober and turnstile from being installed, and
  turns Num Lock on at the console login. It sets up the zram swap, the

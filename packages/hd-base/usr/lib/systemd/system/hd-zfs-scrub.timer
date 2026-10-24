@@ -1,0 +1,12 @@
+# Runs hd-zfs-scrub.service on the second Sunday of the month, as /etc/cron.d/zfsutils-linux
+# does. Installed by hd-base.
+[Unit]
+Description=Scrub the ZFS Pools Every Month
+Documentation=man:hd-base(7)
+
+[Timer]
+OnCalendar=Sun *-*-08..14 00:24:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,4 @@
+// apt downloads no translations of the package descriptions, which take some 40 MB in
+// /var/lib/apt/lists; that includes the English one, which holds the long descriptions.
+// Installed by hd-base.
+Acquire::Languages "none";

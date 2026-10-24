@@ -1,0 +1,11 @@
+# Scrubs the ZFS pools with the script of zfsutils-linux, which /etc/cron.d/zfsutils-linux runs on
+# a system with cron. It scrubs each online pool unless its property org.debian:periodic-scrub
+# is disable. Installed by hd-base.
+[Unit]
+Description=Scrub the ZFS Pools
+Documentation=man:hd-base(7) man:zpool-scrub(8)
+ConditionPathExists=/usr/lib/zfs-linux/scrub
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/zfs-linux/scrub

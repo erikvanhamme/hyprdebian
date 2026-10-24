@@ -1,7 +1,7 @@
 #!/bin/bash
-# The cleanup phase: removes the local repository of the live cd from the apt sources, takes a
-# snapshot of the installed system, unmounts it and exports its pool, so the new system can import
-# it when it boots.
+# The cleanup phase: removes the local repository of the live cd from the apt sources, empties the
+# cache of apt, takes a snapshot of the installed system, unmounts it and exports its pool, so the
+# new system can import it when it boots.
 
 c_pre() {
     return 0
@@ -20,6 +20,12 @@ c_post() {
 c_live_repo() {
     rm -f "${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian-live.sources" || return 1
     in_target apt update
+}
+
+# The packages that apt and debootstrap downloaded, and the caches of the package lists, which apt
+# makes again when it needs them.
+c_apt_clean() {
+    in_target apt clean
 }
 
 c_snapshots() {
@@ -43,6 +49,7 @@ c_repo_note() {
 
 add_dependencies "c_main" \
     "c_live_repo" \
+    "c_apt_clean" \
     "c_snapshots" \
     "c_unmount" \
     "c_repo_note" \

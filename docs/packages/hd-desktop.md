@@ -4,7 +4,8 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - greetd, which logs the user in to Hyprland at the boot;
 - kitty, mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
 - nwg-look with the GTK and Qt themes, and plymouth;
-- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv, firefox and meld.
+- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv, firefox and meld;
+- git with delta, which shows its diffs.
 
 It holds the parts of the desktop, each with a page of its own:
 - [hd-art](hd-art.md): the wallpapers;
@@ -91,6 +92,7 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/alsa`, `pipewire` | The sound. |
 | `~/.config/nwg-look`, `~/.local/share/nwg-look` | The GTK theme and font, applied by `nwg-look -a` when Hyprland starts. |
 | `~/.config/VSCodium` | The settings of VSCodium. |
+| `~/.gitconfig` | delta as the pager and diff filter of git. Versions of `hd-base` before 1.26 installed it; `hd-desktop` took it over. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
 The configs of Hyprland, hyprlock, hyprpaper, kitty and mako take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
