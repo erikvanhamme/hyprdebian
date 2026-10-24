@@ -43,6 +43,7 @@ packages/hd-base/etc/skel/.config/nano/nanorc
 packages/hd-base/etc/profile.d/local-bin-path.sh
 packages/hd-base/etc/apt/preferences.d/00-block-unwanted
 packages/hd-base/etc/apt/apt.conf.d/50hyprdebian-languages
+packages/hd-base/etc/apt/apt.conf.d/50hyprdebian-no-recommends
 packages/hd-base/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes
 packages/hd-base/etc/update-motd.d/00-hyprdebian
 packages/hd-base/usr/lib/systemd/system/getty@.service.d/numlock.conf
@@ -90,7 +91,7 @@ The installer starts from the minimal base of Debian, the `minbase` variant of d
 
 The firmware is not among them: each system needs other firmware, which `hd-firmware` finds from its hardware and installs, see [Firmware](#firmware).
 
-Versions before 1.26 also depended on `build-essential`, `git`, `git-delta`, `nfs-common`, `net-tools`, `pciutils`, `usbutils`, `acpi` and `ack`. After an upgrade `apt autoremove` removes them, and the postinst says so; mark the ones that are still used as installed by hand first, such as `sudo apt-mark manual nfs-common` on a system that mounts NFS shares. git and delta come with [hd-desktop](hd-desktop.md).
+Versions before 1.26 also depended on `build-essential`, `git`, `git-delta`, `nfs-common`, `net-tools`, `pciutils`, `usbutils`, `acpi` and `ack`. After an upgrade `apt autoremove` removes them, and the postinst says so; mark the ones that are still used as installed by hand first, such as `sudo apt-mark manual nfs-common` on a system that mounts NFS shares.
 
 ## Firmware
 `hd-firmware` lists the firmware packages that the hardware needs; `hd-firmware -v` also lists the drivers or the CPU that need each one, and `hd-firmware --install` installs them and marks them as installed by hand, so `apt autoremove` keeps them. The installer runs `hd-firmware --install` in the new system, which sees the devices of the live system through `/sys`, so a new system only gets the firmware of its own hardware. Run it again after adding hardware, such as a graphics card or a wifi adapter.
@@ -189,7 +190,7 @@ sudo hd-link-repo http://repo.example/ --suite unstable
 ```
 
 ## Skel files
-New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades. Versions before 1.26 also had `.gitconfig`, with delta for git; [hd-desktop](hd-desktop.md) has it now, with git and delta.
+New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades. Versions before 1.26 also had `.gitconfig`, with delta for git.
 
 | File | Content |
 | --- | --- |
@@ -202,6 +203,7 @@ New users get these files in their home directory, from `/etc/skel`. They are co
 | `/etc/profile.d/local-bin-path.sh` | Adds `~/.local/bin` to the `PATH` of login shells, when that folder exists. |
 | `/etc/apt/preferences.d/00-block-unwanted` | Keeps apt from installing `ifupdown`, as systemd-networkd runs the network, `os-prober` and `turnstile`. |
 | `/etc/apt/apt.conf.d/50hyprdebian-languages` | Keeps apt from downloading the translations of the package descriptions, some 40 MB in `/var/lib/apt/lists`. That includes the English one, so `apt show` has no long descriptions. |
+| `/etc/apt/apt.conf.d/50hyprdebian-no-recommends` | Keeps apt from installing the recommends of a package, so the system only gets what its packages depend on. The hd-* packages depend on everything they need. |
 | `/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes` | Has dpkg leave out of every package the documentation in `/usr/share/doc` but the copyright files, the translations in `/usr/share/locale`, the man pages in other languages than English, and the info pages. |
 | `/usr/lib/systemd/system/hd-zfs-scrub.timer`, `hd-zfs-trim.timer` | Scrub the ZFS pools on the second Sunday of the month and trim them on the first, with `/usr/lib/zfs-linux/scrub` and `trim` of zfsutils-linux, as its cron job does on a system with cron, which HyprDebian does not have. A pool is left out when its property `org.debian:periodic-scrub` or `org.debian:periodic-trim` is `disable`; at the default, `auto`, only a pool that is only on NVMe disks is trimmed. |
 | `/usr/lib/systemd/system/getty@.service.d/numlock.conf` | Turns Num Lock on for a console before its login prompt shows, with `setleds`. When that fails, the login prompt still shows. |
@@ -239,6 +241,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/etc/profile.d/local-bin-path.sh` | Adds `~/.local/bin` to the `PATH`, a conffile. |
 | `/etc/apt/preferences.d/00-block-unwanted` | The packages apt never installs, a conffile. |
 | `/etc/apt/apt.conf.d/50hyprdebian-languages` | No translations of the package descriptions, a conffile. |
+| `/etc/apt/apt.conf.d/50hyprdebian-no-recommends` | No recommends, a conffile. |
 | `/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes` | The files dpkg leaves out, a conffile. |
 | `/usr/lib/systemd/system/hd-zfs-scrub.*`, `hd-zfs-trim.*` | The monthly scrub and trim of the ZFS pools. |
 | `/etc/update-motd.d/00-hyprdebian` | The banner after a login, a conffile. |

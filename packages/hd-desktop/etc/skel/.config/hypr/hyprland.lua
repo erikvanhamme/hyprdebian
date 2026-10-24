@@ -53,7 +53,6 @@ local launcher    = [[if cmd=$(hd-launcher-cache | hd-menu); then sh -c "$cmd"; 
 --
 hl.on("hyprland.start", function () 
     hl.exec_cmd("uwsm app -- mako")
-    hl.exec_cmd("nwg-look -a") -- Applies theme and font
 end)
 
 

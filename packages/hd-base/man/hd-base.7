@@ -120,6 +120,11 @@ that includes the English one, so
 .B apt show
 has no long descriptions.
 .TP
+.I /etc/apt/apt.conf.d/50hyprdebian\-no\-recommends
+Keeps apt from installing the recommends of a package, so the system only
+gets what its packages depend on.
+The hd-* packages depend on everything they need.
+.TP
 .I /etc/dpkg/dpkg.cfg.d/hyprdebian\-excludes
 Has
 .BR dpkg (1)
@@ -392,8 +397,6 @@ removes them; mark the ones that are still used as installed by hand
 first, such as
 .B apt-mark manual nfs-common
 on a system that mounts NFS shares.
-git and delta come with
-.BR hd-desktop (7).
 .SH FILES
 .TP
 .I /usr/bin/hd-up
@@ -467,6 +470,9 @@ The packages apt never installs, a conffile.
 .TP
 .I /etc/apt/apt.conf.d/50hyprdebian\-languages
 No translations of the package descriptions, a conffile.
+.TP
+.I /etc/apt/apt.conf.d/50hyprdebian\-no\-recommends
+No recommends, a conffile.
 .TP
 .I /etc/dpkg/dpkg.cfg.d/hyprdebian\-excludes
 The files dpkg leaves out, a conffile.

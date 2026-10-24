@@ -40,6 +40,11 @@ the group users after every run of dpkg by apt, but not when the package is inst
 alone, so the postinst writes them too. A menu that cannot be written does not fail the
 installation.
 
+Versions before DROPPED_SINCE also depended on the packages in DROPPED, which are now marked as
+installed automatically and left for apt autoremove. An upgrade from such a version names them and
+says to mark the ones that are still used as installed by hand first, such as git. The postinst
+runs inside apt, which holds the lock, so it cannot do that itself.
+
 The conffiles in OBSOLETE_CONFFILES are removed with dpkg-maintscript-helper rm_conffile, which the
 preinst, the postinst and the postrm all run with their arguments. dpkg cannot remove their
 directory at the unpack, while they are still there, so the postinst removes it when it is empty;
@@ -63,12 +68,23 @@ CONFIG_FILE = "/etc/hyprdebian/config.json"
 THEME_KEY = "hd-theme"
 DEFAULT_THEME = "default"
 
-# The conffiles that hd-desktop no longer has, and the version that removed them, with ~ so that
+# The conffiles that hd-desktop no longer has, each with the version that removed it, with ~ so that
 # its prereleases count. Keep them the same as in the preinst and the postrm.
-OBSOLETE_CONFFILES = ["/etc/skel/.config/wofi/config", "/etc/skel/.config/wofi/style.css"]
-OBSOLETE_SINCE = "0.10~"
-# The directories of the obsolete conffiles, removed when they are empty.
-OBSOLETE_DIRS = ["/etc/skel/.config/wofi"]
+OBSOLETE_CONFFILES = [
+    ("/etc/skel/.config/wofi/config", "0.10~"),
+    ("/etc/skel/.config/wofi/style.css", "0.10~"),
+    ("/etc/skel/.gitconfig", "1.27~"),
+    ("/etc/skel/.config/nwg-look/config", "1.27~"),
+    ("/etc/skel/.local/share/nwg-look/gsettings", "1.27~"),
+]
+# The directories of the obsolete conffiles, removed when they are empty, deepest first.
+OBSOLETE_DIRS = ["/etc/skel/.config/wofi", "/etc/skel/.config/nwg-look",
+                 "/etc/skel/.local/share/nwg-look", "/etc/skel/.local/share", "/etc/skel/.local"]
+
+# The packages that versions before DROPPED_SINCE depended on, and no longer.
+DROPPED = ["git", "git-delta", "meld", "nwg-look", "pulseaudio-utils", "qt5-gtk-platformtheme",
+           "qt6-gtk-platformtheme", "libglib2.0-bin"]
+DROPPED_SINCE = "1.27~"
 
 # The first version of hd-desktop that copies /etc/skel to the home directory of the user.
 SKEL_SINCE = "0.3"
@@ -116,8 +132,8 @@ def theme_selected():
 
 
 def remove_obsolete_conffiles():
-    for conffile in OBSOLETE_CONFFILES:
-        subprocess.run(["dpkg-maintscript-helper", "rm_conffile", conffile, OBSOLETE_SINCE,
+    for conffile, since in OBSOLETE_CONFFILES:
+        subprocess.run(["dpkg-maintscript-helper", "rm_conffile", conffile, since,
                         "hd-desktop", "--", *sys.argv[1:]], check=True)
 
 
@@ -155,6 +171,10 @@ def main():
     subprocess.run(["/usr/sbin/hd-plymouth-render"], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
+    if previous != "" and older_than(previous, DROPPED_SINCE):
+        print(f"hd-desktop no longer depends on {', '.join(DROPPED)}. apt autoremove removes "
+              "them; mark the ones you use as installed by hand first, such as apt-mark manual "
+              "git.")
     if subprocess.run(["/usr/bin/hd-launcher-cache", "--update-all"]).returncode != 0:
         print("Could not write the menu of the launcher.", file=sys.stderr)
     if not os.path.isdir("/run/systemd/system"):

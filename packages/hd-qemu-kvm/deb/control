@@ -4,14 +4,16 @@ Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: python3, python3-debconf, debconf (>= 0.5) | debconf-2.0, hd-base,
- qemu-system-x86, qemu-utils, ovmf, libvirt-daemon-system, libvirt-clients, bridge-utils
+ qemu-system-x86, qemu-system-modules-spice, qemu-system-modules-opengl, qemu-utils, ovmf,
+ libvirt-daemon-system, libvirt-clients, bridge-utils
 Suggests: virt-manager
 Conflicts: qemu-system-gui
 Section: admin
 Priority: optional
 Description: HyprDebian Qemu/KVM support
- Installs Qemu with KVM, the UEFI firmware OVMF and libvirt, and sets them up
- to run virtual machines on the network through the bridge br0.
+ Installs Qemu with KVM, with the spice and OpenGL modules for the graphics of
+ virtual machines, the UEFI firmware OVMF and libvirt, and sets them up to
+ run virtual machines on the network through the bridge br0.
  .
  The first installation makes the wired interfaces that the administrator
  chooses ports of the bridge br0, with the network commands of hd-base.

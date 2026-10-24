@@ -4,36 +4,36 @@ Architecture: @ARCH@
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: hd-base (= @VERSION@), @MENU_DEPENDS@,
- python3, python3-jinja2, python3-cairo, python3-gi,
- gir1.2-rsvg-2.0, gir1.2-pango-1.0, sudo, dconf-cli,
  greetd, uwsm, dbus-user-session,
- hyprland, hyprland-qtutils, hyprpaper, hypridle, hyprlock, hyprshutdown,
- kitty, mako-notifier, libnotify-bin, libglib2.0-bin, jq, procps,
- python3-terminaltexteffects,
- plymouth, plymouth-label, initramfs-tools, fontconfig,
- pipewire, wireplumber, pulseaudio-utils, wiremix, playerctl, brightnessctl,
- grim, slurp, swappy, wl-clipboard,
- nwg-look, qt5-gtk-platformtheme, qt6-gtk-platformtheme,
- hd-audacious, mpv, imv, firefox, meld, yazi, git, git-delta
+ hyprland, hyprland-guiutils, xwayland, hyprpaper, hypridle, hyprlock,
+ hyprshutdown,
+ xdg-desktop-portal, xdg-desktop-portal-hyprland, xdg-desktop-portal-gtk,
+ kitty, mako-notifier, firefox, mpv, imv, yazi, hd-audacious, wiremix,
+ pipewire, wireplumber, pipewire-pulse, rtkit, alsa-ucm-conf,
+ grim, slurp, swappy, wl-clipboard, playerctl, brightnessctl, libnotify-bin,
+ python3, python3-jinja2, python3-cairo, python3-gi, python3-gi-cairo,
+ gir1.2-rsvg-2.0, gir1.2-pango-1.0, python3-terminaltexteffects,
+ jq, procps, sudo, dconf-cli, gnome-themes-extra-data, fontconfig,
+ plymouth, plymouth-label, initramfs-tools
 Conflicts: desktop-base, hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
-Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth, hd-base (<< 1.26)
+Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Provides: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Section: x11
 Priority: optional
 Description: HyprDebian desktop
  Depends on the packages of the HyprDebian desktop, so that they are
  installed with it and stay installed: Hyprland with uwsm, hyprpaper,
- hypridle and hyprlock, greetd, kitty, mako, PipeWire, the screenshot tools,
- the GTK and Qt themes, plymouth, git with delta, and the desktop
- applications. It depends
- on hd-base of the same version, the HyprDebian version of both.
+ hypridle, hyprlock, its dialogs and XWayland, greetd, the desktop portals,
+ kitty, mako, PipeWire, the screenshot tools, the dark GTK theme, plymouth,
+ and the desktop applications. HyprDebian installs no recommends, so these
+ are all the packages the desktop needs. It depends on hd-base of the same
+ version, the HyprDebian version of both.
  .
  greetd logs the first user in to Hyprland on tty7 at the boot; the user is
  the key hd-desktop of /etc/hyprdebian/config.json, written into
  /etc/greetd/config.toml by hd-desktop-render. The package also installs the
  files that new users get in /etc/skel: the configs of Hyprland, hypridle,
- hyprlock, hyprpaper, kitty, mako, mpv, PipeWire and nwg-look, the git config
- with delta, and the
+ hyprlock, hyprpaper, kitty, mako, mpv and PipeWire, and the
  commands that the key bindings run: the reboot and power off questions, the
  monitor mode menu, the mount menus and the volume keys. The users in the
  group sudo mount and unmount drives from the mount menus without a

@@ -56,7 +56,8 @@
 #                                             new users get in /etc/skel,
 #                                             the PATH of /etc/profile.d,
 #                                             the apt preferences, the apt
-#                                             config without translations,
+#                                             config without translations
+#                                             and without recommends,
 #                                             the files dpkg leaves out and
 #                                             the message after a login in
 #                                             /etc/update-motd.d

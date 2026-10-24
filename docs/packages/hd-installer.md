@@ -199,7 +199,7 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_mount` | Binds `/dev`, `/proc` and `/sys` and the journal socket into the new system. |
 | `b_mount_unit` | Writes and enables the automount units of the EFI system partitions on `/boot/efi` and, on mirrored ESP disks, `/boot/efi2`, by their UUID. |
 | `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository or not the suite. |
-| `b_apt_init` | Adds the Debian repositories, with the updates and security repositories for a stable suite, then updates the package lists, without the translations of the descriptions, as `hd-base` sets for the installed system. |
+| `b_apt_init` | Copies `deploy/etc/apt/apt.conf.d/00hd-installer` into the new system, so apt installs no recommends and downloads no translations of the descriptions while the installer runs, as `hd-base` sets for the installed system. Then it adds the Debian repositories, with the updates and security repositories for a stable suite, and updates the package lists. |
 | `b_debconf` | Sets the debconf selections of the answers file, if any, in the new system. |
 | `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font; a package with debconf selections in the answers file is configured with them, without questions. |
 | `b_initramfs` | Installs `initramfs-tools` with `zstd`, so every initramfs is compressed with zstd, and makes the initramfs not wait for a resume device. The kernel headers of `b_kernel` bring the compiler that DKMS builds the ZFS module with. |
@@ -240,7 +240,7 @@ The cleanup phase hands the installed system over:
 
 | Task | What it does |
 | --- | --- |
-| `c_live_repo` | Removes the apt source of the local repository of the live cd and updates the package lists, so the new system keeps only the Debian repositories. |
+| `c_live_repo` | Removes the apt source of the local repository of the live cd and the apt config `00hd-installer`, as hd-base has the same settings, and updates the package lists, so the new system keeps only the Debian repositories. |
 | `c_apt_clean` | Empties the cache of apt with `apt clean`: the packages that apt and `debootstrap` downloaded, and the caches of the package lists, which apt makes again when it needs them. |
 | `c_snapshots` | Takes the snapshot `rpool/hyprdebian@install`, the system as it was installed. |
 | `c_unmount` | Unmounts everything below `/mnt`, deepest first, and exports the pool, so the new system imports it when it boots. |

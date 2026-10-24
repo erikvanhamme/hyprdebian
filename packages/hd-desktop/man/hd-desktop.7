@@ -5,12 +5,21 @@ hd-desktop \- the HyprDebian desktop
 The package
 .B hd-desktop
 depends on the packages of the HyprDebian desktop, so that they are installed
-with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle and
-hyprlock, greetd, kitty, mako, PipeWire with wiremix, the screenshot tools
-grim, slurp and swappy, nwg-look with the GTK and Qt themes, plymouth, yazi,
-and the applications audacious of
+with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle,
+hyprlock, its dialogs and XWayland, greetd, the desktop portals of Hyprland
+and GTK, kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit,
+the screenshot tools grim, slurp and swappy, the dark GTK theme, plymouth,
+yazi, and the applications audacious of
 .BR hd-audacious (7),
-mpv, imv, firefox and meld, and git with delta, which shows its diffs.
+mpv, imv and firefox.
+HyprDebian installs no recommends, so the package depends on everything the
+desktop needs.
+Versions before 1.27 also depended on git, git-delta, meld, nwg-look,
+pulseaudio-utils and the Qt themes; after an upgrade
+.B apt autoremove
+removes them, so mark the ones that are still used as installed by hand
+first, such as
+.BR "apt-mark manual git" .
 .PP
 Its version is the version of HyprDebian, as of
 .BR hd-base (7),
@@ -84,10 +93,8 @@ in
 .IR /etc/skel :
 the configs of Hyprland
 .RI ( ~/.config/hypr/hyprland.lua ),
-hypridle, hyprlock, hyprpaper, kitty, mako, mpv, alsa, PipeWire,
-nwg-look and VSCodium, the git config
-.RI ( ~/.gitconfig )
-with delta as its pager and diff filter, and the directories
+hypridle, hyprlock, hyprpaper, kitty, mako, mpv, alsa, PipeWire and
+VSCodium, and the directories
 .I ~/.icons
 and
 .IR ~/Pictures/Screenshots .
@@ -192,7 +199,9 @@ browser and VSCodium, are started with
 too; the menus and short commands are not.
 .SH DARK THEME
 .I /etc/dconf/db/local.d/00-dark-theme
-asks GTK applications for the dark Adwaita theme.
+asks GTK applications for the dark Adwaita theme, and
+.I 01-font
+for the font of HyprDebian.
 .I /etc/dconf/profile/user
 adds that system database to the one of the user, and the installation
 compiles it with

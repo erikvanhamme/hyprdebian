@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-docker` installs Docker, from `docker.io`, and Docker Compose, from `docker-compose`, and sets them up to work with the ufw firewall, which it also depends on.
+The package `hd-docker` installs Docker, from `docker.io`, with its command line, from `docker-cli`, and buildx, which `docker build` uses, from `docker-buildx`, and Docker Compose, from `docker-compose`, and sets them up to work with the ufw firewall, which it also depends on.
 
 Installing the package:
 - installs `/etc/docker/daemon.json`, which gives the bridge `docker0` the address `192.168.253.1/24` and the networks that Docker makes a `/24` each from `192.168.240.0/20`, clear of the usual home and office networks;
@@ -22,7 +22,7 @@ cd packages/hd-docker
 make deb
 ```
 
-This builds `build/hd-docker_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `docker.io`, `docker-compose` and `ufw`. Install it with:
+This builds `build/hd-docker_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `docker.io`, `docker-cli`, `docker-buildx`, `docker-compose` and `ufw`. Install it with:
 ```
 sudo apt install ./build/hd-docker_<version>_all.deb
 ```

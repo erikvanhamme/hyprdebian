@@ -75,15 +75,15 @@
 #                                             same path, conffiles: the
 #                                             files new users get in
 #                                             /etc/skel, the dark theme
-#                                             for dconf, the sudoers
-#                                             rule of the mount menus and
-#                                             the apt hook that runs
-#                                             hd-launcher-cache
+#                                             and the font for dconf, the
+#                                             sudoers rule of the mount
+#                                             menus and the apt hook that
+#                                             runs hd-launcher-cache
 #                 /etc/skel/.icons
 #                 /etc/skel/Pictures/Screenshots
 #                                             empty directories for new
-#                                             users, for nwg-look and the
-#                                             screenshots
+#                                             users, for cursor themes and
+#                                             the screenshots
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the drop-in that
 #                                             runs hd-desktop-render before

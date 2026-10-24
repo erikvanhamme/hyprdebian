@@ -2,12 +2,18 @@
 # preinst of hd-desktop: the first step of removing the conffiles that hd-desktop no longer has,
 # with dpkg-maintscript-helper rm_conffile; the postinst and the postrm do the other steps. A
 # conffile that the user changed is kept, as <conffile>.dpkg-bak. Since 0.10, wofi is gone: its
-# config in /etc/skel too.
+# config in /etc/skel too. Since 1.27, git with delta and nwg-look are gone: the git config and the
+# settings of nwg-look in /etc/skel too.
 set -e
 
-# The version of hd-desktop that removed the conffiles, with ~ so that its prereleases count.
-OBSOLETE_SINCE=0.10~
-
-for conffile in /etc/skel/.config/wofi/config /etc/skel/.config/wofi/style.css; do
-    dpkg-maintscript-helper rm_conffile "$conffile" "$OBSOLETE_SINCE" hd-desktop -- "$@"
-done
+# The conffiles, each with the version of hd-desktop that removed it, with ~ so that its
+# prereleases count. Keep them the same as in the postinst and the postrm.
+while read -r conffile since; do
+    dpkg-maintscript-helper rm_conffile "$conffile" "$since" hd-desktop -- "$@"
+done <<EOF
+/etc/skel/.config/wofi/config 0.10~
+/etc/skel/.config/wofi/style.css 0.10~
+/etc/skel/.gitconfig 1.27~
+/etc/skel/.config/nwg-look/config 1.27~
+/etc/skel/.local/share/nwg-look/gsettings 1.27~
+EOF

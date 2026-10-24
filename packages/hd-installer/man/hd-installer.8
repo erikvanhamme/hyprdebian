@@ -309,8 +309,10 @@ and
 .IR /boot/efi2 .
 It binds the local repository of the live cd into
 .I /run
-of the new system and adds it as a trusted apt source, adds the Debian
-repositories, sets the debconf selections of the answers file, asks the
+of the new system and adds it as a trusted apt source, has apt install no
+recommends and download no translations while it runs, as hd-base does for
+the installed system, adds the Debian repositories, sets the debconf
+selections of the answers file, asks the
 locales, the time zone and the keyboard, and installs the kernel
 and ZFS.
 It marks the other packages for the packages phase:
@@ -358,8 +360,8 @@ and
 .BR video .
 .TP
 .B cleanup
-Removes the apt source of the local repository of the live cd, empties
-the cache of apt, takes the
+Removes the apt source of the local repository of the live cd and the apt
+config of the installer, empties the cache of apt, takes the
 snapshot
 .B rpool/hyprdebian@install
 of the installed system, unmounts it and exports the pool, so the new

@@ -1,0 +1,5 @@
+// The apt settings of the new system while hd-installer installs it: no recommends, and no
+// translations of the package descriptions, as hd-base sets for the installed system once it is
+// installed. hd-installer removes this file at the end of the installation.
+APT::Install-Recommends "false";
+Acquire::Languages "none";

@@ -175,14 +175,17 @@ b_live_repo() {
         live_repo="${LIVE_REPO_TARGET}"
 }
 
-# The Debian repositories, next to the local repository of the live cd. apt downloads no
-# translations, as hd-base sets for the installed system.
+# The Debian repositories, next to the local repository of the live cd. While the installer runs,
+# apt in the new system installs no recommends and downloads no translations, as hd-base sets for
+# the installed system once it is installed; c_live_repo removes the config of the installer again.
 b_apt_init() {
+    file_deploy deploy/etc/apt/apt.conf.d/00hd-installer || return 1
+
     template_render templates/etc/apt/sources.list.d/debian.sources.j2 || return 1
 
     rm -f "${TARGET_DIR}/etc/apt/sources.list" || return 1
 
-    in_target apt -o Acquire::Languages=none update
+    in_target apt update
 }
 
 # The debconf selections of the answers file, set in the new system before the packages that ask

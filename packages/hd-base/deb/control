@@ -28,8 +28,8 @@ Description: HyprDebian base system
  of systemd, the Secure Boot tools, and the command line tools. It keeps the
  system small: dpkg leaves out the documentation but the copyright files,
  the translations and the man pages in other languages than English, and apt
- downloads no translations of the package descriptions. Monthly timers scrub
- and trim the ZFS pools.
+ installs no recommends and downloads no translations of the package
+ descriptions. Monthly timers scrub and trim the ZFS pools.
  .
  It also installs hd-firmware, which finds and installs the firmware packages
  that the hardware needs, hd-up, which upgrades the system after a ZFS snapshot,

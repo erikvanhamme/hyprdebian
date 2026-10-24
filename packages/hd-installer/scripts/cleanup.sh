@@ -16,9 +16,11 @@ c_post() {
 }
 
 # The new system keeps only the Debian repositories. Its hd-* packages get updates once it is
-# linked to a HyprDebian repository with hd-link-repo, see c_repo_note.
+# linked to a HyprDebian repository with hd-link-repo, see c_repo_note. The apt config of the
+# installer goes too: hd-base has the same settings for the installed system.
 c_live_repo() {
     rm -f "${TARGET_DIR}/etc/apt/sources.list.d/hyprdebian-live.sources" || return 1
+    rm -f "${TARGET_DIR}/etc/apt/apt.conf.d/00hd-installer" || return 1
     in_target apt update
 }
 

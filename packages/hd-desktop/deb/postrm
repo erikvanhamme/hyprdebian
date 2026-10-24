@@ -13,10 +13,15 @@
 set -e
 
 # Keep these the same as in the preinst and the postinst.
-OBSOLETE_SINCE=0.10~
-for conffile in /etc/skel/.config/wofi/config /etc/skel/.config/wofi/style.css; do
-    dpkg-maintscript-helper rm_conffile "$conffile" "$OBSOLETE_SINCE" hd-desktop -- "$@"
-done
+while read -r conffile since; do
+    dpkg-maintscript-helper rm_conffile "$conffile" "$since" hd-desktop -- "$@"
+done <<EOF
+/etc/skel/.config/wofi/config 0.10~
+/etc/skel/.config/wofi/style.css 0.10~
+/etc/skel/.gitconfig 1.27~
+/etc/skel/.config/nwg-look/config 1.27~
+/etc/skel/.local/share/nwg-look/gsettings 1.27~
+EOF
 
 GREETD_CONFIG=/etc/greetd/config.toml
 PLYMOUTH_CONFIG=/etc/plymouth/plymouthd.conf

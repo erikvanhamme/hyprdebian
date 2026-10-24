@@ -1,0 +1,3 @@
+# The font of the GTK programs, for all users. Installed by hd-desktop.
+[org/gnome/desktop/interface]
+font-name='JetBrainsMono NFM Medium 11'

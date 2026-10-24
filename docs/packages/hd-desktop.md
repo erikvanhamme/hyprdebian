@@ -1,11 +1,15 @@
 ## Introduction
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
-- Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown;
+- Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown, its dialogs from `hyprland-guiutils`, and XWayland for the programs that only speak X11;
 - greetd, which logs the user in to Hyprland at the boot;
-- kitty, mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
-- nwg-look with the GTK and Qt themes, and plymouth;
-- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv, firefox and meld;
-- git with delta, which shows its diffs.
+- the desktop portals of Hyprland and GTK, for screen sharing, the file chooser and the dark mode;
+- kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit, and the screenshot tools grim, slurp and swappy;
+- the dark GTK theme Adwaita-dark, and plymouth;
+- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv and firefox.
+
+HyprDebian installs no recommends, see [hd-base](hd-base.md), so the package depends on everything the desktop needs.
+
+Versions before 1.27 also depended on `git`, `git-delta`, `meld`, `nwg-look`, `pulseaudio-utils`, `qt5-gtk-platformtheme`, `qt6-gtk-platformtheme` and `libglib2.0-bin`, and had `.gitconfig` and the settings of nwg-look in `/etc/skel`. An upgrade removes those files, unless they were changed. `apt autoremove` then removes the packages, and the postinst says so; mark the ones that are still used as installed by hand first, such as `sudo apt-mark manual git`.
 
 It holds the parts of the desktop, each with a page of its own:
 - [hd-art](hd-art.md): the wallpapers;
@@ -90,9 +94,7 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/hypr/hyprlock.conf`, `hyprpaper.conf` | The lock screen and the wallpaper. |
 | `~/.config/kitty`, `mako`, `mpv` | The terminal, the notifications and the media player. |
 | `~/.config/alsa`, `pipewire` | The sound. |
-| `~/.config/nwg-look`, `~/.local/share/nwg-look` | The GTK theme and font, applied by `nwg-look -a` when Hyprland starts. |
 | `~/.config/VSCodium` | The settings of VSCodium. |
-| `~/.gitconfig` | delta as the pager and diff filter of git. Versions of `hd-base` before 1.26 installed it; `hd-desktop` took it over. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
 The configs of Hyprland, hyprlock, hyprpaper, kitty and mako take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
@@ -180,7 +182,7 @@ hd-launcher-cache --update
 ```
 
 ## Dark theme
-`/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`.
+`/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme, Adwaita-dark of `gnome-themes-extra-data`, and `01-font` for the font of HyprDebian, `JetBrainsMono NFM Medium 11`. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`.
 
 ## Removing the package
 Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher-cache`; the settings in `/etc/hyprdebian/config.json` and the caches and settings of the users in their home directories stay.
@@ -204,5 +206,5 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/usr/bin/hd-*` | The commands of the key bindings. |
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |
 | `/etc/sudoers.d/hd-desktop` | Lets the group `sudo` mount without a password. |
-| `/etc/dconf/profile/user`, `/etc/dconf/db/local.d/00-dark-theme` | The dark theme for GTK applications. |
+| `/etc/dconf/profile/user`, `/etc/dconf/db/local.d/00-dark-theme`, `01-font` | The dark theme and the font for GTK applications. |
 | `/etc/skel/...` | The files for new users. |

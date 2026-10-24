@@ -3,12 +3,12 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, docker.io, docker-compose, ufw
+Depends: python3, docker.io, docker-cli, docker-buildx, docker-compose, ufw
 Section: admin
 Priority: optional
 Description: HyprDebian Docker support
- Installs Docker and Docker Compose, and sets them up to work with the ufw
- firewall.
+ Installs Docker, with its command line and buildx, which docker build uses,
+ and Docker Compose, and sets them up to work with the ufw firewall.
  .
  /etc/docker/daemon.json gives the bridge of Docker the address
  192.168.253.1/24 and takes the networks of containers from 192.168.240.0/20,

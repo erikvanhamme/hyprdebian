@@ -16,6 +16,7 @@ Run it with make switch-vm-gpu in the root of the repository.
 
 import argparse
 import io
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -23,10 +24,15 @@ from vmcommon import DRI_BY_PATH, URI, VmError, ask, ask_gpu, choose, define, do
 
 
 def load(name):
-    """The inactive domain XML of the vm, parsed, keeping the prefixes of its namespaces."""
+    """The inactive domain XML of the vm, parsed, keeping the prefixes of its namespaces.
+
+    ElementTree reserves the prefixes ns0, ns1 and so on for namespaces it has no prefix for, and
+    names them so itself when it writes them, so those are not registered.
+    """
     xml = virsh("dumpxml", "--inactive", name)
     for _, (prefix, uri) in ET.iterparse(io.StringIO(xml), events=["start-ns"]):
-        ET.register_namespace(prefix, uri)
+        if not re.fullmatch(r"ns\d+", prefix):
+            ET.register_namespace(prefix, uri)
     return ET.fromstring(xml)
 
 

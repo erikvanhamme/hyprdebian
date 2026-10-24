@@ -33,7 +33,7 @@ The postinst runs inside apt, which holds the lock, so it cannot do that itself.
 Versions before DROPPED_SINCE also depended on the packages in DROPPED, which are now marked as
 installed automatically and left for apt autoremove. An upgrade from such a version names them and
 says to mark the ones that are still used as installed by hand first, such as nfs-common on a
-system that mounts NFS shares. git and git-delta come with hd-desktop now.
+system that mounts NFS shares.
 
 Versions before SOURCES_SINCE named the apt source of hd-link-repo hyprdebian.local.sources. An
 upgrade from such a version renames it to hyprdebian.sources, unless that one already exists, so

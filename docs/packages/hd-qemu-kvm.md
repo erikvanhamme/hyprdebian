@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-qemu-kvm` installs Qemu with KVM, from `qemu-system-x86`, the UEFI firmware OVMF and libvirt, from `libvirt-daemon-system`, and sets them up to run virtual machines on the network through the bridge `br0`. It conflicts with `qemu-system-gui`, which `qemu-system-x86` recommends: virtual machines are shown with `virt-manager` or another spice client. `virt-manager` is not installed with the package; install it on a desktop with `sudo apt install virt-manager`.
+The package `hd-qemu-kvm` installs Qemu with KVM, from `qemu-system-x86`, with its modules for spice and OpenGL, `qemu-system-modules-spice` and `qemu-system-modules-opengl`, the graphics of virtual machines, the UEFI firmware OVMF and libvirt, from `libvirt-daemon-system`, and sets them up to run virtual machines on the network through the bridge `br0`. It conflicts with `qemu-system-gui`, which `qemu-system-x86` recommends: virtual machines are shown with `virt-manager` or another spice client. `virt-manager` is not installed with the package; install it on a desktop with `sudo apt install virt-manager`.
 
 Installing the package:
 - makes the chosen wired interfaces ports of the bridge `br0` on the first installation, with the commands of [hd-network](hd-network.md); see below;
@@ -25,7 +25,7 @@ cd packages/hd-qemu-kvm
 make deb
 ```
 
-This builds `build/hd-qemu-kvm_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `python3-debconf`, `debconf`, `hd-base`, `qemu-system-x86`, `qemu-utils`, `ovmf`, `libvirt-daemon-system`, `libvirt-clients` and `bridge-utils`. Install it with:
+This builds `build/hd-qemu-kvm_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `python3-debconf`, `debconf`, `hd-base`, `qemu-system-x86`, `qemu-system-modules-spice`, `qemu-system-modules-opengl`, `qemu-utils`, `ovmf`, `libvirt-daemon-system`, `libvirt-clients` and `bridge-utils`. Install it with:
 ```
 sudo apt install ./build/hd-qemu-kvm_<version>_all.deb
 ```

@@ -1,0 +1,4 @@
+// apt installs the dependencies of a package, but not its recommends, so the system only gets
+// what its packages need: hd-base, hd-desktop and the other hd-* packages depend on all they
+// need. Installed by hd-base.
+APT::Install-Recommends "false";
