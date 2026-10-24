@@ -1,0 +1,106 @@
+#!/usr/bin/python3
+"""Starts audacious with its terminal interface, see hd-audacious(7).
+
+The package hd-audacious installs this as /usr/bin/audacious, in front of the binary in
+/usr/lib/hd-audacious/bin, which is built without GTK and Qt and so only has the terminal
+interface, with --tui. The arguments are those of audacious(1), all handed on to it unchanged, so
+they are not parsed here, apart from a look at the instance and --headless.
+
+The terminal interface needs a terminal. Started from one, audacious runs in it. Started without
+one, as from the application launcher or an opener of yazi, a running instance is given the
+command line over D-Bus, the way audacious does that itself; without a running instance, audacious
+starts in a new kitty window. kitty is only recommended by the package, so that it pulls in no
+graphical libraries; without it, audacious only starts from a terminal.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+AUDACIOUS = "/usr/lib/hd-audacious/bin/audacious"
+TERMINAL = ["kitty", "--class", "audacious", "-o", "confirm_os_window_close=0", "-e"]
+
+
+def options(args):
+    """Returns the arguments before --, after which there are only files."""
+    if "--" in args:
+        return args[:args.index("--")]
+    return args
+
+
+def short_options(args):
+    """Returns the letters of the short options in args, such as Hq of -Hq."""
+    letters = ""
+    for arg in options(args):
+        if re.fullmatch(r"-[A-Za-z]+", arg):
+            letters += arg[1:]
+    return letters
+
+
+def instance(args):
+    """Returns the instance that args select with -1 to -9, 1 when there is none."""
+    number = 1
+    for arg in options(args):
+        if re.fullmatch(r"-[1-9]", arg):
+            number = int(arg[1])
+    return number
+
+
+def without_interface(args):
+    """Tells whether audacious runs without an interface with args: headless, or only to print
+    its help or version."""
+    letters = short_options(args)
+    for option in ("--headless", "--help", "--version"):
+        if option in options(args):
+            return True
+    for letter in "Hhv":
+        if letter in letters:
+            return True
+    return False
+
+
+def is_running(number):
+    """Tells whether instance number of audacious runs, by its name on the D-Bus session bus."""
+    if number == 1:
+        name = "org.atheme.audacious"
+    else:
+        name = f"org.atheme.audacious-{number}"
+
+    try:
+        result = subprocess.run(
+            ["busctl", "--user", "call", "org.freedesktop.DBus", "/org/freedesktop/DBus",
+             "org.freedesktop.DBus", "NameHasOwner", "s", name],
+            capture_output=True, text=True, check=False)
+    except OSError:
+        return False
+    return result.returncode == 0 and result.stdout.strip() == "b true"
+
+
+def main():
+    args = sys.argv[1:]
+
+    if without_interface(args):
+        command = [AUDACIOUS, *args]
+    else:
+        command = [AUDACIOUS, "--tui", *args]
+
+    on_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    if not on_terminal and not without_interface(args) and not is_running(instance(args)):
+        if shutil.which(TERMINAL[0]) is None:
+            print(f"audacious: no terminal, and {TERMINAL[0]} to open one is not installed",
+                  file=sys.stderr)
+            return 1
+        command = [*TERMINAL, *command]
+
+    # audacious, or kitty with it, takes the place of this process.
+    try:
+        os.execvp(command[0], command)
+    except OSError as error:
+        print(f"audacious: cannot start {command[0]}: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

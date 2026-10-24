@@ -14,7 +14,7 @@ Depends: hd-base (= @VERSION@), @MENU_DEPENDS@,
  pipewire, wireplumber, pulseaudio-utils, wiremix, playerctl, brightnessctl,
  grim, slurp, swappy, wl-clipboard,
  nwg-look, qt5-gtk-platformtheme, qt6-gtk-platformtheme,
- audacious, mpv, imv, firefox, meld, yazi
+ hd-audacious, mpv, imv, firefox, meld, yazi
 Conflicts: desktop-base, hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Provides: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth

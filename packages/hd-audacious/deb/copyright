@@ -1,0 +1,63 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: audacious, audacious-plugins
+Upstream-Contact: https://audacious-media-player.org/
+Source: https://github.com/erikvanhamme/audacious
+ https://github.com/erikvanhamme/audacious-plugins
+Comment: The binaries are compiled from the forks of HyprDebian of audacious
+ and audacious-plugins, at the commits named in the control file: the
+ releases of the Audacious developers, with the terminal interface added.
+ Their licenses are in /usr/share/doc/hd-audacious/COPYING-audacious and
+ COPYING-audacious-plugins. The plugins are each under their own license, as
+ their sources say: BSD-2-Clause, GPL-2+, GPL-3+ or ISC. The binaries
+ link to the libraries of Debian, each under its own license.
+
+Files: *
+Copyright: 2001-2026 Audacious developers and others
+License: BSD-2-Clause
+
+Files: audacious-plugins/src/tui/* audacious/src/libaudcore/interface.cc
+Copyright: 2026 Erik Van Hamme
+License: BSD-2-Clause
+
+Files: audacious/images/*
+Copyright: Sam Hewitt
+License: CC-BY-SA-4.0
+ The icons adapted from the Paper Icon Set are distributed under the
+ Creative Commons Attribution-ShareAlike 4.0 license, see
+ https://creativecommons.org/licenses/by-sa/4.0/.
+
+Files: audacious-plugins/src/m3u/* audacious-plugins/src/pls/*
+ audacious-plugins/src/flac/* audacious-plugins/src/sndfile/*
+Copyright: The authors named in the sources
+License: GPL-2+
+ On Debian systems, the full text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.
+
+Files: audacious-plugins/src/flac/metadata.cc
+Copyright: The authors named in the sources
+License: GPL-3+
+ On Debian systems, the full text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
+
+Files: audacious-plugins/src/mpg123/*
+Copyright: 2010 William Pitcock <nenolod@dereferenced.org>
+ 2010-2011 John Lindgren <john.lindgren@tds.net>
+License: ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+
+License: BSD-2-Clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ .
+ 1. Redistributions of source code must retain the above copyright notice,
+    this list of conditions, and the following disclaimer.
+ .
+ 2. Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions, and the following disclaimer in the
+    documentation provided with the distribution.
+ .
+ This software is provided "as is" and without any warranty, express or
+ implied. In no event shall the authors be liable for any damages arising
+ from the use of this software.

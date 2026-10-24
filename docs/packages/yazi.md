@@ -16,7 +16,7 @@ kitty -e hd-yazi
 ## Configuration
 New users get `~/.config/yazi/yazi.toml` from `/etc/skel/.config/yazi/yazi.toml`, a conffile, so local changes are kept on upgrades. Yazi merges it with its defaults. It:
 
-- opens videos with `mpv`, audio with `audacious` (open or enqueue) and images with `imv-wayland`;
+- opens videos with `mpv`, audio with `audacious` of [hd-audacious](hd-audacious.md) (open or enqueue) and images with `imv-wayland`; audacious takes the files in the instance that runs, or starts in a kitty window;
 - shows no previews and preloads nothing under `/stor`, the network storage, so browsing it stays fast;
 - shows hidden files.
 

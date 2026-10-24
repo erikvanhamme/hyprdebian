@@ -4,7 +4,7 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - greetd, which logs the user in to Hyprland at the boot;
 - kitty, mako, PipeWire with wiremix, and the screenshot tools grim, slurp and swappy;
 - nwg-look with the GTK and Qt themes, and plymouth;
-- yazi, and the applications audacious, mpv, imv, firefox and meld.
+- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv, firefox and meld.
 
 It holds the parts of the desktop, each with a page of its own:
 - [hd-art](hd-art.md): the wallpapers;
@@ -32,7 +32,7 @@ This builds `build/hd-desktop_<version>_<arch>.deb`. Its version is the version 
 sudo apt install ./build/hd-desktop_<version>_<arch>.deb
 ```
 
-It needs the HyprDebian repository for `hd-base`, `wiremix` and `yazi`.
+It needs the HyprDebian repository for `hd-base`, `hd-audacious`, `wiremix` and `yazi`.
 
 The files involved are:
 ```

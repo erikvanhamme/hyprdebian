@@ -27,5 +27,5 @@ Hyprdebian is intended to have only 1 user.
 
 ## Key Workflow Principles
 
-- **TUI/CLI First:** Minimal GUI overhead, prioritizing keyboard-driven productivity tools such as **Yazi** for file management and **MPV** / **audacious** for media playback.
+- **TUI/CLI First:** Minimal GUI overhead, prioritizing keyboard-driven productivity tools such as **Yazi** for file management and **MPV** / **audacious**, with its terminal interface, for media playback.
 - **Automated & Maintainable:** Installed via modular Bash installation scripts with dependency verification, ensuring precise build environments and reproducible deployments.

@@ -1,0 +1,27 @@
+Package: hd-audacious
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: @DEPENDS@, python3, systemd
+Recommends: kitty
+Conflicts: audacious, audacious-plugins, audacious-plugins-data
+Replaces: audacious, audacious-plugins, audacious-plugins-data
+Provides: audacious
+Section: sound
+Priority: optional
+Homepage: https://github.com/erikvanhamme/audacious
+Description: Audacious audio player with a terminal interface
+ Audacious plays music in a terminal: a notcurses interface with the
+ controls and progress, the playlist and the song that plays. It plays FLAC,
+ MP3 and WAV with ReplayGain over PipeWire, and can be controlled with
+ playerctl over MPRIS and with audtool. It is built for a small footprint:
+ without GTK, Qt or any other graphical library.
+ .
+ audacious starts in the terminal it is run in. Run without one, as from the
+ application launcher, it starts in a kitty window when kitty is installed,
+ or hands the files to the audacious that already runs.
+ .
+ This package holds audacious and audacious-plugins @UPSTREAM_VERSION@ with
+ the terminal interface of HyprDebian, built from @SOURCE@ of the forks. It
+ replaces the packages audacious and audacious-plugins of Debian.

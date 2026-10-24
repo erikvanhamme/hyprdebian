@@ -1,0 +1,107 @@
+.TH HD-AUDACIOUS 7 "October 2026" "hd-audacious" "HyprDebian"
+.SH NAME
+hd-audacious \- the audio player audacious with a terminal interface
+.SH DESCRIPTION
+The package
+.B hd-audacious
+holds the audio player
+.BR audacious (1)
+with a terminal interface, from the forks of audacious and audacious-plugins
+of HyprDebian. It replaces the packages
+.BR audacious ,
+.B audacious-plugins
+and
+.B audacious-plugins-data
+of Debian.
+.PP
+.PP
+It is built for a small footprint, without GTK, Qt or any other graphical
+library, with only the plugins for the terminal interface, MPRIS, FLAC, MP3
+and WAV, the output to PipeWire and the playlist files m3u, pls and audpl.
+ReplayGain is part of audacious itself and on by default, in track mode; it
+reads the tags of FLAC files and the ID3v2 and APE tags of MP3 files.
+.PP
+.B /usr/bin/audacious
+starts the binary in
+.I /usr/lib/hd-audacious/bin
+with
+.BR \-\-tui .
+All arguments are handed on to it unchanged. Started from a terminal,
+audacious runs in it. Started without one, as from the application launcher
+or an opener of yazi, it hands its command line to the instance of
+audacious that runs, as audacious does over D-Bus; when that instance does
+not run, it starts in a new kitty window of the class
+.BR audacious .
+The package only recommends kitty, so that it pulls in no graphical
+libraries; without kitty, audacious only starts from a terminal.
+With
+.BR \-\-headless ,
+.B \-\-help
+or
+.B \-\-version
+it runs without the terminal interface.
+.PP
+The output of audacious goes to
+.I /tmp/audacious-tui-<user>.log
+while the terminal interface runs, so that it does not mix with the
+interface.
+.SH KEYS
+.TP
+.B Up, Down, Page Up, Page Down
+Move through the playlist.
+.TP
+.B Enter
+Play the song in the playlist.
+.TP
+.B Space
+Pause or play.
+.TP
+.B Left, Right
+Seek 5 seconds back or forward.
+.TP
+.B q
+Quit.
+.SH REMOTE CONTROL
+The plugin mpris2, which is enabled from the start, lets the media keys of
+the desktop control audacious with
+.BR playerctl (1).
+.BR audtool (1)
+controls it from a shell:
+.PP
+.nf
+audtool playlist-addurl ~/Music/album
+audtool playback-play
+.fi
+.SH SETTINGS
+The terminal interface has no settings window. The settings are in
+.IR ~/.config/audacious/config ,
+which audacious writes when it quits, so change it while audacious does not
+run. ReplayGain is in the section
+.BR [audacious] :
+.TP
+.B enable_replay_gain
+TRUE or FALSE; TRUE by default.
+.TP
+.B replay_gain_mode
+0 for track gain, the default, 1 for album gain, 2 for album gain, but track
+gain while the playlist is shuffled.
+.TP
+.B replay_gain_preamp
+The gain to add, in dB; 0 by default.
+.SH FILES
+.TP
+.I /usr/bin/audacious
+Starts audacious with its terminal interface.
+.TP
+.I /usr/lib/hd-audacious
+The binaries, the private libraries libaudcore and libaudtag, and the
+plugins in
+.IR audacious/ .
+.TP
+.I ~/.config/audacious
+The settings and playlists of a user.
+.SH SEE ALSO
+.BR audacious (1),
+.BR audtool (1),
+.BR hd-desktop (7),
+.BR hd-yazi (1)
