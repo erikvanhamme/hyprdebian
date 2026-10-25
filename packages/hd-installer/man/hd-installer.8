@@ -142,10 +142,19 @@ The EFI system partitions are asked apart from the system, so they can go
 on other disks than the ZFS pool, such as a hardware RAID volume next to a
 ZFS mirror on disks that the RAID controller passes through.
 .PP
-Disks are picked by number from a list of the whole disks, by their name in
+Disks are picked by number from a list of the whole disks.
+Each disk is named by its WWN, the
+.B wwn\-
+link in
 .IR /dev/disk/by-id ,
-which stays the same when the kernel names the disks in another order.
-Each is shown with its kernel name, size and model.
+or else its NVMe EUI, the
+.B nvme\-eui.\&
+link there, which stay the same when the kernel names the disks in another
+order, or else its kernel node, such as
+.IR /dev/vda .
+The ZFS pool, the swap and the EFI system partitions are made on the
+partitions of that name.
+Each is shown with its kernel name, size, model and serial number.
 A disk that is already picked for the other side of a mirror stays in the
 list, so the numbers do not change, but cannot be picked again.
 .SH ANSWERS FILE
@@ -175,8 +184,7 @@ or
 A list of one disk, or two for a mirror.
 A disk may be named by any path, such as
 .IR /dev/vdb ;
-the installer stores its name in
-.IR /dev/disk/by-id .
+the installer stores its name in the list of disks.
 .TP
 .B swap
 The swap size in GiB, a whole number.

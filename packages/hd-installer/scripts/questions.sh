@@ -212,7 +212,7 @@ q_wipe() {
 
     echo "The installation wipes these disks:"
     for disk in "${disks[@]}"; do
-        printf '    %s\n        %s\n' "$(basename "${disk}")" "$(disk_info "${disk}")"
+        printf '    %s\n        %s\n' "${disk}" "$(disk_info "${disk}")"
     done
 
     if answered Q_WIPE; then

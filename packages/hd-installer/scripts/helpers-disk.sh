@@ -1,53 +1,61 @@
 #!/bin/bash
-# Helpers for the disks: picking them and checking the swap size. Disks are named by their path
-# in DISK_BY_ID_DIR, which stays the same when the kernel names the disks in another order.
+# Helpers for the disks: picking them and checking the swap size. A disk is named by its WWN in
+# DISK_BY_ID_DIR, or else its NVMe EUI there, which stay the same when the kernel names the disks
+# in another order; a disk with neither is named by its kernel node, such as /dev/vda.
 
-# Fills the array named by the argument with one /dev/disk/by-id path per whole disk, in the
-# order of the names. A disk has several names; the one with its model and serial number is
-# preferred over the nvme-eui. and wwn- ones. Partitions, device mapper and md devices, and
-# devices that are not disks, such as optical drives, are left out.
+# Prints the name of a disk, by its kernel node: its wwn- link in DISK_BY_ID_DIR, or else its
+# nvme-eui. link, or else the kernel node itself.
+# Usage: disk_name <device>
+disk_name() {
+    local device="$1"
+    local pattern link
+
+    for pattern in "wwn-*" "nvme-eui.*"; do
+        for link in "${DISK_BY_ID_DIR}"/${pattern}; do
+            if [[ "${link}" =~ -part[0-9]+$ ]]; then
+                continue
+            fi
+            if [[ -e "${link}" && "$(readlink -f "${link}")" == "${device}" ]]; then
+                echo "${link}"
+                return 0
+            fi
+        done
+    done
+
+    echo "${device}"
+}
+
+# Fills the array named by the argument with the name of every whole disk, see disk_name, in the
+# order of their kernel names. Devices that are not disks, such as optical drives, partitions,
+# device mapper and md devices, and the disks that are not drives, the zram swap, ZFS volumes,
+# network block devices and RAM disks, and empty ones, are left out.
 # Usage: list_disks <array>
 list_disks() {
     local -n disks_out="$1"
-    local -A seen=()
-    local pass link name device type
+    local device type size
 
     disks_out=()
-    for pass in model id; do
-        for link in "${DISK_BY_ID_DIR}"/*; do
-            name="$(basename "${link}")"
-            if [[ "${name}" =~ -part[0-9]+$ || "${name}" == dm-* || "${name}" == md-* \
-                || "${name}" == lvm-* ]]; then
-                continue
-            fi
-            if [[ "${name}" == wwn-* || "${name}" == nvme-eui.* || "${name}" == nvme-nvme.* ]]; then
-                if [[ "${pass}" == "model" ]]; then
-                    continue
-                fi
-            elif [[ "${pass}" == "id" ]]; then
-                continue
-            fi
-
-            device="$(readlink -f "${link}")"
-            if [[ -n "${seen[${device}]+set}" ]]; then
-                continue
-            fi
-            type="$(lsblk -dno TYPE "${device}" 2> /dev/null)" || continue
-            if [[ "${type}" != "disk" ]]; then
-                continue
-            fi
-            seen["${device}"]=1
-            disks_out+=("${link}")
-        done
-    done
+    while read -r device type size; do
+        if [[ "${type}" != "disk" ]]; then
+            continue
+        fi
+        if [[ "${device}" =~ ^/dev/(zram|zd|nbd|ram)[0-9]+$ ]]; then
+            continue
+        fi
+        if [[ "${size}" == "0" ]]; then
+            continue
+        fi
+        disks_out+=("$(disk_name "${device}")")
+    done < <(lsblk -dnpbo NAME,TYPE,SIZE)
 }
 
-# Prints the kernel name, size and model of a disk.
+# Prints the kernel name, size, model and serial number of a disk.
 # Usage: disk_info <path>
 disk_info() {
     local device
     device="$(readlink -f "$1")"
-    printf '%s  %s\n' "$(basename "${device}")" "$(lsblk -dno SIZE,MODEL "${device}" 2> /dev/null)"
+    printf '%s  %s\n' "$(basename "${device}")" \
+        "$(lsblk -dno SIZE,MODEL,SERIAL "${device}" 2> /dev/null)"
 }
 
 # Succeeds when two paths name the same disk.
@@ -56,7 +64,7 @@ same_disk() {
     [[ "$(readlink -f "$1")" == "$(readlink -f "$2")" ]]
 }
 
-# Asks to pick a disk by number, and stores its /dev/disk/by-id path.
+# Asks to pick a disk by number, and stores its name, see disk_name.
 # Usage: ask_disk <variable> <prompt> <default> [disk already picked]
 # The saved answer is offered first, then the default; when neither is a disk of the list, a
 # number must be typed. A disk already picked, such as the first disk of a mirror, stays in the
@@ -118,7 +126,7 @@ ask_disk() {
         if [[ -n "${picked}" ]] && same_disk "${disks[i]}" "${picked}"; then
             note="  (already picked)"
         fi
-        printf "%2d) %s%s\n    %s\n" "$((i + 1))" "$(basename "${disks[i]}")" "${note}" \
+        printf "%2d) %s%s\n    %s\n" "$((i + 1))" "${disks[i]}" "${note}" \
             "$(disk_info "${disks[i]}")"
     done
 
@@ -202,10 +210,21 @@ all_disks() {
     unique_disks "$1" "${Q_ROOT_DISK_A}" "${Q_ROOT_DISK_B}" "${Q_ESP_DISK_A}" "${Q_ESP_DISK_B}"
 }
 
-# Prints the path of a partition of a disk, by the name of the disk in /dev/disk/by-id.
+# Prints the path of a partition of a disk, by the name of the disk: <disk>-part<number> for a
+# name in DISK_BY_ID_DIR, and for a kernel node <disk><number>, or <disk>p<number> when the node
+# ends in a digit, such as /dev/nvme0n1p1.
 # Usage: part <disk> <number>
 part() {
-    echo "$1-part$2"
+    local disk="$1"
+    local number="$2"
+
+    if [[ "${disk}" == "${DISK_BY_ID_DIR}"/* ]]; then
+        echo "${disk}-part${number}"
+    elif [[ "${disk}" =~ [0-9]$ ]]; then
+        echo "${disk}p${number}"
+    else
+        echo "${disk}${number}"
+    fi
 }
 
 # Succeeds when a disk supports discard, which a hardware RAID volume often does not.

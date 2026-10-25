@@ -76,7 +76,7 @@ p_probe() {
 p_review() {
     local disks disk
 
-    # The links of the new partitions in /dev/disk/by-id are made by udev.
+    # The nodes of the new partitions, and their links in /dev/disk/by-id, are made by udev.
     udevadm settle || return 1
 
     all_disks disks
