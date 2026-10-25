@@ -10,12 +10,25 @@ ssh, so the ssh key of the user must be in the authorized_keys of repo on that h
 
     update-repo.py PACKAGE...             ask the host name, then upload and update
     update-repo.py --dry-run PACKAGE...   ask the host name, then only print the commands
+    update-repo.py --host HOST PACKAGE... upload to HOST, without asking for the host name
+    update-repo.py --yes PACKAGE...       upload without asking for a go-ahead
+    update-repo.py --only-new PACKAGE...  leave out the packages that are already in the pool
+                                          of their suite, by file name
+    update-repo.py --iso ISO PACKAGE...   also upload the live ISO to the folder iso of the
+                                          repository, with its SHA256SUMS
+
+With --host and --yes it asks nothing, so it can run unattended, as on a build server.
+
+The ISO is copied under a temporary name, checked against its sha256 on the repository and only
+then renamed into place, so downloads never get a half uploaded ISO. SHA256SUMS is written next
+to it.
 
 Run it with make update-repo in the root of the repository, which builds the packages first and
 takes the suites of each package from the deploy.json of its package directory.
 """
 
 import argparse
+import hashlib
 import os
 import re
 import shlex
@@ -24,10 +37,14 @@ import sys
 
 REPO_USER = "repo"
 SUITES = ["trixie", "unstable"]
-# The host name of the repository in the default URL of hd-installer, http://repo/.
+# The host name that update-repo.py offers when it asks for the repository.
 DEFAULT_HOST = "repo"
 # A host name, a fully qualified domain name or an IPv4 address.
 HOST_PATTERN = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$")
+# The repository on the host, which nginx serves, see hd-repo(7).
+REPO_DIR = "/srv/hd-repo"
+# The folder of the live ISO in the repository.
+ISO_DIR = f"{REPO_DIR}/iso"
 
 
 class UpdateError(Exception):
@@ -78,11 +95,60 @@ def packages_per_suite(args):
     return {suite: debs for suite, debs in per_suite.items() if debs}
 
 
-def commands(host, per_suite):
-    """The commands of the update: an scp to the inbox of each suite, then hd-repo-update."""
+def published(host, suite):
+    """The file names of the packages in the pool of a suite on the repository."""
+    pool = f"{REPO_DIR}/pool/{suite}/main"
+    command = ["ssh", f"{REPO_USER}@{host}", f"ls -1 -- {shlex.quote(pool)}"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise UpdateError(f"could not list {pool} on {host}: {result.stderr.strip()}")
+    return set(result.stdout.split())
+
+
+def only_new(host, per_suite):
+    """The packages of each suite that are not in its pool yet, leaving out suites without any."""
+    new = {}
+    for suite, debs in per_suite.items():
+        names = published(host, suite)
+        debs = [deb for deb in debs if os.path.basename(deb) not in names]
+        if debs:
+            new[suite] = debs
+    return new
+
+
+def sha256(path):
+    """The sha256 of a file, in hexadecimal."""
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def iso_commands(host, iso, digest):
+    """The commands that upload the ISO: make the folder, copy it, then check and rename it."""
+    target = f"{REPO_USER}@{host}"
+    name = os.path.basename(iso)
+    upload = f".{name}.upload"
+    # Checks the upload against the sha256 of the local ISO before it replaces the old one.
+    publish = (f"cd {shlex.quote(ISO_DIR)}"
+               f" && echo {shlex.quote(f'{digest}  {upload}')} | sha256sum -c --quiet"
+               f" && mv -f -- {shlex.quote(upload)} {shlex.quote(name)}"
+               f" && echo {shlex.quote(f'{digest}  {name}')} > .SHA256SUMS.upload"
+               f" && mv -f .SHA256SUMS.upload SHA256SUMS")
+    return [
+        ["ssh", target, f"mkdir -p -- {shlex.quote(ISO_DIR)}"],
+        ["scp", "-q", "--", iso, f"{target}:{ISO_DIR}/{upload}"],
+        ["ssh", target, publish],
+    ]
+
+
+def commands(host, per_suite, iso=None, digest=None):
+    """The commands of the update: an scp to the inbox of each suite, then hd-repo-update, then
+    the upload of the ISO, when there is one."""
     target = f"{REPO_USER}@{host}"
     steps = [["scp", "-q", "--", *debs, f"{target}:inbox/{suite}/"] for suite, debs in per_suite.items()]
-    steps.append(["ssh", target, "hd-repo-update", *per_suite])
+    if per_suite:
+        steps.append(["ssh", target, "hd-repo-update", *per_suite])
+    if iso is not None:
+        steps.extend(iso_commands(host, iso, digest))
     return steps
 
 
@@ -91,6 +157,14 @@ def main():
         description="Uploads the HyprDebian packages to a repository, each for its suites.")
     parser.add_argument("--dry-run", action="store_true",
                         help="only print the commands, without uploading")
+    parser.add_argument("--host",
+                        help="the host name of the repository, instead of asking for it")
+    parser.add_argument("--yes", action="store_true",
+                        help="upload without asking for a go-ahead")
+    parser.add_argument("--only-new", action="store_true",
+                        help="leave out the packages that are already in the pool of their suite")
+    parser.add_argument("--iso",
+                        help="the live ISO, to upload to the folder iso of the repository")
     parser.add_argument("packages", nargs="+", metavar="PACKAGE",
                         help="a package with its suites, as <suites>:<path>, "
                              "such as trixie,unstable:build/hd-base_1.8_all.deb")
@@ -98,8 +172,24 @@ def main():
 
     try:
         per_suite = packages_per_suite(args.packages)
-        host = ask_host()
-        steps = commands(host, per_suite)
+        if args.iso is not None and not os.path.isfile(args.iso):
+            raise UpdateError(f"{args.iso}: there is no such ISO; build it with make iso")
+        if args.host is not None:
+            if not HOST_PATTERN.match(args.host):
+                raise UpdateError(f"{args.host}: give a host name, such as repo or repo.example.com, "
+                                  "or an IP address")
+            host = args.host
+        else:
+            host = ask_host()
+
+        if args.only_new:
+            per_suite = only_new(host, per_suite)
+        if not per_suite and args.iso is None:
+            print(f"All packages are already in the repository on {host}, nothing to upload.")
+            return 0
+
+        digest = sha256(args.iso) if args.iso is not None else None
+        steps = commands(host, per_suite, args.iso, digest)
 
         if args.dry_run:
             for step in steps:
@@ -110,12 +200,16 @@ def main():
             print(f"\nThe packages for {suite} on {REPO_USER}@{host}:")
             for deb in debs:
                 print(f"  {os.path.basename(deb)}")
-        if ask("\nUpload them and update the repository? (y/N)").lower() not in ("y", "yes"):
-            print("Nothing was changed.")
-            return 1
+        if args.iso is not None:
+            print(f"\nThe ISO for {ISO_DIR} on {REPO_USER}@{host}:")
+            print(f"  {os.path.basename(args.iso)}")
+        if not args.yes:
+            if ask("\nUpload them and update the repository? (y/N)").lower() not in ("y", "yes"):
+                print("Nothing was changed.")
+                return 1
 
         for step in steps:
-            print(f"\n{shlex.join([os.path.basename(arg) if arg.endswith(".deb") else arg for arg in step])}")
+            print(f"\n{shlex.join([os.path.basename(arg) if arg.endswith(('.deb', '.iso')) else arg for arg in step])}")
             if subprocess.run(step).returncode != 0:
                 raise UpdateError(f"{step[0]} failed")
     except UpdateError as e:

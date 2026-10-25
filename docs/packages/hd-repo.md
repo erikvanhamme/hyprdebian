@@ -76,6 +76,12 @@ Most HyprDebian packages go to both suites. `hd-desktop` goes to unstable only, 
 
 `make update-repo` hands `update-repo.py` each package as `<suites>:<path>`, such as `trixie,unstable:packages/hd-base_1.8_all.deb`. With `--dry-run` before the packages, it only prints the commands.
 
+Some more options of `update-repo.py`, also given before the packages:
+- `--host <host>` uploads to that host, without asking for the host name.
+- `--yes` uploads without asking for a go-ahead. With `--host` as well, it asks nothing, so it can run unattended, as on a build server.
+- `--only-new` leaves out every package whose file name is already in the pool of its suite, so a rebuild of a version that is already in the repository never replaces it.
+- `--iso <path>` also uploads the live ISO to `/srv/hd-repo/iso`, where it can be downloaded from `http://<host>/iso/`. It is copied under a temporary name, checked against its sha256 on the repository and only then renamed into place, with a `SHA256SUMS` next to it.
+
 ## hd-repo-update
 ```
 hd-repo-update [suite...]
@@ -130,6 +136,7 @@ The key is downloaded over the same connection as the packages, so it does not p
   dists/sid/                        the indices of unstable
   dists/stable -> trixie
   dists/unstable -> sid
+  iso/                              the live ISO and its SHA256SUMS, from update-repo.py --iso
 ```
 
 Each directory in `dists` holds `Release`, its signatures `InRelease` and `Release.gpg`, and `main/binary-amd64/Packages(.gz)`.
@@ -140,6 +147,12 @@ The suites have their own pools, so a package built for one suite never replaces
 When `/srv/hd-repo` is a ZFS dataset of its own, `hd-repo-update` takes a snapshot of it before it adds packages, so an update can be undone with `zfs rollback`. The installation lets `repo` take those snapshots when the dataset already exists. When the dataset is made later, allow it by hand:
 ```
 sudo zfs allow -u repo snapshot,mount rpool/hd-repo
+```
+
+Those snapshots also keep every live ISO that `update-repo.py --iso` replaced. To keep the ISOs out of them, make `/srv/hd-repo/iso` a dataset of its own, owned by `repo`:
+```
+sudo zfs create rpool/hd-repo/iso
+sudo chown repo:repo /srv/hd-repo/iso
 ```
 
 ## The signing key
