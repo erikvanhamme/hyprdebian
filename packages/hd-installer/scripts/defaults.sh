@@ -36,14 +36,14 @@ DEBCONF_DEFAULTS=(
     "console-setup console-setup/charmap47 select UTF-8"
     "console-setup console-setup/codeset47 select Guess optimal character set"
     "console-setup console-setup/fontface47 select TerminusBold"
-    "console-setup console-setup/fontsize-fb47 select 16x32 (framebuffer only)"
+    "console-setup console-setup/fontsize-fb47 select 8x16"
     "console-setup console-setup/fontsize-text47 select 8x16"
 )
 DEBCONF_DEFAULTS_SUMMARY=(
     "Locale:       en_US.UTF-8"
     "Time zone:    Europe/Brussels"
     "Keyboard:     English (US), Generic 105-key PC"
-    "Console font: TerminusBold 16x32"
+    "Console font: TerminusBold 8x16"
 )
 
 # Prints the default of a question, if there is one.

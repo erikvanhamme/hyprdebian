@@ -192,7 +192,9 @@ b_apt_init() {
 # The debconf selections of the answers file, and the defaults of the packages it has none of when
 # Q_DEBCONF_DEFAULTS is true, set in the new system before the packages that ask them are
 # installed. apt does not ask a question that is set; b_console reconfigures the packages it asks
-# without questions.
+# without questions. The config of console-setup overwrites its selections with the defaults of the
+# locale while store_defaults_in_debconf_db is true, as it is on a new system, so that is set to
+# false when it has selections.
 b_debconf() {
     local package lines
     local selections=()
@@ -205,6 +207,9 @@ b_debconf() {
     done
     if answered DEBCONF; then
         selections+=("${ANSWERS[DEBCONF]}")
+    fi
+    if debconf_selected console-setup; then
+        selections+=("console-setup console-setup/store_defaults_in_debconf_db boolean false")
     fi
 
     if (( ${#selections[@]} == 0 )); then
