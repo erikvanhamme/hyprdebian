@@ -72,6 +72,7 @@ packages/hd-base/man/hd-issue.8
 packages/hd-base/man/hd-link-repo.8
 packages/hd-base/man/hd-firmware.8
 packages/hd-base/tests/test_firmware.py
+packages/hd-base/tests/test_issue.py
 packages/hd-base/tests/test_up.py
 ```
 
@@ -200,7 +201,7 @@ hd-issue
 HyprDebian <version> · <suite> · <console>
 ```
 
-with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.sources`, and the name of the console. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`.
+with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.sources`, and the name of the console. A system that is not linked to a HyprDebian repository, as after an installation, has no such source; then the suite is the first one of `/etc/apt/sources.list.d/debian.sources`. The message after a login finds the suite in the same way. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`. The tests in `packages/hd-base/tests/test_issue.py` cover how the suite is found.
 
 The postinst runs it on every installation and upgrade. Run it as root after changing the suite yourself:
 ```

@@ -3,8 +3,11 @@
 # Shows the HyprDebian banner and the state of the system after a login on the console or over
 # ssh. pam_motd runs this as root. The package hd-base installs it.
 
-# The source of the HyprDebian packages, whose suite is shown.
+# The source of the HyprDebian packages, whose suite is shown, and the source of Debian, whose
+# first suite is shown when there is no source of the HyprDebian packages, as after an
+# installation.
 SOURCES=/etc/apt/sources.list.d/hyprdebian.sources
+DEBIAN_SOURCES=/etc/apt/sources.list.d/debian.sources
 
 # The version of HyprDebian, which hd-base installs.
 VERSION=/etc/hyprdebian/version.json
@@ -32,19 +35,21 @@ print("%d.%d" % (v["major"], v["minor"]))' "$VERSION" 2>/dev/null)
     echo "$value"
 }
 
-# Prints the suite of the HyprDebian packages, the first word of Suites: in their source, or
-# "unknown".
+# Prints the suite of the HyprDebian packages, the first word of Suites: in their source, or else
+# that of the source of Debian, or "unknown".
 suite() {
-    local value
+    local source value
 
-    value=$(sed -n 's/^Suites:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$SOURCES" 2>/dev/null \
-        | head -n 1)
+    for source in "$SOURCES" "$DEBIAN_SOURCES"; do
+        value=$(sed -n 's/^Suites:[[:space:]]*\([^[:space:]]*\).*/\1/p' "$source" 2>/dev/null \
+            | head -n 1)
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return
+        fi
+    done
 
-    if [[ -z "$value" ]]; then
-        value="unknown"
-    fi
-
-    echo "$value"
+    echo "unknown"
 }
 
 # Prints a line with a label in front of it.

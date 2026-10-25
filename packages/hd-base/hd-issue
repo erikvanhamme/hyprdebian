@@ -8,8 +8,10 @@ and upgrade.
 
 The banner is "HyprDebian <version> · <suite> · <tty>": the version of HyprDebian from
 /etc/hyprdebian/version.json, the suite of the HyprDebian packages from their apt source, and the
-console. agetty replaces \\e{...} with a color and \\l with the name of the console. A value that
-cannot be found shows as unknown. Run it as root, after a change of the suite.
+console. A system that is not linked to a HyprDebian repository, as after an installation, has no
+such source; then the suite is the first one of the Debian source. agetty replaces \\e{...} with
+a color and \\l with the name of the console. A value that cannot be found shows as unknown. Run
+it as root, after a change of the suite.
 """
 
 import argparse
@@ -21,6 +23,7 @@ import sys
 ISSUE = "/etc/issue"
 VERSION = "/etc/hyprdebian/version.json"
 SOURCES = "/etc/apt/sources.list.d/hyprdebian.sources"
+DEBIAN_SOURCES = "/etc/apt/sources.list.d/debian.sources"
 UNKNOWN = "unknown"
 
 
@@ -34,15 +37,25 @@ def version():
         return UNKNOWN
 
 
-def suite():
+def first_suite(path):
+    """The first suite of an apt source in the deb822 format, or None."""
     try:
-        with open(SOURCES, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 match = re.match(r"Suites:\s*(\S+)", line)
                 if match:
                     return match.group(1)
     except OSError:
         pass
+    return None
+
+
+def suite():
+    """The suite of the HyprDebian packages, or else the first suite of Debian."""
+    for path in (SOURCES, DEBIAN_SOURCES):
+        value = first_suite(path)
+        if value:
+            return value
     return UNKNOWN
 
 
