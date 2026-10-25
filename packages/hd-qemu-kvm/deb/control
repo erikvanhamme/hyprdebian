@@ -18,7 +18,8 @@ Description: HyprDebian Qemu/KVM support
  The first installation makes the wired interfaces that the administrator
  chooses ports of the bridge br0, with the network commands of hd-base.
  libvirtd only listens on its local sockets and stores secrets without
- encryption. The module br_netfilter is loaded with the traffic over bridges
+ encryption. A reboot of the host shuts the running guests down and starts
+ them again, so it reboots them too. The module br_netfilter is loaded with the traffic over bridges
  kept out of the firewall, and new users connect virsh and virt-manager to
  qemu:///system. Adding users to the groups libvirt and kvm is left to the
  administrator.

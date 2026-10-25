@@ -1,0 +1,10 @@
+# The settings of libvirt-guests, written by hd-qemu-kvm when it was installed. The one of libvirt,
+# which explains every setting, is /etc/default/libvirt-guests.libvirt.
+#
+# A shutdown or reboot of the host shuts the running guests down, one after the other, and waits up
+# to SHUTDOWN_TIMEOUT seconds for each. The next boot starts the guests that were running again,
+# so a reboot of the host also reboots them, into a new kernel after an upgrade. Guests that were
+# not running stay off, unless they have autostart.
+ON_BOOT=start
+ON_SHUTDOWN=shutdown
+SHUTDOWN_TIMEOUT=300

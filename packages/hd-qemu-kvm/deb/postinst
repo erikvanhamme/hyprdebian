@@ -1,13 +1,19 @@
 #!/usr/bin/python3
-"""postinst of hd-qemu-kvm: replaces the configs of libvirtd and its secrets driver, applies the
-masks and the bridge settings of the firewall, and on the first installation makes the chosen wired
-interfaces ports of the bridge br0.
+"""postinst of hd-qemu-kvm: replaces the configs of libvirtd, its secrets driver and
+libvirt-guests, applies the masks and the bridge settings of the firewall, and on the first
+installation makes the chosen wired interfaces ports of the bridge br0.
 
-libvirt ships /etc/libvirt/libvirtd.conf and /etc/libvirt/secret.conf as conffiles. They are
-diverted to <name>.libvirt, so dpkg keeps the ones of libvirt there, and the ones of
-/usr/share/hd-qemu-kvm are written in their place when the diversion is made, after which libvirtd
-is restarted. Later installations leave them alone, so changes made to them stay. The postrm of a
-removal removes them and puts the ones of libvirt back.
+libvirt ships /etc/libvirt/libvirtd.conf, /etc/libvirt/secret.conf and /etc/default/libvirt-guests
+as conffiles. They are diverted to <name>.libvirt, so dpkg keeps the ones of libvirt there, and the
+ones of /usr/share/hd-qemu-kvm are written in their place when the diversion is made, after which
+libvirtd is restarted when one of its configs was written. libvirt-guests reads its config each
+time it runs, so it needs no restart. A config that the administrator had changed is moved to
+<name>.libvirt with the diversion, which the postinst says. Later installations leave them alone,
+so changes made to them stay. The postrm of a removal removes them and puts the ones of libvirt
+back.
+
+The config of libvirt-guests starts the guests that were running before a shutdown of the host
+again at the next boot, so a reboot of the host also reboots its guests.
 
 It adds nobody to the groups libvirt and kvm; that is up to the administrator.
 
@@ -20,6 +26,7 @@ settings. This is done last, as the address of the system may change with it.
 """
 
 import fnmatch
+import hashlib
 import os
 import shutil
 import subprocess
@@ -32,8 +39,9 @@ import hd_network as hn
 
 PACKAGE = "hd-qemu-kvm"
 SHARE_DIR = "/usr/share/hd-qemu-kvm"
-# The configs of libvirt that hd-qemu-kvm replaces.
-LIBVIRT_CONFIGS = ["/etc/libvirt/libvirtd.conf", "/etc/libvirt/secret.conf"]
+# The configs of libvirt that hd-qemu-kvm replaces; libvirtd is restarted for the first two.
+LIBVIRTD_CONFIGS = ["/etc/libvirt/libvirtd.conf", "/etc/libvirt/secret.conf"]
+LIBVIRT_CONFIGS = LIBVIRTD_CONFIGS + ["/etc/default/libvirt-guests"]
 SYSCTL_CONF = "/usr/lib/sysctl.d/50-bridge-netfilter.conf"
 NET_CLASS_DIR = "/sys/class/net"
 BRIDGE = "br0"
@@ -65,16 +73,36 @@ def divert(path):
     return True
 
 
+def changed_conffile(path):
+    """True if the conffile was changed from the one of its package."""
+    conffiles = subprocess.run(["dpkg-query", "-W", "-f=${Conffiles}\n"], capture_output=True,
+                               text=True).stdout
+    for line in conffiles.splitlines():
+        fields = line.split()
+        if len(fields) < 2 or fields[0] != path:
+            continue
+        try:
+            with open(path, "rb") as f:
+                return hashlib.md5(f.read()).hexdigest() != fields[1]
+        except OSError:
+            return False
+    return False
+
+
 def replace_libvirt_configs():
-    """Diverts the configs of libvirt and writes those of hd-qemu-kvm. True if one was written."""
-    written = False
+    """Diverts the configs of libvirt and writes those of hd-qemu-kvm. Returns the ones written."""
+    written = []
     for path in LIBVIRT_CONFIGS:
+        changed = changed_conffile(path)
         if not divert(path):
             continue
         shutil.copyfile(os.path.join(SHARE_DIR, os.path.basename(path)), path)
         os.chmod(path, 0o644)
         print(f"Wrote {path}; the one of libvirt is {path}.libvirt.")
-        written = True
+        if changed:
+            print(f"{path} had changes, which are in {path}.libvirt now; copy them to {path} "
+                  "if they are still needed.")
+        written.append(path)
     return written
 
 
@@ -193,7 +221,7 @@ def main():
         subprocess.run(["systemctl", "daemon-reload"], check=True)
         subprocess.run(["modprobe", "br_netfilter"], check=True)
         subprocess.run(["sysctl", "-q", "-p", SYSCTL_CONF], check=True)
-        if configs_written:
+        if any(path in LIBVIRTD_CONFIGS for path in configs_written):
             subprocess.run(["systemctl", "try-restart", "libvirtd.service"], check=True)
 
     if ports:

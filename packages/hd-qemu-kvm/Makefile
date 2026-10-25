@@ -24,8 +24,10 @@
 #                                             out of the firewall
 #                 /usr/share/hd-qemu-kvm/libvirtd.conf
 #                 /usr/share/hd-qemu-kvm/secret.conf
+#                 /usr/share/hd-qemu-kvm/libvirt-guests
 #                                             the files in libvirt/, which the
 #                                             postinst writes to /etc/libvirt
+#                                             and /etc/default
 #                 /usr/share/man/man7/hd-qemu-kvm.7.gz
 #                                             the man page in man/
 #               with the control file deb/control, the debconf question
@@ -51,7 +53,7 @@ SHARE_DIR := /usr/share/$(DEB_NAME)
 UNIT_DIR := /etc/systemd/system
 LIBVIRT_CONF := /etc/skel/.config/libvirt/libvirt.conf
 # The configs of libvirt that the postinst writes.
-LIBVIRT_CONFIGS := libvirt/libvirtd.conf libvirt/secret.conf
+LIBVIRT_CONFIGS := libvirt/libvirtd.conf libvirt/secret.conf libvirt/libvirt-guests
 # The units and drop-ins that the package masks with a link to /dev/null.
 MASKS := libvirtd-tls.socket libvirtd-tcp.socket libvirtd.service.d/10-secret.conf
 # The maintainer scripts in deb/.

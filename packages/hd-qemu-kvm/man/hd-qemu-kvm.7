@@ -105,21 +105,30 @@ by default.
 Existing users can copy it to their home directory.
 .SH LIBVIRT
 libvirt ships
-.I /etc/libvirt/libvirtd.conf
-and
+.IR /etc/libvirt/libvirtd.conf ,
 .I /etc/libvirt/secret.conf
+and
+.I /etc/default/libvirt\-guests
 as conffiles.
 .B hd-qemu-kvm
 diverts them to
-.I libvirtd.conf.libvirt
-and
-.IR secret.conf.libvirt ,
+.IR <name>.libvirt ,
 where dpkg keeps the ones of libvirt, and writes its own in their place when
-it is installed, after which libvirtd is restarted:
+it is installed, after which libvirtd is restarted for its configs:
 .I libvirtd.conf
-turns off listening on TCP and TLS, and
+turns off listening on TCP and TLS,
 .I secret.conf
-stores secrets without encryption.
+stores secrets without encryption, and
+.I libvirt\-guests
+has
+.B libvirt-guests.service
+shut the running guests down when the host shuts down, waiting up to 300
+seconds for each, and start them again at the next boot. A reboot of the
+host thus also reboots its guests, into a new kernel after an upgrade.
+Guests that were not running stay off, unless they have autostart.
+A config that had been changed moves to
+.I <name>.libvirt
+with the diversion, which the installation says.
 Later installations leave them alone, so changes made to them stay.
 Removing the package puts the ones of libvirt back.
 .PP
@@ -151,13 +160,17 @@ takes their place.
 .I /etc/libvirt/libvirtd.conf
 .TQ
 .I /etc/libvirt/secret.conf
-The configs of libvirtd and its secrets driver that
+.TQ
+.I /etc/default/libvirt\-guests
+The configs of libvirtd, its secrets driver and libvirt-guests that
 .B hd-qemu-kvm
 wrote.
 .TP
 .I /etc/libvirt/libvirtd.conf.libvirt
 .TQ
 .I /etc/libvirt/secret.conf.libvirt
+.TQ
+.I /etc/default/libvirt\-guests.libvirt
 The configs of libvirt.
 .TP
 .I /etc/skel/.config/libvirt/libvirt.conf
@@ -167,7 +180,9 @@ a conffile.
 .TP
 .I /usr/share/hd-qemu-kvm
 The configs that are written to
-.IR /etc/libvirt .
+.I /etc/libvirt
+and
+.IR /etc/default .
 .TP
 .I /usr/lib/modules-load.d/br_netfilter.conf
 .TQ
