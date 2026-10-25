@@ -4,7 +4,9 @@
 #   make deb    build build/hd-docker_$(DEB_VERSION)_all.deb, with the version
 #               from version.json. It installs:
 #                 /etc/docker/daemon.json     the addresses of the networks
-#                                             of Docker, a conffile
+#                                             of Docker and the open-files
+#                                             limit of containers, a
+#                                             conffile
 #                 /usr/share/hd-docker/docker-ufw.rules
 #                                             the Docker rules that the
 #                                             postinst puts in

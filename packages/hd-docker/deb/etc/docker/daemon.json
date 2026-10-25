@@ -5,5 +5,12 @@
       "base": "192.168.253.0/20",
       "size": 24
     }
-  ]
+  ],
+  "default-ulimits": {
+    "nofile": {
+      "Name": "nofile",
+      "Soft": 1024,
+      "Hard": 524288
+    }
+  }
 }

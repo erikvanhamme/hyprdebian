@@ -9,7 +9,9 @@ not ship it. The rules go in a block between the lines "# BEGIN DOCKER UFW FIX" 
 installation and upgrade and keeps the rest of the file; the postrm of a removal takes it out.
 
 docker.io starts Docker before hd-docker is configured, with the default addresses. The restart
-happens on the first installation only: later ones would stop the containers that run.
+happens on the first installation only: later ones would stop the containers that run. An upgrade
+from before 0.3, which added the open-files limit of the containers to daemon.json, says to
+restart Docker instead.
 """
 
 import os
@@ -89,6 +91,10 @@ def main():
         return
     if previous == "":
         subprocess.run(["systemctl", "try-restart", "docker.service"], check=True)
+    elif subprocess.run(["dpkg", "--compare-versions", previous, "lt", "0.3"]).returncode == 0:
+        print("/etc/docker/daemon.json now limits the open files of containers to 1024, at most")
+        print("524288. Restart Docker to apply it, which stops the containers that run:")
+        print("    sudo systemctl restart docker")
 
 
 if __name__ == "__main__":

@@ -53,6 +53,18 @@ When you change the address pool, change the
 .B RETURN
 rule of the firewall block to match; see
 .BR FIREWALL .
+.SH OPEN FILES
+.I /etc/docker/daemon.json
+also gives containers a limit of 1024 open files, which a container may raise
+to at most 524288.
+Without it, the containers of some versions of containerd, such as the one of
+trixie, may open about a billion files, and every command that closes all the
+files it may have open before it starts another, as apt does, then takes
+minutes.
+An upgrade from a version of
+.B hd-docker
+before 0.3 does not restart Docker, so the limit only applies after a restart
+of Docker; the upgrade says so.
 .PP
 The first installation of
 .B hd-docker
@@ -105,7 +117,8 @@ Removing the package takes the block out again.
 .SH FILES
 .TP
 .I /etc/docker/daemon.json
-The addresses of the networks of Docker, a conffile.
+The addresses of the networks of Docker and the open-files limit of
+containers, a conffile.
 .TP
 .I /etc/ufw/after.rules
 The rules of ufw, with the block of

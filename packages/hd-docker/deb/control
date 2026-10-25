@@ -12,7 +12,9 @@ Description: HyprDebian Docker support
  .
  /etc/docker/daemon.json gives the bridge of Docker the address
  192.168.253.1/24 and takes the networks of containers from 192.168.240.0/20,
- so they stay clear of the usual home and office networks. The rules that
+ so they stay clear of the usual home and office networks, and limits the
+ open files of containers to 1024, at most 524288, so apt in a container
+ stays fast. The rules that
  hd-docker adds to /etc/ufw/after.rules keep the ports that containers
  publish from bypassing ufw: traffic from outside reaches a container only
  when a route rule of ufw allows it, such as ufw route allow.
