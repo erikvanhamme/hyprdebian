@@ -1,5 +1,5 @@
 ## Introduction
-This page lists what a computer needs to build HyprDebian from this repository: the packages with `make all`, their tests with `make test`, the live ISO with `make iso`, and the tools around them. Every build runs as a normal user; none needs root, but the Docker builds need a user that may run docker.
+This page lists what a computer needs to build HyprDebian from this repository: the packages with `make all`, the kernels with `make kernel`, their tests with `make test`, the live ISO with `make iso`, and the tools around them. Every build runs as a normal user; none needs root, but the Docker builds need a user that may run docker.
 
 The builds are made for amd64. `hd-backup`, `hd-desktop`, `orcaslicer` and the packages compiled from Rust take the architecture of the build computer or are amd64 only, and the AppImage of OrcaSlicer is run on the build computer to unpack it.
 
@@ -39,7 +39,7 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 | `orcaslicer` | `wget`, ca-certificates, internet access, an amd64 computer | Downloads the OrcaSlicer 2.4.2 AppImage from GitHub once, checks its sha256 and unpacks it by running it with `--appimage-extract`, which needs no FUSE. |
 | `hd-desktop` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, `wget`, `unzip`, ca-certificates, internet access | Compiles hd-menu in a `debian:unstable` container, pulled every time. The container installs its own build tools and the -dev packages of wayland, cairo and librsvg. The package gets the architecture of the build computer. `make all` in `menu/`, which builds hd-menu without a package to try it, needs those -dev packages on the computer itself. Downloads the JetBrains Mono zip of Nerd Fonts 3.4.0 from GitHub once, checks its sha256 and unpacks the fonts. |
 | `hd-audacious` | `docker` (docker.io), a user that may run docker, `dpkg` for `--print-architecture`, internet access | Compiles the forks of audacious and audacious-plugins in a `debian:unstable` container, pulled every time. The container installs its own build tools and the -dev packages of the plugins, clones the commits from GitHub and strips the binaries. The package gets the architecture of the build computer. |
-| `hd-kernel` | `docker` (docker.io), a user that may run docker, internet access, about 30 GB of disk per suite, and memory: 5/8 GB per core | Builds the kernel of Debian and its ZFS module for each suite, in a `debian:trixie` and a `debian:sid` container, pulled every time. Each container installs its own build tools, Rust and pahole among them, and gets the source packages `linux` and `zfs-linux` and the config of Debian from its apt sources. It takes about half an hour per suite on a recent computer, more on an older one; `HD_KERNEL_CACHE` reuses earlier builds, see [hd-kernel](../packages/hd-kernel.md). |
+| `hd-kernel`, with `make kernel`, not `make all` | `docker` (docker.io), a user that may run docker, internet access, about 30 GB of disk per suite, and memory: 5/8 GB per core | Builds the kernel of Debian and its ZFS module for each suite, in a `debian:trixie` and a `debian:sid` container, pulled every time. Each container installs its own build tools, Rust and pahole among them, and gets the source packages `linux` and `zfs-linux` and the config of Debian from its apt sources. It takes about half an hour per suite on a recent computer, more on an older one; `HD_KERNEL_CACHE` reuses earlier builds, see [hd-kernel](../packages/hd-kernel.md). |
 | `ouch`, `wiremix`, `yazi` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, internet access | Compiles the release in a `debian:trixie` container, pulled every time. The container installs its own build tools and the latest stable Rust toolchain with rustup, and clones the sources from GitHub. The packages get the architecture of the build computer. |
 
 The downloads and the compiled releases are kept in `build/` of their package directory, so later builds reuse them until `make clean`.
@@ -90,7 +90,7 @@ live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), whic
 `hd-buildserver` builds everything every night in a container of `buildenv/Dockerfile`, which installs what this page lists, see [hd-buildserver](../packages/hd-buildserver.md). Add the build dependencies of a new package to that Dockerfile as well.
 
 ## Uploading to the repository: make update-repo
-`make update-repo` builds every package, then runs `update-repo/update-repo.py`, which needs:
+`make update-repo` builds every package, then runs `update-repo/update-repo.py` with them and the kernels that `make kernel` built, which needs:
 - Everything `make all` needs.
 - `ssh` and `scp` (openssh-client).
 - An ssh key of the user in the `authorized_keys` of the user `repo` on the HyprDebian repository, a computer with `hd-repo`.

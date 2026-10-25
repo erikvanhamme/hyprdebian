@@ -38,9 +38,13 @@ otherwise builds the image of
 of the checkout, a clean
 .B debian:trixie
 build environment, and runs
-.B make iso
-in a container of it, which builds every package and the live ISO; the
-kernels come from the cache in
+.B make iso kernel
+in a container of it, which builds every package and the live ISO, and the
+kernels of
+.BR hd-kernel ,
+which
+.B make all
+leaves out; the kernels come from the cache in
 .I /var/lib/hd-buildserver/hd-kernel
 when they were built of the same versions before;
 .IP 5. 4

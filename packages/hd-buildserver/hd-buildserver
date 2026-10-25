@@ -12,10 +12,10 @@ it every night as the user hd-buildserver. A run:
   3. stops when the commit and those versions are those of the last build, in
      /var/lib/hd-buildserver/last-built, so a night on which only Debian has a new kernel or ZFS
      also builds;
-  4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso in a
-     container of it, which builds every package and the live ISO; the kernels of hd-kernel come
-     from the cache in /var/lib/hd-buildserver/hd-kernel when they were built of the same
-     versions before;
+  4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso kernel
+     in a container of it, which builds every package and the live ISO, and the kernels of
+     hd-kernel, which come from the cache in /var/lib/hd-buildserver/hd-kernel when they were
+     built of the same versions before;
   5. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
      the checkout, see hd-repo(7), and stores the commit and the versions as the last build.
 
@@ -172,13 +172,13 @@ def store_last_built(state):
 
 
 def build():
-    """Runs make iso in the build environment, in the checkout."""
+    """Runs make iso kernel in the build environment, in the checkout."""
     os.makedirs(KERNEL_CACHE, exist_ok=True)
 
     print(f"==> Building the build environment {IMAGE}...", flush=True)
     run(["docker", "build", "--pull", "-t", IMAGE, f"{CHECKOUT}/{BUILDENV}"])
 
-    print("==> Building the packages and the live ISO...", flush=True)
+    print("==> Building the packages, the live ISO and the kernels...", flush=True)
     # The checkout and the kernel cache have the same paths in the container as on the host, so
     # the containers that the builds start with the docker of the host get the right paths.
     run(["docker", "run", "--rm", "--name", CONTAINER,
@@ -190,7 +190,7 @@ def build():
          "-v", f"{CHECKOUT}:{CHECKOUT}",
          "-v", f"{KERNEL_CACHE}:{KERNEL_CACHE}",
          "-w", CHECKOUT,
-         IMAGE, "make", "iso"])
+         IMAGE, "make", "iso", "kernel"])
 
 
 def upload(repo):

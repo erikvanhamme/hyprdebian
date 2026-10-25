@@ -43,11 +43,13 @@ cd packages/hd-kernel
 make deb
 ```
 
-This builds the packages of both suites, into `build/trixie` and `build/unstable`; `make deb-trixie` or `make deb-unstable` builds one. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`, puts them in `build/<suite>` and has them uploaded only to their suite. They stay out of the local repository of the live ISO (`ISO_EXCLUDE`), as the installer does not install them yet.
+This builds the packages of both suites, into `build/trixie` and `build/unstable`; `make deb-trixie` or `make deb-unstable` builds one.
+
+In the root of the repository, `make kernel` does the same and puts them in `build/<suite>`; `make all` leaves the kernels out, as they take long to build. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`. `make update-repo` and `make list-debs` then also give the kernels that `make kernel` built, each only for its suite, but do not build them: run `make kernel` first for new ones. The live ISO does not get them, as the installer does not install them yet.
 
 Raise the version in `version.json` for every change of the packages.
 
-A suite is only built when it has to be. `make deb` starts a container of each suite, which looks up the versions of `linux` and `zfs-linux` and works out the release; when `build/<suite>` already has the three packages of that release, it stops there, which takes a few seconds. So a second `make deb`, `make all` or `make update-repo` builds no kernel, until Debian has a new `linux` or `zfs-linux`, `build-kernel.sh`, `deb/`, `man/` or the version changes, or `make clean` removes the packages. The packages only get to `build/<suite>` at the end of a build that went through, so a build that stops halfway is done again.
+A suite is only built when it has to be. `make deb` starts a container of each suite, which looks up the versions of `linux` and `zfs-linux` and works out the release; when `build/<suite>` already has the three packages of that release, it stops there, which takes a few seconds. So a second `make deb` or `make kernel` builds no kernel, until Debian has a new `linux` or `zfs-linux`, `build-kernel.sh`, `deb/`, `man/` or the version changes, or `make clean` removes the packages. The packages only get to `build/<suite>` at the end of a build that went through, so a build that stops halfway is done again.
 
 `build-kernel.sh` does the work, in a `debian:trixie` or `debian:sid` container, pulled every time:
 1. It takes the most recent versions of the source packages `linux` and `zfs-linux` of the suite, also of `trixie-security`, and gets them with `apt source`, with the patches of Debian, and the config of Debian for amd64 from `linux-config-<x.y>` of the same version.
