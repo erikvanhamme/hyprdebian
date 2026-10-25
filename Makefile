@@ -2,10 +2,11 @@
 # directories are in packages/. A build server checks out this repository and
 # runs make all.
 #
-#   make all        build every package in PACKAGES
+#   make all        build every package in PACKAGES, one after the other
 #   make <package>  build one package directory, packages/<package>: make deb
-#                   in it, then copy the packages it built to build/, each in
-#                   place of older versions of that package
+#                   in it, with JOBS jobs at the same time, then copy the
+#                   packages it built to build/, each in place of older
+#                   versions of that package
 #   make test       run make test in every package directory in TESTS
 #   make clean      remove build/ and run make clean in every package
 #                   directory
@@ -50,6 +51,11 @@
 #
 # Add every new package directory to PACKAGES, and to TESTS when its Makefile
 # also has the target test, which runs the tests of the package.
+#
+# The packages are built one after the other, but make deb of each package
+# directory runs with -j$(JOBS), so the targets within a package are built at
+# the same time. JOBS is the number of cores by default; make all JOBS=1
+# builds one target at a time.
 
 PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-buildserver hd-base hd-installer
 # The package directories with tests.
@@ -57,6 +63,8 @@ TESTS := hd-dashboard hd-report hd-backup hd-base
 # The directory with the package directories.
 SRC := packages
 OUT := build
+# The number of jobs of make deb in each package directory.
+JOBS ?= $(shell nproc)
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
@@ -68,7 +76,7 @@ $(OUT):
 	mkdir -p $@
 
 $(PACKAGES): | $(OUT)
-	$(MAKE) -C $(SRC)/$@ deb
+	$(MAKE) -j$(JOBS) -C $(SRC)/$@ deb
 	for deb in $$($(MAKE) -s --no-print-directory -C $(SRC)/$@ deb-path); do \
 		name=$$(basename $$deb); \
 		rm -f $(OUT)/$${name%%_*}_*.deb; \

@@ -17,7 +17,7 @@ sudo usermod -aG docker $USER
 The computer needs internet access while it builds: some builds download releases from GitHub, and the Docker builds pull `debian:trixie` (`debian:unstable` for `hd-menu`) and the packages, toolchains and sources they compile.
 
 ## The packages: make all
-`make all` in the root of the repository runs `make deb` in every package directory in `packages/` and collects the packages in `build/`.
+`make all` in the root of the repository runs `make deb` in every package directory in `packages/` and collects the packages in `build/`. It builds the packages one after the other, each with as many jobs at the same time as the computer has cores; `make all JOBS=1` builds one target at a time.
 
 ### Every package
 Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefile uses:

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds hd-menu in a Debian container; ../Makefile runs it with docker,
 # with this directory, menu/, in /src, read only. It installs the build
-# dependencies, compiles hd-menu with the hardening flags of Debian and copies
-# what the package needs to /out:
+# dependencies, compiles hd-menu on every core, with the hardening flags of
+# Debian, and copies what the package needs to /out:
 #
 #   /out/hd-menu             the binary
 #   /out/depends             the Depends of the package, from dpkg-shlibdeps
@@ -29,7 +29,7 @@ echo "--> Compiling hd-menu..."
 mkdir -p /usr/src/hd-menu
 cp -r /src/Makefile /src/src /src/protocols /usr/src/hd-menu/
 cd /usr/src/hd-menu
-make all \
+make -j"$(nproc)" all \
   CPPFLAGS="$(dpkg-buildflags --get CPPFLAGS)" \
   CXXFLAGS="$(dpkg-buildflags --get CXXFLAGS)" \
   CFLAGS="$(dpkg-buildflags --get CFLAGS)" \
