@@ -189,27 +189,41 @@ b_apt_init() {
     in_target apt update
 }
 
-# The debconf selections of the answers file, set in the new system before the packages that ask
-# them are installed. apt does not ask a question that is set; b_console reconfigures the packages
-# it asks without questions.
+# The debconf selections of the answers file, and the defaults of the packages it has none of when
+# Q_DEBCONF_DEFAULTS is true, set in the new system before the packages that ask them are
+# installed. apt does not ask a question that is set; b_console reconfigures the packages it asks
+# without questions.
 b_debconf() {
-    if ! answered DEBCONF; then
+    local package lines
+    local selections=()
+
+    for package in "${DEBCONF_PACKAGES[@]}"; do
+        lines="$(debconf_defaults "${package}")"
+        if [[ -n "${lines}" ]]; then
+            selections+=("${lines}")
+        fi
+    done
+    if answered DEBCONF; then
+        selections+=("${ANSWERS[DEBCONF]}")
+    fi
+
+    if (( ${#selections[@]} == 0 )); then
         return 0
     fi
 
-    printf '%s\n' "${ANSWERS[DEBCONF]}" | in_target debconf-set-selections
+    printf '%s\n' "${selections[@]}" | in_target debconf-set-selections
 }
 
-# The locales, the time zone, the keyboard and the console font. A package with debconf selections
-# in the answers file is configured with them, without questions.
+# The locales, the time zone, the keyboard and the console font. A package with debconf selections,
+# from the answers file or the defaults, is configured with them, without questions.
 b_console() {
     local package
 
     in_target env DEBIAN_FRONTEND=noninteractive apt install -y locales keyboard-configuration \
         console-setup || return 1
 
-    for package in locales tzdata keyboard-configuration console-setup; do
-        if ! debconf_answered "${package}"; then
+    for package in "${DEBCONF_PACKAGES[@]}"; do
+        if ! debconf_selected "${package}"; then
             in_target dpkg-reconfigure "${package}" || return 1
             continue
         fi

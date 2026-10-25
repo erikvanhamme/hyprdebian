@@ -177,6 +177,32 @@ q_wifi() {
     fi
 }
 
+# Whether the debconf questions of the locales, the time zone, the keyboard and the console font
+# take the defaults, without asking them. The selections of the answers file go first, so when it
+# has selections of every package, there is nothing to ask.
+q_debconf_defaults() {
+    local package default line
+    local all_answered=true
+
+    for package in "${DEBCONF_PACKAGES[@]}"; do
+        if ! debconf_answered "${package}"; then
+            all_answered=false
+        fi
+    done
+    if [[ "${all_answered}" == "true" ]] && ! answered Q_DEBCONF_DEFAULTS; then
+        set_answer Q_DEBCONF_DEFAULTS false
+        return 0
+    fi
+
+    default="$(get_default Q_DEBCONF_DEFAULTS)" || return 1
+    echo "Default settings:"
+    for line in "${DEBCONF_DEFAULTS_SUMMARY[@]}"; do
+        printf '    %s\n' "${line}"
+    done
+    ask_yes_no Q_DEBCONF_DEFAULTS "Use the default locale, time zone, keyboard and console font" \
+        "${default}"
+}
+
 # Every disk picked for the system or the EFI system partition is wiped. Each must be confirmed
 # by typing the answer, or at once by wipe in the answers file; the confirmation is not saved.
 q_wipe() {
@@ -222,6 +248,7 @@ add_dependencies "q_main" \
     "q_fqdn" \
     "q_iface" \
     "q_wifi" \
+    "q_debconf_defaults" \
     "q_wipe" \
 
 # The password is never saved, so it must be asked again on every run.

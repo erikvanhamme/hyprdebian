@@ -103,6 +103,7 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 | FQDN | `Q_FQDN` | The fully qualified domain name: the host name, a dot and the domain, in labels like the host name, at most 253 characters. By default the host name followed by the domain `Q_DOMAIN` of the defaults. |
 | Wired interface | `Q_IFACE` | The wired interface, which gets its address with DHCP; by default the first one. Without a wired interface, it is empty, without the question. |
 | Wifi | `Q_WIFI`, `Q_WIFACE` | `true` when wifi is used, not by default, and then the wifi interface, which also gets its address with DHCP; `Q_WIFACE` is empty without wifi. Without a wifi interface, there is no wifi, without the question. |
+| Default settings | `Q_DEBCONF_DEFAULTS` | `true`, by default, when the locale, the time zone, the keyboard and the console font take the defaults of `scripts/defaults.sh`, en_US.UTF-8, Europe/Brussels, an English (US) keyboard and TerminusBold 16x32, without their debconf questions. The defaults are shown before the question. Without the question, `false`, when the answers file has debconf selections of all four packages. |
 | Wipe | | Every disk picked above is wiped. Each one must be confirmed by typing `y`; the confirmation is not saved. This is the last question, so nothing is wiped before every question is answered. |
 
 The EFI system partitions are asked apart from the system, so they can go on other disks than the ZFS pool, such as a hardware RAID volume next to a ZFS mirror on disks that the RAID controller passes through. An ESP disk may also be one of the system disks.
@@ -131,9 +132,10 @@ The ask helpers in `scripts/helpers.sh`, `helpers-disk.sh` and `helpers-network.
 | `iface` | `Q_IFACE` | The wired interface, by its path name, such as `enp1s0`. |
 | `wifi` | `Q_WIFI`, `Q_WIFACE` | `false` for no wifi, or the wifi interface by its path name. |
 | `wipe` | the wipe | `true` confirms the wipe of every disk picked at once; `false` aborts. |
+| `debconf_defaults` | `Q_DEBCONF_DEFAULTS` | `true` or `false`. |
 | `debconf` | debconf | A list of lines for `debconf-set-selections`, each `owner question type value`. |
 
-The debconf selections are set in the new system by `b_debconf`, after the Debian repositories are added and before any package is installed but those of `debootstrap`. apt does not ask a question that is set. `b_console` configures `locales`, `tzdata`, `keyboard-configuration` and `console-setup` with `dpkg-reconfigure -f noninteractive` when the file has selections of the package, and asks them as before when it has none. `tzdata` prefers `/etc/localtime` and `/etc/timezone` over debconf, and `locales` prefers `/etc/locale.gen`, so those files are removed first and written again from the selections. Debconf questions without a selection are asked as usual.
+The debconf selections are set in the new system by `b_debconf`, after the Debian repositories are added and before any package is installed but those of `debootstrap`: those of the file, and with `Q_DEBCONF_DEFAULTS` the defaults of `locales`, `tzdata`, `keyboard-configuration` and `console-setup` that the file has no selections of, as the selections of the file go first. apt does not ask a question that is set. `b_console` configures these four packages with `dpkg-reconfigure -f noninteractive` when they have selections, from the file or the defaults, and asks them as before when they have none. `tzdata` prefers `/etc/localtime` and `/etc/timezone` over debconf, and `locales` prefers `/etc/locale.gen`, so those files are removed first and written again from the selections. Debconf questions without a selection are asked as usual.
 
 An example, `test.json`:
 ```json
@@ -200,8 +202,8 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_mount_unit` | Writes and enables the automount units of the EFI system partitions on `/boot/efi` and, on mirrored ESP disks, `/boot/efi2`, by their UUID. |
 | `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository or not the suite. |
 | `b_apt_init` | Copies `deploy/etc/apt/apt.conf.d/00hd-installer` into the new system, so apt installs no recommends and downloads no translations of the descriptions while the installer runs, as `hd-base` sets for the installed system. Then it adds the Debian repositories, with the updates and security repositories for a stable suite, and updates the package lists. |
-| `b_debconf` | Sets the debconf selections of the answers file, if any, in the new system. |
-| `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font; a package with debconf selections in the answers file is configured with them, without questions. |
+| `b_debconf` | Sets the debconf selections of the answers file, if any, and with `Q_DEBCONF_DEFAULTS` the defaults of the packages it has none of, in the new system. |
+| `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font; a package with debconf selections, from the answers file or the defaults, is configured with them, without questions. |
 | `b_initramfs` | Installs `initramfs-tools` with `zstd`, so every initramfs is compressed with zstd, and makes the initramfs not wait for a resume device. The kernel headers of `b_kernel` bring the compiler that DKMS builds the ZFS module with. |
 | `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
 | `b_zfs_support` | Installs ZFS, with its module built by DKMS. |

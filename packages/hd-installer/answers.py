@@ -104,6 +104,7 @@ KEYS = {
     "iface": (text, "Q_IFACE"),
     "wifi": (wifi, None),
     "wipe": (yes_no, "Q_WIPE"),
+    "debconf_defaults": (yes_no, "Q_DEBCONF_DEFAULTS"),
     "debconf": (debconf, None),
 }
 

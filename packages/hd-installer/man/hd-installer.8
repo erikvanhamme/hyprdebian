@@ -122,6 +122,14 @@ Interfaces are picked by number, by their path name, such as
 which is the name they get on the installed system.
 Each is shown with its name on the live system and its IPv4 addresses.
 .TP
+.B Default settings
+Whether the locale, the time zone, the keyboard and the console font take
+the defaults, without their debconf questions: en_US.UTF-8,
+Europe/Brussels, an English (US) keyboard and TerminusBold 16x32; by
+default.
+The defaults are shown before the question.
+It is not asked when the answers file has debconf selections of all four.
+.TP
 .B Wipe
 Every disk picked above is wiped.
 Each one must be confirmed by typing
@@ -198,6 +206,13 @@ confirms the wipe of every disk picked;
 .B false
 aborts.
 .TP
+.B debconf_defaults
+.B true
+or
+.BR false ,
+whether the locale, the time zone, the keyboard and the console font take
+the defaults.
+.TP
 .B debconf
 A list of lines for
 .BR debconf\-set\-selections (1),
@@ -214,6 +229,9 @@ selections:
 .B keyboard\-configuration
 and
 .BR console\-setup .
+These selections go before the defaults: with
+.BR debconf_defaults ,
+a package without selections in the file takes the defaults.
 The debconf questions without a selection are asked as usual.
 .PP
 An example:
@@ -314,8 +332,8 @@ It binds the local repository of the live cd into
 of the new system and adds it as a trusted apt source, has apt install no
 recommends and download no translations while it runs, as hd-base does for
 the installed system, adds the Debian repositories, sets the debconf
-selections of the answers file, asks the
-locales, the time zone and the keyboard, and installs the kernel
+selections of the answers file and the defaults, asks the
+locales, the time zone and the keyboard that have no selections, and installs the kernel
 and ZFS.
 It marks the other packages for the packages phase:
 .BR hd-base ,
