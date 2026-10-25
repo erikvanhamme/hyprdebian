@@ -1,0 +1,197 @@
+#!/usr/bin/python3
+"""Builds HyprDebian from its git repository and updates a HyprDebian package repository with it.
+
+The package hd-buildserver installs this as /usr/bin/hd-buildserver, and hd-buildserver.timer runs
+it every night as the user hd-buildserver. A run:
+
+  1. updates the checkout in /var/lib/hd-buildserver/checkout from the git repository, cloning it
+     the first time;
+  2. stops when the head of the branch is the commit of the last build, in
+     /var/lib/hd-buildserver/last-built;
+  3. otherwise checks out the head, cleans the checkout of everything git does not track, builds
+     the image of buildenv/Dockerfile of the checkout and runs make iso in a container of it,
+     which builds every package and the live ISO;
+  4. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
+     the checkout, see hd-repo(7), and stores the commit as the last build.
+
+    hd-buildserver           build and upload when the branch has moved
+    hd-buildserver --force   build and upload also when it has not
+
+The settings are the key hd-buildserver of /etc/hyprdebian/config.json over the defaults in
+/usr/share/hd-buildserver/defaults.json: git, the URL of the git repository, branch, the branch to
+build, and repo, the host name of the package repository. Run it as the user hd-buildserver: the
+checkout and the ssh key belong to that user.
+"""
+
+import argparse
+import fcntl
+import json
+import os
+import pwd
+import re
+import subprocess
+import sys
+
+USER = "hd-buildserver"
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-buildserver"
+DEFAULTS_FILE = "/usr/share/hd-buildserver/defaults.json"
+STATE_DIR = "/var/lib/hd-buildserver"
+CHECKOUT = f"{STATE_DIR}/checkout"
+LAST_BUILT = f"{STATE_DIR}/last-built"
+LOCK_FILE = f"{STATE_DIR}/build.lock"
+DOCKER_SOCKET = "/var/run/docker.sock"
+# The build environment, from buildenv/Dockerfile of the checkout.
+IMAGE = "hd-buildserver-env"
+CONTAINER = "hd-buildserver-build"
+BUILDENV = "buildenv"
+ISO = "livecd/out/hyprdebian-live-amd64.iso"
+UPDATE_REPO = "update-repo/update-repo.py"
+# A host name, a fully qualified domain name or an IPv4 address, as update-repo.py takes it.
+HOST_PATTERN = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$")
+# A branch name without anything git or a shell could take as an option or a pattern.
+BRANCH_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
+
+class BuildError(Exception):
+    """A problem that stops the build, with the message for the user."""
+
+
+def read_json(path):
+    """The content of a JSON file, None when it does not exist."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as e:
+        raise BuildError(f"could not read {path}: {e}")
+
+
+def settings():
+    """The settings: the key hd-buildserver of the configuration over the defaults, checked."""
+    values = {}
+    defaults = read_json(DEFAULTS_FILE)
+    if isinstance(defaults, dict):
+        values.update(defaults)
+    config = read_json(CONFIG_FILE)
+    if isinstance(config, dict) and isinstance(config.get(CONFIG_KEY), dict):
+        values.update(config[CONFIG_KEY])
+
+    git = values.get("git")
+    if not isinstance(git, str) or not git or git.startswith("-"):
+        raise BuildError(f"no valid git in the settings of {CONFIG_KEY} in {CONFIG_FILE}")
+    branch = values.get("branch")
+    if not isinstance(branch, str) or not BRANCH_PATTERN.match(branch):
+        raise BuildError(f"no valid branch in the settings of {CONFIG_KEY} in {CONFIG_FILE}")
+    repo = values.get("repo")
+    if not isinstance(repo, str) or not HOST_PATTERN.match(repo):
+        raise BuildError(f"no valid repo in the settings of {CONFIG_KEY} in {CONFIG_FILE}")
+    return git, branch, repo
+
+
+def run(command, cwd=None, capture=False):
+    """Runs a command, stops the build when it fails; returns its output when captured."""
+    result = subprocess.run(command, cwd=cwd, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+    if result.returncode != 0:
+        raise BuildError(f"{command[0]} {command[1]} failed with exit code {result.returncode}")
+    return result.stdout if capture else None
+
+
+def update_checkout(git, branch):
+    """Clones or fetches the git repository; returns the commit at the head of the branch."""
+    if os.path.isdir(f"{CHECKOUT}/.git"):
+        print(f"==> Fetching {git}...", flush=True)
+        run(["git", "-C", CHECKOUT, "remote", "set-url", "origin", git])
+        run(["git", "-C", CHECKOUT, "fetch", "--prune", "origin"])
+    else:
+        print(f"==> Cloning {git} to {CHECKOUT}...", flush=True)
+        run(["git", "clone", "--no-checkout", "--", git, CHECKOUT])
+    return run(["git", "-C", CHECKOUT, "rev-parse", "--verify", f"refs/remotes/origin/{branch}^{{commit}}"],
+               capture=True).strip()
+
+
+def last_built():
+    """The commit of the last build that was uploaded, None when there is none."""
+    try:
+        with open(LAST_BUILT, encoding="utf-8") as f:
+            return f.read().strip() or None
+    except FileNotFoundError:
+        return None
+
+
+def build(commit):
+    """Checks out the commit in a clean checkout and runs make iso in the build environment."""
+    print(f"==> Checking out {commit}...", flush=True)
+    run(["git", "-C", CHECKOUT, "checkout", "--force", "--detach", commit])
+    # Everything git does not track goes, also the downloads and compiled releases in build/, so
+    # every build starts from the sources alone.
+    run(["git", "-C", CHECKOUT, "clean", "-fdxq"])
+
+    print(f"==> Building the build environment {IMAGE}...", flush=True)
+    run(["docker", "build", "--pull", "-t", IMAGE, f"{CHECKOUT}/{BUILDENV}"])
+
+    print("==> Building the packages and the live ISO...", flush=True)
+    # The checkout has the same path in the container as on the host, so the containers that the
+    # builds start with the docker of the host get the right paths.
+    run(["docker", "run", "--rm", "--name", CONTAINER,
+         "--user", f"{os.getuid()}:{os.getgid()}",
+         "--group-add", str(os.stat(DOCKER_SOCKET).st_gid),
+         "-e", "HOME=/tmp",
+         "-v", f"{DOCKER_SOCKET}:{DOCKER_SOCKET}",
+         "-v", f"{CHECKOUT}:{CHECKOUT}",
+         "-w", CHECKOUT,
+         IMAGE, "make", "iso"])
+
+
+def upload(repo):
+    """Uploads the packages that are not in the repository yet and the ISO."""
+    print(f"==> Updating the repository on {repo}...", flush=True)
+    debs = run(["make", "-s", "--no-print-directory", "list-debs"], cwd=CHECKOUT, capture=True).split()
+    run(["python3", UPDATE_REPO, "--host", repo, "--yes", "--only-new", "--iso", ISO, *debs],
+        cwd=CHECKOUT)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Builds HyprDebian from git and updates a package repository with it.")
+    parser.add_argument("--force", action="store_true",
+                        help="build and upload also when the branch has not moved")
+    args = parser.parse_args()
+
+    if pwd.getpwuid(os.getuid()).pw_name != USER:
+        print(f"Error: This must be run as {USER}, for example with "
+              f"sudo systemctl start {USER}.service.", file=sys.stderr)
+        return 1
+
+    try:
+        with open(LOCK_FILE, "w") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise BuildError("another hd-buildserver is running")
+
+            git, branch, repo = settings()
+            commit = update_checkout(git, branch)
+            if commit == last_built() and not args.force:
+                print(f"{branch} is still at {commit}, the last build; nothing to do.")
+                return 0
+
+            build(commit)
+            upload(repo)
+
+            # Only a build that was uploaded counts, so a failed night is tried again.
+            with open(f"{LAST_BUILT}.tmp", "w", encoding="utf-8") as f:
+                f.write(commit + "\n")
+            os.replace(f"{LAST_BUILT}.tmp", LAST_BUILT)
+    except BuildError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"==> Built and uploaded {branch} at {commit}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

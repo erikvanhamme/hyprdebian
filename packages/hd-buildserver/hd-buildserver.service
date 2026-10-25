@@ -1,0 +1,20 @@
+[Unit]
+Description=Build HyprDebian and Update the Package Repository
+Documentation=man:hd-buildserver(8)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+# Runs as hd-buildserver, which owns the checkout and the ssh key and may run docker. A build
+# that hangs is stopped after 12 hours.
+[Service]
+Type=oneshot
+User=hd-buildserver
+Group=hd-buildserver
+ExecStart=/usr/bin/hd-buildserver
+TimeoutStartSec=12h
+Nice=10
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

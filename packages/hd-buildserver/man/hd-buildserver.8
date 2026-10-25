@@ -1,0 +1,157 @@
+.TH HD-BUILDSERVER 8 "October 2026" "hd-buildserver" "HyprDebian"
+.SH NAME
+hd-buildserver \- build HyprDebian and update a package repository with it
+.SH SYNOPSIS
+.B hd-buildserver
+.RB [ \-\-force ]
+.SH DESCRIPTION
+.B hd-buildserver
+builds HyprDebian from its git repository and uploads the result to a
+HyprDebian package repository, see
+.BR hd-repo (7).
+A run:
+.IP 1. 4
+updates the checkout in
+.I /var/lib/hd-buildserver/checkout
+from the git repository, and clones it the first time;
+.IP 2. 4
+stops when the head of the branch is the commit of the last build, in
+.IR /var/lib/hd-buildserver/last-built ;
+.IP 3. 4
+otherwise checks out the head, removes everything git does not track, also the
+downloads and compiled releases of earlier builds, builds the image of
+.I buildenv/Dockerfile
+of the checkout, a clean
+.B debian:trixie
+build environment, and runs
+.B make iso
+in a container of it, which builds every package and the live ISO;
+.IP 4. 4
+runs
+.B update-repo/update-repo.py
+of the checkout with
+.BR "\-\-only\-new \-\-iso" ,
+which uploads the packages that are not in the repository yet and the live
+ISO, then stores the commit as the last build.
+.PP
+A run that fails leaves the last build as it was, so the next run tries the
+same commit again.
+.PP
+.B hd-buildserver.timer
+runs it through
+.B hd-buildserver.service
+every night at 3:00, with up to 30 minutes of random delay, and catches up on a
+night the system was off.
+The package enables the timer on its first installation; after that, it stays
+as the admin left it.
+A build that fails or takes longer than 12 hours fails the service, and the
+output of the build is in its journal:
+.PP
+.RS
+journalctl \-u hd-buildserver.service
+.RE
+.PP
+Run it as the user
+.BR hd-buildserver ,
+which owns the checkout and the ssh key and may run docker.
+To build now, start the service:
+.PP
+.RS
+sudo systemctl start hd-buildserver.service
+.RE
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.B \-\-force
+Build and upload also when the branch has not moved since the last build, for
+example with:
+.PP
+.RS
+sudo runuser \-u hd-buildserver \-\- hd-buildserver \-\-force
+.RE
+.SH SETTINGS
+The settings are the key
+.B hd-buildserver
+of
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+A setting that is missing has its default value, from
+.IR /usr/share/hd-buildserver/defaults.json .
+.TP
+.B git
+The URL of the git repository.
+The default is
+.BR https://github.com/erikvanhamme/hyprdebian.git .
+.TP
+.B branch
+The branch to build.
+The default is
+.BR main .
+.TP
+.B repo
+The host name of the package repository.
+The default is
+.BR repo .
+.PP
+For example:
+.PP
+.RS
+sudo hd-config-update hd-buildserver '{"repo": "repo.example"}'
+.RE
+.SH THE SSH KEY
+The uploads log in as the user
+.B repo
+of the package repository with the ssh key in
+.IR /var/lib/hd-buildserver/.ssh/id_ed25519 ,
+which the installation generates when there is none.
+Add its public key to the
+.I authorized_keys
+of
+.B repo
+there, see
+.BR hd-repo (7):
+.PP
+.RS
+sudo cat /var/lib/hd-buildserver/.ssh/id_ed25519.pub
+.RE
+.PP
+The ssh config of
+.B hd-buildserver
+takes the host key of a host it has not seen yet without asking, and never
+asks for a password.
+A git repository that needs a login over ssh takes the same key.
+.SH EXIT STATUS
+0 when the build was uploaded or there was nothing to build, 1 on an error,
+2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/config.json
+The settings, in the key
+.BR hd-buildserver .
+.TP
+.I /usr/share/hd-buildserver/defaults.json
+The default settings.
+.TP
+.I /var/lib/hd-buildserver/checkout
+The checkout of the git repository.
+.TP
+.I /var/lib/hd-buildserver/last-built
+The commit of the last build that was uploaded.
+.TP
+.I /var/lib/hd-buildserver/build.lock
+Keeps two runs from building at the same time.
+.TP
+.I /var/lib/hd-buildserver/.ssh
+The ssh key and the ssh config.
+.TP
+.I /usr/lib/systemd/system/hd-buildserver.timer
+.TQ
+.I /usr/lib/systemd/system/hd-buildserver.service
+Run hd-buildserver every night.
+.SH SEE ALSO
+.BR hd-repo (7),
+.BR hd-config-update (1),
+.BR hd-docker (7)

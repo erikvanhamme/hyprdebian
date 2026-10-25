@@ -1,0 +1,20 @@
+Package: hd-buildserver
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, git, make, openssh-client, passwd, systemd, hd-docker, hd-base (>= 1.22)
+Section: devel
+Priority: optional
+Description: HyprDebian build server
+ Builds HyprDebian from its git repository every night and updates a
+ HyprDebian package repository of hd-repo with it. When the branch has moved
+ since the last build, it checks out its head in a clean checkout, builds every
+ package and the live ISO in a clean debian:trixie container, and uploads the
+ packages that are not in the repository yet and the ISO.
+ .
+ The git repository, the branch and the host name of the package repository
+ are the key hd-buildserver in /etc/hyprdebian/config.json. The build runs as
+ the user hd-buildserver, which may run docker; its ssh key, generated on the
+ first installation, goes in the authorized_keys of the user repo of the
+ package repository. Installing the package enables hd-buildserver.timer.

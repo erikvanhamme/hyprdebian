@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# postinst of hd-buildserver: stores the default settings in the key hd-buildserver of
+# /etc/hyprdebian/config.json when there are none, creates the user hd-buildserver in the group
+# docker, its ssh key and ssh config when there are none, and enables and starts
+# hd-buildserver.timer.
+set -euo pipefail
+
+CONFIG_FILE="/etc/hyprdebian/config.json"
+CONFIG_KEY="hd-buildserver"
+DEFAULTS_FILE="/usr/share/hd-buildserver/defaults.json"
+BUILD_USER="hd-buildserver"
+BUILD_HOME="/var/lib/hd-buildserver"
+SSH_DIR="${BUILD_HOME}/.ssh"
+SSH_KEY="${SSH_DIR}/id_ed25519"
+SSH_CONFIG="${SSH_DIR}/config"
+UNIT="hd-buildserver.timer"
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [[ "${1:-}" != "configure" ]]; then
+    exit 0
+fi
+
+has_settings() {
+    python3 - "${CONFIG_FILE}" "${CONFIG_KEY}" <<'PYTHON'
+import json, os, sys
+config_file, config_key = sys.argv[1:]
+config = json.load(open(config_file)) if os.path.exists(config_file) else {}
+sys.exit(0 if isinstance(config, dict) and config_key in config else 1)
+PYTHON
+}
+
+if has_settings; then
+    echo "Keeping the build server settings in ${CONFIG_FILE}."
+else
+    echo "Storing the default build server settings in ${CONFIG_FILE}."
+    hd-config-update "${CONFIG_KEY}" < "${DEFAULTS_FILE}"
+fi
+
+# hd-buildserver only runs from its service, so it has no login shell. The group docker, of
+# docker.io, lets it run the builds.
+if ! id -u "${BUILD_USER}" > /dev/null 2>&1; then
+    echo "Creating the user ${BUILD_USER}..."
+    useradd --system --user-group --home-dir "${BUILD_HOME}" --shell /usr/sbin/nologin \
+        --comment "HyprDebian build server" "${BUILD_USER}"
+fi
+usermod -aG docker "${BUILD_USER}"
+
+install -d -o "${BUILD_USER}" -g "${BUILD_USER}" -m 0750 "${BUILD_HOME}"
+install -d -o "${BUILD_USER}" -g "${BUILD_USER}" -m 0700 "${SSH_DIR}"
+
+# The key has no passphrase, so the nightly upload can log in as repo without asking for one.
+if [[ -s "${SSH_KEY}" ]]; then
+    echo "Keeping the ssh key in ${SSH_KEY}."
+else
+    echo "Generating the ssh key in ${SSH_KEY}..."
+    host=$(hostname -f 2>/dev/null || hostname)
+    runuser -u "${BUILD_USER}" -- ssh-keygen -q -t ed25519 -N '' \
+        -C "${BUILD_USER}@${host}" -f "${SSH_KEY}"
+fi
+
+# Nobody answers ssh at night: it takes the host key of a new host, and fails instead of asking
+# for a password.
+if [[ ! -e "${SSH_CONFIG}" ]]; then
+    printf 'Host *\n    StrictHostKeyChecking accept-new\n    BatchMode yes\n' > "${SSH_CONFIG}"
+    chown "${BUILD_USER}:${BUILD_USER}" "${SSH_CONFIG}"
+    chmod 0600 "${SSH_CONFIG}"
+fi
+
+echo "Let ${BUILD_USER} upload to the package repository: add this key to the authorized_keys"
+echo "of the user repo there, see hd-buildserver(8):"
+cat "${SSH_KEY}.pub"
+
+# The same steps as the ones debhelper adds for a timer: the timer is enabled on the first
+# installation, by its preset, and keeps the enabled state the admin gave it over upgrades and
+# removals. The unmask undoes the mask of a removal, see the postrm.
+deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+if deb-systemd-helper --quiet was-enabled "${UNIT}"; then
+    deb-systemd-helper enable "${UNIT}" > /dev/null || true
+else
+    deb-systemd-helper update-state "${UNIT}" > /dev/null || true
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    systemctl --system daemon-reload
+    deb-systemd-invoke restart "${UNIT}"
+fi

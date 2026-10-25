@@ -65,6 +65,8 @@ make update-repo
 
 This builds every package into `build/`, then runs `update-repo/update-repo.py`, which asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
 
+A build server with [hd-buildserver](hd-buildserver.md) does the same every night, unattended, with the options below, and also uploads the live ISO.
+
 The suites of a package come from the `deploy.json` in its package directory:
 ```
 {
@@ -167,6 +169,7 @@ The repository is served over HTTP. To serve it over HTTPS as well, add a `serve
 | Path | Purpose |
 | --- | --- |
 | `/srv/hd-repo` | The repository, served by nginx. |
+| `/srv/hd-repo/iso` | The live ISO and its `SHA256SUMS`, uploaded by `update-repo.py --iso`. |
 | `/var/lib/hd-repo` | The home directory of `repo`. |
 | `/var/lib/hd-repo/inbox/trixie`, `/var/lib/hd-repo/inbox/unstable` | The inboxes, emptied by a successful update. |
 | `/var/lib/hd-repo/update.lock` | Keeps two updates from running at the same time. |

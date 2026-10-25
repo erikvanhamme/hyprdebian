@@ -131,3 +131,4 @@ The `docs` folder has more documentation:
 - [Desktop](docs/packages/hd-desktop.md): the Hyprland desktop and the login with greetd.
 - [Boot splash](docs/packages/hd-plymouth.md): the boot splash, which looks like the lock screen and asks for the ZFS password.
 - [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.
+- [Build server](docs/packages/hd-buildserver.md): the build server that builds HyprDebian every night and updates the package repository with it.

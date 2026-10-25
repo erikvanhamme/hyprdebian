@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# prerm of hd-buildserver: stops hd-buildserver.timer and a build that is running when the package
+# is removed.
+set -euo pipefail
+
+if [[ "${1:-}" != "remove" ]]; then
+    exit 0
+fi
+
+if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
+    deb-systemd-invoke stop hd-buildserver.timer hd-buildserver.service > /dev/null || true
+fi

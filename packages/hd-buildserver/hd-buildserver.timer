@@ -1,0 +1,12 @@
+[Unit]
+Description=Build HyprDebian and Update the Package Repository Every Night
+Documentation=man:hd-buildserver(8)
+
+# Persistent catches up on a night the system was off.
+[Timer]
+OnCalendar=*-*-* 03:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

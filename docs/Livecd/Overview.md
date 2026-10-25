@@ -28,6 +28,13 @@ livecd/out/hyprdebian-live-amd64.iso
 
 `make -C livecd image` only builds the docker image, and `make -C livecd clean` removes `livecd/out`.
 
+### Downloading
+The build server builds the ISO of `main` every night it has moved and puts it on the package repository, see [hd-buildserver](../packages/hd-buildserver.md). Download it from there with its checksum, and check it:
+```
+wget http://repo/iso/hyprdebian-live-amd64.iso http://repo/iso/SHA256SUMS
+sha256sum -c SHA256SUMS
+```
+
 The files involved are:
 ```
 livecd/Makefile

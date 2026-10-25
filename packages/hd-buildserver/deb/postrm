@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# postrm of hd-buildserver: a removal masks hd-buildserver.timer, whose unit file is gone, so that
+# it keeps its enabled state for a reinstall, and keeps the user, the checkout and the ssh key. A
+# purge also forgets that state, removes the settings in /etc/hyprdebian/config.json, the user
+# hd-buildserver and its home directory /var/lib/hd-buildserver, with the checkout and the ssh key.
+set -euo pipefail
+
+CONFIG_KEY="hd-buildserver"
+BUILD_USER="hd-buildserver"
+BUILD_HOME="/var/lib/hd-buildserver"
+UNIT="hd-buildserver.timer"
+
+case "${1:-}" in
+    remove | purge) ;;
+    *) exit 0 ;;
+esac
+
+if [[ -d /run/systemd/system ]]; then
+    systemctl --system daemon-reload || true
+fi
+
+if [[ "$1" == "remove" ]]; then
+    deb-systemd-helper mask "${UNIT}" > /dev/null || true
+    exit 0
+fi
+
+deb-systemd-helper purge "${UNIT}" > /dev/null || true
+deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+
+# hd-base may already be removed, see hd-config(7).
+if [[ -x /usr/bin/hd-config-remove ]]; then
+    hd-config-remove "${CONFIG_KEY}"
+fi
+
+if id -u "${BUILD_USER}" > /dev/null 2>&1; then
+    echo "Removing the user ${BUILD_USER}..."
+    userdel "${BUILD_USER}"
+fi
+rm -rf "${BUILD_HOME}"
