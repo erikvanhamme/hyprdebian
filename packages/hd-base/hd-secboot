@@ -1,0 +1,648 @@
+#!/usr/bin/python3
+"""Controls Secure Boot with the keys of the owner in /etc/hyprdebian/secboot.
+
+The package hd-base installs this as /usr/sbin/hd-secboot.
+
+    hd-secboot --status             say what state Secure Boot is in and what the keys hold
+    hd-secboot --status -q          say nothing, only set the exit status
+    hd-secboot --generate           generate the keys, unless they are there already
+    hd-secboot --store              write db and KEK, replacing what they hold
+    hd-secboot --clear              empty db and KEK
+    hd-secboot --enable             write PK, which ends setup mode
+    hd-secboot --disable            remove PK, which puts the firmware in setup mode
+    hd-secboot --append-rom-hash    add the hashes of option ROMs to db
+
+--status reads the EFI variables in /sys/firmware/efi/efivars, which every user can read. It exits
+with 0 when Secure Boot is on and with 1 when it is not. The others run as root.
+
+The keys go in in this order: --store writes db and KEK while the firmware is in setup mode,
+without a platform key, then --enable writes PK, which ends setup mode. --disable removes PK again
+with an update that it signs with the PK key, so the firmware goes back to setup mode and checks
+no signatures; db and KEK stay. --clear empties db and KEK in setup mode.
+
+--append-rom-hash is for devices whose option ROM the firmware has to load before the system boots,
+such as the driver (GOP) that a graphics card needs for a picture. The firmware measures every
+driver it loads in the TPM event log, so while Secure Boot is off the log has the SHA-256 hash
+of each option ROM. --append-rom-hash lists them with their devices, and adds the hashes that
+are picked to db, in an update signed with the KEK key.
+"""
+
+import argparse
+import array
+import fcntl
+import os
+import shutil
+import socket
+import struct
+import subprocess
+import sys
+import tempfile
+import uuid
+
+KEY_DIR = "/etc/hyprdebian/secboot"
+KEY_TMP_DIR = KEY_DIR + ".tmp"
+KEY_NAMES = ["PK", "KEK", "db"]
+# Each key is signed by the one named here: PK by itself, KEK by PK, db by KEK.
+KEY_SIGNER = {"PK": "PK", "KEK": "PK", "db": "KEK"}
+KEY_DAYS = 3650
+
+EFIVARS = "/sys/firmware/efi/efivars"
+EVENT_LOG = "/sys/kernel/security/tpm0/binary_bios_measurements"
+PCI_DEVICES = "/sys/bus/pci/devices"
+PCI_IDS = ["/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids"]
+GLOBAL_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
+DB_GUID = "d719b2cb-3d3a-4596-a3bc-dad00e67656f"
+VAR_GUID = {"PK": GLOBAL_GUID, "KEK": GLOBAL_GUID, "db": DB_GUID}
+
+EFI_CERT_X509_GUID = uuid.UUID("a5c059a1-94e4-4aa7-87b5-ab155c2bf072")
+EFI_CERT_SHA256_GUID = uuid.UUID("c1c41626-504c-4092-aca9-41f936934328")
+
+# The events of the TPM event log for the drivers the firmware loads, and the digest it gives them.
+DRIVER_EVENTS = [0x80000004, 0x80000005]
+TPM_ALG_SHA256 = 0x000B
+
+# From linux/fs.h. The kernel makes most efivarfs files immutable, so they cannot be removed by
+# accident; efi-updatevar can only write them when that flag is cleared.
+FS_IOC_GETFLAGS = 0x80086601
+FS_IOC_SETFLAGS = 0x40086602
+FS_IMMUTABLE_FL = 0x00000010
+
+# What --status says, for the states in which Secure Boot is not on.
+MESSAGES = {
+    "off": "Secure Boot is off. Turn it on in the setup menu of the firmware.",
+    "setup": "Secure Boot is off: the firmware is in setup mode. Write the keys with "
+             "hd-secboot --store, then turn Secure Boot on with hd-secboot --enable.",
+    "unsupported": "Secure Boot is off: the firmware does not support it.",
+    "legacy": "Secure Boot is off: the system was not booted with UEFI.",
+}
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(*command):
+    """Run a tool, and show what it said only when it fails: openssl talks even with -quiet."""
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        sys.stderr.write(result.stdout + result.stderr)
+        fail(f"{command[0]} failed.")
+
+
+def var_path(name, efivars=EFIVARS):
+    return os.path.join(efivars, f"{name}-{VAR_GUID.get(name, GLOBAL_GUID)}")
+
+
+# The value of an EFI variable, without the 4 bytes of attributes in front, or None.
+def read_var(name, efivars=EFIVARS):
+    try:
+        with open(var_path(name, efivars), "rb") as f:
+            return f.read()[4:]
+    except FileNotFoundError:
+        return None
+
+
+def key_path(name):
+    return os.path.join(KEY_DIR, name)
+
+
+def read_key_file(name):
+    with open(key_path(name), "rb") as f:
+        return f.read()
+
+
+def clear_immutable(path):
+    with open(path, "rb") as f:
+        flags = array.array("i", [0])
+        fcntl.ioctl(f.fileno(), FS_IOC_GETFLAGS, flags, True)
+        if flags[0] & FS_IMMUTABLE_FL:
+            flags[0] &= ~FS_IMMUTABLE_FL
+            fcntl.ioctl(f.fileno(), FS_IOC_SETFLAGS, flags)
+
+
+def write_var(name, auth, append=False):
+    """Write a signed update (.auth) to a variable with efi-updatevar."""
+    if os.path.exists(var_path(name)):
+        clear_immutable(var_path(name))
+    command = ["efi-updatevar"]
+    if append:
+        command.append("-a")
+    result = subprocess.run(command + ["-f", auth, name])
+    if result.returncode != 0:
+        fail(f"Writing {name} failed. The firmware may not let the system write its keys; "
+             "use its setup menu instead.")
+
+
+def sign_update(name, esl, auth, append=False):
+    """Sign an EFI signature list as an update of a variable, with the key that signs it."""
+    signer = KEY_SIGNER[name]
+    guid = read_key_file("GUID.txt").decode().strip()
+    command = ["sign-efi-sig-list"]
+    if append:
+        command.append("-a")
+    run(*command, "-g", guid, "-k", key_path(f"{signer}.key"), "-c", key_path(f"{signer}.crt"),
+        name, esl, auth)
+
+
+def remove_var(name):
+    """Remove a variable with an empty update, made and signed in a directory that goes away
+    again: with it, anyone could remove the variable a second time."""
+    with tempfile.TemporaryDirectory() as tmp:
+        empty = os.path.join(tmp, "empty.esl")
+        auth = os.path.join(tmp, f"empty-{name}.auth")
+        open(empty, "wb").close()
+        sign_update(name, empty, auth)
+        write_var(name, auth)
+
+
+def parse_signature_lists(value):
+    """The entries of the EFI signature lists of a variable, as (type, data)."""
+    entries = []
+    offset = 0
+    while value is not None and offset + 28 <= len(value):
+        list_type = uuid.UUID(bytes_le=bytes(value[offset:offset + 16]))
+        list_size, header_size, size = struct.unpack_from("<III", value, offset + 16)
+        if list_size < 28 or size < 16:
+            break
+        entry = offset + 28 + header_size
+        while entry + size <= offset + list_size:
+            # Each entry starts with the GUID of its owner.
+            entries.append((list_type, value[entry + 16:entry + size]))
+            entry += size
+        offset += list_size
+    return entries
+
+
+def signature_list(hashes, owner):
+    """An EFI signature list with SHA-256 hashes, all with the same owner."""
+    size = 16 + 32
+    data = b"".join(owner.bytes_le + digest for digest in hashes)
+    return struct.pack("<16sIII", EFI_CERT_SHA256_GUID.bytes_le, 28 + len(data), 0, size) + data
+
+
+def has_certificate(value, certificate):
+    return (EFI_CERT_X509_GUID, certificate) in parse_signature_lists(value)
+
+
+def certificate_subject(certificate):
+    result = subprocess.run(["openssl", "x509", "-inform", "DER", "-noout", "-subject"],
+                            input=certificate, capture_output=True)
+    if result.returncode != 0:
+        return "a certificate that cannot be read"
+    return result.stdout.decode().strip().removeprefix("subject=").strip()
+
+
+def describe_entry(entry_type, data):
+    if entry_type == EFI_CERT_X509_GUID:
+        return certificate_subject(data)
+    if entry_type == EFI_CERT_SHA256_GUID:
+        return f"sha256 {data.hex()}"
+    return f"an entry of type {entry_type}"
+
+
+def secure_boot_state(efivars=EFIVARS):
+    """The state of Secure Boot: on, off, setup (off, with the firmware in setup mode),
+    unsupported (UEFI without Secure Boot) or legacy (not booted with UEFI)."""
+    if not os.path.isdir(efivars):
+        return "legacy"
+    secure_boot = read_var("SecureBoot", efivars)
+    if secure_boot is None:
+        return "unsupported"
+    if secure_boot == b"\x01":
+        return "on"
+    if read_var("SetupMode", efivars) == b"\x01":
+        return "setup"
+    return "off"
+
+
+def require_keys(*names):
+    for name in names:
+        if not os.path.isfile(key_path(name)):
+            fail(f"{key_path(name)} does not exist. Generate the keys with hd-secboot "
+                 "--generate.")
+
+
+def require_setup_mode(action):
+    if not os.path.isdir(EFIVARS):
+        fail(f"{EFIVARS} does not exist: the system was not booted with UEFI.")
+    setup_mode = read_var("SetupMode")
+    if setup_mode is None:
+        fail("The firmware does not report SetupMode; it may not support Secure Boot.")
+    if setup_mode != b"\x01":
+        fail(f"The firmware is not in setup mode, so it cannot {action}. Remove the platform "
+             "key with hd-secboot --disable first.")
+
+
+def status(args):
+    state = secure_boot_state()
+    if args.quiet:
+        if state == "on":
+            return 0
+        return 1
+
+    if state == "on":
+        print("Secure Boot is on.")
+    else:
+        print(MESSAGES[state])
+    if state in ("legacy", "unsupported"):
+        return 1
+    for name in KEY_NAMES:
+        entries = parse_signature_lists(read_var(name))
+        if len(entries) == 0:
+            print(f"{name}: empty")
+            continue
+        print(f"{name}:")
+        for entry_type, data in entries:
+            print(f"    {describe_entry(entry_type, data)}")
+    if state == "on":
+        return 0
+    return 1
+
+
+def hostname():
+    try:
+        with open("/etc/hostname", encoding="utf-8") as f:
+            name = f.read().strip()
+    except OSError:
+        name = ""
+    if name == "":
+        name = socket.gethostname()
+    return name
+
+
+def generate_keys_in(tmp):
+    guid = str(uuid.uuid4())
+    with open(os.path.join(tmp, "GUID.txt"), "w", encoding="utf-8") as f:
+        f.write(guid + "\n")
+
+    host = hostname()
+    for name in KEY_NAMES:
+        path = os.path.join(tmp, name)
+        run("openssl", "req", "-quiet", "-new", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256",
+            "-days", str(KEY_DAYS), "-subj", f"/CN=HyprDebian {host} Secure Boot {name}/",
+            "-keyout", f"{path}.key", "-out", f"{path}.crt")
+        run("openssl", "x509", "-in", f"{path}.crt", "-outform", "DER", "-out", f"{path}.cer")
+        run("cert-to-efi-sig-list", "-g", guid, f"{path}.crt", f"{path}.esl")
+
+    for name in KEY_NAMES:
+        path = os.path.join(tmp, name)
+        signer = os.path.join(tmp, KEY_SIGNER[name])
+        run("sign-efi-sig-list", "-g", guid, "-k", f"{signer}.key", "-c", f"{signer}.crt",
+            name, f"{path}.esl", f"{path}.auth")
+
+
+def generate(args):
+    if os.path.exists(KEY_DIR):
+        print(f"Keeping the Secure Boot keys in {KEY_DIR}.")
+        return 0
+
+    # The keys are made in a directory of their own that only root can enter, and moved into
+    # place when they are all there, so a failure never leaves half a set of keys behind.
+    print(f"Generating the Secure Boot keys in {KEY_DIR}...", flush=True)
+    shutil.rmtree(KEY_TMP_DIR, ignore_errors=True)
+    os.makedirs(os.path.dirname(KEY_DIR), mode=0o755, exist_ok=True)
+    os.mkdir(KEY_TMP_DIR, mode=0o700)
+    old_umask = os.umask(0o077)
+    try:
+        generate_keys_in(KEY_TMP_DIR)
+    except OSError as e:
+        shutil.rmtree(KEY_TMP_DIR, ignore_errors=True)
+        fail(f"Cannot generate the Secure Boot keys: {e}")
+    except SystemExit:
+        # A tool that failed has said so already.
+        shutil.rmtree(KEY_TMP_DIR, ignore_errors=True)
+        raise
+    finally:
+        os.umask(old_umask)
+    for name in os.listdir(KEY_TMP_DIR):
+        os.chmod(os.path.join(KEY_TMP_DIR, name), 0o600)
+    os.rename(KEY_TMP_DIR, KEY_DIR)
+    return 0
+
+
+def store(args):
+    require_keys("db.auth", "KEK.auth")
+    require_setup_mode("take the keys")
+    for name in ("db", "KEK"):
+        print(f"Writing {name}...", flush=True)
+        write_var(name, key_path(f"{name}.auth"))
+    print("db and KEK hold the keys. Turn Secure Boot on with hd-secboot --enable.")
+    return 0
+
+
+def clear(args):
+    require_keys("PK.key", "PK.crt", "KEK.key", "KEK.crt", "GUID.txt")
+    require_setup_mode("empty db and KEK")
+    for name in ("db", "KEK"):
+        if read_var(name) is None:
+            print(f"{name} is empty already.")
+            continue
+        print(f"Emptying {name}...", flush=True)
+        remove_var(name)
+    print("db and KEK are empty.")
+    return 0
+
+
+def enable(args):
+    require_keys("PK.auth", "KEK.cer", "db.cer")
+    if read_var("PK") is not None:
+        fail("The firmware has a platform key already. hd-secboot --status shows whether "
+             "Secure Boot is on.")
+    require_setup_mode("take the platform key")
+    # Without its keys in db and KEK, the firmware would boot nothing that is signed with them.
+    for name in ("db", "KEK"):
+        if not has_certificate(read_var(name), read_key_file(f"{name}.cer")):
+            fail(f"{name} does not hold the key in {KEY_DIR}. Write db and KEK with hd-secboot "
+                 "--store first.")
+    print("Writing PK...", flush=True)
+    write_var("PK", key_path("PK.auth"))
+    if read_var("SetupMode") != b"\x00":
+        print("PK is written. The firmware still reports setup mode; some firmware only leaves "
+              "it at the next boot.")
+        return 0
+    print("PK is written and the firmware has left setup mode. Secure Boot is on from the next "
+          "boot, unless it is turned off in the setup menu of the firmware.")
+    return 0
+
+
+def disable(args):
+    require_keys("PK.key", "PK.crt", "PK.cer", "GUID.txt")
+    if not os.path.isdir(EFIVARS):
+        fail(f"{EFIVARS} does not exist: the system was not booted with UEFI.")
+    if read_var("SetupMode") is None:
+        fail("The firmware does not report SetupMode; it may not support Secure Boot.")
+    pk = read_var("PK")
+    if pk is None:
+        fail("The firmware has no platform key: it is in setup mode already.")
+    if not has_certificate(pk, read_key_file("PK.cer")):
+        fail(f"The platform key in the firmware is not the one in {KEY_DIR}, so it cannot be "
+             "removed from here. Turn Secure Boot off in the setup menu of the firmware.")
+    print("Removing PK...", flush=True)
+    remove_var("PK")
+    print("PK is removed. From the next boot, Secure Boot is off and the firmware is in setup "
+          "mode: anyone with root can then change db and KEK without a signature. Turn Secure "
+          "Boot on again with hd-secboot --enable.")
+    return 0
+
+
+def read_events(data):
+    """Yield (type, {alg: digest}, event data) for the crypto-agile events of a TPM event log."""
+    # The first event has the SHA-1 layout and holds the digest sizes of the other events.
+    size = struct.unpack_from("<I", data, 28)[0]
+    spec = data[32:32 + size]
+    if not spec.startswith(b"Spec ID Event03"):
+        fail("The TPM event log is not in the crypto-agile format of TPM 2.0.")
+    count = struct.unpack_from("<I", spec, 24)[0]
+    sizes = {}
+    for i in range(count):
+        alg, digest_size = struct.unpack_from("<HH", spec, 28 + 4 * i)
+        sizes[alg] = digest_size
+
+    offset = 32 + size
+    while offset + 12 <= len(data):
+        event_type, count = struct.unpack_from("<II", data, offset + 4)
+        offset += 12
+        digests = {}
+        for _ in range(count):
+            alg = struct.unpack_from("<H", data, offset)[0]
+            digests[alg] = data[offset + 2:offset + 2 + sizes[alg]]
+            offset += 2 + sizes[alg]
+        size = struct.unpack_from("<I", data, offset)[0]
+        yield event_type, digests, data[offset + 4:offset + 4 + size]
+        offset += 4 + size
+
+
+def device_path_nodes(path):
+    """The nodes of an EFI device path, as (type, subtype, data)."""
+    nodes = []
+    offset = 0
+    while offset + 4 <= len(path):
+        node_type, subtype, length = struct.unpack_from("<BBH", path, offset)
+        if node_type == 0x7F or length < 4:
+            break
+        nodes.append((node_type, subtype, path[offset + 4:offset + length]))
+        offset += length
+    return nodes
+
+
+def pci_address(nodes, devices="/sys/devices"):
+    """Follow the PCI nodes of a device path through sysfs to the address of the device."""
+    directory = None
+    address = None
+    for node_type, subtype, data in nodes:
+        if node_type == 2 and subtype == 1:
+            uid = struct.unpack_from("<I", data, 4)[0]
+            directory = os.path.join(devices, f"pci0000:{uid:02x}")
+        elif node_type == 1 and subtype == 1 and directory is not None:
+            function, device = data[0], data[1]
+            suffix = f":{device:02x}.{function:x}"
+            try:
+                matches = [entry for entry in os.listdir(directory)
+                           if entry.startswith("0000:") and entry.endswith(suffix)]
+            except OSError:
+                return None
+            if len(matches) != 1:
+                return None
+            address = matches[0]
+            directory = os.path.join(directory, address)
+    return address
+
+
+def option_roms(data):
+    """The option ROMs the firmware loaded, from a TPM event log: {sha256: [device path nodes]}."""
+    roms = {}
+    for event_type, digests, event in read_events(data):
+        if event_type not in DRIVER_EVENTS:
+            continue
+        if TPM_ALG_SHA256 not in digests:
+            continue
+        # UEFI_IMAGE_LOAD_EVENT: location, length and link time address of the image, the length
+        # of its device path, then the device path.
+        path_length = struct.unpack_from("<Q", event, 24)[0]
+        nodes = device_path_nodes(event[32:32 + path_length])
+        # An option ROM is loaded from an offset in the ROM of a PCI device.
+        if not any(node_type == 4 and subtype == 8 for node_type, subtype, _ in nodes):
+            continue
+        roms.setdefault(digests[TPM_ALG_SHA256], []).append(nodes)
+    return roms
+
+
+def pci_names(vendor, device, files=PCI_IDS):
+    """The names of a PCI vendor and device from pci.ids, or None for each one it lacks."""
+    for path in files:
+        try:
+            f = open(path, encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        vendor_name = None
+        with f:
+            for line in f:
+                if vendor_name is None:
+                    if line[:4].lower() == vendor and line[4:6] == "  ":
+                        vendor_name = line[6:].strip()
+                    continue
+                if not line.startswith("\t"):
+                    if line.strip() != "" and not line.startswith("#"):
+                        break
+                    continue
+                if line[1:5].lower() == device and line[5:7] == "  ":
+                    return vendor_name, line[7:].strip()
+        if vendor_name is not None:
+            return vendor_name, None
+    return None, None
+
+
+def device_name(address, devices=PCI_DEVICES, files=PCI_IDS):
+    """The address, IDs, name and driver of a PCI device."""
+    directory = os.path.join(devices, address)
+    try:
+        with open(os.path.join(directory, "vendor")) as f:
+            vendor = f.read().strip().removeprefix("0x")
+        with open(os.path.join(directory, "device")) as f:
+            device = f.read().strip().removeprefix("0x")
+    except OSError:
+        return address
+    name = f"{address} [{vendor}:{device}]"
+    vendor_name, model_name = pci_names(vendor, device, files)
+    if vendor_name is not None:
+        name += f" {vendor_name}"
+    if model_name is not None:
+        name += f" {model_name}"
+    driver = os.path.join(directory, "driver")
+    if os.path.islink(driver):
+        name += f" (driver {os.path.basename(os.readlink(driver))})"
+    return name
+
+
+def parse_selection(answer, count):
+    """The numbers, from 1, that an answer picks out of count choices: numbers separated by spaces
+    or commas, or all. None when the answer is not valid."""
+    words = answer.replace(",", " ").split()
+    if words == ["all"]:
+        return list(range(1, count + 1))
+    picked = []
+    for word in words:
+        if not word.isdigit():
+            return None
+        number = int(word)
+        if number < 1 or number > count:
+            return None
+        if number not in picked:
+            picked.append(number)
+    return picked
+
+
+def append_rom_hash(args):
+    require_keys("KEK.key", "KEK.crt", "GUID.txt")
+    state = secure_boot_state()
+    if state not in ("off", "setup"):
+        if state == "on":
+            fail("Secure Boot is on, so the firmware measured no option ROM that it refused. "
+                 "Turn it off with hd-secboot --disable, reboot, and run this again.")
+        fail(MESSAGES[state])
+    try:
+        with open(EVENT_LOG, "rb") as f:
+            log = f.read()
+    except OSError as e:
+        fail(f"Cannot read the TPM event log {EVENT_LOG}: {e.strerror}.")
+
+    roms = option_roms(log)
+    if len(roms) == 0:
+        print("The TPM event log has no option ROMs: the firmware loaded none.")
+        return 0
+    db = parse_signature_lists(read_var("db"))
+    hashes = list(roms)
+    for number, digest in enumerate(hashes, start=1):
+        in_db = (EFI_CERT_SHA256_GUID, digest) in db
+        print(f"{number}. sha256 {digest.hex()}" + (" (in db already)" if in_db else ""))
+        for nodes in roms[digest]:
+            address = pci_address(nodes)
+            if address is None:
+                print("     a device that cannot be found")
+            else:
+                print(f"     {device_name(address)}")
+
+    picked = None
+    while picked is None:
+        try:
+            answer = input("Hashes to add to db (numbers, all, or nothing for none): ")
+        except EOFError:
+            print()
+            answer = ""
+        picked = parse_selection(answer, len(hashes))
+        if picked is None:
+            print(f"Give numbers from 1 to {len(hashes)}, separated by spaces, or all.")
+
+    new = []
+    for number in picked:
+        digest = hashes[number - 1]
+        if (EFI_CERT_SHA256_GUID, digest) not in db:
+            new.append(digest)
+    if len(new) == 0:
+        print("Nothing to add to db.")
+        return 0
+    owner = uuid.UUID(read_key_file("GUID.txt").decode().strip())
+    # The update can add the hashes again for as long as KEK holds the key, so it goes away again.
+    with tempfile.TemporaryDirectory() as tmp:
+        esl = os.path.join(tmp, "roms.esl")
+        auth = os.path.join(tmp, "roms.auth")
+        with open(esl, "wb") as f:
+            f.write(signature_list(new, owner))
+        sign_update("db", esl, auth, append=True)
+        print(f"Adding {len(new)} hash{'es' if len(new) > 1 else ''} to db...", flush=True)
+        write_var("db", auth, append=True)
+    if state == "setup":
+        print("db holds the hashes. Turn Secure Boot on again with hd-secboot --enable.")
+    else:
+        print("db holds the hashes. Turn Secure Boot on again in the setup menu of the firmware.")
+    return 0
+
+
+ACTIONS = {
+    "status": status,
+    "generate": generate,
+    "store": store,
+    "clear": clear,
+    "enable": enable,
+    "disable": disable,
+    "append_rom_hash": append_rom_hash,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Control Secure Boot with the keys in {KEY_DIR}.")
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument("--status", action="store_true",
+                        help="say what state Secure Boot is in and what PK, KEK and db hold; "
+                        "exits with 0 when Secure Boot is on, 1 when it is not")
+    action.add_argument("--generate", action="store_true",
+                        help="generate the keys, unless they are there already")
+    action.add_argument("--store", action="store_true",
+                        help="write db and KEK with the keys, replacing what they hold; needs "
+                        "setup mode")
+    action.add_argument("--clear", action="store_true",
+                        help="empty db and KEK; needs setup mode")
+    action.add_argument("--enable", action="store_true",
+                        help="write PK, which ends setup mode and turns Secure Boot on")
+    action.add_argument("--disable", action="store_true",
+                        help="remove PK, which puts the firmware in setup mode and turns Secure "
+                        "Boot off from the next boot")
+    action.add_argument("--append-rom-hash", action="store_true",
+                        help="pick option ROMs the firmware loaded and add their hashes to db; "
+                        "needs Secure Boot off")
+    parser.add_argument("-q", "--quiet", action="store_true",
+                        help="with --status: say nothing, only set the exit status")
+    args = parser.parse_args()
+    if args.quiet and not args.status:
+        parser.error("-q/--quiet only goes with --status")
+
+    name = next(name for name in ACTIONS if getattr(args, name))
+    if name != "status" and os.geteuid() != 0:
+        fail("This must be run as root.")
+    return ACTIONS[name](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

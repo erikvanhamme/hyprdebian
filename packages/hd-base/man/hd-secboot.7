@@ -5,11 +5,10 @@ hd-secboot \- the hyprdebian Secure Boot keys
 The package
 .B hd-base
 lets a hyprdebian system boot under Secure Boot with keys of its owner,
-instead of, or next to, the keys of Microsoft that most firmware ships with.
-.BR hd-secboot-enroll (8)
-enrolls the keys in the firmware, and
-.BR hd-secboot-check (8)
-checks that Secure Boot is on.
+instead of the keys of Microsoft that most firmware ships with.
+.BR hd-secboot (8)
+generates the keys, writes them in the firmware, turns Secure Boot on and
+off, and adds the hashes of option ROMs to db.
 .PP
 It depends on the tools that make and use the keys, so they are installed
 with it and stay installed:
@@ -29,7 +28,9 @@ and checks them with
 .BR sbverify (1).
 .PP
 On its first installation, it generates the keys in
-.IR /etc/hyprdebian/secboot .
+.I /etc/hyprdebian/secboot
+with
+.BR "hd-secboot \-\-generate" .
 When that directory already exists, on an upgrade, a reinstall or when the
 keys were put there by hand, the keys are kept: keys that are enrolled in
 the firmware are never replaced.
@@ -80,10 +81,18 @@ and moved into place when they are all there, so a failed installation never
 leaves half a set behind.
 .SH ENROLLING THE KEYS
 Put the firmware in setup mode, which removes its platform key, in its
-setup menu, then run
-.BR hd-secboot-enroll (8).
-It adds db and KEK to the entries the firmware already has, and sets PK
-last, since that ends setup mode.
+setup menu.
+Most firmware has an entry under Secure Boot to delete the platform key, to
+clear all keys, or to reset to setup mode.
+Then write db and KEK, which replaces what they hold, and PK last, since
+that ends setup mode:
+.PP
+.RS
+.nf
+hd-secboot \-\-store
+hd-secboot \-\-enable
+.fi
+.RE
 .PP
 Some firmware does not let the system write the keys; enroll the
 .I .auth
@@ -92,7 +101,9 @@ or
 files from its setup menu instead.
 .PP
 Sign the EFI files that are to boot with the db key before Secure Boot is
-turned on:
+turned on;
+.BR hd-bootloader-update (8)
+does that for the bootloader and the kernels:
 .PP
 .RS
 .nf
@@ -100,10 +111,29 @@ sbsign \-\-key db.key \-\-cert db.crt \-\-output signed.efi unsigned.efi
 .fi
 .RE
 .PP
-Then turn Secure Boot on in the setup menu of the firmware.
 After the next boot,
-.BR hd-secboot-check (8)
-says whether it is on.
+.B hd-secboot \-\-status
+says whether Secure Boot is on; when it is not, turn it on in the setup menu
+of the firmware.
+.SH OPTION ROMS
+Some devices have a driver in their option ROM that the firmware loads before
+the system boots, such as the driver (GOP) that a graphics card needs to
+show anything before the kernel starts.
+Those drivers are signed with a certificate of Microsoft, which db does not
+hold, so with Secure Boot on the firmware refuses them: the setup menu of the
+firmware and the bootloader menu stay black.
+.B hd-secboot \-\-append\-rom\-hash
+adds the hashes of exactly those drivers to db instead, so no other image
+signed by Microsoft can boot.
+.SH TURNING SECURE BOOT OFF
+.B hd-secboot \-\-disable
+removes the platform key, which puts the firmware back in setup mode, so
+Secure Boot is off from the next boot, without the setup menu.
+db and KEK keep what they hold;
+.B hd-secboot \-\-enable
+turns it on again.
+.B hd-secboot \-\-clear
+empties db and KEK as well.
 .SH BACKUP
 Back up
 .I /etc/hyprdebian/secboot
@@ -116,8 +146,8 @@ has the keys enrolled; with them, anyone can.
 The keys.
 .SH SEE ALSO
 .BR hd-base (7),
-.BR hd-secboot-enroll (8),
-.BR hd-secboot-check (8),
+.BR hd-secboot (8),
+.BR hd-bootloader-update (8),
 .BR efi-updatevar (1),
 .BR sbsign (1),
 .BR sbverify (1),

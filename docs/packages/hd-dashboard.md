@@ -97,7 +97,7 @@ The connection is plain HTTP, meant for the local network.
 | `format` | The layout of the report, now 1. Reports with a newer format than the dashboard knows are refused with 400. |
 | `host`, `fqdn` | The host name, by which the dashboard knows the system, and its FQDN. |
 | `hyprdebian` | `version` and `suite` of the HyprDebian installation. |
-| `os` | `debian`, the Debian version, `kernel`, the running kernel, `kernel_newest`, the newest installed kernel, `boot_time`, and `secure_boot`, the state of Secure Boot as `hd-secboot-check` finds it: `on`, `off`, `setup`, `unsupported` or `legacy`, see [hd-secboot](hd-secboot.md#hd-secboot-check). |
+| `os` | `debian`, the Debian version, `kernel`, the running kernel, `kernel_newest`, the newest installed kernel, `boot_time`, and `secure_boot`, the state of Secure Boot as `hd-secboot --status` finds it: `on`, `off`, `setup`, `unsupported` or `legacy`, see [hd-secboot](hd-secboot.md#--status). |
 | `load`, `cpus` | The load averages and the number of CPUs. |
 | `memory` | `total` and `used`, in bytes. |
 | `pools` | Per ZFS pool: `name`, `health`, `size`, `capacity` in percent, and `scrub`, the last completed scrub, with `repaired`, the bytes it repaired, `errors` and `time`, when it ended; `null` when the pool has none. |

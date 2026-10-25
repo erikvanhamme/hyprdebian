@@ -37,9 +37,9 @@
 #                                             interfaces in the settings
 #                 /usr/sbin/hd-network-bridge adds, changes and removes
 #                                             bridges in the settings
-#                 /usr/sbin/hd-secboot-enroll enrolls the Secure Boot keys
-#                                             in the firmware
-#                 /usr/sbin/hd-secboot-check  checks that Secure Boot is on
+#                 /usr/sbin/hd-secboot        generates the Secure Boot keys,
+#                                             writes them in the firmware and
+#                                             turns Secure Boot on and off
 #                 /usr/sbin/hd-firmware       finds and installs the
 #                                             firmware packages that the
 #                                             hardware needs
@@ -118,7 +118,7 @@ USR := $(shell find usr -type f)
 COMMANDS := hd-up hd-reboot-check hd-reboot hd-poweroff hd-sync-skel hd-config-update hd-config-remove
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-issue hd-link-repo hd-network-render \
-	hd-network-iface hd-network-bridge hd-secboot-enroll hd-secboot-check hd-firmware
+	hd-network-iface hd-network-bridge hd-secboot hd-firmware
 # The jinja2 templates of hd-link-repo.
 TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
 TEMPLATES := $(wildcard templates/*.j2)
@@ -131,7 +131,7 @@ MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot-check.1 man/hd-reboot.1 man/
 	man/hd-issue.8 man/hd-link-repo.8 man/hd-firmware.8 \
 	man/hd-config.7 man/hd-config-update.1 man/hd-config-remove.1 \
 	man/hd-network.7 man/hd-network-render.8 man/hd-network-iface.8 man/hd-network-bridge.8 \
-	man/hd-secboot.7 man/hd-secboot-enroll.8 man/hd-secboot-check.8
+	man/hd-secboot.7 man/hd-secboot.8
 
 .PHONY: deb deb-path test clean
 

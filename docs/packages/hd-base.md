@@ -6,7 +6,7 @@ It installs `hd-up`, which upgrades the system after a ZFS snapshot, by hand and
 It also holds the parts that every hyprdebian system shares, each with a page of its own:
 - [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, and that of each user in `~/.config/hyprdebian/config.json`, with `hd-config-update` and `hd-config-remove`;
 - [hd-network](hd-network.md): the network configuration, rendered into the systemd-networkd files by `hd-network-render` and changed with `hd-network-iface` and `hd-network-bridge`, and the `.link` files that name the network interfaces by their path;
-- [hd-secboot](hd-secboot.md): the Secure Boot keys of the owner, which the postinst generates in `/etc/hyprdebian/secboot` when they are not there yet, with `hd-secboot-enroll`, which enrolls them in the firmware, and `hd-secboot-check`, which checks that Secure Boot is on.
+- [hd-secboot](hd-secboot.md): the Secure Boot keys of the owner, which the postinst generates in `/etc/hyprdebian/secboot` with `hd-secboot` when they are not there yet; `hd-secboot` also writes them in the firmware and turns Secure Boot on and off.
 
 These were the packages `hd-config`, `hd-network` and `hd-secboot` before. `hd-base` conflicts with them, replaces and provides them, so an upgrade removes them; the configuration and the keys stay.
 
@@ -294,5 +294,5 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf` | The config of systemd-resolved. |
 | `/usr/bin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
 | `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
-| `/usr/sbin/hd-secboot-*`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
+| `/usr/sbin/hd-secboot`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |

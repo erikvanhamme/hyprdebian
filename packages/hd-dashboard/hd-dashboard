@@ -49,7 +49,7 @@ UPGRADE_DAYS = 14
 POOL_WARN = 80
 POOL_BAD = 90
 
-# What the states of Secure Boot in a report other than on mean, see hd-secboot-check.
+# What the states of Secure Boot in a report other than on mean, see hd-secboot --status.
 SECURE_BOOT = {
     "off": "Secure Boot is off",
     "setup": "Secure Boot is off, firmware in setup mode",

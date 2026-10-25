@@ -1,0 +1,205 @@
+.TH HD-SECBOOT 8 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-secboot \- control Secure Boot with the hyprdebian Secure Boot keys
+.SH SYNOPSIS
+.B hd-secboot \-\-status
+.RB [ \-q ]
+.br
+.B hd-secboot
+.BR \-\-generate " | " \-\-store " | " \-\-clear " | " \-\-enable " | " \-\-disable
+.br
+.B hd-secboot \-\-append\-rom\-hash
+.SH DESCRIPTION
+.B hd-secboot
+generates the Secure Boot keys of the owner in
+.IR /etc/hyprdebian/secboot ,
+writes them in the firmware and removes them again, turns Secure Boot on
+and off, and adds the hashes of option ROMs to db.
+See
+.BR hd-secboot (7)
+for the keys.
+It does one of these at a time.
+.PP
+.B \-\-status
+does not need root; the others run as root.
+.PP
+The keys go in in this order: the firmware is put in setup mode, without a
+platform key, then
+.B \-\-store
+writes db and KEK, and
+.B \-\-enable
+writes PK, which ends setup mode.
+.B \-\-disable
+removes PK again, and
+.B \-\-clear
+empties db and KEK, which needs setup mode as well.
+.SH OPTIONS
+.TP
+.B \-\-status
+Say whether Secure Boot is on, and why not when it is off: it is turned off
+in the setup menu of the firmware, the firmware is in setup mode, the
+firmware does not support Secure Boot, or the system was not booted with
+UEFI.
+Then list what PK, KEK and db hold: the subject of each certificate and each
+SHA-256 hash.
+It reads the EFI variables in
+.IR /sys/firmware/efi/efivars ,
+which every user can read.
+.TP
+.BR \-q ", " \-\-quiet
+With
+.BR \-\-status :
+say nothing, only set the exit status.
+.TP
+.B \-\-generate
+Generate the keys in
+.IR /etc/hyprdebian/secboot ,
+unless that directory exists already: keys that may be in the firmware are
+never replaced.
+The postinst of
+.B hd-base
+runs this, so the installer has keys to sign the bootloader with.
+The keys are made in
+.I /etc/hyprdebian/secboot.tmp
+and moved into place when they are all there, so a failure never leaves half
+a set behind.
+.TP
+.B \-\-store
+Write db and KEK with the keys, from their signed updates
+.I db.auth
+and
+.IR KEK.auth ,
+with
+.BR efi-updatevar (1).
+They replace what db and KEK held, such as the certificates of Microsoft and
+the hashes of option ROMs.
+The firmware must be in setup mode.
+.TP
+.B \-\-clear
+Empty db and KEK, with updates signed by KEK and PK.
+The firmware must be in setup mode.
+.TP
+.B \-\-enable
+Write PK from
+.IR PK.auth ,
+which ends setup mode, so Secure Boot is on from the next boot unless it is
+turned off in the setup menu of the firmware.
+The firmware must be in setup mode, and db and KEK must hold the keys, so
+the firmware does not end up refusing everything that is signed with them.
+Some firmware only leaves setup mode at the next boot; then it says so.
+.TP
+.B \-\-disable
+Remove PK, with an update signed by the PK key, which puts the firmware in
+setup mode: from the next boot, it checks no signatures and Secure Boot is
+off.
+db and KEK keep what they hold, so
+.B \-\-enable
+turns Secure Boot on again.
+The PK in the firmware must be the one in
+.IR /etc/hyprdebian/secboot .
+In setup mode, anyone with root can change db, KEK and PK without a
+signature.
+.TP
+.B \-\-append\-rom\-hash
+Add the SHA-256 hashes of option ROMs to db.
+Some devices have a driver in their option ROM that the firmware has to
+load before the system boots, such as the driver (GOP) that a graphics card
+needs to show the setup menu of the firmware and the bootloader.
+The firmware measures each driver it loads in the TPM event log
+.IR /sys/kernel/security/tpm0/binary_bios_measurements ,
+so while Secure Boot is off, the log has the hash of every option ROM, also
+of those it would refuse with Secure Boot on.
+.IP
+It lists the hashes with the devices that hold them: the PCI address, the
+vendor and device IDs, their names from
+.I pci.ids
+when that is installed, and the driver of the kernel.
+A hash that db holds already is marked.
+Then it asks which hashes to add: their numbers, separated by spaces or
+commas,
+.BR all ,
+or nothing for none.
+It adds the hashes that were picked to db, in an update signed by the KEK
+key, and keeps what db held.
+.IP
+Secure Boot must be off: turned off with
+.B \-\-disable
+or in the setup menu of the firmware, followed by a reboot.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH NOTES
+The updates that remove PK, db and KEK, and the one with the hashes, are
+made in a temporary directory and removed again, so no file is left that
+could do the same a second time.
+.PP
+Before each write, it clears the immutable flag that the kernel puts on the
+variables in
+.IR /sys/firmware/efi/efivars .
+When a write fails, the firmware may not let the system write its keys;
+enroll the
+.I .auth
+or
+.I .cer
+files from its setup menu instead.
+.PP
+The hash of an option ROM changes with an update of the firmware of the
+device, such as the VBIOS of a graphics card.
+Until the new hash is added, the firmware refuses the driver with Secure
+Boot on; for a graphics card, the screen stays black until the kernel
+starts.
+.SH EXIT STATUS
+With
+.BR \-\-status :
+0 when Secure Boot is on, 1 when it is not.
+Otherwise 0 when it is done, 1 on an error.
+2 on wrong arguments.
+.SH FILES
+.TP
+.I /etc/hyprdebian/secboot
+The keys.
+.TP
+.I /sys/firmware/efi/efivars
+The EFI variables, among them SecureBoot, SetupMode, PK, KEK and db.
+.TP
+.I /sys/kernel/security/tpm0/binary_bios_measurements
+The TPM event log, with the hashes of the option ROMs.
+.SH EXAMPLES
+Turn Secure Boot on, with the firmware in setup mode:
+.PP
+.RS
+.nf
+hd-secboot \-\-store
+hd-secboot \-\-enable
+.fi
+.RE
+.PP
+Add the hash of the driver of a graphics card to db:
+.PP
+.RS
+.nf
+hd-secboot \-\-disable
+reboot
+hd-secboot \-\-append\-rom\-hash
+hd-secboot \-\-enable
+reboot
+.fi
+.RE
+.PP
+In a script:
+.PP
+.RS
+.nf
+if ! hd-secboot \-\-status \-q; then
+    echo "Secure Boot is off."
+fi
+.fi
+.RE
+.SH SEE ALSO
+.BR hd-secboot (7),
+.BR hd-report (8),
+.BR efi-updatevar (1),
+.BR sign-efi-sig-list (1),
+.BR sbsign (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

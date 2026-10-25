@@ -390,7 +390,7 @@ see `zz-hd-bootloader` write new UKIs.
    `rpool/hyprdebian`, `mkdir /boot/efi`, start the automount again, `update-initramfs -u -k all`,
    reboot. Once that works, `zpool destroy bpool`. Partition 3 then stays empty; the layout keeps
    differing from a fresh install (swap p2, root p4 instead of p3), which nothing depends on.
-4. Optional, Secure Boot: `hd-secboot-enroll`, then turn on Secure Boot in the firmware. Keep a way
+4. Optional, Secure Boot: put the firmware in setup mode, then `hd-secboot --store` and `hd-secboot --enable`. Keep a way
    back: the firmware setup can clear the keys again.
 5. Destroy the snapshots `@pre-hd-migration` once you are sure.
 

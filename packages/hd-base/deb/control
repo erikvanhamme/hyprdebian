@@ -59,7 +59,8 @@ Description: HyprDebian base system
  initramfs.
  .
  On its first installation it generates the Secure Boot keys of the owner in
- /etc/hyprdebian/secboot: PK, KEK and db, each with its certificate, EFI
- signature list and signed update. Existing keys are never replaced.
- hd-secboot-enroll enrolls them in the firmware, and hd-secboot-check checks
- that Secure Boot is on.
+ /etc/hyprdebian/secboot with hd-secboot: PK, KEK and db, each with its
+ certificate, EFI signature list and signed update. Existing keys are never
+ replaced. hd-secboot also writes them in the firmware, turns Secure Boot on
+ and off, adds the hashes of option ROMs to db and shows the state of Secure
+ Boot.

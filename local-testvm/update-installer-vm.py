@@ -2,9 +2,9 @@
 """Updates the installer vm: a plain Debian system that installs HyprDebian on another disk.
 
 A tool of the test vm, see .claude/skills/hyprdebian-test-vm. It runs make all in the root of
-the repository, then takes every package of the package directories in packages/, with the
-suites in the deploy.json of its directory, as the Makefile does for make iso. It builds the local
-repository of the packages in a temporary folder, with the same layout as that of the live cd:
+the repository, then takes every package that make list-debs gives, with the suites it goes to.
+It builds the local repository of the packages in a temporary folder, with the same layout as
+that of the live cd:
 each package in pool/<suite> of every suite it goes to, and the indices of each suite with an
 unsigned Release file. It replaces /srv/hyprdebian/repo on the installer vm with it, copied as a
 tar stream over ssh, then installs hd-installer from it there. It logs in with ssh as the user, who must have sudo
@@ -16,8 +16,6 @@ without a password on the vm.
 """
 
 import argparse
-import glob
-import json
 import os
 import shlex
 import shutil
@@ -39,22 +37,19 @@ class UpdateError(Exception):
 
 
 def packages():
-    """Every package of the package directories, as a list of (suites, path in build/): the repos
-    of the deploy.json of its directory, and the packages that make deb-path names there."""
+    """Every package that make list-debs gives, as a list of (suites, path in build/): the repos
+    it goes to and where make all put it, in build/both, build/trixie or build/unstable."""
     found = []
-    for deploy in sorted(glob.glob(os.path.join(ROOT, "packages", "*", "deploy.json"))):
-        directory = os.path.dirname(deploy)
-        with open(deploy) as f:
-            suites = json.load(f)["repos"]
+    for entry in run(["make", "-s", "--no-print-directory", "list-debs"], cwd=ROOT).split():
+        repos, _, deb = entry.partition(":")
+        suites = repos.split(",")
         for suite in suites:
             if suite not in SUITES:
-                raise UpdateError(f"{deploy}: unknown suite {suite}")
-        output = run(["make", "-s", "--no-print-directory", "-C", directory, "deb-path"])
-        for deb in output.split():
-            path = os.path.join(ROOT, "build", os.path.basename(deb))
-            if not os.path.isfile(path):
-                raise UpdateError(f"{path}: there is no such package; build it with make all")
-            found.append((suites, path))
+                raise UpdateError(f"{deb}: unknown suite {suite}")
+        path = os.path.join(ROOT, deb)
+        if not os.path.isfile(path):
+            raise UpdateError(f"{path}: there is no such package; build it with make all")
+        found.append((suites, path))
     return found
 
 

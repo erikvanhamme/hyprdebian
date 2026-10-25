@@ -41,11 +41,10 @@ files that name ethernet and wifi interfaces by their path.
 .BR hd-secboot (7)
 The Secure Boot keys of the owner, which the postinst generates in
 .I /etc/hyprdebian/secboot
-when they are not there yet,
-.BR hd-secboot-enroll (8),
-which enrolls them in the firmware, and
-.BR hd-secboot-check (8),
-which checks that Secure Boot is on.
+with
+.BR hd-secboot (8)
+when they are not there yet; it also writes them in the firmware and turns
+Secure Boot on and off.
 .PP
 It installs
 .BR hd-up (1),
@@ -460,10 +459,9 @@ Switches the HyprDebian repository and suite of apt.
 .I /usr/sbin/hd-network-bridge
 Render and change the network configuration.
 .TP
-.I /usr/sbin/hd-secboot-enroll
-.TQ
-.I /usr/sbin/hd-secboot-check
-Enroll the Secure Boot keys and check that Secure Boot is on.
+.I /usr/sbin/hd-secboot
+Generates the Secure Boot keys, writes them in the firmware and turns Secure
+Boot on and off.
 .TP
 .I /usr/sbin/hd-firmware
 Finds and installs the firmware packages that the hardware needs.
