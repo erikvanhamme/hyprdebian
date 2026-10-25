@@ -28,6 +28,12 @@
 #                   package directory in PACKAGES from build/ to it, each
 #                   only for the repos in the deploy.json of its directory
 #                   (update-repo/update-repo.py)
+#   make list-debs  print every package of the package directories in
+#                   PACKAGES as <repos>:build/<package>.deb, one per line,
+#                   without building them: the arguments of update-repo.py
+#                   and the DEBS of the live cd, for a build that runs make
+#                   all and make iso apart from the upload, as on a build
+#                   server
 #
 # Each package is a directory in packages/ with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
@@ -50,7 +56,7 @@ OUT := build
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
-.PHONY: all test clean iso provision-vm switch-vm-gpu update-repo $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean iso provision-vm switch-vm-gpu update-repo list-debs $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -81,7 +87,8 @@ switch-vm-gpu:
 	python3 vm/switch-vm-gpu.py
 
 # Prints each package of the package directories in PACKAGES as
-# <repos>:build/<package>.deb, one per line, for update-repo.py and the live cd.
+# <repos>:build/<package>.deb, one per line, for update-repo.py, the live cd and
+# make list-debs.
 define LIST_DEBS
 for package in $(PACKAGES); do \
 	repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
@@ -100,3 +107,7 @@ iso: all
 update-repo: all
 	uploads=$$($(LIST_DEBS)) || exit 1; \
 	python3 update-repo/update-repo.py $$uploads
+
+# Prints each package as <repos>:build/<package>.deb, without building it.
+list-debs:
+	@$(LIST_DEBS)
