@@ -13,26 +13,43 @@ A run:
 .IP 1. 4
 updates the checkout in
 .I /var/lib/hd-buildserver/checkout
-from the git repository, and clones it the first time;
+from the git repository, and clones it the first time; checks out the head of
+the branch and removes everything git does not track, also the downloads and
+compiled releases of earlier builds;
 .IP 2. 4
-stops when the head of the branch is the commit of the last build, in
-.IR /var/lib/hd-buildserver/last-built ;
+asks
+.B make sources
+of
+.I packages/hd-kernel
+for the versions of the source packages
+.B linux
+and
+.B zfs-linux
+in each suite, which the kernels of
+.BR hd-kernel (7)
+are built of;
 .IP 3. 4
-otherwise checks out the head, removes everything git does not track, also the
-downloads and compiled releases of earlier builds, builds the image of
+stops when the commit and those versions are those of the last build, in
+.IR /var/lib/hd-buildserver/last-built ,
+so a night on which only Debian has a new kernel or ZFS also builds;
+.IP 4. 4
+otherwise builds the image of
 .I buildenv/Dockerfile
 of the checkout, a clean
 .B debian:trixie
 build environment, and runs
 .B make iso
-in a container of it, which builds every package and the live ISO;
-.IP 4. 4
+in a container of it, which builds every package and the live ISO; the
+kernels come from the cache in
+.I /var/lib/hd-buildserver/hd-kernel
+when they were built of the same versions before;
+.IP 5. 4
 runs
 .B update-repo/update-repo.py
 of the checkout with
 .BR "\-\-only\-new \-\-iso" ,
 which uploads the packages that are not in the repository yet and the live
-ISO, then stores the commit as the last build.
+ISO, then stores the commit and the versions as the last build.
 .PP
 A run that fails leaves the last build as it was, so the next run tries the
 same commit again.
@@ -65,8 +82,8 @@ sudo systemctl start hd-buildserver.service
 Show a short help and exit.
 .TP
 .B \-\-force
-Build and upload also when the branch has not moved since the last build, for
-example with:
+Build and upload also when neither the branch nor the kernel sources have
+moved since the last build, for example with:
 .PP
 .RS
 sudo runuser \-u hd-buildserver \-\- hd-buildserver \-\-force
@@ -139,7 +156,14 @@ The default settings.
 The checkout of the git repository.
 .TP
 .I /var/lib/hd-buildserver/last-built
-The commit of the last build that was uploaded.
+The commit and the kernel sources of the last build that was uploaded, as
+JSON.
+.TP
+.I /var/lib/hd-buildserver/hd-kernel
+The packages of
+.B hd-kernel
+of the last build of each suite, which a build of the same versions copies
+instead of building them again.
 .TP
 .I /var/lib/hd-buildserver/build.lock
 Keeps two runs from building at the same time.
@@ -153,5 +177,6 @@ The ssh key and the ssh config.
 Run hd-buildserver every night.
 .SH SEE ALSO
 .BR hd-repo (7),
+.BR hd-kernel (7),
 .BR hd-config-update (1),
 .BR hd-docker (7)

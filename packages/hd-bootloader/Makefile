@@ -9,9 +9,9 @@
 #               the package ESP_PACKAGE, deb/$(ESP_PACKAGE)/defaults.json:
 #               EFI/BOOT/BOOTX64.EFI, the bootloader of its frontend;
 #               EFI/BOOT/assets.efi, the stub with the config, the menu rows,
-#               the DKMS MOK (/var/lib/dkms/mok.pub) and the assets of that
-#               frontend added as sections; and the UKIs of the 4 most recent
-#               kernels in /boot. make esp ESP_PACKAGE=txt tries the text
+#               the DKMS MOK (/var/lib/dkms/mok.pub) when there is one and the
+#               assets of that frontend added as sections; and the UKIs of the
+#               4 most recent kernels in /boot with a ZFS module. make esp ESP_PACKAGE=txt tries the text
 #               frontend.
 #   make image  build build/esp.img (1GB FAT32) with build/esp/
 #   make deb    build build/hd-bootloader-<package>_$(DEB_VERSION)_amd64.deb

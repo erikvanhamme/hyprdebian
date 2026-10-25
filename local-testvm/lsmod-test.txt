@@ -1,0 +1,95 @@
+Module                  Size  Used by
+cfg80211             1622016  0
+rfkill                 45056  2 cfg80211
+ip6t_REJECT            12288  1
+nf_reject_ipv6         24576  1 ip6t_REJECT
+xt_hl                  12288  22
+ip6t_rt                16384  3
+ipt_REJECT             12288  1
+nf_reject_ipv4         12288  1 ipt_REJECT
+xt_comment             12288  2
+nft_limit              16384  1
+xt_limit               12288  0
+xt_addrtype            12288  4
+xt_tcpudp              16384  60
+xt_conntrack           12288  14
+nf_conntrack          217088  1 xt_conntrack
+nf_defrag_ipv6         24576  1 nf_conntrack
+nf_defrag_ipv4         12288  1 nf_conntrack
+nft_compat             20480  107
+x_tables               61440  10 xt_conntrack,nft_compat,xt_tcpudp,xt_addrtype,ip6t_rt,xt_comment,ipt_REJECT,xt_limit,xt_hl,ip6t_REJECT
+nf_tables             417792  604 nft_compat,nft_limit
+binfmt_misc            28672  1
+intel_rapl_msr         24576  0
+intel_rapl_common      53248  1 intel_rapl_msr
+kvm_amd               245760  0
+snd_hda_codec_generic   131072  1
+ccp                   204800  1 kvm_amd
+snd_hda_intel          65536  0
+snd_hda_codec         229376  2 snd_hda_codec_generic,snd_hda_intel
+kvm                  1540096  1 kvm_amd
+snd_hda_core          155648  3 snd_hda_codec_generic,snd_hda_intel,snd_hda_codec
+snd_intel_dspcfg       49152  1 snd_hda_intel
+snd_intel_sdw_acpi     16384  1 snd_intel_dspcfg
+snd_hwdep              24576  1 snd_hda_codec
+irqbypass              16384  1 kvm
+snd_pcm               217088  3 snd_hda_intel,snd_hda_codec,snd_hda_core
+snd_timer              57344  1 snd_pcm
+virtio_gpu            114688  0
+aesni_intel           102400  0
+virtio_dma_buf         12288  1 virtio_gpu
+drm_client_lib         16384  1 virtio_gpu
+gf128mul               12288  1 aesni_intel
+drm_shmem_helper       40960  2 virtio_gpu
+joydev                 32768  0
+pcspkr                 12288  0
+snd                   159744  6 snd_hda_codec_generic,snd_hwdep,snd_hda_intel,snd_hda_codec,snd_timer,snd_pcm
+drm_kms_helper        270336  3 drm_shmem_helper,virtio_gpu,drm_client_lib
+soundcore              16384  1 snd
+virtio_balloon         28672  0
+button                 28672  0
+evdev                  32768  2
+sg                     40960  0
+drm                   929792  5 drm_kms_helper,drm_shmem_helper,virtio_gpu,drm_client_lib
+configfs               65536  1
+efi_pstore             12288  0
+zstd                   12288  0
+zram                   65536  1
+lz4hc_compress         20480  1 zram
+efivarfs               32768  1
+qemu_fw_cfg            20480  0
+vsock_loopback         12288  0
+vmw_vsock_virtio_transport    20480  0
+vmw_vsock_virtio_transport_common    65536  2 vsock_loopback,vmw_vsock_virtio_transport
+vsock                  77824  3 vmw_vsock_virtio_transport_common,vsock_loopback,vmw_vsock_virtio_transport
+virtio_rng             12288  0
+autofs4                61440  3
+zfs                  7004160  9
+spl                   159744  1 zfs
+hid_generic            12288  0
+usbhid                 94208  0
+hid                   290816  2 usbhid,hid_generic
+sr_mod                 32768  0
+cdrom                  86016  1 sr_mod
+ahci                   53248  0
+libahci                61440  1 ahci
+xhci_pci               24576  0
+xhci_hcd              421888  1 xhci_pci
+libata                499712  2 libahci,ahci
+iTCO_wdt               12288  1
+virtio_scsi            32768  0
+intel_pmc_bxt          16384  1 iTCO_wdt
+psmouse               229376  0
+usbcore               442368  3 xhci_hcd,usbhid,xhci_pci
+watchdog               53248  1 iTCO_wdt
+i2c_i801               32768  0
+scsi_mod              344064  4 virtio_scsi,libata,sg,sr_mod
+virtio_net            122880  0
+i2c_smbus              20480  1 i2c_i801
+serio_raw              16384  0
+lpc_ich                28672  0
+net_failover           24576  1 virtio_net
+virtio_blk             36864  2
+usb_common             20480  2 xhci_hcd,usbcore
+failover               16384  1 net_failover
+scsi_common            16384  4 scsi_mod,libata,sg,sr_mod

@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-buildserver` turns a HyprDebian system into the build server of HyprDebian. Every night it checks the git repository, and when the branch has moved since the last build, it builds every package and the live ISO in a clean build environment and updates a package repository of [hd-repo](hd-repo.md) with them. Only the packages that are not in the repository yet are uploaded.
+The package `hd-buildserver` turns a HyprDebian system into the build server of HyprDebian. Every night it checks the git repository and the kernel and ZFS of Debian, and when the branch has moved since the last build, or Debian has a new kernel or ZFS for [hd-kernel](hd-kernel.md), it builds every package and the live ISO in a clean build environment and updates a package repository of [hd-repo](hd-repo.md) with them. Only the packages that are not in the repository yet are uploaded.
 
 Installing the package sets everything up:
 - the default settings, in the key `hd-buildserver` of `/etc/hyprdebian/config.json`, when there are none yet: the git repository on GitHub, the branch `main` and the package repository `repo`;
@@ -54,14 +54,20 @@ The first build takes long: it pulls the images and compiles every package from 
 
 ## A build
 `hd-buildserver` runs these steps:
-1. It updates the checkout in `/var/lib/hd-buildserver/checkout` from the git repository with `git fetch`, and clones it the first time.
-2. When the head of the branch is the commit of the last build, in `/var/lib/hd-buildserver/last-built`, it stops there.
-3. Otherwise it checks out the head and removes everything git does not track with `git clean -fdx`, also the downloads and the compiled releases that earlier builds left in `build/`, so every build starts from the sources alone. It builds the image `hd-buildserver-env` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, and runs `make iso` in a container of it, which builds every package and the live ISO.
-4. It runs `update-repo/update-repo.py` of the checkout with `--host <repo> --yes --only-new --iso livecd/out/hyprdebian-live-amd64.iso`, which uploads the packages that are not in the repository yet and the ISO, see [hd-repo](hd-repo.md#the-hyprdebian-packages). Then it stores the commit as the last build.
+1. It updates the checkout in `/var/lib/hd-buildserver/checkout` from the git repository with `git fetch`, and clones it the first time. It checks out the head of the branch and removes everything git does not track with `git clean -fdx`, also the downloads and the compiled releases that earlier builds left in `build/`, so every build starts from the sources alone.
+2. It asks `make sources` of `packages/hd-kernel` for the versions of the source packages `linux` and `zfs-linux` in each suite, which the kernels of [hd-kernel](hd-kernel.md) are built of. This starts a container of each suite, which looks them up in its apt sources.
+3. When the commit and those versions are those of the last build, in `/var/lib/hd-buildserver/last-built`, it stops there. A night on which only Debian has a new kernel or ZFS builds too, so their security updates reach the repository the next morning.
+4. Otherwise it builds the image `hd-buildserver-env` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, and runs `make iso` in a container of it, which builds every package and the live ISO. The kernels come from the cache in `/var/lib/hd-buildserver/hd-kernel` when they were built of the same versions before, see [The kernel cache](#the-kernel-cache).
+5. It runs `update-repo/update-repo.py` of the checkout with `--host <repo> --yes --only-new --iso livecd/out/hyprdebian-live-amd64.iso`, which uploads the packages that are not in the repository yet and the ISO, see [hd-repo](hd-repo.md#the-hyprdebian-packages). Then it stores the commit and the versions as the last build.
 
 A build that fails leaves the last build as it was, so the next night tries the same commit again. Only one build runs at a time.
 
 Packages of a version that is already in the repository are never uploaded again: a commit that changes a package without raising its version only reaches the repository with the next raise. The ISO is uploaded with every build.
+
+### The kernel cache
+Building the kernels of [hd-kernel](hd-kernel.md) takes long, about half an hour per suite on a recent machine and more on an older one, and every build signs them with a key of its own. So a build passes `HD_KERNEL_CACHE=/var/lib/hd-buildserver/hd-kernel` to `make iso`: `make deb` of hd-kernel copies the packages of a suite from there when they were built of the same versions of `linux`, `zfs-linux` and hd-kernel, and stores every new build there, in place of the one before. A commit that does not touch the kernel then does not build it again, and the repository and the ISO get the same packages. The cache is outside the checkout, so `git clean` leaves it; removing it makes the next build compile the kernels again.
+
+A kernel build needs about 30 GB of disk per suite in the checkout, which the next build removes, and memory for its compilers: the container of each suite gets 5/8 GB per core.
 
 ### The build environment
 `buildenv/Dockerfile` is in the git repository, not in the package, so a new package brings its build dependencies along: add them to the Dockerfile in the same change. It installs what [Build requirements](../HyprDebian/Build%20requirements.md) lists, on trixie, so what is compiled outside a container of its own, such as `blockwrite` of `hd-backup`, also runs on trixie.
@@ -100,7 +106,7 @@ The uploads log in as `repo` on the package repository with `/var/lib/hd-buildse
 hd-buildserver [--force]
 ```
 
-Run it as `hd-buildserver`, easiest by starting the service. With `--force`, it builds and uploads also when the branch has not moved:
+Run it as `hd-buildserver`, easiest by starting the service. With `--force`, it builds and uploads also when neither the branch nor the kernel sources have moved:
 ```
 sudo runuser -u hd-buildserver -- hd-buildserver --force
 ```
@@ -108,7 +114,7 @@ sudo runuser -u hd-buildserver -- hd-buildserver --force
 It exits with 0 when the build was uploaded or there was nothing to build, 1 on an error and 2 on wrong arguments.
 
 ## Removing the package
-Removing the package stops the timer and keeps the settings, the user, the checkout and the ssh key. Purging it also removes the key `hd-buildserver` of `/etc/hyprdebian/config.json`, the user `hd-buildserver` and `/var/lib/hd-buildserver`, with the checkout and the ssh key. The docker images stay; `docker image prune -a` removes them.
+Removing the package stops the timer and keeps the settings, the user, the checkout and the ssh key. Purging it also removes the key `hd-buildserver` of `/etc/hyprdebian/config.json`, the user `hd-buildserver` and `/var/lib/hd-buildserver`, with the checkout, the kernel cache and the ssh key. The docker images stay; `docker image prune -a` removes them.
 
 ## Files
 | Path | Purpose |
@@ -119,6 +125,7 @@ Removing the package stops the timer and keeps the settings, the user, the check
 | `/usr/share/hd-buildserver/defaults.json` | The default settings. |
 | `/etc/hyprdebian/config.json` | The settings, in the key `hd-buildserver`. |
 | `/var/lib/hd-buildserver/checkout` | The checkout of the git repository. |
-| `/var/lib/hd-buildserver/last-built` | The commit of the last build that was uploaded. |
+| `/var/lib/hd-buildserver/last-built` | The commit and the kernel sources of the last build that was uploaded, as JSON. |
+| `/var/lib/hd-buildserver/hd-kernel` | The packages of hd-kernel of the last build of each suite. |
 | `/var/lib/hd-buildserver/build.lock` | Keeps two builds from running at the same time. |
 | `/var/lib/hd-buildserver/.ssh` | The ssh key and the ssh config. |

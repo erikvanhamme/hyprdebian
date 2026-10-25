@@ -5,17 +5,22 @@ The package hd-buildserver installs this as /usr/bin/hd-buildserver, and hd-buil
 it every night as the user hd-buildserver. A run:
 
   1. updates the checkout in /var/lib/hd-buildserver/checkout from the git repository, cloning it
-     the first time;
-  2. stops when the head of the branch is the commit of the last build, in
-     /var/lib/hd-buildserver/last-built;
-  3. otherwise checks out the head, cleans the checkout of everything git does not track, builds
-     the image of buildenv/Dockerfile of the checkout and runs make iso in a container of it,
-     which builds every package and the live ISO;
-  4. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
-     the checkout, see hd-repo(7), and stores the commit as the last build.
+     the first time, checks out the head of the branch and cleans the checkout of everything git
+     does not track;
+  2. asks make sources of packages/hd-kernel for the versions of the source packages linux and
+     zfs-linux in each suite that the kernels of hd-kernel are built of;
+  3. stops when the commit and those versions are those of the last build, in
+     /var/lib/hd-buildserver/last-built, so a night on which only Debian has a new kernel or ZFS
+     also builds;
+  4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso in a
+     container of it, which builds every package and the live ISO; the kernels of hd-kernel come
+     from the cache in /var/lib/hd-buildserver/hd-kernel when they were built of the same
+     versions before;
+  5. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
+     the checkout, see hd-repo(7), and stores the commit and the versions as the last build.
 
-    hd-buildserver           build and upload when the branch has moved
-    hd-buildserver --force   build and upload also when it has not
+    hd-buildserver           build and upload when the branch or the sources have moved
+    hd-buildserver --force   build and upload also when they have not
 
 The settings are the key hd-buildserver of /etc/hyprdebian/config.json over the defaults in
 /usr/share/hd-buildserver/defaults.json: git, the URL of the git repository, branch, the branch to
@@ -39,6 +44,10 @@ DEFAULTS_FILE = "/usr/share/hd-buildserver/defaults.json"
 STATE_DIR = "/var/lib/hd-buildserver"
 CHECKOUT = f"{STATE_DIR}/checkout"
 LAST_BUILT = f"{STATE_DIR}/last-built"
+# The packages of hd-kernel of earlier builds, which make deb of hd-kernel copies instead of
+# building them again (HD_KERNEL_CACHE). It is outside the checkout, so git clean leaves it.
+KERNEL_CACHE = f"{STATE_DIR}/hd-kernel"
+KERNEL_PACKAGE = "packages/hd-kernel"
 LOCK_FILE = f"{STATE_DIR}/build.lock"
 DOCKER_SOCKET = "/var/run/docker.sock"
 # The build environment, from buildenv/Dockerfile of the checkout.
@@ -100,7 +109,8 @@ def run(command, cwd=None, capture=False):
 
 
 def update_checkout(git, branch):
-    """Clones or fetches the git repository; returns the commit at the head of the branch."""
+    """Clones or fetches the git repository, checks out the head of the branch in a clean checkout
+    and returns its commit."""
     if os.path.isdir(f"{CHECKOUT}/.git"):
         print(f"==> Fetching {git}...", flush=True)
         run(["git", "-C", CHECKOUT, "remote", "set-url", "origin", git])
@@ -108,39 +118,77 @@ def update_checkout(git, branch):
     else:
         print(f"==> Cloning {git} to {CHECKOUT}...", flush=True)
         run(["git", "clone", "--no-checkout", "--", git, CHECKOUT])
-    return run(["git", "-C", CHECKOUT, "rev-parse", "--verify", f"refs/remotes/origin/{branch}^{{commit}}"],
-               capture=True).strip()
+    commit = run(["git", "-C", CHECKOUT, "rev-parse", "--verify", f"refs/remotes/origin/{branch}^{{commit}}"],
+                 capture=True).strip()
 
-
-def last_built():
-    """The commit of the last build that was uploaded, None when there is none."""
-    try:
-        with open(LAST_BUILT, encoding="utf-8") as f:
-            return f.read().strip() or None
-    except FileNotFoundError:
-        return None
-
-
-def build(commit):
-    """Checks out the commit in a clean checkout and runs make iso in the build environment."""
     print(f"==> Checking out {commit}...", flush=True)
     run(["git", "-C", CHECKOUT, "checkout", "--force", "--detach", commit])
     # Everything git does not track goes, also the downloads and compiled releases in build/, so
     # every build starts from the sources alone.
     run(["git", "-C", CHECKOUT, "clean", "-fdxq"])
+    return commit
+
+
+def kernel_sources():
+    """The versions of linux and zfs-linux that hd-kernel builds of, a line per suite.
+
+    An empty list for a commit without hd-kernel. make sources starts a container of each suite,
+    which looks the versions up in its apt sources.
+    """
+    if not os.path.isfile(f"{CHECKOUT}/{KERNEL_PACKAGE}/Makefile"):
+        return []
+    print("==> Looking up the versions of the kernel and ZFS in Debian...", flush=True)
+    output = run(["make", "-s", "--no-print-directory", "-C", f"{CHECKOUT}/{KERNEL_PACKAGE}", "sources"],
+                 capture=True)
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def last_built():
+    """The commit and kernel sources of the last build that was uploaded, None when there is none.
+
+    The file is JSON with the keys commit and sources. A file of an earlier version of
+    hd-buildserver holds only the commit; its sources are None, so they never match.
+    """
+    try:
+        with open(LAST_BUILT, encoding="utf-8") as f:
+            text = f.read().strip()
+    except FileNotFoundError:
+        return None
+    try:
+        state = json.loads(text)
+    except ValueError:
+        return {"commit": text, "sources": None}
+    if not isinstance(state, dict):
+        return None
+    return state
+
+
+def store_last_built(state):
+    """Stores the commit and kernel sources of a build that was uploaded."""
+    with open(f"{LAST_BUILT}.tmp", "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=4)
+        f.write("\n")
+    os.replace(f"{LAST_BUILT}.tmp", LAST_BUILT)
+
+
+def build():
+    """Runs make iso in the build environment, in the checkout."""
+    os.makedirs(KERNEL_CACHE, exist_ok=True)
 
     print(f"==> Building the build environment {IMAGE}...", flush=True)
     run(["docker", "build", "--pull", "-t", IMAGE, f"{CHECKOUT}/{BUILDENV}"])
 
     print("==> Building the packages and the live ISO...", flush=True)
-    # The checkout has the same path in the container as on the host, so the containers that the
-    # builds start with the docker of the host get the right paths.
+    # The checkout and the kernel cache have the same paths in the container as on the host, so
+    # the containers that the builds start with the docker of the host get the right paths.
     run(["docker", "run", "--rm", "--name", CONTAINER,
          "--user", f"{os.getuid()}:{os.getgid()}",
          "--group-add", str(os.stat(DOCKER_SOCKET).st_gid),
          "-e", "HOME=/tmp",
+         "-e", f"HD_KERNEL_CACHE={KERNEL_CACHE}",
          "-v", f"{DOCKER_SOCKET}:{DOCKER_SOCKET}",
          "-v", f"{CHECKOUT}:{CHECKOUT}",
+         "-v", f"{KERNEL_CACHE}:{KERNEL_CACHE}",
          "-w", CHECKOUT,
          IMAGE, "make", "iso"])
 
@@ -157,7 +205,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Builds HyprDebian from git and updates a package repository with it.")
     parser.add_argument("--force", action="store_true",
-                        help="build and upload also when the branch has not moved")
+                        help="build and upload also when neither the branch nor the kernel sources "
+                             "have moved")
     args = parser.parse_args()
 
     if pwd.getpwuid(os.getuid()).pw_name != USER:
@@ -174,17 +223,17 @@ def main():
 
             git, branch, repo = settings()
             commit = update_checkout(git, branch)
-            if commit == last_built() and not args.force:
-                print(f"{branch} is still at {commit}, the last build; nothing to do.")
+            state = {"commit": commit, "sources": kernel_sources()}
+            if state == last_built() and not args.force:
+                print(f"{branch} is still at {commit} and the kernel sources are those of the last "
+                      "build; nothing to do.")
                 return 0
 
-            build(commit)
+            build()
             upload(repo)
 
             # Only a build that was uploaded counts, so a failed night is tried again.
-            with open(f"{LAST_BUILT}.tmp", "w", encoding="utf-8") as f:
-                f.write(commit + "\n")
-            os.replace(f"{LAST_BUILT}.tmp", LAST_BUILT)
+            store_last_built(state)
     except BuildError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

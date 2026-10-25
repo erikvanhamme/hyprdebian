@@ -9,9 +9,11 @@ Priority: optional
 Description: HyprDebian build server
  Builds HyprDebian from its git repository every night and updates a
  HyprDebian package repository of hd-repo with it. When the branch has moved
- since the last build, it checks out its head in a clean checkout, builds every
- package and the live ISO in a clean debian:trixie container, and uploads the
- packages that are not in the repository yet and the ISO.
+ since the last build, or Debian has a new kernel or ZFS for the kernels of
+ hd-kernel, it checks out its head in a clean checkout, builds every package
+ and the live ISO in a clean debian:trixie container, and uploads the
+ packages that are not in the repository yet and the ISO. The kernels come
+ from a cache when they were built of the same versions before.
  .
  The git repository, the branch and the host name of the package repository
  are the key hd-buildserver in /etc/hyprdebian/config.json. The build runs as

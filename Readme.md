@@ -132,3 +132,4 @@ The `docs` folder has more documentation:
 - [Boot splash](docs/packages/hd-plymouth.md): the boot splash, which looks like the lock screen and asks for the ZFS password.
 - [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.
 - [Build server](docs/packages/hd-buildserver.md): the build server that builds HyprDebian every night and updates the package repository with it.
+- [Kernel](docs/packages/hd-kernel.md): the HyprDebian kernel, the kernel of Debian with a prebuilt ZFS module, which a system switches to by installing `hd-kernel`.

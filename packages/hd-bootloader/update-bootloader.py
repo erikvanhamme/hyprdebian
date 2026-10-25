@@ -19,7 +19,8 @@ writes, below the directory given with --esp (default: /boot/efi):
                                           "HyprDebian-Kernel-7.2.10.efi 1"
                                 .mok      the DKMS MOK (--mok) as an
                                           EFI_SIGNATURE_LIST, which the
-                                          bootloader hands to the kernel
+                                          bootloader hands to the kernel;
+                                          only when there is one
                               and the sections of the frontend, which shows
                               the menu, built by <frontend>.py:
                                 graphical the background, the banner and
@@ -29,19 +30,23 @@ writes, below the directory given with --esp (default: /boot/efi):
                                           the rows; see text.py
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
-                              recent kernels in /boot
+                              recent kernels in /boot with a ZFS module;
+                              HyprDebian-Kernel-x.y.z-hd.efi for a kernel
+                              of hd-kernel, whose release has -hd
 
 The menu has a row per profile of each of those kernels, newest kernel
 first. With the labels and the file names in assets.efi, Secure Boot covers
 everything the menu shows and which UKI each row boots; the UKI itself is
 checked when the bootloader starts it.
 
-The ZFS module is built by DKMS and signed with the DKMS MOK, the key pair in
-/var/lib/dkms/mok.key and mok.pub. Under Secure Boot the kernel loads it only
-if it trusts that key. With shim, shim hands its MOKs to the kernel; here the
-bootloader does that with the MOK in assets.efi, so Secure Boot covers it
-too. Without a usable assets.efi the bootloader shows an error and does not
-boot.
+With the kernel of Debian, the ZFS module is built by DKMS and signed with
+the DKMS MOK, the key pair in /var/lib/dkms/mok.key and mok.pub. Under
+Secure Boot the kernel loads it only if it trusts that key. With shim, shim
+hands its MOKs to the kernel; here the bootloader does that with the MOK in
+assets.efi, so Secure Boot covers it too. The kernels of hd-kernel come with
+a ZFS module signed with the key they trust, so a system with only those
+has no DKMS MOK, and assets.efi then has no .mok. Without a usable
+assets.efi the bootloader shows an error and does not boot.
 
 With the assets in a file of their own, a change of the config, the
 wallpaper or the texts leaves BOOTX64.EFI alone; a change of the frontend
@@ -60,7 +65,10 @@ then are the UKIs of older kernels removed, so assets.efi never names a UKI
 that is gone.
 
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
-Other HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
+A kernel without a ZFS module in /lib/modules/<version>, built in or as
+zfs.ko in any directory below it, cannot mount the root and gets no UKI,
+such as a kernel of Debian whose DKMS module is gone. Other
+HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys of every frontend:
 
@@ -231,18 +239,31 @@ def load_config(path):
     return config, frontend
 
 
-def find_kernels(boot_dir):
+def has_zfs(modules_dir, version):
+    """True if the kernel version has a ZFS module in modules_dir/version: built in, or zfs.ko in any directory."""
+    directory = modules_dir / version
+    builtin = directory / "modules.builtin"
+    if builtin.is_file() and any(line.endswith("/zfs.ko") for line in builtin.read_text().split()):
+        return True
+    return any(directory.rglob("zfs.ko*"))
+
+
+def find_kernels(boot_dir, modules_dir):
     """Returns (version, vmlinuz, initrd) of the KERNEL_COUNT most recent kernels, newest first.
 
-    Kernels without an initrd are skipped. Of kernels with the same x.y.z,
-    only the most recent is used, as they would get the same UKI name.
+    Kernels without an initrd or without a ZFS module in modules_dir are
+    skipped. Of kernels with the same UKI name, only the most recent is used.
     """
     kernels = []
     for vmlinuz in boot_dir.glob("vmlinuz-*"):
         version = vmlinuz.name.removeprefix("vmlinuz-")
         initrd = boot_dir / f"initrd.img-{version}"
-        if initrd.is_file():
-            kernels.append((vmlinuz.stat().st_mtime, version, vmlinuz, initrd))
+        if not initrd.is_file():
+            continue
+        if not has_zfs(modules_dir, version):
+            print(f"Skipping {version}: no ZFS module in {modules_dir / version}", flush=True)
+            continue
+        kernels.append((vmlinuz.stat().st_mtime, version, vmlinuz, initrd))
     kernels.sort(reverse=True)
 
     found = []
@@ -256,8 +277,16 @@ def find_kernels(boot_dir):
 
 
 def uki_name(version):
-    """HyprDebian-Kernel-x.y.z.efi for a kernel version such as 7.2.10+deb14-amd64."""
+    """The UKI file name of a kernel version.
+
+    HyprDebian-Kernel-x.y.z.efi for a kernel of Debian, such as
+    7.2.10+deb14-amd64, and HyprDebian-Kernel-x.y.z-hd.efi for one of
+    hd-kernel, such as 7.2.10+deb14-hd1a2b3c-amd64, so the menu tells them
+    apart.
+    """
     short = version.split("+")[0].split("-")[0]
+    if "-hd" in version:
+        return f"{UKI_PREFIX}{short}-hd.efi"
     return f"{UKI_PREFIX}{short}.efi"
 
 
@@ -490,10 +519,16 @@ def main():
     )
     parser.add_argument("--boot-dir", type=Path, default=Path("/boot"), help="where the kernels are (default: /boot)")
     parser.add_argument(
+        "--modules-dir",
+        type=Path,
+        default=Path("/lib/modules"),
+        help="where the modules of the kernels are, to find their ZFS module (default: /lib/modules)",
+    )
+    parser.add_argument(
         "--mok",
         type=Path,
         default=Path("/var/lib/dkms/mok.pub"),
-        help="certificate of the DKMS MOK, DER or PEM (default: /var/lib/dkms/mok.pub)",
+        help="certificate of the DKMS MOK, DER or PEM, when there is one (default: /var/lib/dkms/mok.pub)",
     )
     parser.add_argument(
         "--db-key",
@@ -515,22 +550,25 @@ def main():
     for path in (bootloader, args.assets_stub):
         if not path.is_file():
             sys.exit(f"{path}: not a file; build the bootloader first")
-    if not args.mok.is_file():
-        sys.exit(f"{args.mok}: not a file; the DKMS MOK is needed to boot with the ZFS module")
-    mok = mok_signature_list(args.mok)
+    # Without DKMS there is no MOK, and assets.efi gets no .mok.
+    mok = {}
+    if args.mok.is_file():
+        mok = {".mok": mok_signature_list(args.mok)}
+    else:
+        print(f"No DKMS MOK: {args.mok} is missing", flush=True)
     signing = secure_boot_signing(args.db_key, args.db_cert)
 
     config_text = f"timeout {config['timeout']}\n".encode()
 
     # 1. The UKIs.
-    kernels = find_kernels(args.boot_dir)
+    kernels = find_kernels(args.boot_dir, args.modules_dir)
     if not kernels:
-        sys.exit(f"no kernels with an initrd found in {args.boot_dir}")
+        sys.exit(f"no kernels with an initrd and a ZFS module found in {args.boot_dir}")
     uki_names = build_ukis(config, frontend, args.esp, kernels, signing)
     rows = menu_rows(uki_names)
 
-    # 2. The assets: the config, the menu rows, the DKMS MOK and the sections
-    # of the frontend.
+    # 2. The assets: the config, the menu rows, the DKMS MOK when there is
+    # one and the sections of the frontend.
     boot = args.esp / "EFI" / "BOOT"
     build_efi(
         args.assets_stub,
@@ -539,7 +577,7 @@ def main():
         {
             ".config": config_text,
             **{f".slot{slot}": f"{name} {profile}\n".encode() for slot, (name, profile, _) in enumerate(rows, 1)},
-            ".mok": mok,
+            **mok,
             **frontend.sections(config, [label for _, _, label in rows]),
         },
         signing,

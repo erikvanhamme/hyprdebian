@@ -1,0 +1,12 @@
+#!/bin/sh
+# Adds the ZFS module to the module index of its kernel and to the initrd, which the initramfs
+# hook of hd-bootloader then puts in the UKI. The kernel package built the initrd before this
+# package was there.
+set -e
+
+if [ "$1" = "configure" ]; then
+    depmod -a @RELEASE@
+    if [ -x /usr/sbin/update-initramfs ] && [ -e /boot/initrd.img-@RELEASE@ ]; then
+        update-initramfs -u -k @RELEASE@
+    fi
+fi

@@ -20,9 +20,10 @@
 #                   graphics), asking for the GPU (vm/switch-vm-gpu.py)
 #   make iso        build every package, then the live ISO with them in
 #                   livecd/ (livecd/Makefile): hd-installer installed on the
-#                   live system, and every package as the local repository
-#                   that the installer installs the hd-* packages from, in
-#                   the suites of the deploy.json of its directory
+#                   live system, and every package but those of the package
+#                   directories in ISO_EXCLUDE as the local repository that
+#                   the installer installs the hd-* packages from, in the
+#                   suites of the deploy.json of its directory
 #   make update-repo
 #                   build every package, then ask for the host name of a
 #                   HyprDebian repository and upload the packages of every
@@ -38,7 +39,9 @@
 #                   without building them: the arguments of update-repo.py
 #                   and the DEBS of the live cd, for a build that runs make
 #                   all and make iso apart from the upload, as on a build
-#                   server
+#                   server. hd-kernel only prints the packages it has built,
+#                   as their names come from the versions of Debian it built
+#                   them of
 #
 # Each package is a directory in packages/ with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
@@ -49,6 +52,11 @@
 #       "repos" : ["trixie", "unstable"]
 #   }
 #
+# A package built for one repo only, such as a kernel of that suite, is printed
+# by deb-path as <repos>:<path>; it goes to build/<repos>/ and only to those
+# repos, in place of the repos of the deploy.json. This way a package directory
+# can build a package of the same name for each suite, as hd-kernel does.
+#
 # Add every new package directory to PACKAGES, and to TESTS when its Makefile
 # also has the target test, which runs the tests of the package.
 #
@@ -57,7 +65,12 @@
 # the same time. JOBS is the number of cores by default; make all JOBS=1
 # builds one target at a time.
 
-PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-buildserver hd-base hd-installer
+PACKAGES := hd-repo hd-bootloader hd-kernel hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-buildserver hd-base hd-installer
+# The package directories whose packages stay out of the local repository of
+# the live ISO, as the installer does not install them; they only go to the
+# package repository. The kernels of hd-kernel are for systems that switch to
+# them by hand, for now.
+ISO_EXCLUDE := hd-kernel
 # The package directories with tests.
 TESTS := hd-dashboard hd-report hd-backup hd-base
 # The directory with the package directories.
@@ -77,10 +90,16 @@ $(OUT):
 
 $(PACKAGES): | $(OUT)
 	$(MAKE) -j$(JOBS) -C $(SRC)/$@ deb
-	for deb in $$($(MAKE) -s --no-print-directory -C $(SRC)/$@ deb-path); do \
+	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$@ deb-path); do \
+		deb=$${entry#*:}; \
+		dir=$(OUT); \
+		if [ "$$deb" != "$$entry" ]; then \
+			dir=$(OUT)/$${entry%%:*}; \
+		fi; \
+		mkdir -p $$dir; \
 		name=$$(basename $$deb); \
-		rm -f $(OUT)/$${name%%_*}_*.deb; \
-		install -m 0644 $(SRC)/$@/$$deb $(OUT)/; \
+		rm -f $$dir/$${name%%_*}_*.deb; \
+		install -m 0644 $(SRC)/$@/$$deb $$dir/; \
 	done
 
 test: $(addprefix test-,$(TESTS))
@@ -98,26 +117,33 @@ provision-vm:
 switch-vm-gpu:
 	python3 vm/switch-vm-gpu.py
 
-# Prints each package of the package directories in PACKAGES as
+# Prints each package of the package directories in $(1) as
 # <repos>:build/<package>.deb, one per line, for update-repo.py, the live cd and
-# make list-debs.
+# make list-debs; a package that deb-path prints with its repos as
+# <repos>:build/<repos>/<package>.deb.
 define LIST_DEBS
-for package in $(PACKAGES); do \
+for package in $(1); do \
 	repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
-	for deb in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
-		echo "$$repos:$(OUT)/$$(basename $$deb)"; \
+	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
+		deb=$${entry#*:}; \
+		if [ "$$deb" != "$$entry" ]; then \
+			echo "$${entry%%:*}:$(OUT)/$${entry%%:*}/$$(basename $$deb)"; \
+		else \
+			echo "$$repos:$(OUT)/$$(basename $$deb)"; \
+		fi; \
 	done; \
 done
 endef
 
-# Hands the live cd every package, as <repos>:build/<package>.deb.
+# Hands the live cd every package but those of ISO_EXCLUDE, as
+# <repos>:build/<package>.deb.
 iso: all
-	debs=$$($(LIST_DEBS)) || exit 1; \
+	debs=$$($(call LIST_DEBS,$(filter-out $(ISO_EXCLUDE),$(PACKAGES)))) || exit 1; \
 	$(MAKE) -C livecd iso DEBS="$$(echo $$debs)"
 
 # Hands update-repo.py each package as <repos>:build/<package>.deb.
 update-repo: all
-	uploads=$$($(LIST_DEBS)) || exit 1; \
+	uploads=$$($(call LIST_DEBS,$(PACKAGES))) || exit 1; \
 	python3 update-repo/update-repo.py $$uploads
 
 # Empties a repository; update-repo.py asks for the host name and to type it again.
@@ -126,4 +152,4 @@ clean-repo:
 
 # Prints each package as <repos>:build/<package>.deb, without building it.
 list-debs:
-	@$(LIST_DEBS)
+	@$(call LIST_DEBS,$(PACKAGES))

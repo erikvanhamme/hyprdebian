@@ -19,14 +19,22 @@ by default):
 the bootloader of the frontend of the installed package;
 .TP
 .I EFI/BOOT/assets.efi
-the settings, the menu rows, the DKMS MOK and the assets of the frontend,
-as sections of a PE image that the bootloader loads with LoadImage, so the
+the settings, the menu rows, the DKMS MOK when there is one and the assets
+of the frontend, as sections of a PE image that the bootloader loads with LoadImage, so the
 firmware checks its signature under Secure Boot;
 .TP
 .I EFI/Linux/HyprDebian\-Kernel\-x.y.z.efi
 multi-profile UKIs of the four most recent kernels in
-.IR /boot ,
-with a normal and a ZFS recovery profile.
+.I /boot
+with a ZFS module, with a normal and a ZFS recovery profile;
+.I HyprDebian\-Kernel\-x.y.z\-hd.efi
+for a kernel of
+.BR hd-kernel (7).
+A kernel without a ZFS module in
+.IR /lib/modules/ version,
+built in or as
+.I zfs.ko
+in any directory below it, cannot mount the root and gets no UKI.
 .PP
 See
 .BR hd-bootloader (7)
@@ -74,11 +82,22 @@ Where the kernels are;
 .I /boot
 by default.
 .TP
+.BI \-\-modules\-dir " dir"
+Where the modules of the kernels are, to find their ZFS module;
+.I /lib/modules
+by default.
+.TP
 .BI \-\-mok " file"
 The certificate of the DKMS MOK, DER or PEM;
 .I /var/lib/dkms/mok.pub
 by default.
-It is needed to boot with the ZFS module.
+The kernel of Debian needs it to load the ZFS module that DKMS builds under
+Secure Boot.
+Without the file,
+.I assets.efi
+gets no MOK, as on a system with only the kernels of
+.BR hd-kernel (7),
+whose ZFS module is signed with the key the kernel was built with.
 .TP
 .BI \-\-db\-key " file"
 .TQ

@@ -1,0 +1,21 @@
+Package: hd-kernel
+Version: @META_DEB_VERSION@
+Architecture: amd64
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: linux-image-@RELEASE@ (= @KERNEL_DEB_VERSION@),
+ zfs-modules-@RELEASE@ (= @ZFS_DEB_VERSION@)
+Conflicts: linux-image-amd64, linux-headers-amd64
+Section: kernel
+Priority: optional
+Description: HyprDebian kernel with a prebuilt ZFS module
+ Depends on the most recent HyprDebian kernel of @SUITE@ and its ZFS module,
+ so that they are installed and upgraded with it. The kernel is the kernel of
+ Debian, linux @KERNEL_VERSION@, with its patches and its config; the ZFS
+ module is that of zfs-linux @ZFS_VERSION@, built against it. Both are built
+ on the build server and signed with a key that is made for the build and
+ thrown away, so a system needs neither DKMS nor a compiler for ZFS, and
+ the kernel trusts no other key for its modules.
+ .
+ It replaces the kernel of Debian: installing it removes linux-image-amd64
+ and linux-headers-amd64. See hd-kernel(7).

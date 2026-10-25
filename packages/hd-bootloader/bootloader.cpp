@@ -30,12 +30,13 @@ struct Config {
 
 // The assets are sections that update-bootloader.py adds to a stub PE file,
 // assets.efi next to the bootloader: the config, the menu rows, the DKMS MOK
-// and what the frontend shows. They can change without touching the
-// bootloader. The bootloader loads assets.efi with LoadImage, so that with
-// Secure Boot on the firmware checks its signature, and reads the sections
-// from the loaded image; it never starts it. Without a usable assets.efi the
-// bootloader shows an error and returns to the firmware: the kernel cannot
-// load the ZFS module without the MOK.
+// when the system has one, and what the frontend shows. They can change
+// without touching the bootloader. The bootloader loads assets.efi with
+// LoadImage, so that with Secure Boot on the firmware checks its signature,
+// and reads the sections from the loaded image; it never starts it. Without
+// a usable assets.efi the bootloader shows an error and returns to the
+// firmware: it would not know what to boot, nor the MOK the kernel needs to
+// load a ZFS module built by DKMS.
 constexpr const char16_t* assets_directory = u"\\EFI\\BOOT";
 constexpr const char16_t* assets_name = u"assets.efi";
 constexpr const char* config_section = ".config";
@@ -46,7 +47,9 @@ constexpr const char* config_section = ".config";
 // an EFI configuration table, the MOK variable table; the bootloader does the
 // same with this one, in the entry MokListRT. The entry MokListTrustedRT
 // tells the kernel to trust the MOKs for modules: it puts them in its
-// .machine keyring rather than the .platform keyring.
+// .machine keyring rather than the .platform keyring. A system with only the
+// kernels of hd-kernel has no DKMS MOK and assets.efi no .mok section: their
+// ZFS module is signed with the key the kernel was built with.
 constexpr const char* mok_section = ".mok";
 
 // The UKIs are the .efi files in this directory.
@@ -77,7 +80,7 @@ EFI_HANDLE assets_image = nullptr;
 const uint8_t* assets_base = nullptr;
 uint64_t assets_size = 0;
 // The MOK variable table built from the .mok section of assets.efi, to be
-// installed just before the UKI starts.
+// installed just before the UKI starts. Null if assets.efi has no .mok.
 void* mok_table = nullptr;
 
 // A row of the menu: the UKI file name in uki_directory and the profile to
@@ -636,14 +639,13 @@ void put_mok_entry(uint8_t*& out, const char* name, const uint8_t* data, size_t 
     }
 }
 
-// Builds the MOK variable table from the .mok section of assets.efi, in
-// memory that the kernel keeps: MokListRT with the signature list,
+// Builds the MOK variable table from list, the .mok section of assets.efi,
+// in memory that the kernel keeps: MokListRT with the signature list,
 // MokListTrustedRT with the byte 1 that shim puts there too, and the
-// terminating entry with an empty name and no data. Returns nullptr if there
-// is no valid .mok section or no memory.
-void* build_mok_table()
+// terminating entry with an empty name and no data. Returns nullptr if list
+// is no valid signature list or there is no memory.
+void* build_mok_table(const Bytes& list)
 {
-    const Bytes list = asset_section(mok_section);
     if (!is_signature_list(list)) {
         return nullptr;
     }
@@ -708,9 +710,15 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     if (assets_image == nullptr) {
         return fail(u"EFI\\BOOT\\assets.efi is missing or failed the Secure Boot check.", EFI_NOT_FOUND);
     }
-    mok_table = build_mok_table();
-    if (mok_table == nullptr) {
-        return fail(u"assets.efi holds no valid DKMS MOK.", EFI_NOT_FOUND);
+    // No .mok section means no DKMS MOK; a .mok section that is not a valid
+    // signature list is an error, as the kernel could then not load the ZFS
+    // module of DKMS.
+    const Bytes mok = asset_section(mok_section);
+    if (mok.size != 0) {
+        mok_table = build_mok_table(mok);
+        if (mok_table == nullptr) {
+            return fail(u"assets.efi holds no valid DKMS MOK.", EFI_NOT_FOUND);
+        }
     }
 
     Config config;
@@ -735,8 +743,10 @@ extern "C" EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE* system
     unload_assets();
 
     // The MOK variable table goes to the kernel through the system table.
-    if (bs->InstallConfigurationTable(&mok_variable_table_guid, mok_table) != EFI_SUCCESS) {
-        return fail(u"The DKMS MOK could not be handed to the kernel.", EFI_OUT_OF_RESOURCES);
+    if (mok_table != nullptr) {
+        if (bs->InstallConfigurationTable(&mok_variable_table_guid, mok_table) != EFI_SUCCESS) {
+            return fail(u"The DKMS MOK could not be handed to the kernel.", EFI_OUT_OF_RESOURCES);
+        }
     }
     boot(entry.name, entry.profile);
 

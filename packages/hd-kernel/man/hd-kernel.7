@@ -1,0 +1,91 @@
+.TH HD-KERNEL 7 "October 2026" "hd-kernel" "HyprDebian"
+.SH NAME
+hd-kernel \- the HyprDebian kernel with a prebuilt ZFS module
+.SH DESCRIPTION
+The package
+.B hd-kernel
+depends on the most recent HyprDebian kernel of the suite and its ZFS module,
+so that they are installed and upgraded with it:
+.TP
+.BI linux-image- release
+The kernel of Debian, with the patches and the config of Debian, built by the
+build server of HyprDebian.
+.TP
+.BI zfs-modules- release
+The ZFS module of the
+.B zfs-linux
+of Debian, built against that kernel, in
+.IR /lib/modules/ release /extra/zfs .
+It provides
+.BR zfs-modules ,
+which
+.B zfs-initramfs
+takes in place of
+.BR zfs-dkms .
+.PP
+The release is
+.IB x.y.z +debNN-hd id -amd64\fR,
+such as
+.BR 7.2.12+deb14-hd1a2b3c-amd64 ,
+where
+.I id
+comes from the versions of
+.BR linux ,
+.B zfs-linux
+and
+.BR hd-kernel .
+A new build has a new release, so it installs next to the kernel that runs.
+.PP
+Every build signs the modules of the kernel and the ZFS module with a key it
+makes for the build and then throws away; the kernel trusts that key and no
+other for its modules.
+A system with this kernel needs neither DKMS nor a compiler for ZFS, and
+under Secure Boot not even root can load a module that the build did not
+sign.
+.SH SWITCHING
+To switch a system to the HyprDebian kernel:
+.PP
+.RS
+sudo apt install hd-kernel
+.RE
+.PP
+This removes
+.B linux-image-amd64
+and
+.BR linux-headers-amd64 ,
+so the kernels of Debian get no more upgrades.
+After the installation the bootloader shows the new kernel at the top of its
+menu, with
+.B -hd
+in its name, see
+.BR hd-bootloader-update (8).
+Once it boots, the kernels of Debian can go:
+.PP
+.RS
+sudo apt purge linux-image-<version>-amd64 linux-headers-<version>-amd64
+.RE
+.PP
+To switch back to the kernel of Debian, which gets its ZFS module from
+.B zfs-dkms
+again:
+.PP
+.RS
+sudo apt install linux-image-amd64 linux-headers-amd64
+.RE
+.PP
+This removes
+.BR hd-kernel ;
+the HyprDebian kernels stay until they are purged.
+.SH FILES
+.TP
+.IR /boot/vmlinuz- release
+.TQ
+.IR /lib/modules/ release
+The kernel and its modules.
+.TP
+.IR /lib/modules/ release /extra/zfs
+The ZFS module.
+.SH SEE ALSO
+.BR hd-bootloader-update (8),
+.BR hd-buildserver (8),
+.BR zfs (4)

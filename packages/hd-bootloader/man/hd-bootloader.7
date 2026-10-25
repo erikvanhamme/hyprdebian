@@ -22,6 +22,12 @@ to an EFI system partition (ESP).
 .I assets.efi
 holds the settings, the menu and the DKMS MOK, which the bootloader hands to
 the kernel so that it loads the DKMS-built ZFS module under Secure Boot.
+A system with only the kernels of
+.BR hd-kernel (7)
+has no DKMS MOK: their ZFS module is signed with the key the kernel was built
+with, and
+.I assets.efi
+then has no MOK.
 .PP
 .I /usr/lib/hd-bootloader/update-esps
 runs

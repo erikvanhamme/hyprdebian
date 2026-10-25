@@ -1,0 +1,14 @@
+Package: zfs-modules-@RELEASE@
+Version: @ZFS_DEB_VERSION@
+Architecture: amd64
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: linux-image-@RELEASE@ (= @KERNEL_DEB_VERSION@)
+Provides: zfs-modules (= @ZFS_UPSTREAM@)
+Recommends: zfsutils-linux (>= @ZFS_VERSION@)
+Section: contrib/kernel
+Priority: optional
+Description: OpenZFS kernel module for Linux @RELEASE@
+ The ZFS module of zfs-linux @ZFS_VERSION@, built for the HyprDebian kernel
+ @RELEASE@ and signed with the key the kernel was built with, so no system
+ needs DKMS or a compiler for ZFS. See hd-kernel(7).

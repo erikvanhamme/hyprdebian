@@ -1,0 +1,7 @@
+#!/bin/sh
+# Takes the ZFS module out of the module index of its kernel, as long as the kernel is there.
+set -e
+
+if [ -d @MODDIR@kernel ]; then
+    depmod -a @RELEASE@
+fi

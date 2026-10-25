@@ -4,7 +4,7 @@ HyprDebian has its own live ISO. It is a small Debian trixie live system to inst
 The live cd contains:
 - A text console, no desktop. The live user `user` is logged in on the console automatically, and has sudo.
 - The package `hd-installer`, built from this repository, and the tools it runs on the live system: debootstrap, dosfstools, gdisk, mdadm and parted.
-- A local repository in `/srv/hyprdebian/repo` with every package built from this repository, in the suites of the `deploy.json` of its package directory. `hd-installer` installs the hd-* packages from it, so an installation needs no HyprDebian repository. The Debian packages still come from the Debian mirrors.
+- A local repository in `/srv/hyprdebian/repo` with every package built from this repository, in the suites of the `deploy.json` of its package directory, but those of the package directories in `ISO_EXCLUDE` of the Makefile in the root: the kernels of [hd-kernel](../packages/hd-kernel.md), which the installer does not install, only go to the package repository. `hd-installer` installs the hd-* packages from it, so an installation needs no HyprDebian repository. The Debian packages still come from the Debian mirrors.
 - ZFS support. The ZFS kernel module is built with DKMS while the ISO is built and is loaded at boot.
 - An ssh server, started at boot, which allows logging in with a password, so the installation can also be done from another machine.
 - NetworkManager. Wired networks come up by themselves, `nmtui` sets up wifi.
@@ -19,7 +19,7 @@ The ISO is built with live-build, in a debian:trixie docker container, so live-b
 make iso
 ```
 
-This builds every package into `build/` first, as `make all` does, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its `deploy.json`. `make -C livecd iso` alone stops with an error, as it has no packages.
+This builds every package into `build/` first, as `make all` does, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its `deploy.json`, but those of `ISO_EXCLUDE`. `make -C livecd iso` alone stops with an error, as it has no packages.
 
 The finished ISO is written to:
 ```

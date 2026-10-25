@@ -6,7 +6,7 @@ The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the un
 | `hd-bootloader-gfx` | The graphical frontend: the menu on the wallpaper of `hd-desktop`, in its JetBrains Mono Nerd Font. |
 | `hd-bootloader-txt` | The text frontend: the menu on the text console of the firmware. |
 
-`hd-bootloader-update` builds the UKIs and writes them, the bootloader and `assets.efi` to an EFI system partition (ESP). `assets.efi` holds the settings, the menu and the DKMS MOK, which the bootloader hands to the kernel so that it loads the DKMS-built ZFS module under Secure Boot.
+`hd-bootloader-update` builds the UKIs and writes them, the bootloader and `assets.efi` to an EFI system partition (ESP). `assets.efi` holds the settings, the menu and the DKMS MOK, which the bootloader hands to the kernel so that it loads the DKMS-built ZFS module under Secure Boot. A system with only the kernels of [hd-kernel](hd-kernel.md) has no DKMS MOK: their ZFS module is signed with the key the kernel was built with, and `assets.efi` then has no MOK.
 
 `/usr/lib/hd-bootloader/update-esps` runs `hd-bootloader-update` for `/boot/efi` and, when it exists, `/boot/efi2`. The kernel and initramfs hooks of the package run it when a kernel or an initrd is installed or removed. All ESPs are checked before any is written; a missing one makes the hook, and with it the kernel package or apt, fail: a system with a missing drive should not be upgraded.
 
@@ -136,8 +136,8 @@ hd-bootloader-update [options]
 | File | Content |
 | --- | --- |
 | `EFI/BOOT/BOOTX64.EFI` | The bootloader of the frontend of the installed package. |
-| `EFI/BOOT/assets.efi` | The settings, the menu rows, the DKMS MOK and the assets of the frontend, as sections of a PE image that the bootloader loads with LoadImage, so the firmware checks its signature under Secure Boot. |
-| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four most recent kernels in `/boot`, with a normal and a ZFS recovery profile. |
+| `EFI/BOOT/assets.efi` | The settings, the menu rows, the DKMS MOK when there is one and the assets of the frontend, as sections of a PE image that the bootloader loads with LoadImage, so the firmware checks its signature under Secure Boot. |
+| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four most recent kernels in `/boot` with a ZFS module, with a normal and a ZFS recovery profile; `HyprDebian-Kernel-x.y.z-hd.efi` for a kernel of [hd-kernel](hd-kernel.md). A kernel without a ZFS module in `/lib/modules/<version>`, built in or as `zfs.ko` in any directory below it, cannot mount the root and gets no UKI. |
 
 The files are written in an order that leaves a bootable ESP when it is interrupted: first the UKIs, then `assets.efi` and `BOOTX64.EFI`, and only then are the UKIs of older kernels removed. A file whose contents would not change is not rewritten.
 
@@ -146,7 +146,8 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 | `--esp <dir>` | The root of the ESP to write to; `/boot/efi` by default. |
 | `--config <file>` | Read the settings from the JSON object in the file instead of the key `hd-bootloader`. |
 | `--boot-dir <dir>` | Where the kernels are; `/boot` by default. |
-| `--mok <file>` | The certificate of the DKMS MOK, DER or PEM; `/var/lib/dkms/mok.pub` by default. It is needed to boot with the ZFS module. |
+| `--modules-dir <dir>` | Where the modules of the kernels are, to find their ZFS module; `/lib/modules` by default. |
+| `--mok <file>` | The certificate of the DKMS MOK, DER or PEM; `/var/lib/dkms/mok.pub` by default. The kernel of Debian needs it to load the ZFS module that DKMS builds under Secure Boot. Without the file, `assets.efi` gets no MOK. |
 | `--db-key <file>`, `--db-cert <file>` | The Secure Boot db key and its PEM certificate; `/etc/hyprdebian/secboot/db.key` and `db.crt` by default. |
 | `--bootloader-dir <dir>`, `--assets-stub <file>` | Where the compiled bootloaders and the assets stub are; `/usr/lib/hd-bootloader` by default. |
 
