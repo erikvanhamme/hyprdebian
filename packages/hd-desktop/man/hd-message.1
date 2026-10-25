@@ -1,0 +1,187 @@
+.TH HD-MESSAGE 1 "October 2026" "hd-desktop" "HyprDebian"
+.SH NAME
+hd-message \- a message box for the HyprDebian desktop
+.SH SYNOPSIS
+.B hd-message
+.RI < message.json
+.SH DESCRIPTION
+.B hd-message
+shows a message in the middle of the screen, with a title, a text and a row
+of buttons, chosen from with the keyboard, and prints the value of the button
+chosen on stdout.
+It takes no arguments; it reads the message as JSON from stdin.
+.PP
+It draws on a wlr-layer-shell surface over the whole output, so it needs a
+Wayland compositor with wlr-layer-shell, such as Hyprland.
+The namespace of the surface is
+.BR hd-message .
+The message box has the keyboard to itself while it is open.
+Only one
+.B hd-message
+is open at a time: another one exits at once with 1.
+.SH THE MESSAGE
+.nf
+{
+    "title": "Reboot system?",
+    "text": "The new kernel is used after a reboot.\enUnsaved work is lost.",
+    "width": 600,
+    "buttons": [
+        {"label": "Later", "value": "later"},
+        {"label": "Reboot", "value": "reboot", "icon": "/usr/share/icons/reboot.svg"}
+    ],
+    "default": "later"
+}
+.fi
+.TP
+.B title
+Optional: a line of text at the top, in the big font, with a divider under it.
+.TP
+.B text
+Optional: the message, in the normal font.
+It is wrapped at the spaces to the width of the box; a word that is wider
+than the box on its own is broken between characters.
+A newline (\e\&n) starts a new line, an empty line between two newlines.
+.TP
+.B width
+Optional: the width of the box, in logical pixels (a number) or as a
+percentage of the output (a string such as \(dq50%\(dq).
+Without it, the box is as wide as the title, the text and the buttons need,
+but the text wraps at half the width of the output.
+The box is as high as its content needs.
+It is never larger than the output; text that does not fit is cut off.
+.TP
+.B buttons
+The buttons, from left to right; at least one.
+All buttons are as wide as the widest.
+Each is an object with:
+.RS
+.TP
+.B label
+The text shown.
+.TP
+.B value
+Optional: what
+.B hd-message
+prints when the button is chosen; the label when there is none.
+.TP
+.B icon
+Optional: the path of a PNG or SVG
+.RB ( .svg " or " .svgz )
+image, shown left of the label at the
+.B icon_size
+of the theme.
+An icon that cannot be loaded is left out, with a message on stderr.
+.RE
+.TP
+.B default
+Optional: the value of the button selected at the start; the first button
+when there is none.
+.PP
+Other members are ignored.
+.PP
+The Font Awesome glyphs of the Nerd Font of
+.BR hd-fonts ,
+such as \e\&uf00c (a check mark) and \e\&uf00d (a cross), can be written as
+escapes in the title, the text and a label.
+.SH KEYS
+.TP
+.BR Left ", " Right ", " Tab ", " Shift+Tab
+Select the previous or next button.
+.TP
+.BR Home ", " End
+Select the first or the last button.
+.TP
+.B Enter
+Choose the selected button.
+.TP
+.BR Escape ", " q
+Close the message box without a choice. q is the key with the letter q in the
+keyboard layout, with or without Shift.
+.PP
+A key that is held repeats at the rate and after the delay of the compositor,
+.B input:repeat_rate
+and
+.B input:repeat_delay
+in Hyprland.
+.SH THE THEME
+.B hd-message
+draws the message in the
+.B hd-theme
+of the configuration of the user,
+.IR ~/.config/hyprdebian/config.json ,
+or, when that has none, of the configuration of the system,
+.IR /etc/hyprdebian/config.json ;
+when neither has it, it uses defaults of its own, and run as root it only
+reads the configuration of the system.
+.BR hd-theme (1)
+sets the key when a theme is selected.
+The theme gives the font, its
+.B font-size-big
+for the title and its
+.B font-size-normal
+for the text and the buttons, the colours
+.B dark
+(the background, at
+.BR opacity ),
+.B light
+(the text),
+.B normal
+(the selected button, the outline of the other buttons and the divider) and
+.B highlight
+(the border), the
+.B border
+width, the corner
+.B radius
+and the
+.BR icon_size .
+The font sizes are in points, like in the other programs of the theme;
+.B hd-message
+draws them at 4/3 logical pixels per point.
+The border, the radius and the icon size are in logical pixels.
+The scale of the monitor decides how large that is on the screen.
+A setting that is missing has its default; when the file cannot be read, the
+whole theme has.
+.SH EXIT STATUS
+.TP
+.B 0
+A button was chosen; its value is on stdout.
+.TP
+.B 1
+The message box was closed without a choice, or another
+.B hd-message
+is open.
+.TP
+.B 2
+An error: arguments, invalid JSON on stdin, a message without buttons, a
+default that is not the value of a button, or no Wayland compositor with
+wlr-layer-shell.
+.SH FILES
+.TP
+.I ~/.config/hyprdebian/config.json
+The theme of the user, in
+.BR hd-theme .
+.TP
+.I /etc/hyprdebian/config.json
+The theme of the system, in
+.BR hd-theme ,
+when the user has none.
+.TP
+.IR /run/user/ UID /hd-message.lock
+The lock that keeps a second
+.B hd-message
+from opening.
+.SH EXAMPLES
+Ask before a reboot, with No selected:
+.PP
+.nf
+message=\(aq{"title": "Reboot system?", "text": "Unsaved work is lost.",
+  "buttons": [{"label": "No"}, {"label": "Yes"}], "default": "No"}\(aq
+if [[ "$(echo "$message" | hd-message)" == "Yes" ]]; then
+    hd-reboot
+fi
+.fi
+.SH SEE ALSO
+.BR hd-menu (1),
+.BR hd-desktop (7),
+.BR hd-theme (1),
+.BR hd-config (7)

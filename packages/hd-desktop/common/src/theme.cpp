@@ -1,6 +1,7 @@
 #include "theme.hpp"
 
 #include "json.hpp"
+#include "program.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -56,7 +57,7 @@ bool read_theme(const std::string& path, Theme& theme)
     }
     std::ifstream file(path);
     if (!file) {
-        std::cerr << "hd-menu: cannot read " << path << "\n";
+        std::cerr << PROGRAM << ": cannot read " << path << "\n";
         return false;
     }
     std::stringstream text;
@@ -87,7 +88,7 @@ bool read_theme(const std::string& path, Theme& theme)
         });
         reader.end();
     } catch (const std::exception& e) {
-        std::cerr << "hd-menu: " << path << ": " << e.what() << "\n";
+        std::cerr << PROGRAM << ": " << path << ": " << e.what() << "\n";
         return false;
     }
     if (!found) {
@@ -100,12 +101,15 @@ bool read_theme(const std::string& path, Theme& theme)
     for (auto [name, color] : {std::pair{"highlight", &theme.highlight}, std::pair{"normal", &theme.normal},
                                std::pair{"dark", &theme.dark}, std::pair{"light", &theme.light}}) {
         if (strings.count(name) != 0 && !parse_color(strings[name], *color)) {
-            std::cerr << "hd-menu: hd-theme: " << name << " is not a #rrggbb colour\n";
+            std::cerr << PROGRAM << ": hd-theme: " << name << " is not a #rrggbb colour\n";
         }
     }
     if (numbers.count("font-size-big") != 0 && numbers["font-size-big"] > 0) {
         // Points to logical pixels: a point is 1/72 inch, a logical pixel 1/96.
         theme.font_size_big = numbers["font-size-big"] * 96.0 / 72.0;
+    }
+    if (numbers.count("font-size-normal") != 0 && numbers["font-size-normal"] > 0) {
+        theme.font_size_normal = numbers["font-size-normal"] * 96.0 / 72.0;
     }
     if (numbers.count("icon_size") != 0 && numbers["icon_size"] > 0) {
         theme.icon_size = numbers["icon_size"];
@@ -132,6 +136,6 @@ Theme load_theme()
             return theme;
         }
     }
-    std::cerr << "hd-menu: no hd-theme in the configuration, using the default theme\n";
+    std::cerr << PROGRAM << ": no hd-theme in the configuration, using the default theme\n";
     return Theme();
 }

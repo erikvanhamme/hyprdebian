@@ -1,13 +1,17 @@
-# Builds every hyprdebian package and collects them in build/. The package
-# directories are in packages/. A build server checks out this repository and
-# runs make iso and make kernel.
+# Builds every hyprdebian package and collects them in build/, by the repos
+# they go to: build/both for trixie and unstable, build/trixie and
+# build/unstable for one suite. The package directories are in packages/. A
+# build server checks out this repository and runs make iso and make kernel.
 #
 #   make all        build every package in PACKAGES, one after the other; not
 #                   the kernels, see make kernel
 #   make <package>  build one package directory, packages/<package>: make deb
 #                   in it, with JOBS jobs at the same time, then copy the
-#                   packages it built to build/, each in place of older
-#                   versions of that package
+#                   packages it built to the folder of their repos in build/.
+#                   Every package that no package directory builds now goes
+#                   from build/: older versions, the kernels of an older
+#                   release, and a package in the folder of repos it no longer
+#                   goes to
 #   make test       run make test in every package directory in TESTS
 #   make clean      remove build/ and run make clean in every package
 #                   directory
@@ -21,7 +25,7 @@
 #                   graphics), asking for the GPU (vm/switch-vm-gpu.py)
 #   make kernel     build the kernels, the package directories in
 #                   KERNEL_PACKAGES, as make <package> does, into
-#                   build/<suite>/. Apart from make all, as they take long
+#                   build/<suite>. Apart from make all, as they take long
 #                   to build; a suite whose kernel is built already is not
 #                   built again, see hd-kernel
 #   make iso        build every package, then the live ISO with them in
@@ -32,26 +36,20 @@
 #                   kernels
 #   make update-repo
 #                   build every package, then ask for the host name of a
-#                   HyprDebian repository and upload the packages of every
-#                   package directory in PACKAGES from build/ to it, each
-#                   only for the repos in the deploy.json of its directory,
-#                   and the kernels that make kernel put in build/<suite>/,
-#                   each only for its suite (update-repo/update-repo.py). It
-#                   does not build the kernels: run make kernel first for
-#                   new ones
+#                   HyprDebian repository and upload every package in
+#                   build/ to it, each only for the repos of its folder
+#                   (update-repo/update-repo.py), so also the kernels that
+#                   make kernel put there. It does not build the kernels: run
+#                   make kernel first for new ones
 #   make clean-repo ask for the host name of a HyprDebian repository and
 #                   remove every package of every suite and the live ISO from
 #                   it, after the host name is typed again, keeping the
 #                   signing key (update-repo/update-repo.py --clean)
-#   make list-debs  print every package of the package directories in
-#                   PACKAGES as <repos>:build/<package>.deb, one per line,
-#                   without building them: the arguments of update-repo.py
-#                   and the DEBS of the live cd, for a build that runs make
-#                   all and make iso apart from the upload, as on a build
-#                   server. Then the kernels that make kernel put in
-#                   build/<suite>/, as <suite>:build/<suite>/<package>.deb;
-#                   none when it did not run, as their names come from the
-#                   versions of Debian they are built of
+#   make list-debs  print every package in build/ as
+#                   <repos>:build/<folder>/<package>.deb, one per line,
+#                   without building anything: the arguments of
+#                   update-repo.py, for a build that runs make iso and make
+#                   kernel apart from the upload, as on a build server
 #
 # Each package is a directory in packages/ with a Makefile that has the targets deb,
 # deb-path, which prints the paths of the packages that deb builds, one or
@@ -63,9 +61,9 @@
 #   }
 #
 # A package built for one repo only, such as a kernel of that suite, is printed
-# by deb-path as <repos>:<path>; it goes to build/<repos>/ and only to those
-# repos, in place of the repos of the deploy.json. This way a package directory
-# can build a package of the same name for each suite, as hd-kernel does.
+# by deb-path as <repos>:<path>; it goes to the folder of those repos, in place
+# of the repos of the deploy.json. This way a package directory can build a
+# package of the same name for each suite, as hd-kernel does.
 #
 # Add every new package directory to PACKAGES, or to KERNEL_PACKAGES for a
 # kernel, and to TESTS when its Makefile also has the target test, which runs
@@ -86,6 +84,9 @@ TESTS := hd-dashboard hd-report hd-backup hd-base
 # The directory with the package directories.
 SRC := packages
 OUT := build
+# The folders of build/: both for the packages of trixie and unstable, trixie
+# and unstable for those of one suite.
+DIRS := both trixie unstable
 # The number of jobs of make deb in each package directory.
 JOBS ?= $(shell nproc)
 # Prints the repos in the deploy.json given as argument, separated by commas.
@@ -100,27 +101,67 @@ kernel: $(KERNEL_PACKAGES)
 $(OUT):
 	mkdir -p $@
 
-# build/.<package>.debs lists the packages that the package directory put in
-# build/ the last time. They are removed before the new ones go there, also
-# when their names change, as those of hd-kernel do with every release.
+# Prints each package of the package directories in $(1) as
+# <folder>:packages/<package directory>/<path>, without building it: the
+# folder of build/ it goes to, from the repos that deb-path prints with it or
+# else the deploy.json of its directory, and the package that deb builds.
+define DEBS
+for package in $(1); do \
+	repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
+	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
+		deb=$${entry#*:}; \
+		dir=$$repos; \
+		if [ "$$deb" != "$$entry" ]; then \
+			dir=$${entry%%:*}; \
+		fi; \
+		case $$dir in \
+			trixie,unstable|unstable,trixie) dir=both ;; \
+			trixie|unstable) ;; \
+			*) echo "Error: $$package goes to the repos $$dir, which have no folder in $(OUT)/" >&2; exit 1 ;; \
+		esac; \
+		echo "$$dir:$(SRC)/$$package/$$deb"; \
+	done; \
+done
+endef
+
+# The repos of the folder of build/ in the shell variable dir: both is trixie
+# and unstable.
+define FOLDER_REPOS
+repos=$$dir; \
+if [ "$$dir" = both ]; then \
+	repos=trixie,unstable; \
+fi
+endef
+
+# Removes every package from the folders of build/ that no package directory
+# builds now, so they hold only the packages that make update-repo uploads.
+define PRUNE
+debs=$$($(call DEBS,$(PACKAGES) $(KERNEL_PACKAGES))) || exit 1; \
+keep=" "; \
+for entry in $$debs; do \
+	keep="$${keep}$(OUT)/$${entry%%:*}/$$(basename $${entry#*:}) "; \
+done; \
+for deb in $(foreach dir,$(DIRS),$(OUT)/$(dir)/*.deb); do \
+	if [ -f "$$deb" ]; then \
+		case "$$keep" in \
+			*" $$deb "*) ;; \
+			*) rm -f "$$deb" ;; \
+		esac; \
+	fi; \
+done
+endef
+
+# Copies the packages of the package directory to their folders in build/,
+# then removes those that no package directory builds now, as the older
+# kernels of hd-kernel, whose names change with every release.
 $(PACKAGES) $(KERNEL_PACKAGES): | $(OUT)
 	$(MAKE) -j$(JOBS) -C $(SRC)/$@ deb
-	if [ -f $(OUT)/.$@.debs ]; then \
-		xargs -r rm -f < $(OUT)/.$@.debs; \
-		rm -f $(OUT)/.$@.debs; \
-	fi
-	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$@ deb-path); do \
-		deb=$${entry#*:}; \
-		dir=$(OUT); \
-		if [ "$$deb" != "$$entry" ]; then \
-			dir=$(OUT)/$${entry%%:*}; \
-		fi; \
-		mkdir -p $$dir; \
-		name=$$(basename $$deb); \
-		rm -f $$dir/$${name%%_*}_*.deb; \
-		install -m 0644 $(SRC)/$@/$$deb $$dir/; \
-		echo $$dir/$$name >> $(OUT)/.$@.debs; \
+	debs=$$($(call DEBS,$@)) || exit 1; \
+	for entry in $$debs; do \
+		mkdir -p $(OUT)/$${entry%%:*}; \
+		install -m 0644 $${entry#*:} $(OUT)/$${entry%%:*}/; \
 	done
+	$(PRUNE)
 
 test: $(addprefix test-,$(TESTS))
 
@@ -137,56 +178,42 @@ provision-vm:
 switch-vm-gpu:
 	python3 vm/switch-vm-gpu.py
 
-# Prints each package of the package directories in $(1) as
-# <repos>:build/<package>.deb, one per line, for update-repo.py, the live cd and
-# make list-debs; a package that deb-path prints with its repos as
-# <repos>:build/<repos>/<package>.deb.
-define LIST_DEBS
-for package in $(1); do \
-	repos=$$($(DEPLOY_REPOS) $(SRC)/$$package/deploy.json) || exit 1; \
-	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$$package deb-path); do \
-		deb=$${entry#*:}; \
-		if [ "$$deb" != "$$entry" ]; then \
-			echo "$${entry%%:*}:$(OUT)/$${entry%%:*}/$$(basename $$deb)"; \
-		else \
-			echo "$$repos:$(OUT)/$$(basename $$deb)"; \
+# Prints each package in the folders of build/ as
+# <repos>:build/<folder>/<package>.deb, for update-repo.py and make list-debs.
+define BUILT_DEBS
+for dir in $(DIRS); do \
+	$(FOLDER_REPOS); \
+	for deb in $(OUT)/$$dir/*.deb; do \
+		if [ -f "$$deb" ]; then \
+			echo "$$repos:$$deb"; \
 		fi; \
 	done; \
 done
 endef
 
-# Prints the kernels that make kernel put in build/<suite>/, from the lists
-# build/.<package>.debs of the package directories in KERNEL_PACKAGES, as
-# <suite>:build/<suite>/<package>.deb.
-define KERNEL_DEBS
-for package in $(KERNEL_PACKAGES); do \
-	if [ -f $(OUT)/.$$package.debs ]; then \
-		while read -r deb; do \
-			if [ -f "$$deb" ]; then \
-				suite=$${deb#$(OUT)/}; \
-				echo "$${suite%%/*}:$$deb"; \
-			fi; \
-		done < $(OUT)/.$$package.debs; \
-	fi; \
-done
-endef
-
-# Hands the live cd every package, as <repos>:build/<package>.deb.
+# Hands the live cd the packages of the package directories in PACKAGES, as
+# <repos>:build/<folder>/<package>.deb, so not the kernels that make kernel
+# put in build/.
 iso: all
-	debs=$$($(call LIST_DEBS,$(PACKAGES))) || exit 1; \
-	$(MAKE) -C livecd iso DEBS="$$(echo $$debs)"
+	debs=$$($(call DEBS,$(PACKAGES))) || exit 1; \
+	isodebs=""; \
+	for entry in $$debs; do \
+		dir=$${entry%%:*}; \
+		$(FOLDER_REPOS); \
+		isodebs="$$isodebs $$repos:$(OUT)/$$dir/$$(basename $${entry#*:})"; \
+	done; \
+	$(MAKE) -C livecd iso DEBS="$$(echo $$isodebs)"
 
-# Hands update-repo.py each package as <repos>:build/<package>.deb, and the
-# kernels that make kernel built.
+# Hands update-repo.py every package in build/, also the kernels that make
+# kernel built.
 update-repo: all
-	uploads=$$($(call LIST_DEBS,$(PACKAGES)); $(KERNEL_DEBS)) || exit 1; \
+	uploads=$$($(BUILT_DEBS)) || exit 1; \
 	python3 update-repo/update-repo.py $$uploads
 
 # Empties a repository; update-repo.py asks for the host name and to type it again.
 clean-repo:
 	python3 update-repo/update-repo.py --clean
 
-# Prints each package as <repos>:build/<package>.deb, without building it, and
-# the kernels that make kernel built.
+# Prints every package in build/, without building it.
 list-debs:
-	@$(call LIST_DEBS,$(PACKAGES)); $(KERNEL_DEBS)
+	@$(BUILT_DEBS)

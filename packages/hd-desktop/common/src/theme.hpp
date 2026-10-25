@@ -1,6 +1,6 @@
 /**
  * @file theme.hpp
- * @brief The look of the menu.
+ * @brief The look of hd-menu and hd-message.
  *
  * The theme is the "hd-theme" key of the configuration of the user,
  * ~/.config/hyprdebian/config.json, or, when that has none, of the
@@ -23,7 +23,7 @@ struct Color {
 };
 
 /**
- * @brief The settings of the hd-theme that hd-menu uses, with their defaults.
+ * @brief The settings of the hd-theme that hd-menu and hd-message use, with their defaults.
  *
  * Sizes are in logical pixels.
  */
@@ -31,14 +31,17 @@ struct Theme {
     /** @brief The font of all text, a family name for fontconfig. */
     std::string font = "JetBrainsMono NFM Medium";
     /**
-     * @brief The size of all text: font-size-big.
+     * @brief The size of big text: font-size-big, of all text of hd-menu and
+     *        of the title of hd-message.
      *
      * The theme has it in points; load_theme() converts it to logical pixels
      * at 96 dpi, the resolution of a logical pixel. The theme also has
-     * font-size-normal and font-size-small; hd-menu uses the big one.
+     * font-size-small, which neither uses.
      */
     double font_size_big = 32;  // 24 pt
-    /** @brief The width and height of the icons of the options. */
+    /** @brief The size of normal text: font-size-normal, of the text and the buttons of hd-message. */
+    double font_size_normal = 24;  // 18 pt
+    /** @brief The width and height of the icons of the options and the buttons. */
     double icon_size = 64;
     /** @brief Focus: the outline of the focused window. Never a fill behind text. */
     Color highlight = {1.0, 0.4, 0.0};  // #ff6600
@@ -60,7 +63,7 @@ struct Theme {
 };
 
 /**
- * @brief Reads the theme of the user who runs hd-menu.
+ * @brief Reads the theme of the user who runs the program.
  *
  * The first configuration that has the key "hd-theme" gives the theme. A
  * configuration that does not exist, or has no such key, is skipped

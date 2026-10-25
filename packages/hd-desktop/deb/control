@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: hd-base (= @VERSION@), @MENU_DEPENDS@,
+Depends: hd-base (= @VERSION@), @PROGRAM_DEPENDS@,
  greetd, uwsm, dbus-user-session,
  hyprland, hyprland-guiutils, xwayland, hyprpaper, hypridle, hyprlock,
  hyprshutdown,
@@ -58,6 +58,8 @@ Description: HyprDebian desktop
     v3.4.0, in /usr/share/fonts/truetype/jetbrains-mono-nerd;
   - hd-menu, the keyboard-driven menu, which reads a menu as JSON from stdin
     and prints the value of the option chosen;
+  - hd-message, the message box, which reads a title, a text and buttons as
+    JSON from stdin and prints the value of the button chosen;
   - the theme engine hd-theme, with the themes in /etc/hyprdebian/themes,
     the theme of the system in the key hd-theme of
     /etc/hyprdebian/config.json and the theme of a user in that key of

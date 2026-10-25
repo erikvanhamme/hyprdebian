@@ -10,7 +10,7 @@
 # DEBS holds the packages for the ISO, separated by spaces, each as
 # <repos>:<path>, with the repos it goes to, separated by commas, and its
 # path relative to the root of the repository, such as
-# trixie,unstable:build/hd-base_1.10_all.deb.
+# trixie,unstable:build/both/hd-base_1.10_all.deb.
 #
 # The container gets the repository read-only at /src and builds the ISO in
 # its own filesystem, with the live-build configuration in config/ (see

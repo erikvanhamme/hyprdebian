@@ -19,7 +19,7 @@ The ISO is built with live-build, in a debian:trixie docker container, so live-b
 make iso
 ```
 
-This builds every package into `build/` first, as `make all` does, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its `deploy.json`. `make -C livecd iso` alone stops with an error, as it has no packages.
+This builds every package into `build/` first, as `make all` does, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its folder there: `build/both` for trixie and unstable, `build/trixie` or `build/unstable` for one. The kernels of `make kernel` are left out. `make -C livecd iso` alone stops with an error, as it has no packages.
 
 The finished ISO is written to:
 ```

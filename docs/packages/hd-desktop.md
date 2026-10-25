@@ -15,6 +15,7 @@ It holds the parts of the desktop, each with a page of its own:
 - [hd-art](hd-art.md): the wallpapers;
 - [hd-fonts](hd-fonts.md): JetBrains Mono with the icons of Nerd Fonts;
 - [hd-menu](hd-menu.md): the keyboard-driven menu of the key bindings and the application launcher;
+- [hd-message](hd-message.md): the message box, a title, a text and a row of buttons;
 - [hd-theme](hd-theme.md): the theme engine;
 - [hd-screensaver](hd-screensaver.md): the screensaver, which hypridle starts after 2 minutes;
 - [hd-plymouth](hd-plymouth.md): the boot splash, which looks like the lock screen of hyprlock in the theme of the system and asks for the password of an encrypted ZFS dataset.
@@ -32,7 +33,7 @@ cd packages/hd-desktop
 make deb
 ```
 
-This builds `build/hd-desktop_<version>_<arch>.deb`. Its version is the version of HyprDebian, from `version.json` in the root of this repository, as for [hd-base](hd-base.md); hd-desktop has no version of its own. It depends on `hd-base` of exactly the same version, so the desktop and the base system always come from the same release. hd-menu is compiled in a container, so the package is for the architecture of the build computer; see [hd-menu](hd-menu.md#building-the-package). The fonts are downloaded on the first build; see [hd-fonts](hd-fonts.md#building-the-package). Install it with:
+This builds `build/hd-desktop_<version>_<arch>.deb`. Its version is the version of HyprDebian, from `version.json` in the root of this repository, as for [hd-base](hd-base.md); hd-desktop has no version of its own. It depends on `hd-base` of exactly the same version, so the desktop and the base system always come from the same release. hd-menu and hd-message are compiled in a container, so the package is for the architecture of the build computer; see [hd-menu](hd-menu.md#building-the-package). The fonts are downloaded on the first build; see [hd-fonts](hd-fonts.md#building-the-package). Install it with:
 ```
 sudo apt install ./build/hd-desktop_<version>_<arch>.deb
 ```

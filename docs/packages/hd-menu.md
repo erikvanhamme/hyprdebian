@@ -3,16 +3,18 @@
 
 [hd-desktop](hd-desktop.md) uses it for its menus: whether to reboot or power off (`hd-ask-reboot`, `hd-ask-poweroff`), the mode of a monitor (`hd-mode-select`), and the drive to mount or unmount (`hd-mount`, `hd-unmount`). The application launcher of `SUPER + SPACE` shows the menu that `hd-launcher-cache` prints in it.
 
+For a question with a text and a row of buttons, the desktop has [hd-message](hd-message.md).
+
 Only one `hd-menu` is open at a time: a lock in `/run/user/<uid>/hd-menu.lock` makes a second one exit at once with 1.
 
 `hd-desktop` comes with the man page `man 1 hd-menu`.
 
 ## Building the package
-hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). Its source is in `packages/hd-desktop/menu`. `make deb` of hd-desktop compiles it in a `debian:unstable` container, with `make all` of `menu/Makefile`, and puts the libraries the binary links to, as `dpkg-shlibdeps` finds them, in the Depends of `hd-desktop`, which is therefore built for the architecture of the build computer.
+hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). Its source is in `packages/hd-desktop/menu`, the code it shares with [hd-message](hd-message.md), the Wayland surface, the theme, the JSON reader, the icons and the drawing of the box, in `packages/hd-desktop/common`. `make deb` of hd-desktop compiles both programs in one `debian:unstable` container, with `make all` of `menu/Makefile` and `message/Makefile`, and puts the libraries the binaries link to, as `dpkg-shlibdeps` finds them, in the Depends of `hd-desktop`, which is therefore built for the architecture of the build computer.
 
 To try a change without a package, `make all` in `menu/` builds `build/hd-menu` there, on the computer itself, which then needs the -dev packages:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libcairo2-dev librsvg2-dev
+sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev
 cd packages/hd-desktop/menu
 make all
 echo '{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu
@@ -21,14 +23,16 @@ echo '{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}
 The files involved are:
 ```
 packages/hd-desktop/menu/Makefile
-packages/hd-desktop/menu/build-hd-menu.sh
-packages/hd-desktop/menu/protocols/wlr-layer-shell-unstable-v1.xml
 packages/hd-desktop/menu/src/
+packages/hd-desktop/common/build.sh
+packages/hd-desktop/common/program.mk
+packages/hd-desktop/common/protocols/wlr-layer-shell-unstable-v1.xml
+packages/hd-desktop/common/src/
 packages/hd-desktop/man/hd-menu.1
 packages/hd-desktop/deb/copyright
 ```
 
-wlr-layer-shell is not in a Debian package, so `protocols/` has a copy of it from wlr-protocols.
+wlr-layer-shell is not in a Debian package, so `common/protocols/` has a copy of it from wlr-protocols.
 
 ## The menu
 ```

@@ -1,6 +1,6 @@
 /**
  * @file window.hpp
- * @brief The Wayland side of hd-menu.
+ * @brief The Wayland side of hd-menu and hd-message.
  *
  * A layer-shell surface over the whole output, the shared memory buffers
  * that the renderer draws into, and the keyboard.
@@ -8,15 +8,15 @@
  * How a frame gets on the screen:
  *
  * 1. The compositor sends a configure event of the layer surface with the
- *    size of the surface, in logical pixels. hd-menu acks it.
- * 2. hd-menu takes a free buffer: memory shared with the compositor (a
+ *    size of the surface, in logical pixels. The program acks it.
+ * 2. The program takes a free buffer: memory shared with the compositor (a
  *    memfd, mapped by both), width * scale by height * scale pixels of 32
  *    bit ARGB. cairo draws into that memory directly.
- * 3. hd-menu attaches the buffer to the surface, marks it damaged and
+ * 3. The program attaches the buffer to the surface, marks it damaged and
  *    commits. From then on the buffer belongs to the compositor, until it
  *    sends a release event of the buffer.
  *
- * There are two buffers, so that hd-menu can draw the next frame into one
+ * There are two buffers, so that the program can draw the next frame into one
  * while the compositor still reads the other.
  */
 #pragma once
@@ -39,7 +39,7 @@ struct zwlr_layer_shell_v1;
 struct zwlr_layer_surface_v1;
 
 /**
- * @brief What the window tells the rest of hd-menu.
+ * @brief What the window tells the rest of the program.
  *
  * Sizes are in logical pixels.
  */
@@ -70,7 +70,7 @@ public:
     virtual void closed() = 0;
 };
 
-/** @brief The surface of the menu, from the connection to the compositor to the frames on the screen. */
+/** @brief The surface of the program, from the connection to the compositor to the frames on the screen. */
 class Window {
 public:
     /**
@@ -133,7 +133,7 @@ private:
     };
 
     /**
-     * @brief Binds a global of the registry that hd-menu uses.
+     * @brief Binds a global of the registry that the program uses.
      * @param registry  The registry.
      * @param name      The name of the global.
      * @param interface The interface of the global.
@@ -252,7 +252,7 @@ private:
     /** @brief Gives the surface the layer-shell role. */
     zwlr_layer_shell_v1* layer_shell_ = nullptr;
 
-    /** @brief The surface of the menu. */
+    /** @brief The surface of the program. */
     wl_surface* surface_ = nullptr;
     /** @brief The layer-shell role of the surface. */
     zwlr_layer_surface_v1* layer_surface_ = nullptr;

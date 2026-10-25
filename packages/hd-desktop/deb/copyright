@@ -6,9 +6,9 @@ Comment: The wallpapers in /usr/share/backgrounds/hyprdebian are PNG renders
  background is the Emerald wallpaper, by Juliette Taka Belin, under the same
  license.
  .
- The binary hd-menu also holds the interface tables that wayland-scanner
- generates from two Wayland protocols: wlr-layer-shell, of wlr-protocols, and
- xdg-shell, of wayland-protocols. Their notices follow.
+ The binaries hd-menu and hd-message also hold the interface tables that
+ wayland-scanner generates from two Wayland protocols: wlr-layer-shell, of
+ wlr-protocols, and xdg-shell, of wayland-protocols. Their notices follow.
  .
  The fonts in /usr/share/fonts/truetype/jetbrains-mono-nerd are the
  JetBrains Mono Nerd Font of the Nerd Fonts release v3.4.0, unchanged: the
@@ -63,7 +63,7 @@ Copyright: 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains
            2014 Ryan L McIntyre (https://ryanlmcintyre.com)
 License: OFL-1.1
 
-Files: protocols/wlr-layer-shell-unstable-v1.xml
+Files: common/protocols/wlr-layer-shell-unstable-v1.xml
 Copyright: 2017, Drew DeVault
 License: wlr-layer-shell
 

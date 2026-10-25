@@ -12,14 +12,18 @@
 #                                             hd-theme-card of the theme
 #                                             engine, and the commands of
 #                                             the screensaver
-#                 /usr/bin/hd-menu            the menu, compiled from menu/;
-#                                             build-hd-menu.sh compiles it
-#                                             with make all of
-#                                             menu/Makefile in a $(IMAGE)
-#                                             container, into build/menu;
-#                                             later builds reuse it until a
-#                                             source changes or make clean
-#                                             removes it
+#                 /usr/bin/hd-menu            the menu, compiled from menu/
+#                 /usr/bin/hd-message         the message box, compiled from
+#                                             message/; common/build.sh
+#                                             compiles both, with the code
+#                                             they share in common/, with
+#                                             make all of menu/Makefile and
+#                                             message/Makefile in one
+#                                             $(IMAGE) container, into
+#                                             build/programs; later builds
+#                                             reuse them until a source
+#                                             changes or make clean removes
+#                                             them
 #                 /usr/libexec/hd-desktop/hd-mount-helper
 #                                             mounts and unmounts for the
 #                                             mount menus, run with sudo
@@ -109,8 +113,8 @@
 #                 /usr/share/man/man*/*.gz    the man pages in man/
 #               with the control file deb/control, whose Depends are the
 #               packages of the desktop, hd-base of the same version, and
-#               the libraries of hd-menu that dpkg-shlibdeps finds in the
-#               container; deb/triggers, which has initramfs-tools rebuild
+#               the libraries of hd-menu and hd-message that dpkg-shlibdeps
+#               finds in the container; deb/triggers, which has initramfs-tools rebuild
 #               the initramfs with the boot splash; and the maintainer
 #               scripts deb/postinst, which diverts /etc/greetd/config.toml
 #               of greetd and writes it with hd-desktop-render, diverts
@@ -134,8 +138,9 @@
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
-#   make clean  remove build/, also the compiled hd-menu and the downloaded
-#               zip of the fonts, and menu/build/ of make all in menu/
+#   make clean  remove build/, also the compiled hd-menu and hd-message and
+#               the downloaded zip of the fonts, and menu/build/ and
+#               message/build/ of make all in menu/ and message/
 
 BUILD := build
 PYTHON := python3
@@ -145,7 +150,7 @@ DEB_NAME := hd-desktop
 # hd-base.
 VERSION_FILE := ../../version.json
 DEB_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("$(VERSION_FILE)")); print("%d.%d" % (v["major"], v["minor"]))')
-# hd-menu is compiled, so the package is for the architecture of this machine, on which the
+# hd-menu and hd-message are compiled, so the package is for the architecture of this machine, on which the
 # container runs.
 ARCH := $(shell dpkg --print-architecture)
 DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
@@ -167,7 +172,7 @@ SBIN_COMMANDS := hd-desktop-render hd-plymouth-render
 TEMPLATES := $(wildcard templates/*.j2)
 # The man pages, named <page>.<section>.
 MANPAGES := man/hd-desktop.7 man/hd-desktop-render.8 man/hd-launcher-cache.1 man/hd-art.7 \
-	man/hd-fonts.7 man/hd-menu.1 man/hd-theme.7 man/hd-theme.1 man/hd-theme-card.1 \
+	man/hd-fonts.7 man/hd-menu.1 man/hd-message.1 man/hd-theme.7 man/hd-theme.1 man/hd-theme-card.1 \
 	man/hd-screensaver.7 man/hd-plymouth.7 man/hd-plymouth-render.8
 
 # The theme engine: the templates of the theme files, and the themes.
@@ -205,12 +210,13 @@ HOOK_DIR := /usr/share/initramfs-tools/hooks
 PLYMOUTH_THEME := $(wildcard plymouth/theme/*)
 PLYMOUTH_TEMPLATES := $(wildcard templates/hd-plymouth/*.j2)
 
-# The menu, compiled in a container. The desktop needs Hyprland, so it is only for unstable; the
-# binary needs the libraries of the release it is compiled on.
+# The menu and the message box, compiled in a container. The desktop needs Hyprland, so they are
+# only for unstable; the binaries need the libraries of the release they are compiled on.
 IMAGE := debian:unstable
-MENU := $(BUILD)/menu
-MENU_SOURCES := menu/Makefile menu/build-hd-menu.sh $(wildcard menu/src/*) \
-	$(wildcard menu/protocols/*)
+PROGRAMS := $(BUILD)/programs
+PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) \
+	$(wildcard common/protocols/*) menu/Makefile $(wildcard menu/src/*) message/Makefile \
+	$(wildcard message/src/*)
 
 .PHONY: deb deb-path clean
 
@@ -222,17 +228,20 @@ deb-path:
 $(BUILD):
 	mkdir -p $@
 
-# make all of menu/Makefile, in the container. It compiles into a temporary directory, so a
-# build that fails leaves no $(MENU) behind. It pulls the latest $(IMAGE) every time.
-$(MENU): $(MENU_SOURCES) | $(BUILD)
+# make all of menu/Makefile and message/Makefile, in the container. It compiles into a temporary
+# directory, so a build that fails leaves no $(PROGRAMS) behind. It pulls the latest $(IMAGE)
+# every time.
+$(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
 	docker run --rm --pull always \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
-		-v $(CURDIR)/menu:/src:ro \
+		-v $(CURDIR)/common:/src/common:ro \
+		-v $(CURDIR)/menu:/src/menu:ro \
+		-v $(CURDIR)/message:/src/message:ro \
 		-v $(CURDIR)/$@.tmp:/out \
-		$(IMAGE) bash /src/build-hd-menu.sh
+		$(IMAGE) bash /src/common/build.sh
 	mv $@.tmp $@
 
 # A download that does not match the checksum is removed, so the next make
@@ -248,7 +257,7 @@ $(ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
@@ -259,7 +268,7 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-not
 		$(STAGE)$(PLYMOUTH_THEME_DIR) $(STAGE)$(PLYMOUTH_SHARE_DIR) $(STAGE)$(PLYMOUTH_TEMPLATE_DIR) \
 		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
-	install -s -m 0755 $(MENU)/hd-menu $(STAGE)/usr/bin/
+	install -s -m 0755 $(PROGRAMS)/hd-menu $(PROGRAMS)/hd-message $(STAGE)/usr/bin/
 	install -m 0755 hd-mount-helper hd-reboot-notify $(STAGE)$(LIBEXEC_DIR)/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
@@ -295,7 +304,7 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-not
 	done
 	sed -e 's/@VERSION@/$(DEB_VERSION)/g' \
 		-e 's/@ARCH@/$(ARCH)/' \
-		-e "s/@MENU_DEPENDS@/$$(cat $(MENU)/depends)/" \
+		-e "s/@PROGRAM_DEPENDS@/$$(cat $(PROGRAMS)/depends)/" \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
 	install -m 0644 deb/triggers $(STAGE)/DEBIAN/
@@ -305,3 +314,4 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-not
 clean:
 	rm -rf $(BUILD)
 	$(MAKE) -C menu clean
+	$(MAKE) -C message clean

@@ -1,5 +1,7 @@
 #include "window.hpp"
 
+#include "program.hpp"
+
 #include <algorithm>
 #include <cerrno>
 #include <climits>
@@ -40,7 +42,7 @@ Window::Window(WindowHandler& handler) : handler_(handler)
     }
 
     // The registry lists the globals of the compositor; bind the ones that
-    // hd-menu needs. The roundtrip waits until they have all been sent.
+    // the program needs. The roundtrip waits until they have all been sent.
     static const wl_registry_listener registry_listener = {
         .global = [](void* data, wl_registry* registry, uint32_t name, const char* interface, uint32_t version) {
             static_cast<Window*>(data)->bind_global(registry, name, interface, version);
@@ -116,7 +118,7 @@ Window::Window(WindowHandler& handler) : handler_(handler)
         .closed = [](void* data, zwlr_layer_surface_v1*) { static_cast<Window*>(data)->handler_.closed(); },
     };
     layer_surface_ = zwlr_layer_shell_v1_get_layer_surface(layer_shell_, surface_, nullptr,
-                                                           ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, "hd-menu");
+                                                           ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY, PROGRAM);
     zwlr_layer_surface_v1_add_listener(layer_surface_, &layer_surface_listener, this);
     zwlr_layer_surface_v1_set_anchor(layer_surface_,
                                      ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
@@ -184,7 +186,7 @@ void Window::bind_global(wl_registry* registry, uint32_t name, const char* inter
     } else if (iface == wl_shm_interface.name) {
         shm_ = static_cast<wl_shm*>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
     } else if (iface == wl_seat_interface.name && seat_ == nullptr && version >= 5) {
-        // The keyboard comes from the seat; hd-menu assumes it has one.
+        // The keyboard comes from the seat; the program assumes it has one.
         seat_ = static_cast<wl_seat*>(wl_registry_bind(registry, name, &wl_seat_interface, 5));
     } else if (iface == zwlr_layer_shell_v1_interface.name && version >= 4) {
         layer_shell_ = static_cast<zwlr_layer_shell_v1*>(
@@ -275,7 +277,7 @@ void Window::repeat()
     if (read(repeat_fd_, &expirations, sizeof expirations) != sizeof expirations) {
         return;
     }
-    // When hd-menu falls behind, the repeats it missed still count, so that
+    // When the program falls behind, the repeats it missed still count, so that
     // the selection moves as far as the time held asks.
     for (uint64_t i = 0; i < expirations && running_ && repeat_key_ != 0; ++i) {
         handler_.key(repeat_key_, keysym(repeat_key_));
@@ -372,7 +374,7 @@ void Window::create_buffer(Buffer& b)
     b.size = static_cast<std::size_t>(stride) * h;
 
     // Anonymous memory with a file descriptor, which the compositor maps too.
-    const int fd = memfd_create("hd-menu", MFD_CLOEXEC);
+    const int fd = memfd_create(PROGRAM, MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, static_cast<off_t>(b.size)) < 0) {
         fail(std::string("cannot allocate a buffer: ") + std::strerror(errno));
     }

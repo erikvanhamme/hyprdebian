@@ -1,6 +1,6 @@
 /**
  * @file json.hpp
- * @brief Just enough JSON for hd-menu.
+ * @brief Just enough JSON for hd-menu and hd-message.
  *
  * A reader that walks through the text, reads strings, numbers and booleans,
  * and skips whatever the caller does not want, without building a tree.

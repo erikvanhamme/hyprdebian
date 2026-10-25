@@ -63,7 +63,7 @@ From the root of this repository:
 make update-repo
 ```
 
-This builds every package into `build/`, then runs `update-repo/update-repo.py` with them and the kernels that `make kernel` built into `build/<suite>`, see [hd-kernel](hd-kernel.md), which asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
+This builds every package into `build/`, then runs `update-repo/update-repo.py` with every package there, also the kernels that `make kernel` built, see [hd-kernel](hd-kernel.md). Each package goes to the suites of its folder: `build/both` to trixie and unstable, `build/trixie` and `build/unstable` to one. update-repo.py asks for the host name of the repository, `repo` by default, shows the packages of each suite and asks for a go-ahead. It then copies each package to the inboxes of its suites, `inbox/trixie`, `inbox/unstable` or both, and runs `hd-repo-update` for the suites that got packages there, all as `repo` over ssh, so your ssh key must be in the `authorized_keys` of `repo`.
 
 A build server with [hd-buildserver](hd-buildserver.md) does the same every night, unattended, with the options below, and also uploads the live ISO.
 

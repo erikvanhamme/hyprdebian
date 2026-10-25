@@ -45,7 +45,7 @@ make deb
 
 This builds the packages of both suites, into `build/trixie` and `build/unstable`; `make deb-trixie` or `make deb-unstable` builds one.
 
-In the root of the repository, `make kernel` does the same and puts them in `build/<suite>`; `make all` leaves the kernels out, as they take long to build. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`. `make update-repo` and `make list-debs` then also give the kernels that `make kernel` built, each only for its suite, but do not build them: run `make kernel` first for new ones. The live ISO does not get them, as the installer does not install them yet.
+In the root of the repository, `make kernel` does the same and puts them in `build/<suite>` there too; `make all` leaves the kernels out, as they take long to build. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`, and removes the kernels of an older release from its `build/<suite>`. `make update-repo` and `make list-debs` then also give the kernels that `make kernel` built, each only for its suite, but do not build them: run `make kernel` first for new ones. The live ISO does not get them, as the installer does not install them yet.
 
 Raise the version in `version.json` for every change of the packages.
 

@@ -9,12 +9,14 @@
 // after a choice, with 1 when the menu is closed without one or another
 // hd-menu is already open, and with 2 on an error.
 //
-// The parts: theme.cpp reads the hd-theme of the user, or of the system,
-// menu.cpp reads the menu, renderer.cpp draws it with cairo, window.cpp puts
-// the drawing on the screen and gets the keys, and the App here ties them
-// together.
+// The parts: menu.cpp reads the menu, renderer.cpp draws it with cairo, and
+// the App here ties them together. The rest is in ../../common/src, shared
+// with hd-message: theme.cpp reads the hd-theme of the user, or of the
+// system, icon.cpp loads the icons, draw.cpp draws the box, the text and the
+// icons, and window.cpp puts the drawing on the screen and gets the keys.
 
 #include "menu.hpp"
+#include "program.hpp"
 #include "renderer.hpp"
 #include "theme.hpp"
 #include "window.hpp"
@@ -29,6 +31,8 @@
 #include <string>
 #include <sys/file.h>
 #include <unistd.h>
+
+const char* const PROGRAM = "hd-menu";
 
 namespace {
 
