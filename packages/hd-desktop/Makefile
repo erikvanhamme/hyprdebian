@@ -23,6 +23,10 @@
 #                 /usr/libexec/hd-desktop/hd-mount-helper
 #                                             mounts and unmounts for the
 #                                             mount menus, run with sudo
+#                 /usr/libexec/hd-desktop/hd-reboot-notify
+#                                             shows that a reboot is
+#                                             needed, run by
+#                                             hd-reboot-notify.service
 #                 /usr/bin/hd-launcher-cache  writes the menu of the
 #                                             launcher in the cache of the
 #                                             system or of the user, and
@@ -91,9 +95,11 @@
 #                                             runs hd-desktop-render before
 #                                             greetd starts, the
 #                                             warning icon of
-#                                             hd-launcher-cache and the
+#                                             hd-launcher-cache, the
 #                                             colour scheme hyprdebian of
-#                                             qt5ct and qt6ct
+#                                             qt5ct and qt6ct and the user
+#                                             units that notify of a
+#                                             pending reboot
 #                 /usr/share/doc/hd-desktop/copyright
 #                                             deb/copyright
 #                 /usr/share/doc/hd-desktop/nerd-fonts/OFL.txt
@@ -113,8 +119,10 @@
 #               database, renders the cards of the themes and selects the
 #               theme default when none is selected, renders the boot splash
 #               with hd-plymouth-render, and writes the menu of the launcher
-#               with hd-launcher-cache, and deb/postrm, which undoes the
-#               diversions and removes the cards on a removal, and
+#               with hd-launcher-cache, and enables hd-reboot-notify.path
+#               for every user, and deb/postrm, which undoes the
+#               diversions, removes the cards and masks the user unit on a
+#               removal, and
 #               removes the menu, the rendered boot splash and the key
 #               hd-theme on a purge.
 #               deb/preinst, deb/postinst and deb/postrm also remove the
@@ -240,7 +248,7 @@ $(ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
@@ -252,7 +260,7 @@ $(DEB): $(VERSION_FILE) $(MENU) $(ZIP) $(COMMANDS) hd-mount-helper $(SBIN_COMMAN
 		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -s -m 0755 $(MENU)/hd-menu $(STAGE)/usr/bin/
-	install -m 0755 hd-mount-helper $(STAGE)$(LIBEXEC_DIR)/
+	install -m 0755 hd-mount-helper hd-reboot-notify $(STAGE)$(LIBEXEC_DIR)/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	install -m 0644 $(THEME_TEMPLATES) $(STAGE)$(THEME_TEMPLATE_DIR)/

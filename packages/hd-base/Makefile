@@ -9,7 +9,11 @@
 #                                             ../../version.json, which the
 #                                             banners show, a conffile
 #                 /usr/bin/hd-up              upgrades the system after a
-#                                             ZFS snapshot
+#                                             ZFS snapshot, by hand and
+#                                             every week
+#                 /usr/bin/hd-reboot-check    tells whether a reboot is
+#                                             needed, and writes
+#                                             /run/reboot-required
 #                 /usr/bin/hd-reboot
 #                 /usr/bin/hd-poweroff        reboot or power off, with
 #                                             hyprshutdown in a Hyprland
@@ -58,14 +62,17 @@
 #                                             the apt preferences, the apt
 #                                             config without translations
 #                                             and without recommends,
-#                                             the files dpkg leaves out and
+#                                             the files dpkg leaves out,
 #                                             the message after a login in
-#                                             /etc/update-motd.d
+#                                             /etc/update-motd.d and the
+#                                             kernel hook that writes
+#                                             /run/reboot-required
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the Num Lock
 #                                             drop-in of getty, the timers
 #                                             that scrub and trim the ZFS
-#                                             pools, the zram
+#                                             pools and upgrade the
+#                                             system, the zram
 #                                             swap, the sysctls for it,
 #                                             the resolved config, and the
 #                                             .link files that name network
@@ -79,7 +86,7 @@
 #               writes the login banner with hd-issue, generates the
 #               Secure Boot keys in /etc/hyprdebian/secboot when they are not
 #               there yet, removes the files that dpkg leaves out from the
-#               packages installed before it and enables the ZFS timers,
+#               packages installed before it and enables the timers,
 #               deb/prerm, which stops the timers on a removal, deb/postrm,
 #               which undoes the diversions and masks the timers on a
 #               removal and unmasks the units on a purge, and deb/triggers,
@@ -108,7 +115,7 @@ STAGE := $(BUILD)/deb
 ETC := $(shell find etc -type f)
 USR := $(shell find usr -type f)
 # The commands, installed in /usr/bin.
-COMMANDS := hd-up hd-reboot hd-poweroff hd-sync-skel hd-config-update hd-config-remove
+COMMANDS := hd-up hd-reboot-check hd-reboot hd-poweroff hd-sync-skel hd-config-update hd-config-remove
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-issue hd-link-repo hd-network-render \
 	hd-network-iface hd-network-bridge hd-secboot-enroll hd-secboot-check hd-firmware
@@ -120,7 +127,7 @@ NETWORK_TEMPLATE_DIR := /usr/share/hd-network/templates
 NETWORK_TEMPLATES := $(wildcard templates/hd-network/*.j2)
 NETWORK_LIB_DIR := /usr/lib/hd-network
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
-MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
+MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot-check.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
 	man/hd-issue.8 man/hd-link-repo.8 man/hd-firmware.8 \
 	man/hd-config.7 man/hd-config-update.1 man/hd-config-remove.1 \
 	man/hd-network.7 man/hd-network-render.8 man/hd-network-iface.8 man/hd-network-bridge.8 \

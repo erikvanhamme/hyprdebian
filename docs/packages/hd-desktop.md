@@ -57,6 +57,9 @@ hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
 packages/hd-desktop/etc/...
 packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
 packages/hd-desktop/usr/share/hd-desktop/icons/warning.svg
+packages/hd-desktop/hd-reboot-notify
+packages/hd-desktop/usr/lib/systemd/user/hd-reboot-notify.path
+packages/hd-desktop/usr/lib/systemd/user/hd-reboot-notify.service
 packages/hd-desktop/man/hd-desktop.7
 packages/hd-desktop/man/hd-desktop-render.8
 packages/hd-desktop/man/hd-launcher-cache.1
@@ -121,6 +124,12 @@ The key bindings run these commands, in `/usr/bin`:
 The menus above and the application launcher use [hd-menu](hd-menu.md), which has a lock of its own, so a second press of a key binding opens no second menu.
 
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
+
+## Pending reboot
+The user unit `hd-reboot-notify.path` starts `hd-reboot-notify.service` in the desktop session when `/run/reboot-required` exists: when an upgrade writes it, and at every login until the reboot, see `hd-reboot-check` in [hd-base](hd-base.md#hd-reboot-check). It runs `/usr/libexec/hd-desktop/hd-reboot-notify`, which shows a notification with the reasons of `hd-reboot-check`; clicking it runs `hd-ask-reboot`. The service stays active after the notification, so it shows once per session. The postinst enables the unit for every user on its first installation, by its preset, and keeps the state the admin gave it over upgrades; a removal masks it, so a reinstall keeps that state, and a purge forgets it. To switch it off for a user:
+```
+systemctl --user disable --now hd-reboot-notify.path
+```
 
 ## Application launcher
 `SUPER + SPACE` opens the application launcher: the menu that `hd-launcher-cache` prints, in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
@@ -219,6 +228,7 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/var/log/hyprland.log` | The output of Hyprland. |
 | `/usr/bin/hd-*` | The commands of the key bindings. |
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |
+| `/usr/libexec/hd-desktop/hd-reboot-notify`, `/usr/lib/systemd/user/hd-reboot-notify.*` | The notification of a pending reboot. |
 | `/etc/sudoers.d/hd-desktop` | Lets the group `sudo` mount without a password. |
 | `/etc/dconf/profile/user`, `/etc/dconf/db/local.d/00-dark-theme`, `01-font` | The dark theme and the font for GTK applications. |
 | `/etc/gtk-3.0/settings.ini`, `/etc/gtk-4.0/settings.ini` | The same, for GTK applications on XWayland. |

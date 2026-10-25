@@ -1,0 +1,12 @@
+# Shows that a reboot is needed, and why, once per desktop session: it stays active after the
+# notification, so hd-reboot-notify.path does not start it again. Installed by hd-desktop.
+[Unit]
+Description=Notify of a Pending Reboot
+Documentation=man:hd-desktop(7) man:hd-reboot-check(1)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/hd-desktop/hd-reboot-notify

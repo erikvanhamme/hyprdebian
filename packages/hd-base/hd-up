@@ -1,29 +1,60 @@
 #!/usr/bin/python3
 """Upgrades the system with apt, after a ZFS snapshot of the root.
 
-The package hd-base installs this as /usr/bin/hd-up.
+The package hd-base installs this as /usr/bin/hd-up, and hd-up.timer runs it with --unattended
+every Tuesday at 04:30.
 
-    hd-up   update the package lists, show the upgrades, and on a yes take a snapshot
-            rpool/hyprdebian@hd-up-<date>_<time> and upgrade
+    hd-up               update the package lists, show the upgrades, and on a yes download them,
+                        take a snapshot rpool/hyprdebian@hd-up-<date>_<time> and upgrade
+    hd-up --unattended  the same without the question, for hd-up.service: it first checks that
+                        the pool is healthy and dpkg has nothing half done, and leaves an upgrade
+                        that removes packages to a run by hand
 
-Run it as the user, who must be allowed to use sudo, or as root. The snapshot lets an upgrade
-that went wrong be undone with zfs rollback.
+Run it as the user, who must be allowed to use sudo, or as root; as the user it runs itself again
+with sudo. The snapshot lets an upgrade that went wrong be undone with zfs rollback. After an
+upgrade that succeeded, hd-reboot-check writes /run/reboot-required when the new kernel or ZFS
+module needs a reboot, and hd-up says why; it never reboots. Only the newest hd-up snapshots are
+kept: as many as the value of keep
+under the key hd-up in /etc/hyprdebian/config.json, KEEP_DEFAULT without it. The snapshot has the
+property org.hyprdebian:hd-up, manual or unattended, after the way hd-up ran.
 """
 
 import argparse
 import datetime
+import fcntl
+import json
 import os
+import re
 import subprocess
 import sys
 
 DATASET = "rpool/hyprdebian"
+POOL = DATASET.split("/")[0]
+PREFIX = "hd-up-"
+# The names of the snapshots of hd-up, so another snapshot that starts with PREFIX is never pruned.
+SNAPSHOT_NAME = re.compile(re.escape(f"{DATASET}@{PREFIX}") + r"\d{4}-\d{2}-\d{2}_\d{6}")
+PROPERTY = "org.hyprdebian:hd-up"
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-up"
+KEEP_DEFAULT = 8
+# A manual and an unattended hd-up never run at the same time.
+LOCK_FILE = "/run/hd-up.lock"
+# apt waits this many seconds for another apt or dpkg to finish.
+LOCK_TIMEOUT = "600"
 
 
 def run(*command, check=True, capture=False):
-    """Runs a command as root, with sudo when this is not root."""
-    if os.geteuid() != 0:
-        command = ("sudo",) + command
     return subprocess.run(command, check=check, capture_output=capture, text=True)
+
+
+def apt_options(unattended):
+    """The options of apt-get and apt: an unattended run keeps the conffiles that were changed,
+    and asks nothing."""
+    options = ["-o", f"DPkg::Lock::Timeout={LOCK_TIMEOUT}"]
+    if unattended:
+        options += ["-o", "Dpkg::Options::=--force-confdef",
+                    "-o", "Dpkg::Options::=--force-confold"]
+    return options
 
 
 def upgradable():
@@ -33,39 +64,199 @@ def upgradable():
             if line and not line.startswith("Listing...")]
 
 
-def main():
-    argparse.ArgumentParser(
-        description=f"Upgrade the system with apt, after a ZFS snapshot of {DATASET}.").parse_args()
+def parse_simulation(text):
+    """Returns the packages that apt-get -s full-upgrade installs or upgrades, and those it
+    removes, from its output."""
+    installs = []
+    removals = []
+    for line in text.splitlines():
+        fields = line.split()
+        if len(fields) < 2:
+            continue
+        if fields[0] == "Inst":
+            installs.append(fields[1])
+        elif fields[0] == "Remv":
+            removals.append(fields[1])
+    return installs, removals
 
-    print("--- 1. Syncing Repositories ---", flush=True)
-    run("apt", "update")
 
-    packages = upgradable()
-    if not packages:
-        print("Everything is current. Exiting.")
-        return
+def simulate():
+    result = run("apt-get", "-s", "full-upgrade", capture=True)
+    return parse_simulation(result.stdout)
 
-    print(f"\n--- 2. Pending Upgrades ({len(packages)} packages) ---")
-    print("\n".join(packages))
 
+def keep_count(config):
+    """Returns the number of hd-up snapshots to keep, from the configuration of the system."""
+    settings = config.get(CONFIG_KEY, {})
+    if not isinstance(settings, dict):
+        settings = {}
+    keep = settings.get("keep", KEEP_DEFAULT)
+    if isinstance(keep, bool) or not isinstance(keep, int) or keep < 1:
+        print(f"Warning: keep under {CONFIG_KEY} in {CONFIG_FILE} is not a number of 1 or more, "
+              f"keeping {KEEP_DEFAULT} snapshots.", file=sys.stderr)
+        return KEEP_DEFAULT
+    return keep
+
+
+def load_config():
     try:
-        answer = input("\nProceed with Snapshot and Upgrade? (y/N): ")
-    except EOFError:
-        answer = ""
-    if not answer.lower().startswith("y"):
-        print("Upgrade cancelled by user.")
-        return
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        print(f"Warning: cannot read {CONFIG_FILE}: {e}", file=sys.stderr)
+        return {}
+    if not isinstance(config, dict):
+        return {}
+    return config
 
-    snapshot = f"{DATASET}@hd-up-{datetime.datetime.now():%Y-%m-%d_%H%M%S}"
-    print("\n--- 3. Creating ZFS Snapshot ---", flush=True)
-    if run("zfs", "snapshot", snapshot, check=False).returncode != 0:
-        print("Error: Could not create snapshot. Upgrade cancelled.", file=sys.stderr)
+
+def snapshots_to_prune(listing, keep):
+    """Returns the hd-up snapshots of `zfs list -Hp -o name,creation` beyond the newest `keep`,
+    the oldest first."""
+    snapshots = []
+    for line in listing.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 2:
+            continue
+        name, creation = fields
+        if not SNAPSHOT_NAME.fullmatch(name):
+            continue
+        snapshots.append((int(creation), name))
+    snapshots.sort()
+    if len(snapshots) <= keep:
+        return []
+    return [name for _, name in snapshots[:len(snapshots) - keep]]
+
+
+def prune():
+    keep = keep_count(load_config())
+    listing = run("zfs", "list", "-Hp", "-t", "snapshot", "-o", "name,creation", "-d", "1",
+                  DATASET, capture=True).stdout
+    for snapshot in snapshots_to_prune(listing, keep):
+        if run("zfs", "destroy", snapshot, check=False).returncode == 0:
+            print(f"Snapshot destroyed: {snapshot}")
+        else:
+            print(f"Warning: Could not destroy snapshot {snapshot}.", file=sys.stderr)
+
+
+def check_reboot():
+    """Says why a reboot is needed, if it is, and has hd-reboot-check write /run/reboot-required
+    for the login message, hd-report and the notification of the desktop."""
+    result = run("hd-reboot-check", "--write", check=False, capture=True)
+    if result.returncode != 0:
+        print(f"Warning: Could not check for a reboot: {result.stderr.strip()}", file=sys.stderr)
+        return
+    found = result.stdout.splitlines()
+    if found:
+        print(f"\nReboot needed: {'; '.join(found)}.")
+
+
+def check_system():
+    """Returns what keeps an unattended upgrade from starting, or None when nothing does."""
+    health = run("zpool", "list", "-H", "-o", "health", POOL, capture=True).stdout.strip()
+    if health != "ONLINE":
+        return f"the pool {POOL} is {health}"
+    audit = run("dpkg", "--audit", capture=True).stdout.strip()
+    if audit != "":
+        return f"dpkg has packages that are not fully installed:\n{audit}"
+    return None
+
+
+def lock():
+    """Takes the lock of hd-up, and keeps it until the process ends."""
+    fd = os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("Error: hd-up is already running.", file=sys.stderr)
         sys.exit(1)
+
+
+def upgrade(unattended):
+    # apt prints a progress bar on a terminal; apt-get is the command for scripts.
+    apt = "apt-get" if unattended else "apt"
+    options = apt_options(unattended)
+
+    if unattended:
+        problem = check_system()
+        if problem is not None:
+            print(f"Error: Not upgrading: {problem}", file=sys.stderr)
+            return 1
+
+    print("--- 1. Syncing Repositories ---")
+    run(apt, *options, "update")
+
+    installs, removals = simulate()
+    if not installs and not removals:
+        print("Everything is current. Exiting.")
+        check_reboot()
+        return 0
+
+    print(f"\n--- 2. Pending Upgrades ({len(installs)} packages) ---")
+    print("\n".join(upgradable()))
+    if removals:
+        print(f"\nPackages to remove ({len(removals)}): {' '.join(removals)}")
+
+    if unattended:
+        if removals:
+            print("Error: Not upgrading: the upgrade removes packages. Run hd-up by hand.",
+                  file=sys.stderr)
+            return 1
+    else:
+        try:
+            answer = input("\nProceed with Snapshot and Upgrade? (y/N): ")
+        except EOFError:
+            answer = ""
+        if not answer.lower().startswith("y"):
+            print("Upgrade cancelled by user.")
+            return 0
+
+    # The packages are downloaded before the snapshot, so a download that fails leaves no
+    # snapshot behind and the snapshot is as close to the upgrade as can be.
+    print("\n--- 3. Downloading Packages ---")
+    run(apt, *options, "full-upgrade", "--download-only", "-y")
+
+    snapshot = f"{DATASET}@{PREFIX}{datetime.datetime.now():%Y-%m-%d_%H%M%S}"
+    mode = "unattended" if unattended else "manual"
+    print("\n--- 4. Creating ZFS Snapshot ---")
+    if run("zfs", "snapshot", "-o", f"{PROPERTY}={mode}", snapshot, check=False).returncode != 0:
+        print("Error: Could not create snapshot. Upgrade cancelled.", file=sys.stderr)
+        return 1
     print(f"Snapshot created: {snapshot}")
 
     # full-upgrade, so packages that need new or removed dependencies are not held back.
-    print("\n--- 4. Executing Upgrade ---", flush=True)
-    sys.exit(run("apt", "full-upgrade", "-y", check=False).returncode)
+    print("\n--- 5. Executing Upgrade ---")
+    status = run(apt, *options, "full-upgrade", "-y", check=False).returncode
+    if status != 0:
+        print(f"Error: The upgrade failed. Undo it with: zfs rollback {snapshot}",
+              file=sys.stderr)
+        return status
+
+    print("\n--- 6. Removing Old Snapshots ---")
+    prune()
+    check_reboot()
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Upgrade the system with apt, after a ZFS snapshot of {DATASET}.")
+    parser.add_argument("--unattended", action="store_true",
+                        help="upgrade without asking, after checking the system; for "
+                             "hd-up.service")
+    args = parser.parse_args()
+
+    if os.geteuid() != 0:
+        os.execvp("sudo", ["sudo", sys.executable, os.path.abspath(__file__), *sys.argv[1:]])
+
+    # The output goes to the journal in an unattended run, between that of apt.
+    sys.stdout.reconfigure(line_buffering=True)
+    if args.unattended:
+        os.environ["DEBIAN_FRONTEND"] = "noninteractive"
+    lock()
+    sys.exit(upgrade(args.unattended))
 
 
 if __name__ == "__main__":

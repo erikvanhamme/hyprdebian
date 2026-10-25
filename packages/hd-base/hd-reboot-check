@@ -1,0 +1,126 @@
+#!/usr/bin/python3
+"""Tells whether the system needs a reboot to run what was installed.
+
+The package hd-base installs this as /usr/bin/hd-reboot-check. hd-up runs it after an upgrade,
+the kernel hook /etc/kernel/postinst.d/zz-hd-reboot-check after a kernel is installed, the
+message after a login, hd-report and the notification of hd-desktop to show why.
+
+    hd-reboot-check          print why a reboot is needed, one reason per line, or nothing
+    hd-reboot-check --write  also write /run/reboot-required when one is, as root
+
+A reboot is needed when the newest kernel in /boot is not the one running, or the ZFS module for
+the running kernel is not the one loaded, as after an upgrade of zfs-dkms. /run/reboot-required
+is where Debian packages ask for a reboot; /run/reboot-required.pkgs names the packages, one per
+line. Both are in /run, so they are gone after the reboot. When a package wrote them and neither
+check finds a reason, that request is the reason.
+"""
+
+import argparse
+import glob
+import os
+import re
+import subprocess
+import sys
+
+BOOT = "/boot"
+ZFS_LOADED = "/sys/module/zfs/version"
+# In /usr/sbin, which is not in the PATH of the users.
+MODINFO = "/usr/sbin/modinfo"
+MARKER = "/run/reboot-required"
+MARKER_PKGS = MARKER + ".pkgs"
+
+
+def version_key(version):
+    return [int(part) if part.isdigit() else part for part in re.split(r"[.+~-]", version)]
+
+
+def newest_kernel(boot=BOOT):
+    """Returns the newest kernel in /boot, or None when there is none."""
+    versions = [os.path.basename(name)[len("vmlinuz-"):]
+                for name in glob.glob(os.path.join(boot, "vmlinuz-*"))]
+    if not versions:
+        return None
+    return max(versions, key=version_key)
+
+
+def read_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def zfs_installed():
+    """Returns the version of the ZFS module for the running kernel, or None."""
+    try:
+        result = subprocess.run([MODINFO, "-F", "version", "zfs"], capture_output=True,
+                                text=True)
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def reasons(running, newest, loaded, installed):
+    """Returns the reasons for a reboot, as (package, text): a kernel that is newer than the one
+    running, and a ZFS module that is not the one loaded."""
+    found = []
+    if newest is not None and newest != running:
+        found.append((f"linux-image-{newest}", f"new kernel {newest}"))
+    if loaded is not None and installed is not None and loaded != installed:
+        found.append(("zfs-dkms", f"new ZFS module {installed}"))
+    return found
+
+
+def requested(pkgs_text):
+    """Returns the reason for a reboot that packages asked for in /run/reboot-required."""
+    packages = []
+    for line in (pkgs_text or "").splitlines():
+        if line.strip() and line.strip() not in packages:
+            packages.append(line.strip())
+    if packages:
+        return f"requested by {', '.join(packages)}"
+    return "requested by a package"
+
+
+def write_marker(found):
+    """Writes /run/reboot-required, and adds the packages that are not in its .pkgs yet."""
+    if not os.path.exists(MARKER):
+        with open(MARKER, "w", encoding="utf-8") as f:
+            f.write("*** System restart required ***\n")
+    listed = (read_file(MARKER_PKGS) or "").splitlines()
+    with open(MARKER_PKGS, "a", encoding="utf-8") as f:
+        for package, _ in found:
+            if package not in listed:
+                f.write(package + "\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Print why the system needs a reboot, one reason per line, or nothing.")
+    parser.add_argument("--write", action="store_true",
+                        help=f"also write {MARKER} when a reboot is needed, as root")
+    args = parser.parse_args()
+
+    loaded = read_file(ZFS_LOADED)
+    if loaded is not None:
+        loaded = loaded.strip()
+    found = reasons(os.uname().release, newest_kernel(), loaded, zfs_installed())
+
+    if found:
+        if args.write:
+            write_marker(found)
+        for _, text in found:
+            print(text)
+    elif os.path.exists(MARKER):
+        print(requested(read_file(MARKER_PKGS)))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except OSError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)

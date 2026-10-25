@@ -8,8 +8,10 @@
 # that hd-plymouth-render wrote in /var/lib/hd-plymouth, and the key hd-theme from
 # /etc/hyprdebian/config.json. The themes that were added stay in /etc/hyprdebian/themes, and the
 # themes of the users, the theme files and the caches of the launcher of the users stay in the
-# home directories. It also finishes the removal of the conffiles that hd-desktop no longer has,
-# as the preinst and the postinst. Written for sh, as python3 may be gone by then.
+# home directories. A removal masks the user unit hd-reboot-notify.path, whose unit file is gone,
+# so that it keeps its enabled state for a reinstall; a purge forgets that state. It also finishes
+# the removal of the conffiles that hd-desktop no longer has, as the preinst and the postinst.
+# Written for sh, as python3 may be gone by then.
 set -e
 
 # Keep these the same as in the preinst and the postinst.
@@ -30,6 +32,7 @@ PLYMOUTH_STATE=/var/lib/hd-plymouth
 DCONF_DB=/etc/dconf/db/local
 DCONF_SOURCE=/etc/dconf/db/local.d
 LAUNCHER_CACHE=/var/cache/hd-launcher
+USER_UNITS="hd-reboot-notify.path"
 
 if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; then
     if [ "$(dpkg-divert --listpackage "$GREETD_CONFIG")" = "hd-desktop" ]; then
@@ -48,8 +51,21 @@ if [ "$1" = "remove" ] || [ "$1" = "abort-install" ] || [ "$1" = "disappear" ]; 
     fi
 fi
 
+if [ "$1" = "remove" ] && [ -x /usr/bin/deb-systemd-helper ]; then
+    for unit in $USER_UNITS; do
+        deb-systemd-helper --user mask "$unit" > /dev/null || true
+    done
+fi
+
 if [ "$1" != "purge" ]; then
     exit 0
+fi
+
+if [ -x /usr/bin/deb-systemd-helper ]; then
+    for unit in $USER_UNITS; do
+        deb-systemd-helper --user purge "$unit" > /dev/null || true
+        deb-systemd-helper --user unmask "$unit" > /dev/null || true
+    done
 fi
 
 if [ -z "$(ls -A "$DCONF_SOURCE" 2> /dev/null)" ]; then

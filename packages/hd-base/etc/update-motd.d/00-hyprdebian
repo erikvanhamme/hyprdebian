@@ -162,10 +162,22 @@ show_units() {
     fi
 }
 
+# A line when a reboot is needed, with the reasons of hd-reboot-check.
+show_reboot() {
+    local reasons=()
+
+    mapfile -t reasons < <(hd-reboot-check 2>/dev/null)
+
+    if (( ${#reasons[@]} > 0 )); then
+        line "Reboot" "${BAD}needed:${RESET} $(IFS=';'; echo "${reasons[*]}" | sed 's/;/; /g')"
+    fi
+}
+
 show_logo
 show_version
 show_system
 show_pools
 show_arrays
 show_units
+show_reboot
 echo

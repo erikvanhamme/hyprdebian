@@ -93,7 +93,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | Pools | `zpool list`, and the last completed scrub from the scan line of `zpool status`: the bytes it repaired, the errors it found and when it ended. A scrub that is running, paused or was canceled, and a resilver, leave it out. |
 | Arrays | The mdadm arrays in `/sys/block`, named as in `/dev/md`. |
 | Units | `systemctl is-system-running` and the failed units. |
-| Updates | The packages `apt full-upgrade` would upgrade, from the package lists apt has now (`hd-report` does not run `apt update`), when the lists were updated, the last upgrade in the apt history, and `/run/reboot-required`. |
+| Updates | The packages `apt full-upgrade` would upgrade, from the package lists apt has now (`hd-report` does not run `apt update`), when the lists were updated, the last upgrade in the apt history, and whether a reboot is pending, as `hd-reboot-check` of hd-base finds it: a newer kernel, a new ZFS module, or `/run/reboot-required`. |
 | Snapshot | The newest `hd-up-` snapshot of `rpool/hyprdebian`, see `hd-up` in [hd-base](hd-base.md). |
 | Timers | The enabled timers in `/etc/systemd/system`, those of the admin, and the `hd-*` timers of the packages in `/usr/lib/systemd/system`, with the last and next run and the result of their service. `hd-report.timer` itself is left out. |
 

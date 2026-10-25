@@ -149,6 +149,28 @@ may do so without a password, by
 .TP
 .BR hd-volume-up ,\  hd-volume-down ,\  hd-volume-mute
 Change the volume of the default output and show it in a notification.
+.SS Pending reboot
+The user unit
+.B hd-reboot-notify.path
+starts
+.B hd-reboot-notify.service
+in the desktop session when
+.I /run/reboot-required
+exists: when an upgrade writes it, and at every login until the reboot. It
+runs
+.IR /usr/libexec/hd-desktop/hd-reboot-notify ,
+which shows a notification with the reasons of
+.BR hd-reboot-check (1);
+clicking it runs
+.BR hd-ask-reboot .
+It shows once per session. The postinst enables the unit for every user on
+its first installation; to switch it off for a user:
+.PP
+.RS
+.nf
+systemctl \-\-user disable \-\-now hd\-reboot\-notify.path
+.fi
+.RE
 .PP
 The menus above and the application launcher use
 .BR hd-menu (1),

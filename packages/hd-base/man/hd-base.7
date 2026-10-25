@@ -49,7 +49,10 @@ which checks that Secure Boot is on.
 .PP
 It installs
 .BR hd-up (1),
-which upgrades the system after a ZFS snapshot,
+which upgrades the system after a ZFS snapshot, by hand and every week with
+.BR hd-up.timer ,
+.BR hd-reboot-check (1),
+which tells whether a reboot is needed, as after a new kernel,
 .BR hd-reboot (1)
 and
 .BR hd-poweroff (1),
@@ -155,6 +158,16 @@ at the default,
 only a pool that is only on NVMe disks is trimmed.
 The timers are enabled on the first installation.
 .TP
+.I /usr/lib/systemd/system/hd\-up.timer
+Runs
+.B hd-up \-\-unattended
+with
+.B hd-up.service
+every Tuesday at 04:30, or after the next boot when the system was off then,
+except on battery power; see
+.BR hd-up (1).
+The timer is enabled on its first installation.
+.TP
 .I /usr/lib/systemd/system/getty@.service.d/numlock.conf
 Turns Num Lock on for a console before its login prompt shows, with
 .BR setleds (1).
@@ -164,8 +177,18 @@ Shows the HyprDebian banner after a login on the console or over ssh, with
 the version of HyprDebian from
 .IR /etc/hyprdebian/version.json ,
 the suite and the Debian version, the kernel, the uptime, the load, the
-memory, the health of the ZFS pools and the RAID arrays, and the failed
-units.
+memory, the health of the ZFS pools and the RAID arrays, the failed
+units, and why a reboot is needed, as
+.BR hd-reboot-check (1)
+finds it.
+.TP
+.I /etc/kernel/postinst.d/zz\-hd\-reboot\-check
+Runs
+.B hd-reboot-check \-\-write
+after a kernel is installed, so
+.I /run/reboot-required
+says that a reboot is due also when the kernel did not come with
+.BR hd-up (1).
 .TP
 .I /usr/lib/systemd/zram\-generator.conf.d/hyprdebian.conf
 A swap in compressed RAM,
@@ -402,6 +425,9 @@ on a system that mounts NFS shares.
 .I /usr/bin/hd-up
 Upgrades the system after a ZFS snapshot.
 .TP
+.I /usr/bin/hd-reboot-check
+Tells whether a reboot is needed.
+.TP
 .I /usr/bin/hd-reboot
 .TQ
 .I /usr/bin/hd-poweroff
@@ -482,8 +508,18 @@ The files dpkg leaves out, a conffile.
 .I /usr/lib/systemd/system/hd\-zfs\-trim.timer
 The monthly scrub and trim of the ZFS pools, with their services.
 .TP
+.I /usr/lib/systemd/system/hd\-up.timer
+.TQ
+.I /usr/lib/systemd/system/hd\-up.service
+The weekly unattended upgrade.
+.TP
 .I /etc/update\-motd.d/00\-hyprdebian
 The banner after a login, a conffile.
+.TP
+.I /etc/kernel/postinst.d/zz\-hd\-reboot\-check
+Writes
+.I /run/reboot-required
+after a kernel is installed, a conffile.
 .TP
 .I /usr/lib/systemd/system/getty@.service.d/numlock.conf
 Num Lock on the console.
@@ -503,6 +539,7 @@ The config of systemd-resolved.
 Name the network interfaces by their path.
 .SH SEE ALSO
 .BR hd-up (1),
+.BR hd-reboot-check (1),
 .BR hd-reboot (1),
 .BR hd-sync-skel (1),
 .BR hd-issue (8),

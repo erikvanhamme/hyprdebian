@@ -29,7 +29,10 @@ Description: HyprDebian base system
  system small: dpkg leaves out the documentation but the copyright files,
  the translations and the man pages in other languages than English, and apt
  installs no recommends and downloads no translations of the package
- descriptions. Monthly timers scrub and trim the ZFS pools.
+ descriptions. Monthly timers scrub and trim the ZFS pools, and a weekly
+ timer upgrades the system with hd-up. hd-reboot-check tells whether a
+ reboot is needed, as after a new kernel; the message after a login shows
+ it.
  .
  It also installs hd-firmware, which finds and installs the firmware packages
  that the hardware needs, hd-up, which upgrades the system after a ZFS snapshot,

@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+"""Shows a notification that the system needs a reboot, with the reasons of hd-reboot-check.
+Clicking it asks whether to reboot, with hd-ask-reboot.
+
+The package hd-desktop installs this as /usr/libexec/hd-desktop/hd-reboot-notify, and
+hd-reboot-notify.service runs it in the desktop session when /run/reboot-required exists. mako
+may not be running yet at the start of the session, so the notification is tried again for a
+while.
+"""
+
+import argparse
+import subprocess
+import sys
+import time
+
+ICON = "/usr/share/hd-desktop/icons/warning.svg"
+TRIES = 10
+WAIT = 3
+
+
+def reasons():
+    result = subprocess.run(["hd-reboot-check"], capture_output=True, text=True)
+    return result.stdout.splitlines()
+
+
+def notify(found):
+    """Shows the notification, and returns the action that was chosen, or None."""
+    # The hint comes first: mako cuts off a body that is too long.
+    body = "Click to reboot.\n" + "\n".join(found)
+    for _ in range(TRIES):
+        result = subprocess.run(["notify-send", "--app-name=HyprDebian", f"--icon={ICON}",
+                                 "--urgency=critical", "--action=default=Reboot",
+                                 "Reboot needed", body], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+        time.sleep(WAIT)
+    print(f"Could not show the notification: {result.stderr.strip()}", file=sys.stderr)
+    return None
+
+
+def main():
+    argparse.ArgumentParser(
+        description="Show a notification that the system needs a reboot.").parse_args()
+
+    found = reasons()
+    if not found:
+        return
+    if notify(found) == "default":
+        subprocess.run(["/usr/bin/hd-ask-reboot"])
+
+
+if __name__ == "__main__":
+    main()

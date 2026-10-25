@@ -4,7 +4,9 @@ HyprDebian in its place with hd-desktop-render, diverts /etc/plymouth/plymouthd.
 and puts the config of the boot splash in its place, compiles the dconf database of the dark theme,
 renders the cards of the themes and selects the theme default when no theme is selected yet,
 renders the boot splash in the theme of the system with hd-plymouth-render, copies /etc/skel to the home directory of the user, and writes the menu of the application launcher
-with hd-launcher-cache. It also finishes the removal of the conffiles that hd-desktop no longer has.
+with hd-launcher-cache. It enables the user unit hd-reboot-notify.path, which shows a notification
+in the desktop session when a reboot is needed. It also finishes the removal of the conffiles that
+hd-desktop no longer has.
 
 greetd ships /etc/greetd/config.toml as a conffile. It is diverted to /etc/greetd/config.toml.greetd,
 so dpkg keeps the one of greetd there, and hd-desktop-render writes the file that greetd reads,
@@ -50,6 +52,10 @@ Versions before DROPPED_SINCE also depended on the packages in DROPPED, which ar
 installed automatically and left for apt autoremove. An upgrade from such a version names them and
 says to mark the ones that are still used as installed by hand first, such as git. The postinst
 runs inside apt, which holds the lock, so it cannot do that itself.
+
+hd-reboot-notify.path gets the steps that debhelper adds for a user unit: it is enabled for every
+user on its first installation, by its preset, and keeps the state that the admin gave it over
+upgrades. It starts at the next login. The unmask undoes the mask of a removal, see the postrm.
 
 The conffiles in OBSOLETE_CONFFILES are removed with dpkg-maintscript-helper rm_conffile, which the
 preinst, the postinst and the postrm all run with their arguments. dpkg cannot remove their
@@ -99,6 +105,9 @@ SKEL_SINCE = "0.3"
 # their paths in /etc/skel.
 TOOLKITS_SINCE = "1.28~"
 TOOLKITS_SKEL = [".config/qt5ct", ".config/qt6ct", ".config/hypr/hyprtoolkit.conf"]
+
+# The user units of hd-desktop.
+USER_UNITS = ["hd-reboot-notify.path"]
 
 
 def divert(path, diverted):
@@ -167,6 +176,18 @@ def remove_obsolete_dirs():
             os.rmdir(directory)
 
 
+def enable_user_units():
+    for unit in USER_UNITS:
+        subprocess.run(["deb-systemd-helper", "--user", "unmask", unit], stdout=subprocess.DEVNULL)
+        if subprocess.run(["deb-systemd-helper", "--user", "--quiet", "was-enabled",
+                           unit]).returncode == 0:
+            subprocess.run(["deb-systemd-helper", "--user", "enable", unit],
+                           stdout=subprocess.DEVNULL)
+        else:
+            subprocess.run(["deb-systemd-helper", "--user", "update-state", unit],
+                           stdout=subprocess.DEVNULL)
+
+
 def main():
     remove_obsolete_conffiles()
 
@@ -208,6 +229,7 @@ def main():
               "git.")
     if subprocess.run(["/usr/bin/hd-launcher-cache", "--update-all"]).returncode != 0:
         print("Could not write the menu of the launcher.", file=sys.stderr)
+    enable_user_units()
     if not os.path.isdir("/run/systemd/system"):
         return
     subprocess.run(["systemctl", "daemon-reload"], check=True)

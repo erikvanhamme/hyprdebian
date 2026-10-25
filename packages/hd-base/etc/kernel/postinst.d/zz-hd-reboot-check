@@ -1,0 +1,11 @@
+#!/bin/sh
+# Writes /run/reboot-required after a kernel is installed, with hd-reboot-check, so the login
+# message, hd-report and the desktop say that a reboot is due also when the kernel did not come
+# with hd-up. Not in a chroot, such as that of the installer, whose kernel is not the one that
+# runs. A check that fails does not fail the kernel. Installed by hd-base.
+
+if systemd-detect-virt --quiet --chroot; then
+    exit 0
+fi
+
+/usr/bin/hd-reboot-check --write > /dev/null || true

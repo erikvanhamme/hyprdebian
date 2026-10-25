@@ -1,0 +1,17 @@
+# Upgrades the system with hd-up --unattended, after a ZFS snapshot of the root. It skips the
+# upgrade on battery power, and hd-up skips it when the pool is not healthy, dpkg has packages
+# that are not fully installed, or the upgrade removes packages. Installed by hd-base.
+[Unit]
+Description=Upgrade the System After a ZFS Snapshot
+Documentation=man:hd-up(1)
+Wants=network-online.target
+After=network-online.target
+ConditionACPower=true
+
+# Runs as root: hd-up takes the snapshot and runs apt. No time limit: an upgrade with a new
+# kernel builds the ZFS module with DKMS.
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/hd-up --unattended
+Nice=10
+TimeoutStartSec=infinity

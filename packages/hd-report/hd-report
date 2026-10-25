@@ -271,6 +271,16 @@ def count_upgradable():
     return sum(1 for line in output.splitlines() if line.startswith("Inst "))
 
 
+def reboot_required():
+    """True when hd-reboot-check of hd-base gives a reason for a reboot: a newer kernel, a new ZFS
+    module, or /run/reboot-required."""
+    output = run("hd-reboot-check")
+    if output is None:
+        return os.path.exists("/run/reboot-required")
+
+    return output.strip() != ""
+
+
 def lists_time(path=APT_LISTS):
     """Returns when apt last updated its package lists."""
     newest = None
@@ -441,7 +451,7 @@ def collect():
             "upgradable": count_upgradable(),
             "lists_time": lists_time(),
             "last_upgrade": last_upgrade(history),
-            "reboot_required": os.path.exists("/run/reboot-required"),
+            "reboot_required": reboot_required(),
         },
         "snapshot": parse_snapshots(snapshots),
         "timers": collect_timers(),

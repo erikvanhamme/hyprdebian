@@ -1,6 +1,7 @@
 #!/bin/sh
-# prerm of hd-base: stops the timers that scrub and trim the ZFS pools, and a scrub or trim that is
-# being started, when the package is removed.
+# prerm of hd-base: stops the timers that scrub and trim the ZFS pools and upgrade the system, and
+# a scrub or trim that is being started, when the package is removed. hd-up.service is left
+# running: the removal may be part of the upgrade it runs.
 set -e
 
 if [ "$1" != "remove" ]; then
@@ -8,6 +9,6 @@ if [ "$1" != "remove" ]; then
 fi
 
 if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
-    deb-systemd-invoke stop hd-zfs-scrub.timer hd-zfs-trim.timer hd-zfs-scrub.service \
-        hd-zfs-trim.service > /dev/null || true
+    deb-systemd-invoke stop hd-zfs-scrub.timer hd-zfs-trim.timer hd-up.timer \
+        hd-zfs-scrub.service hd-zfs-trim.service > /dev/null || true
 fi

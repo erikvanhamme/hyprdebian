@@ -3,6 +3,7 @@
 hd-up \- upgrade the system after a ZFS snapshot
 .SH SYNOPSIS
 .B hd-up
+.RB [ \-\-unattended ]
 .SH DESCRIPTION
 .B hd-up
 upgrades the system with
@@ -13,32 +14,128 @@ undone with
 .IP 1. 4
 It updates the package lists.
 .IP 2. 4
-It shows the packages that can be upgraded, and stops when there are none.
+It shows the packages that can be upgraded and those that the upgrade
+removes, and stops when there are none.
 .IP 3. 4
 It asks whether to go on; anything but
 .B y
 stops it.
 .IP 4. 4
+It downloads the packages, so a download that fails leaves no snapshot
+behind.
+.IP 5. 4
 It takes the snapshot
 .BI rpool/hyprdebian@hd-up- date _ time\fR,
 such as
 .BR rpool/hyprdebian@hd-up-2026-10-17_143000 ,
 and stops when that fails.
-.IP 5. 4
+The snapshot has the property
+.BR org.hyprdebian:hd-up ,
+.B manual
+or
+.BR unattended .
+.IP 6. 4
 It runs
 .BR "apt full-upgrade" ,
 so upgrades that need new packages or remove old ones are not held back.
+.IP 7. 4
+After an upgrade that succeeded, it destroys the oldest
+.B hd-up-
+snapshots, so only the newest are kept; 8, unless the configuration says
+otherwise, see
+.BR CONFIGURATION .
+Other snapshots, such as
+.BR @install ,
+are left alone.
+.IP 8. 4
+It runs
+.BR "hd-reboot-check \-\-write" ,
+which writes
+.I /run/reboot-required
+when the new kernel or ZFS module needs a reboot, and says why; also when
+everything was current.
 .PP
 Run it as a user who may use
 .BR sudo (8),
-or as root.
+or as root; as a user it runs itself again with
+.BR sudo .
+Only one
+.B hd-up
+runs at a time.
+.SS Unattended upgrades
+.B hd-up.timer
+runs
+.B hd-up.service
+every Tuesday at 04:30, or after the next boot when the system was off
+then. The service runs
+.BR "hd-up \-\-unattended" ,
+which does not ask, keeps the configuration files that were changed, and
+upgrades nothing when:
+.IP \(bu 4
+the system runs on battery power;
+.IP \(bu 4
+the pool
+.B rpool
+is not
+.BR ONLINE ,
+such as with a missing drive;
+.IP \(bu 4
+.B dpkg \-\-audit
+shows packages that are not fully installed;
+.IP \(bu 4
+the upgrade removes packages. Run
+.B hd-up
+by hand for such an upgrade, which shows the packages first.
+.PP
+In all but the first case the service fails, so the failed unit shows
+after a login and on the dashboard. It never reboots: a new kernel takes
+effect at the next reboot. Until then the message after a login, the
+dashboard and a notification on the desktop say that a reboot is due, see
+.BR hd-reboot-check (1).
+.PP
+Show the last run, or switch the weekly upgrades off and on:
+.PP
+.RS
+.nf
+journalctl \-u hd\-up
+sudo systemctl disable \-\-now hd\-up.timer
+sudo systemctl enable \-\-now hd\-up.timer
+.fi
+.RE
+.PP
+Run
+.B sudo systemctl edit hd\-up.timer
+to upgrade at another time.
 .SH OPTIONS
+.TP
+.B \-\-unattended
+Upgrade without asking, after checking the system, as described above.
 .TP
 .BR \-h ", " \-\-help
 Show a short help and exit.
+.SH CONFIGURATION
+The key
+.B hd-up
+in
+.I /etc/hyprdebian/config.json
+holds the settings, set with
+.BR hd-config-update (1):
+.TP
+.B keep
+The number of
+.B hd-up-
+snapshots to keep, 1 or more; 8 without it.
+.PP
+.RS
+.nf
+sudo hd\-config\-update hd\-up '{"keep": 12}'
+.fi
+.RE
 .SH EXIT STATUS
-0 when the system is up to date or the upgrade was cancelled, otherwise the
-exit status of the command that failed.
+0 when the system is up to date, was upgraded, or the upgrade was
+cancelled, 1 when an unattended upgrade was not started or another
+.B hd-up
+is running, otherwise the exit status of the command that failed.
 .SH EXAMPLES
 Undo the last upgrade, after a reboot into a system that still works, or
 from a live system:
@@ -49,8 +146,21 @@ zfs list \-t snapshot rpool/hyprdebian
 zfs rollback rpool/hyprdebian@hd\-up\-2026\-10\-17_143000
 .fi
 .RE
+.SH FILES
+.TP
+.I /usr/lib/systemd/system/hd\-up.timer
+.TQ
+.I /usr/lib/systemd/system/hd\-up.service
+The weekly unattended upgrade.
+.TP
+.I /run/hd\-up.lock
+The lock that keeps a second
+.B hd-up
+from running.
 .SH SEE ALSO
 .BR hd-base (7),
+.BR hd-config-update (1),
+.BR hd-reboot-check (1),
 .BR apt (8),
 .BR zfs-rollback (8)
 .SH AUTHOR

@@ -49,7 +49,8 @@ Description: HyprDebian desktop
  commands that the key bindings run: the reboot and power off questions, the
  monitor mode menu, the mount menus and the volume keys. The users in the
  group sudo mount and unmount drives from the mount menus without a
- password.
+ password. A notification in the desktop session says when a reboot is
+ needed, as after a new kernel; clicking it asks whether to reboot.
  .
  It holds the parts of the desktop:
   - the Emerald wallpaper of Debian 12, in /usr/share/backgrounds/hyprdebian;

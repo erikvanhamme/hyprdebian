@@ -1,0 +1,14 @@
+# Starts hd-reboot-notify.service in the desktop session when /run/reboot-required exists: when an
+# upgrade writes it, and at the login while the reboot is still due. Installed by hd-desktop.
+[Unit]
+Description=Watch for a Pending Reboot
+Documentation=man:hd-desktop(7) man:hd-reboot-check(1)
+DefaultDependencies=no
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Path]
+PathExists=/run/reboot-required
+
+[Install]
+WantedBy=graphical-session.target

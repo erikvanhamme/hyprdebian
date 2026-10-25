@@ -3,7 +3,7 @@
 the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, writes
 the login banner in /etc/issue, generates the Secure Boot keys, removes the files that dpkg leaves
 out on HyprDebian from the packages installed before, and enables the timers that scrub and trim
-the ZFS pools.
+the ZFS pools and upgrade the system every week.
 
 The units are masked on the first installation only, or on an upgrade from a version before
 MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
@@ -50,7 +50,7 @@ from a version before EXCLUDES_SINCE, which did not have it, the postinst remove
 the packages that are installed, with the rules of that file: the last rule that matches a path
 decides, as for dpkg. Directories that are left empty go too.
 
-hd-zfs-scrub.timer and hd-zfs-trim.timer get the steps that debhelper adds for a timer: they are
+hd-zfs-scrub.timer, hd-zfs-trim.timer and hd-up.timer get the steps that debhelper adds for a timer: they are
 enabled on the first installation, by their preset, and keep the enabled state that the admin gave
 them over upgrades. The unmask undoes the mask of a removal, see the postrm.
 
@@ -117,7 +117,7 @@ EXCLUDES_SINCE = "1.26"
 DPKG_INFO = "/var/lib/dpkg/info"
 
 # The timers of hd-base.
-TIMERS = ["hd-zfs-scrub.timer", "hd-zfs-trim.timer"]
+TIMERS = ["hd-zfs-scrub.timer", "hd-zfs-trim.timer", "hd-up.timer"]
 
 RESOLV_CONF = "/etc/resolv.conf"
 STUB_LINKS = ["../run/systemd/resolve/stub-resolv.conf", "/run/systemd/resolve/stub-resolv.conf"]

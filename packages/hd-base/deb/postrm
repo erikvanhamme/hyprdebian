@@ -7,7 +7,7 @@ set -e
 
 UNAME=/etc/update-motd.d/10-uname
 ISSUE=/etc/issue
-TIMERS="hd-zfs-scrub.timer hd-zfs-trim.timer"
+TIMERS="hd-zfs-scrub.timer hd-zfs-trim.timer hd-up.timer"
 
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     if [ -d /run/systemd/system ]; then

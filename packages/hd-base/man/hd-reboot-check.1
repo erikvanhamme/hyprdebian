@@ -1,0 +1,67 @@
+.TH HD-REBOOT-CHECK 1 "October 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-reboot-check \- tell whether the system needs a reboot
+.SH SYNOPSIS
+.B hd-reboot-check
+.RB [ \-\-write ]
+.SH DESCRIPTION
+.B hd-reboot-check
+prints why the system needs a reboot to run what was installed, one reason
+per line, or nothing when it does not:
+.IP \(bu 4
+the newest kernel in
+.I /boot
+is not the one running;
+.IP \(bu 4
+the ZFS module for the running kernel is not the one loaded, as after an
+upgrade of
+.BR zfs-dkms .
+.PP
+When neither is the case but
+.I /run/reboot-required
+exists, where Debian packages ask for a reboot, the packages in
+.I /run/reboot-required.pkgs
+that asked are the reason.
+.PP
+.BR hd-up (1)
+runs it with
+.B \-\-write
+after an upgrade, and so does the kernel hook
+.I /etc/kernel/postinst.d/zz\-hd\-reboot\-check
+after a kernel is installed. The message after a login shows the reasons,
+.BR hd-report (8)
+sends whether a reboot is due to the dashboard, and hd-desktop shows a
+notification in the desktop session. The system is never rebooted on its
+own. The files are in
+.IR /run ,
+so they are gone after the reboot.
+.SH OPTIONS
+.TP
+.B \-\-write
+When a reboot is needed, also write
+.I /run/reboot-required
+and add the packages that are not in
+.I /run/reboot-required.pkgs
+yet. Needs root.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0, also when a reboot is needed; 1 when a file cannot be written.
+.SH FILES
+.TP
+.I /run/reboot-required
+.TQ
+.I /run/reboot-required.pkgs
+A reboot is due, and the packages that need it.
+.TP
+.I /etc/kernel/postinst.d/zz\-hd\-reboot\-check
+Runs
+.B hd-reboot-check \-\-write
+after a kernel is installed, outside a chroot, a conffile.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR hd-up (1),
+.BR hd-reboot (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>
