@@ -16,9 +16,16 @@
 #   hd-kernel_<version>_amd64.deb                 depends on both, see deb/hd-kernel/control
 #
 # The release is <x.y.z>+debNN-hd<id>-amd64: debNN as in the release of the kernel of Debian, and
-# <id> six hex digits of the sha256 of the versions of linux, zfs-linux and hd-kernel. Every build
-# signs the modules with a key of its own, so a build of other versions also gets another release:
-# it installs next to the kernel that runs, whose modules stay signed with the key it trusts.
+# <id> six hex digits of a sha256 of everything the packages are made of: the versions of linux,
+# zfs-linux and hd-kernel, this script and the files in deb/ and man/, and in the mode test the
+# modules in /lsmod. Every build signs the modules with a key of its own, so a build of anything
+# else also gets another release: it installs next to the kernel that runs, whose modules stay
+# signed with the key it trusts.
+#
+# A build only builds when it has to. When /out already has the three packages of the release, it
+# stops there: they only get there at the end of a build that went through. A make clean removes
+# them, and with them the reason to skip. Otherwise, when /cache has them, it copies them from
+# there. Only then does it build, and first removes the packages of other releases from /out.
 #
 # ZFS is not copied into the kernel tree: with copy-builtin, the configure of ZFS takes it to be
 # built into the kernel and skips its checks for the symbols that only GPL modules may use, so a
@@ -37,7 +44,8 @@
 #   /src    the package directory, read-only: the control files and maintainer scripts in deb/
 #   /work   the source packages and the trees, kept for the next build of the same versions, and
 #           the ccache of the compiler
-#   /out    the packages
+#   /out    the packages, kept for the next build, which skips the build when they are those of
+#           its release
 #   /cache  only with HD_KERNEL_CACHE in the Makefile: the packages of earlier builds, one
 #           directory per release; a build of a release that is there copies its packages instead
 #   /lsmod  only in the mode test: the modules, as lsmod prints them
@@ -99,7 +107,13 @@ if [[ -z "${DEBIAN_RELEASE}" ]]; then
   exit 1
 fi
 DEBNN="$(grep -oE '\+deb[0-9]+' <<< "${DEBIAN_RELEASE}")"
-ID="$(printf '%s %s %s' "${KERNEL_VERSION}" "${ZFS_VERSION}" "${HD_VERSION}" | sha256sum | cut -c1-6)"
+# The sums of the files the packages are made of, by their path in /src.
+inputs="$(cd /src && find build-kernel.sh deb man -type f | LC_ALL=C sort | xargs sha256sum)"
+if [[ "${MODE}" == "test" ]]; then
+  inputs="${inputs}"$'\n'"$(sha256sum /lsmod)"
+fi
+ID="$(printf '%s %s %s\n%s\n' "${KERNEL_VERSION}" "${ZFS_VERSION}" "${HD_VERSION}" "${inputs}" \
+  | sha256sum | cut -c1-6)"
 if [[ "${MODE}" == "test" ]]; then
   ID="test${ID}"
 fi
@@ -111,12 +125,37 @@ ZFS_DEB_VERSION="${ZFS_VERSION}+hd${HD_VERSION}"
 META_DEB_VERSION="${KERNEL_VERSION}+hd${HD_VERSION}+zfs${ZFS_VERSION//-/.}"
 KERNEL_DIR="/work/src/linux-${UPSTREAM}"
 ZFS_DIR="/work/src/zfs-linux-${ZFS_UPSTREAM}"
+PACKAGES=(
+  "linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
+  "zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
+  "hd-kernel_${META_DEB_VERSION}_amd64.deb"
+)
 
 echo "--> ${SUITE}: linux ${KERNEL_VERSION}, zfs-linux ${ZFS_VERSION}, release ${RELEASE}"
 
-if [[ -d /cache && -f "/cache/${SUITE}/${RELEASE}/complete" ]]; then
+# True when the directory $1 has the three packages of the release.
+has_packages() {
+  local package
+  for package in "${PACKAGES[@]}"; do
+    if [[ ! -f "$1/${package}" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+if has_packages /out; then
+  echo "--> The packages of ${RELEASE} are built already."
+  exit 0
+fi
+
+rm -f /out/*.deb
+
+if [[ -d /cache ]] && has_packages "/cache/${SUITE}/${RELEASE}"; then
   echo "--> Copying the packages of ${RELEASE} from the cache..."
-  install -m 0644 "/cache/${SUITE}/${RELEASE}"/*.deb /out/
+  for package in "${PACKAGES[@]}"; do
+    install -m 0644 "/cache/${SUITE}/${RELEASE}/${package}" /out/
+  done
   exit 0
 fi
 
@@ -274,14 +313,18 @@ fill /src/deb/hd-kernel/control "${stage}/DEBIAN/control" "${stage}"
 meta_deb="/work/src/hd-kernel_${META_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${meta_deb}"
 
+# The packages go to /out last, so a build that stops halfway leaves none there.
 echo "--> Copying the packages to /out..."
 install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" /out/
 
+# Into a directory of another name first, so the cache never has a release with only some of its
+# packages.
 if [[ -d /cache ]]; then
   echo "--> Storing the packages of ${RELEASE} in the cache..."
+  rm -rf "/cache/${SUITE}.new"
+  install -d "/cache/${SUITE}.new/${RELEASE}"
+  install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" "/cache/${SUITE}.new/${RELEASE}/"
   rm -rf "/cache/${SUITE}"
-  install -d "/cache/${SUITE}/${RELEASE}"
-  install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" "/cache/${SUITE}/${RELEASE}/"
-  touch "/cache/${SUITE}/${RELEASE}/complete"
+  mv "/cache/${SUITE}.new" "/cache/${SUITE}"
 fi
 ccache -s

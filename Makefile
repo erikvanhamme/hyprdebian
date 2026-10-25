@@ -88,8 +88,15 @@ all: $(PACKAGES)
 $(OUT):
 	mkdir -p $@
 
+# build/.<package>.debs lists the packages that the package directory put in
+# build/ the last time. They are removed before the new ones go there, also
+# when their names change, as those of hd-kernel do with every release.
 $(PACKAGES): | $(OUT)
 	$(MAKE) -j$(JOBS) -C $(SRC)/$@ deb
+	if [ -f $(OUT)/.$@.debs ]; then \
+		xargs -r rm -f < $(OUT)/.$@.debs; \
+		rm -f $(OUT)/.$@.debs; \
+	fi
 	for entry in $$($(MAKE) -s --no-print-directory -C $(SRC)/$@ deb-path); do \
 		deb=$${entry#*:}; \
 		dir=$(OUT); \
@@ -100,6 +107,7 @@ $(PACKAGES): | $(OUT)
 		name=$$(basename $$deb); \
 		rm -f $$dir/$${name%%_*}_*.deb; \
 		install -m 0644 $(SRC)/$@/$$deb $$dir/; \
+		echo $$dir/$$name >> $(OUT)/.$@.debs; \
 	done
 
 test: $(addprefix test-,$(TESTS))

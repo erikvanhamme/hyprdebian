@@ -20,7 +20,12 @@
 #               of linux, zfs-linux and hd-kernel; the versions of the
 #               packages are those of linux and zfs-linux with +hd and the
 #               version of version.json. Raise it for every change of the
-#               packages. With HD_KERNEL_CACHE set to a directory, a suite
+#               packages. The release also changes with build-kernel.sh and
+#               the files in deb/ and man/, so it says what the packages are
+#               made of: a suite whose packages of that release are in
+#               build/<suite> already is not built again, until make clean
+#               removes them. That costs a container start and an apt update
+#               per suite. With HD_KERNEL_CACHE set to a directory, a suite
 #               whose release is already built there is copied from it
 #               instead of built, and every build is stored there.
 #   make deb-<suite>
@@ -92,7 +97,6 @@ define run
 endef
 
 $(addprefix deb-,$(SUITES)): deb-%:
-	rm -f $(BUILD)/$*/*.deb
 	$(if $(HD_KERNEL_CACHE),mkdir -p $(HD_KERNEL_CACHE))
 	$(call run,full,$*,$*)
 
@@ -111,7 +115,6 @@ $(addprefix sources-,$(SUITES)): sources-%:
 	$(call run,sources,$*,$*)
 
 test-build:
-	rm -f $(BUILD)/test/*.deb
 	$(call run,test,unstable,test)
 
 clean:

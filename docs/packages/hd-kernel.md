@@ -14,7 +14,7 @@ For now a system switches when its admin installs `hd-kernel`; `hd-base` still d
 | `zfs-modules-<release>` | `zfs.ko` and `spl.ko` in `/lib/modules/<release>/extra/zfs`. It provides `zfs-modules`, which `zfs-initramfs` takes in place of `zfs-dkms`, and adds the module to the initrd of its kernel. |
 | `hd-kernel` | Depends on the exact versions of both, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64` and `linux-headers-amd64`, and installs the man page `man hd-kernel`. |
 
-The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, and `<id>` six hex digits of the sha256 of the versions of `linux`, `zfs-linux` and `hd-kernel`. A build of other versions has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
+The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, and `<id>` six hex digits of a sha256 of everything the packages are made of: the versions of `linux`, `zfs-linux` and `hd-kernel`, `build-kernel.sh` and the files in `deb/` and `man/`. A build of anything else has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
 
 The bootloader names the UKI of such a kernel `HyprDebian-Kernel-<x.y.z>-hd.efi`, so the menu tells it apart from the kernel of Debian, see [hd-bootloader](hd-bootloader.md).
 
@@ -47,6 +47,8 @@ This builds the packages of both suites, into `build/trixie` and `build/unstable
 
 Raise the version in `version.json` for every change of the packages.
 
+A suite is only built when it has to be. `make deb` starts a container of each suite, which looks up the versions of `linux` and `zfs-linux` and works out the release; when `build/<suite>` already has the three packages of that release, it stops there, which takes a few seconds. So a second `make deb`, `make all` or `make update-repo` builds no kernel, until Debian has a new `linux` or `zfs-linux`, `build-kernel.sh`, `deb/`, `man/` or the version changes, or `make clean` removes the packages. The packages only get to `build/<suite>` at the end of a build that went through, so a build that stops halfway is done again.
+
 `build-kernel.sh` does the work, in a `debian:trixie` or `debian:sid` container, pulled every time:
 1. It takes the most recent versions of the source packages `linux` and `zfs-linux` of the suite, also of `trixie-security`, and gets them with `apt source`, with the patches of Debian, and the config of Debian for amd64 from `linux-config-<x.y>` of the same version.
 2. It changes the config only where it has to: the kernel trusts no keys of Debian (`SYSTEM_TRUSTED_KEYS`), signs every module with a key that the build makes in `certs/signing_key.pem` (`MODULE_SIG_ALL`), and has the release above (`LOCALVERSION`). It stops when an option that Debian has on is off in the config of the build, as `olddefconfig` silently turns off what the tools in the container cannot build, such as Rust.
@@ -65,7 +67,7 @@ With `HD_KERNEL_CACHE` set to a directory, a suite whose release is already buil
 make -s sources
 ```
 
-`make test-build` builds the packages of unstable quicker, into `build/test`: with only the modules of `local-testvm/lsmod-test.txt`, the output of `lsmod` on the test vm, and without debug info, so without BTF. Its release has `hdtest<id>`. It is only for trying out on the test vm, never for a repository.
+`make test-build` builds the packages of unstable quicker, into `build/test`: with only the modules of `local-testvm/lsmod-test.txt`, the output of `lsmod` on the test vm, and without debug info, so without BTF. Its release has `hdtest<id>`, with the module list in the sha256 too, and it is skipped in the same way. It is only for trying out on the test vm, never for a repository.
 
 The files involved are:
 ```
