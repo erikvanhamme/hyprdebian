@@ -14,6 +14,8 @@ Depends: hd-base (= @VERSION@), @MENU_DEPENDS@,
  python3, python3-jinja2, python3-cairo, python3-gi, python3-gi-cairo,
  gir1.2-rsvg-2.0, gir1.2-pango-1.0, python3-terminaltexteffects,
  jq, procps, sudo, dconf-cli, gnome-themes-extra-data, fontconfig,
+ fonts-noto-color-emoji,
+ qt6ct, qt6-xdgdesktopportal-platformtheme, qt6-wayland,
  plymouth, plymouth-label, initramfs-tools
 Conflicts: desktop-base, hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
 Replaces: hd-art, hd-fonts, hd-menu, hd-theme, hd-screensaver, hd-plymouth
@@ -24,16 +26,26 @@ Description: HyprDebian desktop
  Depends on the packages of the HyprDebian desktop, so that they are
  installed with it and stay installed: Hyprland with uwsm, hyprpaper,
  hypridle, hyprlock, its dialogs and XWayland, greetd, the desktop portals,
- kitty, mako, PipeWire, the screenshot tools, the dark GTK theme, plymouth,
- and the desktop applications. HyprDebian installs no recommends, so these
- are all the packages the desktop needs. It depends on hd-base of the same
- version, the HyprDebian version of both.
+ kitty, mako, PipeWire, the screenshot tools, the dark GTK theme, qt6ct
+ and the Wayland plugin of Qt 6 for the Qt applications, the colour emoji
+ of Noto, plymouth, and the desktop applications. HyprDebian
+ installs no recommends, so these are all the packages the desktop needs. It
+ depends on hd-base of the same version, the HyprDebian version of both.
+ .
+ The GTK and Qt applications and the dialogs of Hyprland look the same:
+ dark, in the colours of Adwaita-dark, in JetBrainsMono NFM Medium 11, with
+ the file chooser of the desktop portals, the one of GTK. dconf and the
+ settings.ini of GTK 3 and GTK 4 hold it for GTK, qt5ct and qt6ct with the
+ colour scheme hyprdebian for Qt, and hyprtoolkit.conf for the dialogs.
+ qt5ct is not a dependency, as the desktop has no Qt 5 applications: install
+ qt5ct, qt5-xdgdesktopportal-platformtheme and qtwayland5 for them.
  .
  greetd logs the first user in to Hyprland on tty7 at the boot; the user is
  the key hd-desktop of /etc/hyprdebian/config.json, written into
  /etc/greetd/config.toml by hd-desktop-render. The package also installs the
  files that new users get in /etc/skel: the configs of Hyprland, hypridle,
- hyprlock, hyprpaper, kitty, mako, mpv and PipeWire, and the
+ hyprlock, hyprpaper, hyprtoolkit, kitty, mako, mpv, PipeWire, qt5ct and
+ qt6ct, and the
  commands that the key bindings run: the reboot and power off questions, the
  monitor mode menu, the mount menus and the volume keys. The users in the
  group sudo mount and unmount drives from the mount menus without a

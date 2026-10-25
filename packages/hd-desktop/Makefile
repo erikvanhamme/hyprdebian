@@ -75,7 +75,9 @@
 #                                             same path, conffiles: the
 #                                             files new users get in
 #                                             /etc/skel, the dark theme
-#                                             and the font for dconf, the
+#                                             and the font for dconf and
+#                                             the settings.ini of GTK 3
+#                                             and GTK 4, the
 #                                             sudoers rule of the mount
 #                                             menus and the apt hook that
 #                                             runs hd-launcher-cache
@@ -87,9 +89,11 @@
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the drop-in that
 #                                             runs hd-desktop-render before
-#                                             greetd starts, and the
+#                                             greetd starts, the
 #                                             warning icon of
-#                                             hd-launcher-cache
+#                                             hd-launcher-cache and the
+#                                             colour scheme hyprdebian of
+#                                             qt5ct and qt6ct
 #                 /usr/share/doc/hd-desktop/copyright
 #                                             deb/copyright
 #                 /usr/share/doc/hd-desktop/nerd-fonts/OFL.txt

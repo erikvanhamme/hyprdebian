@@ -4,7 +4,7 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - greetd, which logs the user in to Hyprland at the boot;
 - the desktop portals of Hyprland and GTK, for screen sharing, the file chooser and the dark mode;
 - kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit, and the screenshot tools grim, slurp and swappy;
-- the dark GTK theme Adwaita-dark, and plymouth;
+- the dark GTK theme Adwaita-dark, qt6ct and the Wayland plugin `qt6-wayland` for the Qt applications, the colour emoji of `fonts-noto-color-emoji`, and plymouth;
 - yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv and firefox.
 
 HyprDebian installs no recommends, see [hd-base](hd-base.md), so the package depends on everything the desktop needs.
@@ -92,8 +92,10 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/hypr/hyprland.lua` | The config of Hyprland, with the [key bindings](../HyprDebian/Key%20Bindings.md). |
 | `~/.config/hypr/hypridle.conf` | The screensaver of [hd-screensaver](hd-screensaver.md) after 2 minutes, hyprlock after 4, and the monitors off after that. |
 | `~/.config/hypr/hyprlock.conf`, `hyprpaper.conf` | The lock screen and the wallpaper. |
+| `~/.config/hypr/hyprtoolkit.conf` | The colours and the font of the dialogs of Hyprland, see [Dark theme](#dark-theme). |
 | `~/.config/kitty`, `mako`, `mpv` | The terminal, the notifications and the media player. |
 | `~/.config/alsa`, `pipewire` | The sound. |
+| `~/.config/qt5ct`, `qt6ct` | The dark theme and the font of the Qt applications, see [Dark theme](#dark-theme). |
 | `~/.config/VSCodium` | The settings of VSCodium. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
@@ -182,7 +184,19 @@ hd-launcher-cache --update
 ```
 
 ## Dark theme
-`/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme, Adwaita-dark of `gnome-themes-extra-data`, and `01-font` for the font of HyprDebian, `JetBrainsMono NFM Medium 11`. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`.
+The GTK and the Qt applications and the dialogs of Hyprland look the same: dark, in the colours of Adwaita-dark, in `JetBrainsMono NFM Medium 11`, and with the file chooser of GTK.
+
+`/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme, Adwaita-dark of `gnome-themes-extra-data`, and `01-font` for the font of HyprDebian, `JetBrainsMono NFM Medium 11`, of the interface, the documents and the monospaced text. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`. GTK applications on XWayland have no XSETTINGS and do not read dconf; they get the same from `/etc/gtk-3.0/settings.ini` and `/etc/gtk-4.0/settings.ini`.
+
+The Qt applications get it from qt5ct and qt6ct, which `QT_QPA_PLATFORMTHEME=qt5ct` in `~/.config/hypr/hyprland.lua` loads for Qt 5 and Qt 6 alike: `~/.config/qt5ct/qt5ct.conf` and `~/.config/qt6ct/qt6ct.conf` give them the style Fusion with the colour scheme `hyprdebian`, the colours of Adwaita-dark, in `/usr/share/qt5ct/colors` and `/usr/share/qt6ct/colors`, the font, the Adwaita icons and the file chooser of the desktop portals. The commands `qt5ct` and `qt6ct` change them. The package depends on `qt6ct`, `qt6-xdgdesktopportal-platformtheme` and `qt6-wayland`, which lets the Qt 6 applications run on Wayland instead of XWayland, as `QT_QPA_PLATFORM=wayland;xcb` asks for first. It does not depend on qt5ct, as the desktop has no Qt 5 applications; for those, install:
+
+```bash
+sudo apt install qt5ct qt5-xdgdesktopportal-platformtheme qtwayland5
+```
+
+The dialogs of Hyprland, of `hyprland-guiutils`, get the same colours and font from `~/.config/hypr/hyprtoolkit.conf` of hyprtoolkit.
+
+An upgrade from a version before 1.28 gives the user who is logged in to Hyprland the folders `~/.config/qt5ct` and `~/.config/qt6ct` and `~/.config/hypr/hyprtoolkit.conf`, as the first installation does, and says to set `QT_QPA_PLATFORMTHEME` to `qt5ct` in their `~/.config/hypr/hyprland.lua`, which still names `gtk3`, and to remove `QT_STYLE_OVERRIDE`, as in `/etc/skel/.config/hypr/hyprland.lua`.
 
 ## Removing the package
 Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher-cache`; the settings in `/etc/hyprdebian/config.json` and the caches and settings of the users in their home directories stay.
@@ -207,4 +221,6 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |
 | `/etc/sudoers.d/hd-desktop` | Lets the group `sudo` mount without a password. |
 | `/etc/dconf/profile/user`, `/etc/dconf/db/local.d/00-dark-theme`, `01-font` | The dark theme and the font for GTK applications. |
+| `/etc/gtk-3.0/settings.ini`, `/etc/gtk-4.0/settings.ini` | The same, for GTK applications on XWayland. |
+| `/usr/share/qt5ct/colors/hyprdebian.conf`, `/usr/share/qt6ct/colors/hyprdebian.conf` | The colours of Adwaita-dark for the Qt applications. |
 | `/etc/skel/...` | The files for new users. |

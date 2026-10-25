@@ -8,7 +8,9 @@ depends on the packages of the HyprDebian desktop, so that they are installed
 with it and stay installed: Hyprland with uwsm, hyprpaper, hypridle,
 hyprlock, its dialogs and XWayland, greetd, the desktop portals of Hyprland
 and GTK, kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit,
-the screenshot tools grim, slurp and swappy, the dark GTK theme, plymouth,
+the screenshot tools grim, slurp and swappy, the dark GTK theme, qt6ct and
+qt6-wayland for the Qt applications, the colour emoji of
+fonts-noto-color-emoji, plymouth,
 yazi, and the applications audacious of
 .BR hd-audacious (7),
 mpv, imv and firefox.
@@ -93,8 +95,8 @@ in
 .IR /etc/skel :
 the configs of Hyprland
 .RI ( ~/.config/hypr/hyprland.lua ),
-hypridle, hyprlock, hyprpaper, kitty, mako, mpv, alsa, PipeWire and
-VSCodium, and the directories
+hypridle, hyprlock, hyprpaper, hyprtoolkit, kitty, mako, mpv, alsa,
+PipeWire, qt5ct, qt6ct and VSCodium, and the directories
 .I ~/.icons
 and
 .IR ~/Pictures/Screenshots .
@@ -198,14 +200,61 @@ browser and VSCodium, are started with
 .B uwsm app
 too; the menus and short commands are not.
 .SH DARK THEME
+The GTK and the Qt applications and the dialogs of Hyprland look the same:
+dark, in the colours of Adwaita-dark, in JetBrainsMono NFM Medium 11, and
+with the file chooser of GTK.
+.PP
 .I /etc/dconf/db/local.d/00-dark-theme
 asks GTK applications for the dark Adwaita theme, and
 .I 01-font
-for the font of HyprDebian.
+for the font of HyprDebian, of the interface, the documents and the
+monospaced text.
 .I /etc/dconf/profile/user
 adds that system database to the one of the user, and the installation
 compiles it with
 .BR "dconf update" .
+GTK applications on XWayland have no XSETTINGS and do not read dconf; they
+get the same from
+.I /etc/gtk-3.0/settings.ini
+and
+.IR /etc/gtk-4.0/settings.ini .
+.PP
+The Qt applications get it from qt5ct and qt6ct, which
+.B QT_QPA_PLATFORMTHEME=qt5ct
+in
+.I ~/.config/hypr/hyprland.lua
+loads for Qt 5 and Qt 6 alike:
+.I ~/.config/qt5ct/qt5ct.conf
+and
+.I ~/.config/qt6ct/qt6ct.conf
+give them the style Fusion with the colour scheme hyprdebian, the colours of
+Adwaita-dark, in
+.I /usr/share/qt5ct/colors
+and
+.IR /usr/share/qt6ct/colors ,
+the font, the Adwaita icons and the file chooser of the desktop portals.
+.B qt5ct
+and
+.B qt6ct
+change them.
+The package depends on qt6ct only, as the desktop has no Qt 5
+applications; for those, install
+.BR qt5ct ,
+.B qt5-xdgdesktopportal-platformtheme
+and
+.BR qtwayland5 .
+.B qt6-wayland
+lets the Qt 6 applications run on Wayland instead of XWayland, which
+.B QT_QPA_PLATFORM=wayland;xcb
+asks for first.
+The dialogs of Hyprland, of hyprland-guiutils, get the same colours and font
+from
+.IR ~/.config/hypr/hyprtoolkit.conf .
+An upgrade from a version before 1.28 gives the user the settings of qt5ct,
+qt6ct and hyprtoolkit and says to set
+.B QT_QPA_PLATFORMTHEME
+to qt5ct in their config of Hyprland, which still names gtk3, and to remove
+.BR QT_STYLE_OVERRIDE .
 .SH REMOVAL
 Removing the package puts back the config of the package greetd, which
 logs nobody in.
@@ -239,6 +288,25 @@ The output of Hyprland.
 Runs
 .B hd-desktop-render
 before greetd starts.
+.TP
+.I /etc/dconf/db/local.d
+.TQ
+.I /etc/gtk-3.0/settings.ini
+.TQ
+.I /etc/gtk-4.0/settings.ini
+The dark theme and the font of the GTK applications.
+.TP
+.I ~/.config/qt5ct/qt5ct.conf
+.TQ
+.I ~/.config/qt6ct/qt6ct.conf
+.TQ
+.I /usr/share/qt5ct/colors/hyprdebian.conf
+.TQ
+.I /usr/share/qt6ct/colors/hyprdebian.conf
+The dark theme and the font of the Qt applications.
+.TP
+.I ~/.config/hypr/hyprtoolkit.conf
+The colours and the font of the dialogs of Hyprland.
 .SH SEE ALSO
 .BR hd-desktop-render (8),
 .BR hd-launcher-cache (1),

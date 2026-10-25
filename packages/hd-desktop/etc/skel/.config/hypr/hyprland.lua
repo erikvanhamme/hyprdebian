@@ -66,8 +66,9 @@ hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
-hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
-hl.env("QT_STYLE_OVERRIDE", "fusion")
+-- The dark theme and the font of ~/.config/qt5ct and ~/.config/qt6ct, for Qt 5 and Qt 6: both
+-- plugins answer to the name qt5ct.
+hl.env("QT_QPA_PLATFORMTHEME", "qt5ct")
 
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "wayland")
 

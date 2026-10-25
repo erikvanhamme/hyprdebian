@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-desktop` holds the font of hyprdebian: JetBrains Mono, the typeface by JetBrains, with the icons of Nerd Fonts patched in, from the Nerd Fonts release v3.4.0. They are only the fonts; they have no commands and no settings.
+The package `hd-desktop` holds the font of hyprdebian: JetBrains Mono, the typeface by JetBrains, with the icons of Nerd Fonts patched in, from the Nerd Fonts release v3.4.0. They are only the fonts; they have no commands and no settings. They have no emoji; fontconfig takes those from Noto Color Emoji, of `fonts-noto-color-emoji`, which `hd-desktop` depends on.
 
 It holds two families, each in 16 styles:
 

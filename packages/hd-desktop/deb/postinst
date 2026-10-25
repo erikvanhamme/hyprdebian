@@ -35,6 +35,12 @@ upgrade from a version before SKEL_SINCE, which did not do it, so a file that th
 does not come back on later upgrades. It runs as the user, so the files belong to them. When the
 installer runs, the user does not exist yet, and the installer copies /etc/skel itself.
 
+Versions before TOOLKITS_SINCE had no settings for the Qt applications and the dialogs of
+Hyprland. An upgrade from such a version gives that user the settings of qt5ct, qt6ct and
+hyprtoolkit of /etc/skel, in TOOLKITS_SKEL, in the same way, and says that the config of Hyprland
+of the user still names the platform theme gtk3, which is gone, and should name qt5ct, as the one
+in /etc/skel.
+
 The apt hook of hd-launcher-cache writes the menu in the caches of the system and of the users in
 the group users after every run of dpkg by apt, but not when the package is installed with dpkg
 alone, so the postinst writes them too. A menu that cannot be written does not fail the
@@ -89,6 +95,11 @@ DROPPED_SINCE = "1.27~"
 # The first version of hd-desktop that copies /etc/skel to the home directory of the user.
 SKEL_SINCE = "0.3"
 
+# The first version of hd-desktop with the settings of the Qt applications and of hyprtoolkit, and
+# their paths in /etc/skel.
+TOOLKITS_SINCE = "1.28~"
+TOOLKITS_SKEL = [".config/qt5ct", ".config/qt6ct", ".config/hypr/hyprtoolkit.conf"]
+
 
 def divert(path, diverted):
     """Diverts a file of another package to another name, unless hd-desktop already did."""
@@ -105,19 +116,32 @@ def older_than(version, than):
     return subprocess.run(["dpkg", "--compare-versions", version, "lt", than]).returncode == 0
 
 
-def copy_skel():
+def copy_skel(paths=None):
+    """Copies the files of /etc/skel that the user does not have to their home directory: all of
+    them, or those below the paths, relative to /etc/skel. Returns the home directory, or None
+    when there is no user to copy to."""
     user = subprocess.run(["/usr/sbin/hd-desktop-render", "--print-user"], capture_output=True,
                           text=True, check=True).stdout.strip()
     if user == "":
         print(f"No user to copy {SKEL_DIR} to.")
-        return
+        return None
     home = pwd.getpwnam(user).pw_dir
     if not os.path.isdir(home):
         print(f"The home directory {home} of {user} does not exist; not copying {SKEL_DIR}.")
-        return
-    subprocess.run(["runuser", "-u", user, "--", "cp", "-a", "--update=none", SKEL_DIR + "/.",
-                    home + "/"], check=True)
-    print(f"Copied the files of {SKEL_DIR} that {user} did not have to {home}.")
+        return None
+    if paths is None:
+        subprocess.run(["runuser", "-u", user, "--", "cp", "-a", "--update=none",
+                        SKEL_DIR + "/.", home + "/"], check=True)
+        print(f"Copied the files of {SKEL_DIR} that {user} did not have to {home}.")
+        return home
+    for path in paths:
+        target = os.path.dirname(os.path.join(home, path))
+        subprocess.run(["runuser", "-u", user, "--", "mkdir", "-p", target], check=True)
+        subprocess.run(["runuser", "-u", user, "--", "cp", "-a", "--update=none",
+                        os.path.join(SKEL_DIR, path), target + "/"], check=True)
+    print(f"Copied the files of {', '.join(paths)} in {SKEL_DIR} that {user} did not have to "
+          f"{home}.")
+    return home
 
 
 def theme_selected():
@@ -171,6 +195,13 @@ def main():
     subprocess.run(["/usr/sbin/hd-plymouth-render"], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
+    elif older_than(previous, TOOLKITS_SINCE):
+        home = copy_skel(TOOLKITS_SKEL)
+        if home is not None:
+            print(f"Set QT_QPA_PLATFORMTHEME to qt5ct instead of gtk3 in "
+                  f"{home}/.config/hypr/hyprland.lua, and remove QT_STYLE_OVERRIDE, as in "
+                  f"{SKEL_DIR}/.config/hypr/hyprland.lua, so that the Qt applications get the dark "
+                  "theme.")
     if previous != "" and older_than(previous, DROPPED_SINCE):
         print(f"hd-desktop no longer depends on {', '.join(DROPPED)}. apt autoremove removes "
               "them; mark the ones you use as installed by hand first, such as apt-mark manual "
