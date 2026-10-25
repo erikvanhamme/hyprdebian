@@ -91,7 +91,7 @@ The installer starts from the minimal base of Debian, the `minbase` variant of d
 | Network | `iproute2` and `iputils-ping`, with `linux-sysctl-defaults`, which lets every user ping; `netbase`. |
 | ZFS | `zfs-dkms`, `zfsutils-linux` and `zfs-initramfs`; `zfs-zed`, the event daemon that reports pool errors, resilvers and scrubs; `initramfs-tools` for the initrd, and `zstd` to compress it. DKMS builds the ZFS module with the compiler that the kernel headers bring along; there is no `build-essential`. |
 | Boot | `efibootmgr` for the boot entries of the firmware. |
-| Console | `locales`, `keyboard-configuration`, `console-setup` and `ca-certificates`. |
+| Console | `locales`, `keyboard-configuration`, `console-setup` and `ca-certificates`; `whiptail`, which shows the debconf questions in dialogs. |
 | System services | `systemd-resolved`, name resolution; `libpam-systemd` and `libnss-systemd`, which register every login as a session of systemd-logind, with its runtime directory and the user instance of systemd. The logs stay in the journal of systemd-journald; there is no syslog daemon. |
 | Command line tools | `nano`, `less`, `procps`, `eza`, `fzf`, `psmisc`, `bash-completion`, `command-not-found`, `man-db`, `apt-file` and `systemd-zram-generator`. `command-not-found` names the package of a command that is not installed, from the Contents indexes that `apt-file` downloads, so both stay. It conflicts with `zram-tools`, which would set up a second zram swap. |
 

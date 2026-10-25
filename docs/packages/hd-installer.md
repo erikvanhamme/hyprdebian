@@ -190,7 +190,7 @@ The base phase installs Debian on the root of the new system and prepares it:
 
 | Task | What it does |
 | --- | --- |
-| `b_bootstrap` | Installs the base system of the suite with the `minbase` variant of `debootstrap`: the required packages, apt, `ca-certificates` and `systemd`, which `b_mount_unit` needs. The important packages of the default variant, such as `cron`, `dhcpcd-base` and `vim-tiny`, stay out; `hd-base` depends on the ones HyprDebian uses. |
+| `b_bootstrap` | Installs the base system of the suite with the `minbase` variant of `debootstrap`: the required packages, apt, `ca-certificates`, `systemd`, which `b_mount_unit` needs, and `whiptail`, so the debconf questions of `b_console` are asked in dialogs. The important packages of the default variant, such as `cron`, `dhcpcd-base` and `vim-tiny`, stay out; `hd-base` depends on the ones HyprDebian uses. |
 | `b_templates` | Writes `/etc/hostname` and `/etc/hosts`. |
 | `b_fstab` | Writes `/etc/fstab` with the swap: `/dev/mapper/swap` with encryption, otherwise the swap partition or array by its UUID. |
 | `b_mdadm` | On mirrored system disks with swap, writes `/etc/mdadm/mdadm.conf` with the swap array, and marks `mdadm`. |

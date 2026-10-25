@@ -294,8 +294,10 @@ Installs the minimal base of Debian, the
 variant of
 .BR debootstrap (8)
 with
-.BR systemd ,
-on the root, and writes the files that depend on the disks and the answers:
+.B systemd
+and
+.BR whiptail ,
+which shows the debconf questions in dialogs, on the root, and writes the files that depend on the disks and the answers:
 .IR /etc/hostname ,
 .IR /etc/hosts ,
 .IR /etc/fstab ,

@@ -19,15 +19,16 @@ b_post() {
 # The base system is the minbase variant of debootstrap: the required packages and apt, without
 # the important ones, such as cron, dhcpcd and vim, which HyprDebian does not use. hd-base depends
 # on the ones it needs. systemd comes along, as b_mount_unit enables units with systemctl before
-# hd-base is installed.
+# hd-base is installed, and whiptail, so the debconf questions of b_console are asked in dialogs
+# instead of as long numbered lists.
 b_bootstrap() {
     mkdir -p "${TARGET_DIR}/run" || return 1
     mount -t tmpfs tmpfs "${TARGET_DIR}/run" || return 1
     mkdir -p "${TARGET_DIR}/run/lock" || return 1
     mkdir -p "${TARGET_DIR}/var/lib" || return 1
 
-    debootstrap --arch=amd64 --variant=minbase --include=ca-certificates,systemd "${Q_SUITE}" \
-        "${TARGET_DIR}" http://deb.debian.org/debian
+    debootstrap --arch=amd64 --variant=minbase --include=ca-certificates,systemd,whiptail \
+        "${Q_SUITE}" "${TARGET_DIR}" http://deb.debian.org/debian
 }
 
 b_templates() {
