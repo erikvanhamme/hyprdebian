@@ -28,6 +28,10 @@
 #                   package directory in PACKAGES from build/ to it, each
 #                   only for the repos in the deploy.json of its directory
 #                   (update-repo/update-repo.py)
+#   make clean-repo ask for the host name of a HyprDebian repository and
+#                   remove every package of every suite and the live ISO from
+#                   it, after the host name is typed again, keeping the
+#                   signing key (update-repo/update-repo.py --clean)
 #   make list-debs  print every package of the package directories in
 #                   PACKAGES as <repos>:build/<package>.deb, one per line,
 #                   without building them: the arguments of update-repo.py
@@ -56,7 +60,7 @@ OUT := build
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
-.PHONY: all test clean iso provision-vm switch-vm-gpu update-repo list-debs $(PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all test clean iso provision-vm switch-vm-gpu update-repo clean-repo list-debs $(PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -107,6 +111,10 @@ iso: all
 update-repo: all
 	uploads=$$($(LIST_DEBS)) || exit 1; \
 	python3 update-repo/update-repo.py $$uploads
+
+# Empties a repository; update-repo.py asks for the host name and to type it again.
+clean-repo:
+	python3 update-repo/update-repo.py --clean
 
 # Prints each package as <repos>:build/<package>.deb, without building it.
 list-debs:

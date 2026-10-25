@@ -84,6 +84,21 @@ Some more options of `update-repo.py`, also given before the packages:
 - `--only-new` leaves out every package whose file name is already in the pool of its suite, so a rebuild of a version that is already in the repository never replaces it.
 - `--iso <path>` also uploads the live ISO to `/srv/hd-repo/iso`, where it can be downloaded from `http://<host>/iso/`. It is copied under a temporary name, checked against its sha256 on the repository and only then renamed into place, with a `SHA256SUMS` next to it.
 
+### Emptying the repository
+From the root of this repository:
+```
+make clean-repo
+```
+
+This runs `update-repo.py --clean`, which asks for the host name of the repository, shows how many packages each suite has and asks to type the host name again. Then it removes every package from the pools and the inboxes and everything in `/srv/hd-repo/iso`, and runs `hd-repo-update`, which signs the empty indices. The signing key stays, so the clients stay linked and only find no packages; nothing is removed from them. Use it to start a repository over, such as the dev repository before you fill it again with `make update-repo`.
+
+`hd-repo-update` only takes a ZFS snapshot when it adds packages, so emptying takes none. To be able to undo it, take one first:
+```
+ssh repo@repo.example /usr/sbin/zfs snapshot rpool/hd-repo@before-clean
+```
+
+`--clean` takes no packages, `--iso` or `--only-new`. With `--host` it does not ask for the host name, but it always asks to type it again, also with `--yes`.
+
 ## hd-repo-update
 ```
 hd-repo-update [suite...]

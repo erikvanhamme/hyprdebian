@@ -17,7 +17,12 @@ ssh, so the ssh key of the user must be in the authorized_keys of repo on that h
     update-repo.py --iso ISO PACKAGE...   also upload the live ISO to the folder iso of the
                                           repository, with its SHA256SUMS
 
-With --host and --yes it asks nothing, so it can run unattended, as on a build server.
+    update-repo.py --clean                remove every package of every suite, the packages in
+                                          the inboxes and the ISO, then sign the empty indices
+
+With --host and --yes it asks nothing, so it can run unattended, as on a build server. --clean
+takes no packages; it asks to type the host name to go ahead, also with --yes, and keeps the
+signing key, so the clients stay linked to the empty repository.
 
 The ISO is copied under a temporary name, checked against its sha256 on the repository and only
 then renamed into place, so downloads never get a half uploaded ISO. SHA256SUMS is written next
@@ -140,6 +145,22 @@ def iso_commands(host, iso, digest):
     ]
 
 
+def clean_commands(host):
+    """The commands that empty the repository: remove the packages of the pools and the inboxes
+    and the files in the folder of the ISO, then sign the empty indices with hd-repo-update."""
+    target = f"{REPO_USER}@{host}"
+    debs = [f"{REPO_DIR}/pool/{suite}/main/*.deb" for suite in SUITES]
+    debs += [f"inbox/{suite}/*.deb" for suite in SUITES]
+    # The folder of the ISO may be a ZFS dataset of its own, so only what is in it goes.
+    remove = (f"rm -f -- {' '.join(debs)}"
+              f" && if [ -d {shlex.quote(ISO_DIR)} ]; then"
+              f" find {shlex.quote(ISO_DIR)} -mindepth 1 -delete; fi")
+    return [
+        ["ssh", target, remove],
+        ["ssh", target, "hd-repo-update"],
+    ]
+
+
 def commands(host, per_suite, iso=None, digest=None):
     """The commands of the update: an scp to the inbox of each suite, then hd-repo-update, then
     the upload of the ISO, when there is one."""
@@ -150,6 +171,48 @@ def commands(host, per_suite, iso=None, digest=None):
     if iso is not None:
         steps.extend(iso_commands(host, iso, digest))
     return steps
+
+
+def get_host(args):
+    """The host name of the repository: the one of --host, or asked for."""
+    if args.host is None:
+        return ask_host()
+    if not HOST_PATTERN.match(args.host):
+        raise UpdateError(f"{args.host}: give a host name, such as repo or repo.example.com, "
+                          "or an IP address")
+    return args.host
+
+
+def run_steps(steps):
+    """Runs the commands one by one, and stops at the first that fails."""
+    for step in steps:
+        print(f"\n{shlex.join([os.path.basename(arg) if arg.endswith(('.deb', '.iso')) else arg for arg in step])}")
+        if subprocess.run(step).returncode != 0:
+            raise UpdateError(f"{step[0]} failed")
+
+
+def clean(args):
+    """Removes every package and the ISO from the repository, after the host name is typed."""
+    host = get_host(args)
+    steps = clean_commands(host)
+
+    if args.dry_run:
+        for step in steps:
+            print(shlex.join(step))
+        return 0
+
+    counts = {suite: len(published(host, suite)) for suite in SUITES}
+    print(f"\nThis removes every package and the ISO from the repository on {REPO_USER}@{host}:")
+    for suite, count in counts.items():
+        print(f"  {suite}: {count} packages")
+    # Removing everything is not undone by a new upload, so it always asks, also with --yes.
+    if ask(f"\nType {host} to empty the repository").strip() != host:
+        print("Nothing was changed.")
+        return 1
+
+    run_steps(steps)
+    print(f"\nThe repository on {host} is empty.")
+    return 0
 
 
 def main():
@@ -165,22 +228,25 @@ def main():
                         help="leave out the packages that are already in the pool of their suite")
     parser.add_argument("--iso",
                         help="the live ISO, to upload to the folder iso of the repository")
-    parser.add_argument("packages", nargs="+", metavar="PACKAGE",
+    parser.add_argument("--clean", action="store_true",
+                        help="remove every package and the ISO from the repository")
+    parser.add_argument("packages", nargs="*", metavar="PACKAGE",
                         help="a package with its suites, as <suites>:<path>, "
                              "such as trixie,unstable:build/hd-base_1.8_all.deb")
     args = parser.parse_args()
+    if args.clean:
+        if args.packages or args.iso is not None or args.only_new:
+            parser.error("--clean takes no packages, --iso or --only-new")
+    elif not args.packages:
+        parser.error("give the packages to upload, or --clean")
 
     try:
+        if args.clean:
+            return clean(args)
         per_suite = packages_per_suite(args.packages)
         if args.iso is not None and not os.path.isfile(args.iso):
             raise UpdateError(f"{args.iso}: there is no such ISO; build it with make iso")
-        if args.host is not None:
-            if not HOST_PATTERN.match(args.host):
-                raise UpdateError(f"{args.host}: give a host name, such as repo or repo.example.com, "
-                                  "or an IP address")
-            host = args.host
-        else:
-            host = ask_host()
+        host = get_host(args)
 
         if args.only_new:
             per_suite = only_new(host, per_suite)
@@ -208,10 +274,7 @@ def main():
                 print("Nothing was changed.")
                 return 1
 
-        for step in steps:
-            print(f"\n{shlex.join([os.path.basename(arg) if arg.endswith(('.deb', '.iso')) else arg for arg in step])}")
-            if subprocess.run(step).returncode != 0:
-                raise UpdateError(f"{step[0]} failed")
+        run_steps(steps)
     except UpdateError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
