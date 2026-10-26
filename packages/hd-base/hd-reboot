@@ -5,34 +5,33 @@ The package hd-base installs this as /usr/bin/hd-reboot.
 
     hd-reboot   reboot
 
-In a Hyprland session with hyprshutdown, hyprshutdown closes the applications and shows
-"Rebooting" first, then runs systemctl reboot. Otherwise, as on the console, over ssh or on a
-system without a desktop, systemctl reboot runs right away. Whether the user may do that is up to
-polkit, as for systemctl itself.
+In a Hyprland session with hd-desktop, its hd-shutdown closes the applications first, asks what
+to do about those that do not close, and then runs systemctl reboot. Otherwise, as on the
+console, over ssh or on a system without a desktop, systemctl reboot runs right away. Whether
+the user may do that is up to polkit, as for systemctl itself.
 """
 
 import argparse
 import os
-import shutil
 import sys
 
 ACTION = "reboot"
-TITLE = "Rebooting"
+# The command of hd-desktop that closes the applications of a Hyprland session first.
+SHUTDOWN = "/usr/libexec/hd-desktop/hd-shutdown"
 
 
 def on_desktop():
-    """True in a Hyprland session that has hyprshutdown."""
-    return bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")) and \
-        shutil.which("hyprshutdown") is not None
+    """True in a Hyprland session that has hd-shutdown."""
+    return bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")) and os.access(SHUTDOWN, os.X_OK)
 
 
 def main():
     argparse.ArgumentParser(
-        description=f"{ACTION.capitalize()} the system: with hyprshutdown in a Hyprland session, "
+        description=f"{ACTION.capitalize()} the system: with hd-shutdown in a Hyprland session, "
         f"otherwise with systemctl {ACTION}.").parse_args()
 
     if on_desktop():
-        command = ["hyprshutdown", "-t", TITLE, "--post-cmd", f"systemctl {ACTION}"]
+        command = [SHUTDOWN, ACTION]
     else:
         command = ["systemctl", ACTION]
 

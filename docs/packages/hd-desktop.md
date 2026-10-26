@@ -1,6 +1,6 @@
 ## Introduction
 The package `hd-desktop` is the HyprDebian desktop. It depends on the packages of the desktop, so that they are installed with it and stay installed, and boots the system into Hyprland with greetd:
-- Hyprland with uwsm, hyprpaper, hypridle, hyprlock and hyprshutdown, its dialogs from `hyprland-guiutils`, and XWayland for the programs that only speak X11;
+- Hyprland with uwsm, hyprpaper, hypridle and hyprlock, its dialogs from `hyprland-guiutils`, and XWayland for the programs that only speak X11;
 - greetd, which logs the user in to Hyprland at the boot;
 - the desktop portals of Hyprland and GTK, for screen sharing, the file chooser and the dark mode;
 - kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit, and the screenshot tools grim, slurp and swappy;
@@ -59,6 +59,7 @@ packages/hd-desktop/etc/...
 packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
 packages/hd-desktop/usr/share/hd-desktop/icons/warning.svg
 packages/hd-desktop/hd-reboot-notify
+packages/hd-desktop/hd-shutdown
 packages/hd-desktop/usr/lib/systemd/user/hd-reboot-notify.path
 packages/hd-desktop/usr/lib/systemd/user/hd-reboot-notify.service
 packages/hd-desktop/man/hd-desktop.7
@@ -125,6 +126,25 @@ The key bindings run these commands, in `/usr/bin`:
 The menus above and the application launcher use [hd-menu](hd-menu.md), which has a lock of its own, so a second press of a key binding opens no second menu.
 
 `hd-mount` and `hd-unmount` run `/usr/libexec/hd-desktop/hd-mount-helper` with sudo. `/etc/sudoers.d/hd-desktop` lets the users in the group `sudo` run it, `mount`, `umount` and the `lsblk` of `hd-mount` without a password.
+
+## Reboot and power off
+In the desktop session, `hd-reboot` and `hd-poweroff` of [hd-base](hd-base.md#hd-reboot-and-hd-poweroff), and so `hd-ask-reboot` and `hd-ask-poweroff`, run `/usr/libexec/hd-desktop/hd-shutdown reboot` or `poweroff`. It asks every window to close, as `SUPER + W` does, and runs `systemctl reboot` or `systemctl poweroff` once all are gone.
+
+An application that asks something first, such as whether to save a file, keeps its windows open. When the windows that are left have stayed the same for 3 seconds, [hd-message](hd-message.md) names their applications, one line per process with its window class, the name and pid of the process and the titles of its windows, and offers:
+
+| Button | |
+| --- | --- |
+| Wait | Closes the message: answer the applications yourself, and the shutdown goes on once their windows are gone. Escape does the same. |
+| Kill | Ends the processes of those windows with SIGTERM, and those still running 3 seconds later with SIGKILL. Their unsaved work is lost. |
+| Cancel | Stops the shutdown. The applications that have closed stay closed. |
+
+After Wait, the message comes back when an application closes the windows of its question but stays open, as when the question was cancelled, or when `hd-reboot` or `hd-poweroff` runs again, such as by its key binding. The windows of a question are those that `hd-shutdown` did not ask to close. An application that asks something, or closes, does not bring it back, so the questions can be answered in peace. A question inside the window itself, such as that of kitty, is not seen: when it is cancelled, run `hd-reboot` or `hd-poweroff` again to get the message back. An open message closes by itself when the windows change, and shows again with the windows that are left.
+
+`hd-shutdown` does its work in the transient user unit `hd-shutdown.service`, so it is not stopped when it closes the terminal it was started from, and its output is in the journal:
+```
+journalctl --user -u hd-shutdown
+```
+While the unit runs, a second `hd-shutdown` sends it SIGUSR1, which shows the message again, and starts no second one.
 
 ## Pending reboot
 The user unit `hd-reboot-notify.path` starts `hd-reboot-notify.service` in the desktop session when `/run/reboot-required` exists: when an upgrade writes it, and at every login until the reboot, see `hd-reboot-check` in [hd-base](hd-base.md#hd-reboot-check). It runs `/usr/libexec/hd-desktop/hd-reboot-notify`, which shows a notification with the reasons of `hd-reboot-check`. The service stays active after the notification, so it shows once per session. The postinst enables the unit for every user on its first installation, by its preset, and keeps the state the admin gave it over upgrades; a removal masks it, so a reinstall keeps that state, and a purge forgets it. To switch it off for a user:
@@ -230,6 +250,7 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | `/usr/bin/hd-*` | The commands of the key bindings. |
 | `/usr/libexec/hd-desktop/hd-mount-helper` | Mounts and unmounts for the mount menus, run with sudo. |
 | `/usr/libexec/hd-desktop/hd-reboot-notify`, `/usr/lib/systemd/user/hd-reboot-notify.*` | The notification of a pending reboot. |
+| `/usr/libexec/hd-desktop/hd-shutdown` | Closes the applications before a reboot or power off. |
 | `/etc/sudoers.d/hd-desktop` | Lets the group `sudo` mount without a password. |
 | `/etc/dconf/profile/user`, `/etc/dconf/db/local.d/00-dark-theme`, `01-font` | The dark theme and the font for GTK applications. |
 | `/etc/gtk-3.0/settings.ini`, `/etc/gtk-4.0/settings.ini` | The same, for GTK applications on XWayland. |

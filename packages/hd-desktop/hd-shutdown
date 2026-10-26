@@ -1,0 +1,292 @@
+#!/usr/bin/python3
+"""Closes the applications of the Hyprland session, then reboots or powers off the system.
+
+The package hd-desktop installs this as /usr/libexec/hd-desktop/hd-shutdown, and hd-reboot and
+hd-poweroff of hd-base run it in a Hyprland session.
+
+    hd-shutdown reboot      close the applications, then systemctl reboot
+    hd-shutdown poweroff    close the applications, then systemctl poweroff
+
+It asks every window to close, as SUPER + W does, and waits until all are gone. An application
+that asks something first, such as whether to save a file, keeps its windows open. When the
+windows that are left have stayed the same for a few seconds, hd-message names their
+applications and offers:
+
+    Wait    close the message; the shutdown goes on once the windows are gone
+    Kill    end those applications, with SIGTERM and a few seconds later SIGKILL
+    Cancel  stop the shutdown; the applications that have closed stay closed
+
+After Wait, the message comes back when an application closes the windows of its question but
+stays open, as when the question was cancelled, or when hd-reboot or hd-poweroff runs again. An
+application that asks something, or closes, does not bring it back. An open message closes by
+itself when the windows change, and shows again with those that are left.
+
+The work runs in the transient user unit hd-shutdown.service, so it outlives the terminal it was
+started from, which it closes as well, and its output goes to the journal. When that unit runs
+already, hd-shutdown sends it SIGUSR1, which shows the message again, and starts no second one.
+"""
+
+import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+
+UNIT = "hd-shutdown.service"
+# What hyprctl and hd-message need, passed on to the unit.
+ENVIRONMENT = ["HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY"]
+# The action in the message, by the action of systemctl.
+NAMES = {"reboot": "reboot", "poweroff": "power off"}
+# Seconds between two looks at the windows.
+POLL = 0.5
+# Seconds the windows that are left stay the same before the message shows.
+SETTLE = 3
+# Seconds from SIGTERM to SIGKILL.
+KILL_WAIT = 3
+
+# Set by SIGUSR1: show the message again.
+asked = False
+
+
+def on_sigusr1(signum, frame):
+    global asked
+    asked = True
+
+
+def start(action):
+    """Runs hd-shutdown in its unit, or has the unit that runs already show the message again."""
+    active = subprocess.run(["systemctl", "--user", "is-active", "--quiet", UNIT])
+    if active.returncode == 0:
+        return subprocess.run(["systemctl", "--user", "kill", "--kill-whom=main",
+                               "--signal=SIGUSR1", UNIT]).returncode
+
+    command = ["systemd-run", "--user", "--quiet", "--collect", f"--unit={UNIT}"]
+    for name in ENVIRONMENT:
+        command.append(f"--setenv={name}")
+    command += ["--", os.path.realpath(__file__), "--detached", action]
+    return subprocess.run(command).returncode
+
+
+def windows():
+    """The windows of the session, by their address."""
+    result = subprocess.run(["hyprctl", "-j", "clients"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"hyprctl clients failed: {result.stderr.strip()}")
+    return {window["address"]: window for window in json.loads(result.stdout)}
+
+
+def close(address):
+    subprocess.run(["hyprctl", "dispatch",
+                    f'hl.dsp.window.close({{ window = "address:{address}" }})'],
+                   capture_output=True)
+
+
+def process_name(pid):
+    try:
+        with open(f"/proc/{pid}/comm") as comm:
+            return comm.read().strip()
+    except OSError:
+        return None
+
+
+def by_process(left):
+    """The windows that are left, by the pid of their process."""
+    processes = {}
+    for window in left.values():
+        processes.setdefault(window["pid"], []).append(window)
+    return processes
+
+
+def asking(left, closed):
+    """The pids of the processes that have a window that was not asked to close, such as a
+    question whether to save a file."""
+    return {window["pid"] for address, window in left.items() if address not in closed}
+
+
+def describe(left):
+    """A line for each process with windows left: its application, process and window titles."""
+    lines = []
+    for pid, group in sorted(by_process(left).items()):
+        comm = process_name(pid)
+        name = group[0]["class"] or comm or "Unknown application"
+        process = f"process {pid}"
+        if comm and comm != name:
+            process = f"{comm}, process {pid}"
+        line = f"\u2022 {name} ({process})"
+        titles = [f"\u201c{window['title']}\u201d" for window in group if window["title"]]
+        if titles:
+            line += ": " + ", ".join(titles)
+        lines.append(line)
+    return lines
+
+
+def open_message(action, left):
+    """Opens hd-message for the windows that are left, without waiting for it."""
+    name = NAMES[action]
+    count = len(by_process(left))
+    if count == 1:
+        intro = "This application has not closed. It may be asking something, such as whether " \
+            "to save a file:"
+        outro = f"Wait to answer it yourself: the {name} goes on once it has closed. Kill ends " \
+            f"it, and its unsaved work is lost. Cancel stops the {name}."
+    else:
+        intro = f"These {count} applications have not closed. They may be asking something, " \
+            "such as whether to save a file:"
+        outro = f"Wait to answer them yourself: the {name} goes on once they have closed. Kill " \
+            f"ends them, and their unsaved work is lost. Cancel stops the {name}."
+    text = "\n".join([intro, ""] + describe(left) + ["", outro])
+    box = {
+        "title": f"\uf071  The {name} is waiting",
+        "text": text,
+        "buttons": [
+            {"label": "Wait", "value": "wait"},
+            {"label": "Kill", "value": "kill"},
+            {"label": "Cancel", "value": "cancel"},
+        ],
+        "default": "wait",
+    }
+    try:
+        process = subprocess.Popen(["hd-message"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   text=True)
+    except OSError as e:
+        print(f"Error: Cannot run hd-message: {e}", file=sys.stderr)
+        return None
+    process.stdin.write(json.dumps(box))
+    process.stdin.close()
+    return process
+
+
+def answer(process):
+    """The button chosen in hd-message, which has exited: Wait when it closed without one."""
+    output = process.stdout.read().strip()
+    if process.returncode == 0:
+        return output
+    if process.returncode != 1:
+        print(f"Error: hd-message exited with {process.returncode}", file=sys.stderr)
+    return "wait"
+
+
+def close_message(process):
+    process.terminate()
+    process.wait()
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def send(pid, number):
+    try:
+        os.kill(pid, number)
+    except (ProcessLookupError, PermissionError) as e:
+        print(f"Cannot send signal {number} to process {pid}: {e}", file=sys.stderr)
+
+
+def kill(pids):
+    """Ends the processes with SIGTERM, and those still running after KILL_WAIT with SIGKILL."""
+    for pid in pids:
+        print(f"Ending process {pid} ({process_name(pid)})")
+        send(pid, signal.SIGTERM)
+    deadline = time.monotonic() + KILL_WAIT
+    while time.monotonic() < deadline and any(alive(pid) for pid in pids):
+        time.sleep(POLL)
+    for pid in pids:
+        if alive(pid):
+            print(f"Killing process {pid} ({process_name(pid)})")
+            send(pid, signal.SIGKILL)
+
+
+def close_all(action):
+    """Closes all windows; True when they are gone, False when the shutdown was cancelled."""
+    global asked
+    signal.signal(signal.SIGUSR1, on_sigusr1)
+
+    closed = set(windows())
+    for address in closed:
+        close(address)
+
+    current = windows()
+    since = time.monotonic()
+    # The open hd-message, and the windows it names.
+    message = None
+    named = {}
+    # Whether the message is to show once the windows have settled: at the start, after it was
+    # closed because the windows changed, and when an application gave up its question but not
+    # itself, as when it was cancelled. Not when an application asks something, or closes.
+    due = True
+    while current:
+        if message is not None and message.poll() is not None:
+            choice = answer(message)
+            message = None
+            if choice == "cancel":
+                print(f"The {NAMES[action]} was cancelled.")
+                return False
+            if choice == "kill":
+                pids = [pid for pid in by_process(named) if pid > 1 and pid != os.getpid()]
+                kill(pids)
+
+        if message is None:
+            settled = time.monotonic() - since >= SETTLE
+            if asked or (due and settled):
+                named = current
+                due = False
+                message = open_message(action, current)
+        asked = False
+
+        time.sleep(POLL)
+        latest = windows()
+        if set(latest) != set(current):
+            since = time.monotonic()
+            if message is not None:
+                close_message(message)
+                message = None
+                due = True
+            pids = {window["pid"] for window in latest.values()}
+            gave_up = (asking(current, closed) - asking(latest, closed)) & pids
+            if gave_up:
+                due = True
+        current = latest
+
+    if message is not None:
+        close_message(message)
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Close the applications of the Hyprland session, then reboot or power off.")
+    parser.add_argument("action", choices=sorted(NAMES), help="the action of systemctl")
+    parser.add_argument("--detached", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+
+    if not args.detached:
+        sys.exit(start(args.action))
+
+    # The journal gets each line at once, and none is lost when systemctl replaces the process.
+    sys.stdout.reconfigure(line_buffering=True)
+    try:
+        closed = close_all(args.action)
+    except (RuntimeError, OSError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    if not closed:
+        sys.exit(0)
+
+    command = ["systemctl", args.action]
+    try:
+        os.execvp(command[0], command)
+    except OSError as e:
+        print(f"Error: Cannot run {command[0]}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -152,6 +152,55 @@ may do so without a password, by
 .TP
 .BR hd-volume-up ,\  hd-volume-down ,\  hd-volume-mute
 Change the volume of the default output and show it in a notification.
+.SS Reboot and power off
+In the desktop session,
+.BR hd-reboot (1)
+and
+.BR hd-poweroff (1)
+run
+.I /usr/libexec/hd-desktop/hd-shutdown
+with
+.B reboot
+or
+.BR poweroff .
+It asks every window to close, as
+.B SUPER + W
+does, and runs
+.B systemctl reboot
+or
+.B systemctl poweroff
+once all are gone.
+When windows of applications that ask something first, such as whether to
+save a file, have stayed the same for 3 seconds,
+.BR hd-message (1)
+names their applications, by window class, process name, pid and window
+titles, and offers:
+.TP
+.B Wait
+Close the message and answer the applications; the shutdown goes on once
+their windows are gone. Escape does the same.
+.TP
+.B Kill
+End their processes with SIGTERM, and those still running 3 seconds later
+with SIGKILL; their unsaved work is lost.
+.TP
+.B Cancel
+Stop the shutdown; the applications that have closed stay closed.
+.PP
+After
+.BR Wait ,
+the message comes back when an application closes the windows of its
+question but stays open, as when the question was cancelled, or when
+.B hd-reboot
+or
+.B hd-poweroff
+runs again.
+.B hd-shutdown
+works in the transient user unit
+.BR hd-shutdown.service ,
+whose output is in the journal; a second
+.B hd-shutdown
+sends it SIGUSR1, which shows the message again.
 .SS Pending reboot
 The user unit
 .B hd-reboot-notify.path

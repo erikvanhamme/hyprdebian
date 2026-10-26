@@ -11,16 +11,16 @@ reboots the system and
 .B hd-poweroff
 powers it off.
 .PP
-In a Hyprland session, when
-.B hyprshutdown
-is installed, they let it close the applications and show
-.B Rebooting
-or
-.B Shutting down
-first, then run
+In a Hyprland session, when hd-desktop is installed, they let its
+.I /usr/libexec/hd-desktop/hd-shutdown
+close the applications first, which asks with
+.BR hd-message (1)
+what to do about those that do not close, then runs
 .B systemctl reboot
 or
-.BR "systemctl poweroff" .
+.BR "systemctl poweroff" ;
+see
+.BR hd-desktop (7).
 A session is recognized by
 .B HYPRLAND_INSTANCE_SIGNATURE
 in the environment, which Hyprland sets for the programs it starts.
@@ -43,12 +43,13 @@ over ssh is asked for the password of an administrator.
 Show a short help and exit.
 .SH EXIT STATUS
 The exit status of
-.B hyprshutdown
+.B hd-shutdown
 or
 .BR systemctl ;
 1 when it cannot be started.
 .SH SEE ALSO
 .BR hd-base (7),
+.BR hd-desktop (7),
 .BR systemctl (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

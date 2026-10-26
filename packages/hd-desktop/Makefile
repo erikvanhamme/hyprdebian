@@ -31,6 +31,12 @@
 #                                             shows that a reboot is
 #                                             needed, run by
 #                                             hd-reboot-notify.service
+#                 /usr/libexec/hd-desktop/hd-shutdown
+#                                             closes the applications of
+#                                             the session, asking with
+#                                             hd-message about those that
+#                                             do not close, before
+#                                             hd-reboot and hd-poweroff
 #                 /usr/bin/hd-launcher-cache  writes the menu of the
 #                                             launcher in the cache of the
 #                                             system or of the user, and
@@ -257,7 +263,7 @@ $(ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
@@ -269,7 +275,7 @@ $(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot
 		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -s -m 0755 $(PROGRAMS)/hd-menu $(PROGRAMS)/hd-message $(STAGE)/usr/bin/
-	install -m 0755 hd-mount-helper hd-reboot-notify $(STAGE)$(LIBEXEC_DIR)/
+	install -m 0755 hd-mount-helper hd-reboot-notify hd-shutdown $(STAGE)$(LIBEXEC_DIR)/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	install -m 0644 $(THEME_TEMPLATES) $(STAGE)$(THEME_TEMPLATE_DIR)/

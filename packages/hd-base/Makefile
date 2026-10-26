@@ -16,9 +16,9 @@
 #                                             /run/reboot-required
 #                 /usr/bin/hd-reboot
 #                 /usr/bin/hd-poweroff        reboot or power off, with
-#                                             hyprshutdown in a Hyprland
-#                                             session, otherwise with
-#                                             systemctl
+#                                             hd-shutdown of hd-desktop in
+#                                             a Hyprland session,
+#                                             otherwise with systemctl
 #                 /usr/bin/hd-sync-skel       brings the files of /etc/skel
 #                                             into the home directory
 #                 /usr/bin/hd-config-update   adds a key to the

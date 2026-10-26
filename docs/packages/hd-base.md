@@ -176,7 +176,7 @@ hd-reboot
 hd-poweroff
 ```
 
-`hd-reboot` reboots the system and `hd-poweroff` powers it off. In a Hyprland session, when `hyprshutdown` is installed, they let it close the applications and show "Rebooting" or "Shutting down" first, then run `systemctl reboot` or `systemctl poweroff`. A session is recognized by `HYPRLAND_INSTANCE_SIGNATURE` in the environment, which Hyprland sets for the programs it starts.
+`hd-reboot` reboots the system and `hd-poweroff` powers it off. In a Hyprland session, when [hd-desktop](hd-desktop.md#reboot-and-power-off) is installed, they let its `/usr/libexec/hd-desktop/hd-shutdown` close the applications first, which asks with `hd-message` what to do about those that do not close, then runs `systemctl reboot` or `systemctl poweroff`. A session is recognized by `HYPRLAND_INSTANCE_SIGNATURE` in the environment, which Hyprland sets for the programs it starts.
 
 Otherwise, as on the console, over ssh, or on a system without a desktop, they run `systemctl reboot` or `systemctl poweroff` right away. Whether the user may do that is up to polkit, as for `systemctl` itself: a user who is logged in on the console of the system may, a user over ssh is asked for the password of an administrator.
 
