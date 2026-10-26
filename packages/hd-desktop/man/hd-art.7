@@ -4,8 +4,21 @@ hd-art \- the hyprdebian wallpapers
 .SH DESCRIPTION
 The package
 .B hd-desktop
-holds the wallpapers of hyprdebian: the Emerald wallpaper of Debian 12,
-rendered to PNG at four sizes.
+holds the wallpapers of hyprdebian, each rendered to PNG at four sizes:
+.TP
+.B emerald
+The Emerald wallpaper of Debian 12, in its own colours; the theme
+.I default
+uses it.
+.TP
+.B softwaves-mulberry
+The Soft Waves wallpaper of Debian 9, in the colours of the theme
+.IR mulberry .
+.TP
+.B lines-sand
+The Lines wallpaper of Debian 8, in the colours of the theme
+.IR sand .
+.PP
 They are only the wallpapers; they have no commands and no settings.
 .PP
 The wallpapers are in
@@ -13,15 +26,23 @@ The wallpapers are in
 .PP
 .RS
 .nf
-emerald\-3840x2160.png    4K UHD, 16:9
-emerald\-3440x1440.png    ultrawide, 21:9
-emerald\-1920x1080.png    full HD, 16:9
-emerald\-1024x768.png     4:3
+<family>\-3840x2160.png    4K UHD, 16:9
+<family>\-3440x1440.png    ultrawide, 21:9
+<family>\-1920x1080.png    full HD, 16:9
+<family>\-1024x768.png     4:3
 .fi
 .RE
 .PP
-The 3440x1440 wallpaper is rendered from the middle band of the 3840x2160
-SVG.
+The 3440x1440 wallpapers are rendered from the middle band of the
+3840x2160 SVG.
+The 1024x768 Lines wallpaper is rendered from its 1600x1200 SVG.
+Soft Waves and Lines are recoloured with a gradient from the colour
+.I dark
+of the theme through
+.I normal
+to
+.IR light ,
+by the brightness of the original.
 .SH USING THE WALLPAPERS
 Pick the wallpaper that matches the resolution of the monitor, or the next
 larger one.
@@ -36,21 +57,22 @@ path = /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
 .fi
 .RE
 .SH COPYRIGHT
-The wallpapers are PNG renders of the Emerald theme SVGs from the Debian
-package
+The wallpapers are PNG renders of the Emerald, Soft Waves and Lines theme
+SVGs from the Debian package
 .BR desktop-base ,
 by Juliette Taka Belin, under the GPL, version 2 or later.
 See
 .IR /usr/share/doc/hd-desktop/copyright .
 .SH FILES
 .TP
-.I /usr/share/backgrounds/hyprdebian/emerald\-*.png
+.I /usr/share/backgrounds/hyprdebian/*.png
 The wallpapers.
 .TP
 .I /usr/share/doc/hd-desktop/copyright
 The copyright and license of the wallpapers.
 .SH SEE ALSO
 .BR hd-desktop (7),
+.BR hd-theme (7),
 .BR hyprpaper (1)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

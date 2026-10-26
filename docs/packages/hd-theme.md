@@ -14,7 +14,7 @@ It has two commands:
 ## Building the package
 The theme engine is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). It needs the wallpapers and the font of `hd-desktop`, `python3-jinja2` for the templates, `python3-cairo`, `python3-gi` and `gir1.2-pango-1.0` for the cards, and `imv`, whose `imv-wayland` shows them.
 
-`hd-desktop` comes with the themes `default` and `sand`. The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
+`hd-desktop` comes with the themes `default`, on the wallpaper `emerald`, `sand`, in browns on `lines-sand`, and `mulberry`, in reds and purples on `softwaves-mulberry` and in `SauceCodePro NFM Medium`. The installation renders the cards of all themes, and selects the theme `default` when no theme is selected yet. It does not write the theme files in the home directories; after an upgrade with changed templates, each user runs `hd-theme --apply` again.
 
 The files involved are:
 ```
@@ -22,6 +22,7 @@ packages/hd-desktop/hd-theme
 packages/hd-desktop/hd-theme-card
 packages/hd-desktop/themes/default.json
 packages/hd-desktop/themes/sand.json
+packages/hd-desktop/themes/mulberry.json
 packages/hd-desktop/templates/hd-theme/
 packages/hd-desktop/deb/postinst
 packages/hd-desktop/deb/postrm

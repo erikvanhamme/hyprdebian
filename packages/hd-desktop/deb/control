@@ -52,9 +52,13 @@ Description: HyprDebian desktop
  needed, as after a new kernel.
  .
  It holds the parts of the desktop:
-  - the Emerald wallpaper of Debian 12, in /usr/share/backgrounds/hyprdebian;
+  - the wallpapers Emerald of Debian 12, Soft Waves of Debian 9 in the
+    colours of the theme mulberry and Lines of Debian 8 in those of the
+    theme sand, in /usr/share/backgrounds/hyprdebian;
   - JetBrains Mono with the icons of Nerd Fonts, from the Nerd Fonts release
-    v3.4.0, in /usr/share/fonts/truetype/jetbrains-mono-nerd;
+    v3.4.0, in /usr/share/fonts/truetype/jetbrains-mono-nerd, and Source
+    Code Pro with the same icons, SauceCodePro Nerd Font Mono, in
+    /usr/share/fonts/truetype/sauce-code-pro-nerd;
   - hd-menu, the keyboard-driven menu, which reads a menu as JSON from stdin
     and prints the value of the option chosen;
   - hd-message, the message box, which reads a title, a text and buttons as

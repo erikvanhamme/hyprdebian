@@ -57,7 +57,7 @@
 #                 /usr/share/hd-screensaver/screensaver.txt
 #                                             the text of the screensaver
 #                                             when the user has none
-#                 /usr/share/backgrounds/hyprdebian/emerald-*.png
+#                 /usr/share/backgrounds/hyprdebian/*.png
 #                                             the wallpapers in wallpapers/
 #                 /usr/share/fonts/truetype/jetbrains-mono-nerd/
 #                                             the families JetBrainsMono Nerd
@@ -68,6 +68,14 @@
 #                                             downloaded to build/ once and
 #                                             checked against ZIP_SHA256;
 #                                             not the Propo and NL families
+#                 /usr/share/fonts/truetype/sauce-code-pro-nerd/
+#                                             the family SauceCodePro Nerd
+#                                             Font Mono from the Nerd Fonts
+#                                             release zip of Source Code
+#                                             Pro, downloaded and checked
+#                                             against SCP_ZIP_SHA256 in the
+#                                             same way; not the Nerd Font
+#                                             and Propo families
 #                 /usr/share/plymouth/themes/hyprdebian/
 #                                             the plymouth theme in
 #                                             plymouth/theme/, which names
@@ -115,7 +123,11 @@
 #                 /usr/share/doc/hd-desktop/nerd-fonts/OFL.txt
 #                 /usr/share/doc/hd-desktop/nerd-fonts/README.md
 #                                             the license and the readme from
-#                                             the zip of the fonts
+#                                             the zip of JetBrains Mono
+#                 /usr/share/doc/hd-desktop/sauce-code-pro-nerd/LICENSE.txt
+#                 /usr/share/doc/hd-desktop/sauce-code-pro-nerd/README.md
+#                                             the license and the readme from
+#                                             the zip of Source Code Pro
 #                 /usr/share/man/man*/*.gz    the man pages in man/
 #               with the control file deb/control, whose Depends are the
 #               packages of the desktop, hd-base of the same version, and
@@ -145,7 +157,7 @@
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
 #   make clean  remove build/, also the compiled hd-menu and hd-message and
-#               the downloaded zip of the fonts, and menu/build/ and
+#               the downloaded zips of the fonts, and menu/build/ and
 #               message/build/ of make all in menu/ and message/
 
 BUILD := build
@@ -197,15 +209,26 @@ WALLPAPERS := $(wildcard wallpapers/*.png)
 # The fonts, and their license and readme.
 FONTS := /usr/share/fonts/truetype/jetbrains-mono-nerd
 FONTS_DOC := $(DOC)/nerd-fonts
-# The release of Nerd Fonts, and the checksum of its JetBrains Mono zip.
-# Change both together, and check the new zip and its license first.
+# The release of Nerd Fonts, and the checksums of its JetBrains Mono and
+# Source Code Pro zips. Change them together, and check the new zips and their
+# licenses first.
 NERD_FONTS_VERSION := 3.4.0
-ZIP_URL := https://github.com/ryanoasis/nerd-fonts/releases/download/v$(NERD_FONTS_VERSION)/JetBrainsMono.zip
+NERD_FONTS_URL := https://github.com/ryanoasis/nerd-fonts/releases/download/v$(NERD_FONTS_VERSION)
+ZIP_URL := $(NERD_FONTS_URL)/JetBrainsMono.zip
 ZIP_SHA256 := 76f05ff3ace48a464a6ca57977998784ff7bdbb65a6d915d7e401cd3927c493c
 ZIP := $(BUILD)/JetBrainsMono-$(NERD_FONTS_VERSION).zip
 # The families in the package: Nerd Font and Nerd Font Mono, each in all
 # styles. The pattern of the first does not match the files of the second.
 FONT_FILES := 'JetBrainsMonoNerdFont-*.ttf' 'JetBrainsMonoNerdFontMono-*.ttf'
+# Source Code Pro, as Nerd Fonts names it SauceCodePro: Adobe reserves the
+# name Source. Only the family Nerd Font Mono, in all styles; the others would
+# make the package 32 MB larger.
+SCP_FONTS := /usr/share/fonts/truetype/sauce-code-pro-nerd
+SCP_FONTS_DOC := $(DOC)/sauce-code-pro-nerd
+SCP_ZIP_URL := $(NERD_FONTS_URL)/SourceCodePro.zip
+SCP_ZIP_SHA256 := f8abc5576d1761b8c2a7c03aaff54a692af109f12f2cde641320c8d2f4c5ad53
+SCP_ZIP := $(BUILD)/SourceCodePro-$(NERD_FONTS_VERSION).zip
+SCP_FONT_FILES := 'SauceCodeProNerdFontMono-*.ttf'
 
 # The boot splash: the plymouth theme, the template of its script, its config and the initramfs
 # hook that renders it and puts it in the initramfs.
@@ -252,10 +275,14 @@ $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 
 # A download that does not match the checksum is removed, so the next make
 # downloads it again.
-$(ZIP): | $(BUILD)
-	wget -O $@.tmp $(ZIP_URL)
-	if ! echo '$(ZIP_SHA256)  $@.tmp' | sha256sum --check --quiet; then \
-		echo "$(ZIP_URL) does not match ZIP_SHA256" >&2; \
+$(ZIP): URL := $(ZIP_URL)
+$(ZIP): SHA256 := $(ZIP_SHA256)
+$(SCP_ZIP): URL := $(SCP_ZIP_URL)
+$(SCP_ZIP): SHA256 := $(SCP_ZIP_SHA256)
+$(ZIP) $(SCP_ZIP): | $(BUILD)
+	wget -O $@.tmp $(URL)
+	if ! echo '$(SHA256)  $@.tmp' | sha256sum --check --quiet; then \
+		echo "$(URL) does not match its checksum" >&2; \
 		rm -f $@.tmp; \
 		exit 1; \
 	fi
@@ -263,14 +290,15 @@ $(ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
-	rm -rf $(STAGE) $(BUILD)/zip
+	rm -rf $(STAGE) $(BUILD)/zip $(BUILD)/scp-zip
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(LIBEXEC_DIR) \
 		$(STAGE)$(TEMPLATE_DIR) $(STAGE)$(THEME_TEMPLATE_DIR) $(STAGE)$(THEME_DIR) \
 		$(STAGE)$(SCREENSAVER_DIR) $(STAGE)$(BACKGROUNDS) $(STAGE)$(FONTS) $(STAGE)$(FONTS_DOC) \
+		$(STAGE)$(SCP_FONTS) $(STAGE)$(SCP_FONTS_DOC) \
 		$(STAGE)$(PLYMOUTH_THEME_DIR) $(STAGE)$(PLYMOUTH_SHARE_DIR) $(STAGE)$(PLYMOUTH_TEMPLATE_DIR) \
 		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
@@ -288,6 +316,9 @@ $(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(COMMANDS) hd-mount-helper hd-reboot
 	unzip -q $(ZIP) $(FONT_FILES) OFL.txt README.md -d $(BUILD)/zip
 	install -m 0644 $(BUILD)/zip/*.ttf $(STAGE)$(FONTS)/
 	install -m 0644 $(BUILD)/zip/OFL.txt $(BUILD)/zip/README.md $(STAGE)$(FONTS_DOC)/
+	unzip -q $(SCP_ZIP) $(SCP_FONT_FILES) LICENSE.txt README.md -d $(BUILD)/scp-zip
+	install -m 0644 $(BUILD)/scp-zip/*.ttf $(STAGE)$(SCP_FONTS)/
+	install -m 0644 $(BUILD)/scp-zip/LICENSE.txt $(BUILD)/scp-zip/README.md $(STAGE)$(SCP_FONTS_DOC)/
 	install -m 0644 $(PLYMOUTH_THEME) $(STAGE)$(PLYMOUTH_THEME_DIR)/
 	install -m 0644 $(PLYMOUTH_TEMPLATES) $(STAGE)$(PLYMOUTH_TEMPLATE_DIR)/
 	install -m 0644 plymouth/plymouthd.conf $(STAGE)$(PLYMOUTH_SHARE_DIR)/

@@ -1,7 +1,11 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: hd-desktop
 Comment: The wallpapers in /usr/share/backgrounds/hyprdebian are PNG renders
- of the Emerald theme SVGs from the Debian package desktop-base. The plymouth
+ of the theme SVGs of the Debian package desktop-base: emerald-*.png of
+ Emerald, softwaves-mulberry-*.png of Soft Waves and lines-sand-*.png of
+ Lines, the last two recoloured with the colours of the themes mulberry and
+ sand. All three are by Juliette Taka Belin, under the GPL, version 2 or
+ later. The plymouth
  theme hyprdebian is based on the theme emerald of desktop-base; its
  background is the Emerald wallpaper, by Juliette Taka Belin, under the same
  license.
@@ -42,12 +46,23 @@ Comment: The wallpapers in /usr/share/backgrounds/hyprdebian are PNG renders
  the SIL Open Font License 1.1. JetBrains Mono has no Reserved Font Name.
  /usr/share/doc/hd-desktop/nerd-fonts/OFL.txt is the license file of the
  release zip.
+ .
+ The fonts in /usr/share/fonts/truetype/sauce-code-pro-nerd are the
+ SauceCodePro Nerd Font of the same release, unchanged: the family
+ SauceCodePro Nerd Font Mono of the release zip. It is Source Code Pro 2.042
+ of Adobe, https://github.com/adobe-fonts/source-code-pro, with the same
+ icons patched in. Adobe reserves the font name Source, so Nerd Fonts names
+ the patched fonts SauceCodePro. They are under the SIL Open Font License 1.1;
+ /usr/share/doc/hd-desktop/sauce-code-pro-nerd/LICENSE.txt is the license
+ file of the release zip.
 
 Files: *
 Copyright: 2026, Erik Van Hamme <erik.vanhamme@gmail.com>
 License: GPL-2+
 
 Files: usr/share/backgrounds/hyprdebian/emerald-*.png
+       usr/share/backgrounds/hyprdebian/softwaves-mulberry-*.png
+       usr/share/backgrounds/hyprdebian/lines-sand-*.png
 Copyright: 2014-2022, Juliette Taka Belin <juliette.belin@logilab.fr>
 License: GPL-2+
 
@@ -60,6 +75,11 @@ License: GPL-2+
 
 Files: usr/share/fonts/truetype/jetbrains-mono-nerd/*
 Copyright: 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+           2014 Ryan L McIntyre (https://ryanlmcintyre.com)
+License: OFL-1.1
+
+Files: usr/share/fonts/truetype/sauce-code-pro-nerd/*
+Copyright: 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'
            2014 Ryan L McIntyre (https://ryanlmcintyre.com)
 License: OFL-1.1
 

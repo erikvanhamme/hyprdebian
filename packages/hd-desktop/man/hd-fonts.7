@@ -29,7 +29,21 @@ Both families keep the ligatures of JetBrains Mono.
 .PP
 The fonts are in
 .IR /usr/share/fonts/truetype/jetbrains-mono-nerd .
-fontconfig finds them there, and refreshes its cache when the package is
+.PP
+It also holds Source Code Pro, the typeface by Adobe, with the same icons,
+for the theme mulberry of
+.BR hd-theme (7):
+the family
+.BR "SauceCodePro Nerd Font Mono" ,
+short
+.BR "SauceCodePro NFM" ,
+with one letter wide icons, in the styles ExtraLight, Light, Regular,
+Medium, SemiBold, Bold and Black, each also in Italic.
+Adobe reserves the font name Source, so Nerd Fonts names it SauceCodePro.
+It is in
+.IR /usr/share/fonts/truetype/sauce-code-pro-nerd .
+.PP
+fontconfig finds the fonts there, and refreshes its cache when the package is
 installed, upgraded or removed.
 .SH USING THE FONTS
 Name the font in the configuration of a program by a family name, with the
@@ -83,6 +97,11 @@ The typeface, made by The JetBrains Mono Project Authors at JetBrains.
 .br
 https://github.com/JetBrains/JetBrainsMono
 .TP
+.B Source Code Pro
+The typeface, made by Adobe.
+.br
+https://github.com/adobe-fonts/source-code-pro
+.TP
 .B Nerd Fonts
 The icons and the patched fonts, by Ryan L McIntyre and the Nerd Fonts
 contributors.
@@ -91,14 +110,16 @@ Icons, Codicons, Devicons, Octicons and Powerline.
 .br
 https://www.nerdfonts.com/
 .SH COPYRIGHT
-The fonts are under the SIL Open Font License 1.1, as is JetBrains Mono, which
-they are derived from.
+The fonts are under the SIL Open Font License 1.1, as are JetBrains Mono and
+Source Code Pro, which they are derived from.
 The icons are under the licenses of their projects.
 See
 .I /usr/share/doc/hd-desktop/copyright
 for the copyright holders and every license, and
 .I /usr/share/doc/hd-desktop/nerd\-fonts/OFL.txt
-for the license file of the release.
+and
+.I /usr/share/doc/hd-desktop/sauce\-code\-pro\-nerd/LICENSE.txt
+for the license files of the release.
 .SH FILES
 .TP
 .I /usr/share/fonts/truetype/jetbrains-mono-nerd/JetBrainsMonoNerdFont\-*.ttf
@@ -107,13 +128,21 @@ The family JetBrainsMono Nerd Font.
 .I /usr/share/fonts/truetype/jetbrains-mono-nerd/JetBrainsMonoNerdFontMono\-*.ttf
 The family JetBrainsMono Nerd Font Mono.
 .TP
+.I /usr/share/fonts/truetype/sauce-code-pro-nerd/SauceCodeProNerdFontMono\-*.ttf
+The family SauceCodePro Nerd Font Mono.
+.TP
 .I /usr/share/doc/hd-desktop/copyright
 The copyright holders and licenses.
 .TP
 .I /usr/share/doc/hd-desktop/nerd\-fonts/OFL.txt
 .TQ
 .I /usr/share/doc/hd-desktop/nerd\-fonts/README.md
-The license and the readme of the Nerd Fonts release.
+The license and the readme of the Nerd Fonts release of JetBrains Mono.
+.TP
+.I /usr/share/doc/hd-desktop/sauce\-code\-pro\-nerd/LICENSE.txt
+.TQ
+.I /usr/share/doc/hd-desktop/sauce\-code\-pro\-nerd/README.md
+The license and the readme of the Nerd Fonts release of Source Code Pro.
 .SH SEE ALSO
 .BR hd-desktop (7),
 .BR fc-list (1),

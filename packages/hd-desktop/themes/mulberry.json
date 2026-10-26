@@ -1,0 +1,16 @@
+{
+    "font": "SauceCodePro NFM Medium",
+    "font-size-big": 24,
+    "font-size-normal": 18,
+    "font-size-small": 14,
+    "highlight": "#e8364f",
+    "normal": "#6b2a7e",
+    "dark": "#1a0a1c",
+    "light": "#f3e3ef",
+    "border": 4,
+    "radius": 10,
+    "gap": 4,
+    "opacity": 0.85,
+    "icon_size": 48,
+    "background": "softwaves-mulberry"
+}
