@@ -163,9 +163,7 @@ exists: when an upgrade writes it, and at every login until the reboot. It
 runs
 .IR /usr/libexec/hd-desktop/hd-reboot-notify ,
 which shows a notification with the reasons of
-.BR hd-reboot-check (1);
-clicking it runs
-.BR hd-ask-reboot .
+.BR hd-reboot-check (1).
 It shows once per session. The postinst enables the unit for every user on
 its first installation; to switch it off for a user:
 .PP

@@ -50,7 +50,7 @@ Description: HyprDebian desktop
  monitor mode menu, the mount menus and the volume keys. The users in the
  group sudo mount and unmount drives from the mount menus without a
  password. A notification in the desktop session says when a reboot is
- needed, as after a new kernel; clicking it asks whether to reboot.
+ needed, as after a new kernel.
  .
  It holds the parts of the desktop:
   - the Emerald wallpaper of Debian 12, in /usr/share/backgrounds/hyprdebian;

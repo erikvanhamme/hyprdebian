@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 """Shows a notification that the system needs a reboot, with the reasons of hd-reboot-check.
-Clicking it asks whether to reboot, with hd-ask-reboot.
 
 The package hd-desktop installs this as /usr/libexec/hd-desktop/hd-reboot-notify, and
 hd-reboot-notify.service runs it in the desktop session when /run/reboot-required exists. mako
@@ -24,18 +23,14 @@ def reasons():
 
 
 def notify(found):
-    """Shows the notification, and returns the action that was chosen, or None."""
-    # The hint comes first: mako cuts off a body that is too long.
-    body = "Click to reboot.\n" + "\n".join(found)
     for _ in range(TRIES):
         result = subprocess.run(["notify-send", "--app-name=HyprDebian", f"--icon={ICON}",
-                                 "--urgency=critical", "--action=default=Reboot",
-                                 "Reboot needed", body], capture_output=True, text=True)
+                                 "--urgency=critical", "Reboot needed", "\n".join(found)],
+                                capture_output=True, text=True)
         if result.returncode == 0:
-            return result.stdout.strip() or None
+            return
         time.sleep(WAIT)
     print(f"Could not show the notification: {result.stderr.strip()}", file=sys.stderr)
-    return None
 
 
 def main():
@@ -43,10 +38,8 @@ def main():
         description="Show a notification that the system needs a reboot.").parse_args()
 
     found = reasons()
-    if not found:
-        return
-    if notify(found) == "default":
-        subprocess.run(["/usr/bin/hd-ask-reboot"])
+    if found:
+        notify(found)
 
 
 if __name__ == "__main__":
