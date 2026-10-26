@@ -48,12 +48,15 @@ local launcher    = [[if cmd=$(hd-launcher-cache | hd-menu); then sh -c "$cmd"; 
 
 -- See https://wiki.hypr.land/Configuring/Basics/Autostart/
 
+-- mako, hypridle and hyprpaper start by their own systemd user units, which graphical-session.target
+-- wants.
+--
 -- Autostart necessary processes (like notifications daemons, status bars, etc.)
 -- Or execute your favorite apps at launch like this:
 --
-hl.on("hyprland.start", function () 
-    hl.exec_cmd("uwsm app -- mako")
-end)
+-- hl.on("hyprland.start", function ()
+--     hl.exec_cmd("uwsm app -- myapp")
+-- end)
 
 
 -------------------------------
