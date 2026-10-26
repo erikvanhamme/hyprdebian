@@ -102,12 +102,16 @@ class TestParsing(unittest.TestCase):
         self.assertEqual(report.last_upgrade(logs),
                          int(time.mktime((2026, 9, 20, 9, 0, 0, 0, 0, -1))))
 
-    def test_newest_kernel_compares_versions_by_number(self):
+    def test_newest_kernel_is_modified_last(self):
+        # Two builds of hd-kernel of the same linux: the hash of the newer one sorts first.
         with tempfile.TemporaryDirectory() as tmp:
-            for version in ["6.9.12+deb14-amd64", "6.12.1+deb14-amd64", "6.10.3+deb14-amd64"]:
-                open(os.path.join(tmp, "vmlinuz-" + version), "w").close()
+            for when, version in [(1000, "7.2.13+deb14-amd64"), (2000, "7.2.12+deb14-hdf00000-amd64"),
+                                  (3000, "7.2.12+deb14-hd000000-amd64")]:
+                path = os.path.join(tmp, "vmlinuz-" + version)
+                open(path, "w").close()
+                os.utime(path, (when, when))
 
-            self.assertEqual(report.newest_kernel(tmp), "6.12.1+deb14-amd64")
+            self.assertEqual(report.newest_kernel(tmp), "7.2.12+deb14-hd000000-amd64")
 
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIsNone(report.newest_kernel(tmp))

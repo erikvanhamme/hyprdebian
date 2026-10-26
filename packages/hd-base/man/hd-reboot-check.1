@@ -11,7 +11,12 @@ per line, or nothing when it does not:
 .IP \(bu 4
 the newest kernel in
 .I /boot
-is not the one running;
+is not the one running: the one whose
+.I vmlinuz
+was modified last, as
+.B hd-bootloader
+picks it, since dpkg keeps the time of the build and the releases of
+hd-kernel end in a hash;
 .IP \(bu 4
 the ZFS module for the running kernel is not the one loaded, as after an
 upgrade of

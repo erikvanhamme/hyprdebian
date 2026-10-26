@@ -293,18 +293,17 @@ def lists_time(path=APT_LISTS):
     return newest
 
 
-def version_key(version):
-    return [int(part) if part.isdigit() else part for part in re.split(r"[.+~-]", version)]
-
-
 def newest_kernel(boot="/boot"):
-    """Returns the newest installed kernel, so the dashboard can tell a reboot is due."""
-    versions = [os.path.basename(name)[len("vmlinuz-"):] for name in glob.glob(os.path.join(boot, "vmlinuz-*"))]
+    """Returns the newest installed kernel, so the dashboard can tell a reboot is due: the one whose
+    vmlinuz was modified last, as hd-bootloader and hd-reboot-check of hd-base pick it."""
+    names = glob.glob(os.path.join(boot, "vmlinuz-*"))
 
-    if not versions:
+    if not names:
         return None
 
-    return max(versions, key=version_key)
+    newest = max(names, key=lambda name: (os.path.getmtime(name), name))
+
+    return os.path.basename(newest)[len("vmlinuz-"):]
 
 
 def parse_snapshots(text):

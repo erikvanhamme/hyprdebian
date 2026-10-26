@@ -163,7 +163,7 @@ The tests in `packages/hd-base/tests/test_up.py` cover the parts that read the s
 hd-reboot-check [--write]
 ```
 
-`hd-reboot-check` prints why the system needs a reboot, one reason per line, or nothing: the newest kernel in `/boot` is not the one running, or the ZFS module for the running kernel is not the one loaded, as after an upgrade of `zfs-dkms`. When neither is the case but `/run/reboot-required` exists, where Debian packages ask for a reboot, the packages in `/run/reboot-required.pkgs` are the reason. With `--write`, as root, it also writes those two files when a reboot is needed; they are in `/run`, so they are gone after the reboot.
+`hd-reboot-check` prints why the system needs a reboot, one reason per line, or nothing: the newest kernel in `/boot` is not the one running, or the ZFS module for the running kernel is not the one loaded, as after an upgrade of `zfs-dkms`. The newest kernel is the one whose `vmlinuz` was modified last, as [hd-bootloader](hd-bootloader.md) picks it: dpkg keeps the time of the build, and the releases of [hd-kernel](hd-kernel.md) end in a hash, by which their order cannot be told. When neither is the case but `/run/reboot-required` exists, where Debian packages ask for a reboot, the packages in `/run/reboot-required.pkgs` are the reason. With `--write`, as root, it also writes those two files when a reboot is needed; they are in `/run`, so they are gone after the reboot.
 
 `hd-up` runs it with `--write` after every run, and so does the kernel hook `/etc/kernel/postinst.d/zz-hd-reboot-check` after a kernel is installed, outside a chroot. Nothing reboots the system on its own; until the reboot:
 - the message after a login has a line `Reboot needed:` with the reasons;

@@ -9,16 +9,18 @@ message after a login, hd-report and the notification of hd-desktop to show why.
     hd-reboot-check --write  also write /run/reboot-required when one is, as root
 
 A reboot is needed when the newest kernel in /boot is not the one running, or the ZFS module for
-the running kernel is not the one loaded, as after an upgrade of zfs-dkms. /run/reboot-required
-is where Debian packages ask for a reboot; /run/reboot-required.pkgs names the packages, one per
-line. Both are in /run, so they are gone after the reboot. When a package wrote them and neither
-check finds a reason, that request is the reason.
+the running kernel is not the one loaded, as after an upgrade of zfs-dkms. The newest kernel is
+the one whose vmlinuz was modified last, as hd-bootloader picks it: dpkg keeps the time of the
+build, and the releases of hd-kernel end in a hash, by which their order cannot be told.
+
+/run/reboot-required is where Debian packages ask for a reboot; /run/reboot-required.pkgs names
+the packages, one per line. Both are in /run, so they are gone after the reboot. When a package
+wrote them and neither check finds a reason, that request is the reason.
 """
 
 import argparse
 import glob
 import os
-import re
 import subprocess
 import sys
 
@@ -30,17 +32,13 @@ MARKER = "/run/reboot-required"
 MARKER_PKGS = MARKER + ".pkgs"
 
 
-def version_key(version):
-    return [int(part) if part.isdigit() else part for part in re.split(r"[.+~-]", version)]
-
-
 def newest_kernel(boot=BOOT):
-    """Returns the newest kernel in /boot, or None when there is none."""
-    versions = [os.path.basename(name)[len("vmlinuz-"):]
-                for name in glob.glob(os.path.join(boot, "vmlinuz-*"))]
-    if not versions:
+    """Returns the kernel in /boot whose vmlinuz was modified last, or None when there is none."""
+    names = glob.glob(os.path.join(boot, "vmlinuz-*"))
+    if not names:
         return None
-    return max(versions, key=version_key)
+    newest = max(names, key=lambda name: (os.path.getmtime(name), name))
+    return os.path.basename(newest)[len("vmlinuz-"):]
 
 
 def read_file(path):

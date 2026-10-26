@@ -87,7 +87,7 @@ The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-report` 
 | --- | --- |
 | Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
 | HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.sources`. |
-| Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`. |
+| Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`, the one whose `vmlinuz` was modified last, as `hd-reboot-check` picks it. |
 | Secure Boot | The EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`, read as `hd-secboot --status` reads them, see [hd-secboot](hd-secboot.md#--status). |
 | Boot time, load, CPUs, memory | `/proc`. |
 | Pools | `zpool list`, and the last completed scrub from the scan line of `zpool status`: the bytes it repaired, the errors it found and when it ended. A scrub that is running, paused or was canceled, and a resilver, leave it out. |

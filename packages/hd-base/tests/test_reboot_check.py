@@ -42,12 +42,16 @@ class TestReasons(unittest.TestCase):
 
 
 class TestNewestKernel(unittest.TestCase):
-    def test_versions_compare_by_number(self):
+    def test_modified_last(self):
+        # Two builds of hd-kernel of the same linux: the hash of the newer one sorts first.
         with tempfile.TemporaryDirectory() as boot:
-            for version in ["7.2.9+deb14-amd64", "7.2.12+deb14-amd64", "7.10.1+deb14-amd64"]:
-                open(os.path.join(boot, f"vmlinuz-{version}"), "w").close()
+            for when, version in [(1000, "7.2.13+deb14-amd64"), (2000, "7.2.12+deb14-hdf00000-amd64"),
+                                  (3000, "7.2.12+deb14-hd000000-amd64")]:
+                path = os.path.join(boot, f"vmlinuz-{version}")
+                open(path, "w").close()
+                os.utime(path, (when, when))
             open(os.path.join(boot, "config-7.11.0+deb14-amd64"), "w").close()
-            self.assertEqual(check.newest_kernel(boot), "7.10.1+deb14-amd64")
+            self.assertEqual(check.newest_kernel(boot), "7.2.12+deb14-hd000000-amd64")
 
     def test_no_kernels(self):
         with tempfile.TemporaryDirectory() as boot:
