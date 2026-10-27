@@ -59,6 +59,7 @@ packages/hd-base/usr/lib/systemd/zram-generator.conf.d/hyprdebian.conf
 packages/hd-base/usr/lib/sysctl.d/50-zram.conf
 packages/hd-base/usr/lib/systemd/resolved.conf.d/00-direct-uplink.conf
 packages/hd-base/deb/postinst
+packages/hd-base/deb/prerm
 packages/hd-base/deb/postrm
 packages/hd-base/deb/triggers
 packages/hd-base/deb/control
@@ -73,12 +74,13 @@ packages/hd-base/man/hd-link-repo.8
 packages/hd-base/man/hd-firmware.8
 packages/hd-base/tests/test_firmware.py
 packages/hd-base/tests/test_issue.py
+packages/hd-base/tests/test_reboot_check.py
 packages/hd-base/tests/test_up.py
 ```
 
 The files of the shared parts are listed on their pages: [hd-config](hd-config.md#building-the-package), [hd-network](hd-network.md#building-the-package) and [hd-secboot](hd-secboot.md#building-the-package).
 
-`make test` runs the tests in `packages/hd-base/tests`, see [hd-secboot](hd-secboot.md#tests) and [Firmware](#firmware).
+`make test` runs the tests in `packages/hd-base/tests`, see [Firmware](#firmware), [hd-up](#hd-up), [hd-reboot-check](#hd-reboot-check), [hd-issue](#hd-issue) and [hd-secboot](hd-secboot.md#tests).
 
 ## Packages
 The installer starts from the minimal base of Debian, the `minbase` variant of debootstrap, so these are all the packages besides the required ones of Debian.
@@ -169,6 +171,8 @@ hd-reboot-check [--write]
 - the message after a login has a line `Reboot needed:` with the reasons;
 - `hd-report` sends that a reboot is due to the dashboard;
 - hd-desktop shows a notification in the desktop session, see [hd-desktop](hd-desktop.md).
+
+The tests in `packages/hd-base/tests/test_reboot_check.py` cover the parts that compare the kernels and the ZFS modules and read `/run/reboot-required.pkgs`.
 
 ## hd-reboot and hd-poweroff
 ```
@@ -275,6 +279,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/bin/hd-sync-skel` | Brings the files of `/etc/skel` into the home directory. |
 | `/usr/sbin/hd-issue` | Writes the login banner in `/etc/issue`. |
 | `/usr/sbin/hd-link-repo` | Switches the HyprDebian repository and suite of apt. |
+| `/usr/sbin/hd-firmware` | Finds and installs the firmware packages that the hardware needs. |
 | `/usr/share/hd-base/templates/hyprdebian.sources.j2` | The template of the apt source of `hd-link-repo`. |
 | `/etc/hyprdebian/version.json` | The version of HyprDebian, `version.json` of the root of this repository, which is also the version of hd-base. The banners show it. A conffile. |
 | `/etc/issue` | The login banner, written by `hd-issue`. The one of base-files is diverted to `/etc/issue.debian`. |
@@ -295,4 +300,4 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/bin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
 | `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
 | `/usr/sbin/hd-secboot`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
-| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz` | The man pages. |
+| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot-check.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz`, `/usr/share/man/man8/hd-firmware.8.gz` | The man pages. |

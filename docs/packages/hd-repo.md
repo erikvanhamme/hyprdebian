@@ -74,9 +74,9 @@ The suites of a package come from the `deploy.json` in its package directory:
 }
 ```
 
-Most HyprDebian packages go to both suites. `hd-desktop` goes to unstable only, as they need Hyprland, which trixie does not have.
+Most HyprDebian packages go to both suites. `hd-desktop` and `hd-audacious` go to unstable only: the desktop needs Hyprland, which trixie does not have, and hd-audacious is built for the desktop.
 
-`make update-repo` hands `update-repo.py` each package as `<suites>:<path>`, such as `trixie,unstable:packages/hd-base_1.8_all.deb`. With `--dry-run` before the packages, it only prints the commands.
+`make update-repo` hands `update-repo.py` each package as `<suites>:<path>`, such as `trixie,unstable:build/both/hd-base_<version>_all.deb`. `make list-debs` prints that list without building anything, for a build that runs the upload apart from `make all`. With `--dry-run` before the packages, it only prints the commands.
 
 Some more options of `update-repo.py`, also given before the packages:
 - `--host <host>` uploads to that host, without asking for the host name.

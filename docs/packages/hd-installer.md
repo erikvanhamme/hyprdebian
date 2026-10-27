@@ -43,6 +43,17 @@ packages/hd-installer/scripts/helpers-host.sh
 packages/hd-installer/scripts/helpers-network.sh
 packages/hd-installer/scripts/helpers-user.sh
 packages/hd-installer/scripts/questions.sh
+packages/hd-installer/scripts/disk.sh
+packages/hd-installer/scripts/partition.sh
+packages/hd-installer/scripts/filesystem.sh
+packages/hd-installer/scripts/base.sh
+packages/hd-installer/scripts/packages.sh
+packages/hd-installer/scripts/user.sh
+packages/hd-installer/scripts/cleanup.sh
+packages/hd-installer/render.py
+packages/hd-installer/templates/
+packages/hd-installer/deploy/
+packages/hd-installer/examples/beast.json
 packages/hd-installer/deb/control
 packages/hd-installer/man/hd-installer.8
 ```
@@ -83,6 +94,7 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 | `render.py` | Renders a jinja2 template with the variables of its environment. |
 | `templates/` | The templates of the files written in the new system, at their path there with `.j2`. |
 | `deploy/` | The files copied into the new system, at their path there. |
+| `examples/beast.json` | An answers file of a real system, without the password; not in the package. |
 
 A task is a shell function. Tasks run without `set -e`, as they run inside an `if`, so every command that may fail ends in `|| return 1`.
 
@@ -168,7 +180,7 @@ The answers are read again on every run, as the password is never saved. The pat
 ## Disk, partition and filesystem
 The disk phase turns off the swap, stops the md arrays, unmounts everything below `/mnt` and exports the ZFS pools of the live system, such as those of an earlier attempt, then wipes every disk picked with `wipefs` and `sgdisk --zap-all`, and discards it with `blkdiscard`. A disk without discard, such as a hardware RAID volume, is not discarded.
 
-The partition phase partitions the disks. The numbers of the partitions are the same on every disk, so every partition has a fixed name, such as `/dev/disk/by-id/wwn-<wwn>-part3`, or `/dev/vda3` and `/dev/nvme0n1p3` for a disk named by its kernel node:
+The partition phase clears the partition table of every disk picked, partitions the disks, has the kernel read the new tables with `partprobe`, waits for udev and shows each disk with `lsblk`. The numbers of the partitions are the same on every disk, so every partition has a fixed name, such as `/dev/disk/by-id/wwn-<wwn>-part3`, or `/dev/vda3` and `/dev/nvme0n1p3` for a disk named by its kernel node:
 
 | Partition | Disks | Size | Type |
 | --- | --- | --- | --- |
@@ -226,7 +238,7 @@ The packages phase installs every marked package in one `apt install`, then runs
 | `pkg_root_skel` | Copies `/etc/skel` into `/root`, so root gets the files of hd-base there, such as the aliases and the nano config, as the user does in `u_skel`. |
 | `pkg_network` | Sets the wired interface with `hd-network-iface set`, and the wifi interface with route metric 200, so wired is preferred; with wifi the boot does not wait for the network. Then renders the files with `hd-network-render` and enables `systemd-networkd`. |
 | `pkg_esps` | Writes the bootloader, its assets and the UKIs to the EFI system partitions with `update-esps` of the bootloader, signed with the Secure Boot keys of `hd-base`. |
-| `pkg_boot_entries` | Adds the firmware boot entries of the bootloader, `HyprDebian`, or `HyprDebian (primary)` and `HyprDebian (secondary)` on mirrored ESP disks. |
+| `pkg_boot_entries` | Adds the firmware boot entries of the bootloader, `HyprDebian`, or `HyprDebian (primary)` and `HyprDebian (secondary)` on mirrored ESP disks, so the primary comes first in the boot order. Entries with the same label, as of an earlier installation, are removed first. |
 
 ## User and cleanup
 The user phase makes the user account:

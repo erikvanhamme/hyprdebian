@@ -293,6 +293,8 @@ system partition (1 GiB) on the ESP disks, 2 the swap and 3 the ZFS pool on
 the system disks.
 A disk that is only an ESP disk or only a system disk has only its own
 partitions.
+Then it shows each disk with
+.BR lsblk (8).
 .TP
 .B filesystem
 Makes
@@ -370,7 +372,14 @@ Boot keys of
 .BR hd-base ,
 see
 .BR hd-secboot (7),
-and adds the firmware boot entries.
+and adds the firmware boot entries:
+.BR HyprDebian ,
+or
+.B HyprDebian (primary)
+and
+.B HyprDebian (secondary)
+on mirrored ESP disks, in place of the entries of the same name of an
+earlier installation.
 .TP
 .B user
 Makes the user account, with the full name and the password, and its home

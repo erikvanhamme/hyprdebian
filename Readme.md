@@ -24,13 +24,14 @@ Feel free to experiment with it.
 11. Some laptop friendly optimization.
 12. Optional docker support. See [hd-docker](docs/packages/hd-docker.md).
 13. Optional QEMU/KVM support. See [hd-qemu-kvm](docs/packages/hd-qemu-kvm.md).
-14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md).
+14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/HyprDebian/Backup%20tool.md).
 15. Optional status reports to a dashboard that shows all hyprdebian systems on one page. See [hd-dashboard](docs/packages/hd-dashboard.md) and [hd-report](docs/packages/hd-report.md).
 
 ## System overview
 
-- **Base:** Debian unstable (sid), with extra packages from the local hyprdebian repository.
-- **Storage:** ZFS on root with native encryption, on a single drive or mirrored over two drives. The installer takes an `@install` snapshot of the boot and root datasets.
+- **Base:** Debian unstable (sid), with extra packages from the HyprDebian repository. A system without the desktop can also run on trixie.
+- **Storage:** ZFS on root, encrypted by default, on a single drive or mirrored over two drives. There is no boot pool. The installer takes the snapshot `rpool/hyprdebian@install`, and `hd-up` takes one before every upgrade.
+- **Boot:** hd-bootloader, a small UEFI bootloader that boots UKIs from the EFI system partitions, signed with the Secure Boot keys of the owner.
 - **Session:** systemd, with uwsm managing the Hyprland session and greetd for the login.
 - **Desktop:** Hyprland, with kitty as terminal, hd-menu as launcher and menus, and mako for notifications.
 - **Audio:** PipeWire, with wiremix as mixer.
@@ -40,9 +41,7 @@ See [About](docs/HyprDebian/About.md) for more.
 
 ## Installation
 
-Please note:
-1. The installer will not do any handholding. If it asks questions, you better have the right answers.
-2. Near the end, it will complain that 'rpool' could not be exported. This is a known bug which is very hard to fix, see 'First boot' below for a workaround.
+Please note: the installer will not do any handholding. If it asks questions, you better have the right answers.
 
 ### From the HyprDebian live ISO
 
@@ -100,20 +99,15 @@ Because it is in `/tmp`, it is also gone after a reboot of the live system.
 
 ## First boot
 
-On first boot, you will be dropped in the busybox shell.
+When the installer is done, it has exported the pool, and the new system can be booted. With encryption, the initramfs asks for the passphrase of the pool, the password of the user, before it imports the pool; with `hd-desktop`, the boot splash asks for it.
 
-Grub will complain that 'rpool' could not be imported because it is in use by another system.
-
-To correct this, on the busybox prompt, execute:
+The system boots to the console. For a desktop, install it and reboot:
 
 ```
-zpool import -f rpool
-exit
+sudo apt install hd-desktop
 ```
 
-You will then be prompted for the unlock passphrase as entered during installation.
-
-Subsequent boots will be normal.
+This needs a HyprDebian repository with the suite `unstable`, see `hd-link-repo` above.
 
 ## Keyboard shortcuts
 
@@ -127,7 +121,7 @@ The `docs` folder has more documentation:
 - [Installer](docs/packages/hd-installer.md): how the installer works, its questions and how it is built.
 - [Live cd](docs/Livecd/Overview.md): building and using the hyprdebian live ISO.
 - [VM provisioning](docs/VM/Provisioning.md): provisioning a vm on the local computer to install with the live cd.
-- [Backup tool](docs/Backup%20tool/Backup%20tool%20overview.md): the hyprdebian backup tool.
+- [Backup tool](docs/HyprDebian/Backup%20tool.md): the HyprDebian backup tool.
 - [Desktop](docs/packages/hd-desktop.md): the Hyprland desktop and the login with greetd.
 - [Boot splash](docs/packages/hd-plymouth.md): the boot splash, which looks like the lock screen and asks for the ZFS password.
 - [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, and [hd-report](docs/packages/hd-report.md), which sends their status reports.

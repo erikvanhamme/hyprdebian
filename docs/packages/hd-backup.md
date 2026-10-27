@@ -57,6 +57,14 @@ packages/hd-backup/man/hd-backup-unload.8
 packages/hd-backup/man/hd-backup-vm.8
 packages/hd-backup/man/hd-backup-vms.8
 packages/hd-backup/man/hd-restore-vm.8
+packages/hd-backup/tests/helpers.py
+packages/hd-backup/tests/test_units.py
+packages/hd-backup/tests/test_scan.py
+packages/hd-backup/tests/test_write.py
+packages/hd-backup/tests/test_write_tar.py
+packages/hd-backup/tests/test_accounting.py
+packages/hd-backup/tests/test_commands.py
+packages/hd-backup/tests/test_backup_restore.py
 packages/hd-backup/tests/test_vm.py
 packages/hd-backup/tests/test_blockwrite.py
 packages/hd-backup/tests/test_drive.py
@@ -151,7 +159,7 @@ It then defines the VM in libvirt with the XML of the backup, with the disks poi
 Removing the package stops the timer and keeps the list of VMs and the backups. Purging it also removes the key `hd-backup` of `/etc/hyprdebian/config.json`. The backups and the snapshot of the last backup of each disk stay.
 
 ## Tests
-The tests are in `packages/hd-backup/tests`. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
+The tests are in `packages/hd-backup/tests`. The tests of `hd-backup` cover the scan, the write, the estimate of the tarball sizes when a carrier runs full and every command, on a database in memory or a temporary one, and write and restore backups end to end with `tar`, with stubs in place of the tape drive. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
 ```
 cd packages/hd-backup
 make test

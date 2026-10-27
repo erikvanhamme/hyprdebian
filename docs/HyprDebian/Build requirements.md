@@ -45,10 +45,11 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 The downloads and the compiled releases are kept in `build/` of their package directory, so later builds reuse them until `make clean`.
 
 ## The tests: make test
-`make test` runs the unittest tests of `hd-dashboard`, `hd-report` and `hd-backup`. They need:
+`make test` runs the unittest tests of `hd-dashboard`, `hd-report`, `hd-backup` and `hd-base`. They need:
 
 | Package | Needs |
 | --- | --- |
+| `hd-base` | `python3`, only the standard library. |
 | `hd-dashboard` | `python3`, only the standard library. |
 | `hd-report` | `python3`, only the standard library. It also loads `packages/hd-dashboard/hd-dashboard`. |
 | `hd-backup` | `python3` and the C compiler of `make deb`, as it builds `blockwrite` first. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
