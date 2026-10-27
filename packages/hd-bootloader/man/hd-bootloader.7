@@ -8,9 +8,12 @@ normal and a ZFS recovery profile, and boots the chosen one.
 It comes in two packages, of which only one can be installed:
 .TP
 .B hd-bootloader-gfx
-the graphical frontend: the menu on the wallpaper of
+the graphical frontend: the menu on the background of the theme of the
+system of
 .BR hd-desktop ,
-in its JetBrains Mono Nerd Font;
+in its colours and font, as
+.BR hd-menu (1)
+shows a menu;
 .TP
 .B hd-bootloader-txt
 the text frontend: the menu on the text console of the firmware.
@@ -113,13 +116,6 @@ which can override it.
 .PP
 The fields of the graphical frontend:
 .TP
-.B wallpaper
-The wallpaper, a PNG or other image;
-.I /usr/share/backgrounds/hyprdebian/emerald\-1920x1080.png
-by default.
-A relative path is relative to
-.IR /etc/hyprdebian .
-.TP
 .BR res_x ", " res_y
 The display resolution of the bootloader; 1920 by 1080 by default.
 It is also passed to the kernel as
@@ -128,22 +124,6 @@ so that the boot splash of
 .BR plymouth (8)
 and the desktop start with the same resolution.
 .TP
-.B font
-The fontconfig name or file of the font;
-.B JetBrainsMono NFM Medium
-by default.
-.TP
-.BR color ", " selected_color
-The colour of the menu labels, and of the selected label and the border of
-the menu box;
-.B #0066cc
-and
-.B #ff6600
-by default.
-.TP
-.B border_width
-The width of the border of the menu box in pixels; 5 by default.
-.TP
 .B work_area_size
 The width and height of the menu box in percent of the screen; 50 by
 default.
@@ -151,6 +131,18 @@ The texts scale with it.
 .TP
 .BR x_center ", " y_center
 The centre of the menu box in percent of the screen; 50 by default.
+.PP
+The fields
+.BR wallpaper ,
+.BR font ,
+.BR color ,
+.B selected_color
+and
+.B border_width
+of versions before 0.10 are ignored with a warning; the upgrade removes them.
+The graphical frontend takes its look from the theme; see
+.B THE LOOK
+below.
 .SH CHANGING THE SETTINGS
 Write the whole key with
 .BR hd-config-update (1),
@@ -162,6 +154,58 @@ hd-config-update hd-bootloader < bootloader.json
 /usr/lib/hd-bootloader/update-esps
 .fi
 .RE
+.SH THE LOOK
+The graphical frontend shows the menu as
+.BR hd-menu (1)
+does, in the theme of the system: the key
+.B hd-theme
+of
+.IR /etc/hyprdebian/config.json ,
+which
+.B hd-theme \-\-select
+sets as root; see
+.BR hd-theme (7).
+A member that is missing or not valid takes the value of the theme default.
+.TP
+.B background
+The background: of the images of the family in
+.IR /usr/share/backgrounds/hyprdebian ,
+the smallest that covers
+.IR res_x " x " res_y ,
+else the largest; without one, the screen is
+.BR dark .
+.TP
+.BR dark ", " opacity
+The menu box,
+.B dark
+at
+.BR opacity .
+.TP
+.B highlight
+The border of the menu box.
+.TP
+.BR border ", " radius
+The width of that border and the radius of its corners; the box and the bar
+of the selected label have the inner radius,
+.B radius
+minus
+.BR border .
+.TP
+.B light
+The banner and the labels.
+.TP
+.B normal
+The divider under the banner, and the bar behind the selected label.
+.TP
+.B font
+The font of the texts.
+.PP
+The sizes of the theme are pixels at a height of 1080, scaled with
+.BR res_y .
+A new theme reaches the bootloader when the ESPs are written again:
+.B hd-theme \-\-select
+does that as root, unless it is given
+.BR \-\-no\-initramfs .
 .SH SECURE BOOT
 .B hd-base
 generates the Secure Boot keys of the owner in

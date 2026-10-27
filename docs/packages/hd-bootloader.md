@@ -3,7 +3,7 @@ The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the un
 
 | Package | Frontend |
 | --- | --- |
-| `hd-bootloader-gfx` | The graphical frontend: the menu on the wallpaper of `hd-desktop`, in its JetBrains Mono Nerd Font. |
+| `hd-bootloader-gfx` | The graphical frontend: the menu on the background of the theme of the system of `hd-desktop`, in its colours and font, as [hd-menu](hd-menu.md) shows a menu. |
 | `hd-bootloader-txt` | The text frontend: the menu on the text console of the firmware. |
 
 `hd-bootloader-update` builds the UKIs and writes them, the bootloader and `assets.efi` to an EFI system partition (ESP). `assets.efi` holds the settings, the menu and the DKMS MOK, which the bootloader hands to the kernel so that it loads the DKMS-built ZFS module under Secure Boot. A system with only the kernels of [hd-kernel](hd-kernel.md) has no DKMS MOK: their ZFS module is signed with the key the kernel was built with, and `assets.efi` then has no MOK.
@@ -81,15 +81,10 @@ The key `hd-bootloader` holds a JSON object, as `hd-bootloader-gfx` stores it:
 {
     "hd-bootloader": {
         "frontend": "graphical",
-        "wallpaper": "/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png",
         "res_x": 1920,
         "res_y": 1080,
         "timeout": 5,
         "banner_text": "HyprDebian Bootloader",
-        "font": "JetBrainsMono NFM Medium",
-        "color": "#0066cc",
-        "selected_color": "#ff6600",
-        "border_width": 5,
         "work_area_size": 50,
         "x_center": 50,
         "y_center": 50,
@@ -103,7 +98,7 @@ The key `hd-bootloader` holds a JSON object, as `hd-bootloader-gfx` stores it:
 }
 ```
 
-All fields are optional; a missing field gets its default. A field of the other frontend is an error.
+All fields are optional; a missing field gets its default. A field of the other frontend is an error. The fields `wallpaper`, `font`, `color`, `selected_color` and `border_width` of versions before 0.10 are ignored with a warning; the upgrade removes them, as the graphical frontend now takes its look from the theme, see [The look](#the-look).
 
 | Field | Frontend | Default | Meaning |
 | --- | --- | --- | --- |
@@ -111,12 +106,7 @@ All fields are optional; a missing field gets its default. A field of the other 
 | `timeout` | both | `5` | Seconds before the default entry boots. |
 | `banner_text` | both | `HyprDebian Bootloader` | The text above the menu. |
 | `cmdline` | both | see above | The kernel command line of the UKIs: `root` (the value of `root=`), `quiet`, `splash`, and `extra`, a list of more arguments. The graphical frontend adds `video=<res_x>x<res_y>` before those of `extra`, which can override it. |
-| `wallpaper` | graphical | `/usr/share/backgrounds/hyprdebian/emerald-1920x1080.png` | The wallpaper; a relative path is relative to `/etc/hyprdebian`. |
 | `res_x`, `res_y` | graphical | `1920`, `1080` | The display resolution of the bootloader, also passed to the kernel as `video=<res_x>x<res_y>`, so that the plymouth boot splash and the desktop start with the same resolution. |
-| `font` | graphical | `JetBrainsMono NFM Medium` | The fontconfig name or file of the font. |
-| `color` | graphical | `#0066cc` | The colour of the menu labels. |
-| `selected_color` | graphical | `#ff6600` | The colour of the selected label and of the border of the menu box. |
-| `border_width` | graphical | `5` | The width of the border of the menu box in pixels. |
 | `work_area_size` | graphical | `50` | The width and height of the menu box in percent of the screen; the texts scale with it. |
 | `x_center`, `y_center` | graphical | `50`, `50` | The centre of the menu box in percent of the screen. |
 
@@ -125,6 +115,23 @@ To change the settings, write the whole key with `hd-config-update`, then update
 sudo hd-config-update hd-bootloader < bootloader.json
 sudo /usr/lib/hd-bootloader/update-esps
 ```
+
+## The look
+The graphical frontend shows the menu as [hd-menu](hd-menu.md) does, in the theme of the system: the key `hd-theme` of `/etc/hyprdebian/config.json`, which `sudo hd-theme --select <name>` sets, see [hd-theme](hd-theme.md). The themes of the users are not used. A member that is missing or not valid takes the value of the theme default, which is also used without a theme.
+
+| Member | Use |
+| --- | --- |
+| `background` | The background: of the images of the family in `/usr/share/backgrounds/hyprdebian`, the smallest that covers `res_x` x `res_y`, else the largest, scaled and cropped to it. Without one, the screen is `dark`. |
+| `dark`, `opacity` | The menu box, `dark` at `opacity`. |
+| `highlight` | The border of the menu box. |
+| `border`, `radius` | The width of that border and the radius of its corners; the box and the bar of the selected label have the inner radius, `radius` minus `border`. |
+| `light` | The banner and the labels. |
+| `normal` | The divider under the banner, and the bar behind the selected label. |
+| `font` | The font of the texts. |
+
+The sizes of the theme are pixels at a height of 1080: they are scaled with `res_y`, so the menu looks the same at every resolution. The texts take 80% of the height of a row, a tenth of the menu box.
+
+The menu is in `assets.efi`, so a new theme reaches the bootloader when the ESPs are written again. `sudo hd-theme --select` does that, unless it is given `--no-initramfs`; otherwise the next kernel or initrd does, or run `sudo /usr/lib/hd-bootloader/update-esps`.
 
 ## hd-bootloader-update
 ```

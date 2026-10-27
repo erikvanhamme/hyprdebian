@@ -5,7 +5,9 @@ bootloader in the key hd-bootloader of /etc/hyprdebian/config.json with hd-confi
     no settings yet             the defaults of this package are stored
     settings of the other one   the defaults of this package are stored, keeping the settings
                                 that both frontends have: timeout, banner_text and cmdline
-    settings of this one        they are left as they are
+    settings of this one        they are left as they are, but for the settings that the
+                                frontend no longer uses, which are removed: those of the
+                                graphical frontend that the theme of the system replaced
 
 The ESPs are not updated: that happens with the next kernel or initrd, or by running
 /usr/lib/hd-bootloader/update-esps.
@@ -25,6 +27,8 @@ UPDATE_ESPS = "/usr/lib/hd-bootloader/update-esps"
 DEFAULT_FRONTEND = "graphical"
 # The settings of every frontend.
 COMMON_KEYS = ["timeout", "banner_text", "cmdline"]
+# The settings that each frontend no longer uses, as OBSOLETE of its module.
+OBSOLETE_KEYS = {"graphical": ["wallpaper", "font", "color", "selected_color", "border_width"]}
 
 
 def current_settings():
@@ -58,8 +62,14 @@ def main():
             if key in current:
                 settings[key] = current[key]
     else:
-        print(f"Keeping the bootloader settings in {CONFIG_FILE}.")
-        settings = None
+        obsolete = [k for k in OBSOLETE_KEYS.get(defaults["frontend"], []) if k in current]
+        if obsolete:
+            print(f"Removing the bootloader settings {', '.join(obsolete)} from {CONFIG_FILE}; "
+                  "the bootloader takes them from the theme of the system now.")
+            settings = {k: v for k, v in current.items() if k not in obsolete}
+        else:
+            print(f"Keeping the bootloader settings in {CONFIG_FILE}.")
+            settings = None
 
     if settings is not None:
         subprocess.run([CONFIG_UPDATE, CONFIG_KEY, json.dumps(settings)], check=True)

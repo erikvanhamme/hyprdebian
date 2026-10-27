@@ -26,10 +26,12 @@ and the other programs of the desktop look up the theme in the same way. A user 
 theme of the system with hd-config-remove hd-theme. Selecting a theme does not change the
 desktops: each user runs hd-theme --apply for their own desktop.
 
-The boot splash uses the theme of the system. Selecting it as root, or replacing it with --add,
-renders the splash again with hd-plymouth-render --update-initramfs, which rebuilds the initramfs
-of all kernels when the splash changed; that takes a while. --no-initramfs leaves that out; the
-next rebuild of the initramfs, such as for a new kernel, then takes the new splash.
+The boot splash and the bootloader use the theme of the system. Selecting it as root, or replacing
+it with --add, renders the splash again with hd-plymouth-render --update-initramfs, which rebuilds
+the initramfs of all kernels when the splash changed; that takes a while. Then, when hd-bootloader
+is installed, it writes the bootloader again with /usr/lib/hd-bootloader/update-esps, so the menu
+of the graphical bootloader has the theme. --no-initramfs leaves both out; the next rebuild of the
+initramfs, such as for a new kernel, then takes the new splash and bootloader.
 
 --apply writes, from the jinja2 templates in /usr/share/hd-theme/templates, one theme file per
 program, next to its own config in the home directory of the user:
@@ -70,6 +72,7 @@ CARD_DIR = "/var/cache/hd-theme/cards"
 BACKGROUNDS = "/usr/share/backgrounds/hyprdebian"
 TEMPLATE_DIR = "/usr/share/hd-theme/templates"
 PLYMOUTH_RENDER = "/usr/sbin/hd-plymouth-render"
+UPDATE_ESPS = "/usr/lib/hd-bootloader/update-esps"
 
 VALID_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -294,7 +297,8 @@ def render_card(theme_file, card):
 def select(name, initramfs):
     """Copies the theme to the configuration of whoever runs hd-theme, with hd-config-update,
     which picks the same configuration as own_config(). For the theme of the system, it also
-    renders the boot splash, and with initramfs rebuilds the initramfs when the splash changed."""
+    renders the boot splash, and with initramfs rebuilds the initramfs when the splash changed and
+    writes the bootloader again, when hd-bootloader is installed."""
     theme = load_theme(name)
     result = subprocess.run(["hd-config-update", CONFIG_KEY],
                             input=json.dumps({"name": name, **theme}), text=True)
@@ -308,6 +312,9 @@ def select(name, initramfs):
             command.append("--update-initramfs")
         if subprocess.run(command).returncode != 0:
             fail("Could not render the boot splash in the theme.")
+        if initramfs and os.path.exists(UPDATE_ESPS):
+            if subprocess.run([UPDATE_ESPS]).returncode != 0:
+                fail(f"Could not write the bootloader in the theme; run {UPDATE_ESPS} again.")
     else:
         print(f"Selected the theme {name} for you. Run hd-theme --apply to apply it to your "
               "desktop.")

@@ -111,6 +111,11 @@ Selected as root, the theme is rendered into the splash with
 .BR "hd-plymouth-render \-\-update\-initramfs" ,
 which rebuilds the initramfs of all kernels when the splash changed; that
 takes a while.
+The graphical bootloader of
+.BR hd-bootloader (7)
+uses it too: when hd-bootloader is installed, the bootloader is written to the
+EFI system partitions again with
+.IR /usr/lib/hd-bootloader/update-esps .
 .TP
 .B \-\-apply
 Write the theme files of the desktop programs in the home directory of the
@@ -129,8 +134,10 @@ With
 .B \-\-select
 or
 .B \-\-add
-as root: render the boot splash, but do not rebuild the initramfs.
-The next rebuild, such as for a new kernel, takes the new splash.
+as root: render the boot splash, but do not rebuild the initramfs nor write
+the bootloader.
+The next rebuild, such as for a new kernel, takes the new splash and
+bootloader.
 .TP
 .B \-\-cards
 Render the cards of all themes again, and remove the cards of themes that are

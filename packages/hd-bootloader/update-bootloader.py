@@ -49,7 +49,7 @@ has no DKMS MOK, and assets.efi then has no .mok. Without a usable
 assets.efi the bootloader shows an error and does not boot.
 
 With the assets in a file of their own, a change of the config, the
-wallpaper or the texts leaves BOOTX64.EFI alone; a change of the frontend
+theme or the texts leaves BOOTX64.EFI alone; a change of the frontend
 replaces it. assets.efi is a PE image
 that is never started: the bootloader loads it with LoadImage, so that with
 Secure Boot on the firmware checks its signature as it does for BOOTX64.EFI,
@@ -86,7 +86,8 @@ text.py). The postinst of the package of each frontend stores its keys and
 their defaults, deb/<package>/defaults.json, in the key hd-bootloader. All
 keys are optional: a key that is missing from the config gets the default
 here or in the module of the frontend, which should match. A key of another
-frontend is an error.
+frontend is an error; a key that the frontend no longer uses, in OBSOLETE of
+its module, is ignored with a warning.
 
 When the Secure Boot keys of the system are in /etc/hyprdebian/secboot, as
 the package hd-base generates them, BOOTX64.EFI, assets.efi and the UKIs
@@ -223,6 +224,13 @@ def load_config(path):
     if not (SCRIPTS / f"{name}.py").is_file():
         sys.exit(f"{where}: the {name} frontend is not installed; it is in the package {PACKAGES[name]}")
     frontend = importlib.import_module(name)
+
+    # Settings that a frontend no longer uses are left out with a warning,
+    # so that a config of an earlier version still works.
+    for key in sorted(set(config) & set(getattr(frontend, "OBSOLETE", []))):
+        print(f"{where}: the setting {key} is no longer used by the {name} frontend; ignoring it",
+              file=sys.stderr)
+        del config[key]
 
     defaults = {**DEFAULTS, **frontend.DEFAULTS}
     unknown = set(config) - set(defaults)
