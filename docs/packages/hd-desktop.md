@@ -5,7 +5,7 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - the desktop portals of Hyprland and GTK, for screen sharing, the file chooser and the dark mode;
 - kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit, and the screenshot tools grim, slurp and swappy;
 - the dark GTK theme Adwaita-dark, qt6ct and the Wayland plugin `qt6-wayland` for the Qt applications, the colour emoji of `fonts-noto-color-emoji`, and plymouth;
-- yazi, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv and firefox.
+- yazi with [ouch](ouch.md) for its archives, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv and firefox.
 
 HyprDebian installs no recommends, see [hd-base](hd-base.md), so the package depends on everything the desktop needs.
 
@@ -38,7 +38,7 @@ This builds `build/hd-desktop_<version>_<arch>.deb`. Its version is the version 
 sudo apt install ./build/hd-desktop_<version>_<arch>.deb
 ```
 
-It needs the HyprDebian repository for `hd-base`, `hd-audacious`, `wiremix` and `yazi`.
+It needs the HyprDebian repository for `hd-base`, `hd-audacious`, `wiremix`, `yazi` and `ouch`.
 
 The files involved are:
 ```

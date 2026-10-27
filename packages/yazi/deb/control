@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Recommends: ffmpeg, 7zip, jq, poppler-utils, fd-find, ripgrep, fzf, zoxide
+Recommends: ffmpeg, ouch, jq, poppler-utils, fd-find, ripgrep, fzf, zoxide
 Section: utils
 Priority: optional
 Homepage: https://yazi-rs.github.io/

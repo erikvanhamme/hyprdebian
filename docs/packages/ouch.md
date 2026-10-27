@@ -10,6 +10,8 @@ ouch list archive.7z
 
 It handles tar, zip, 7z, gzip, snappy, zstd, xz, lzma, lzip, bzip2, bzip3, lz4 and brotli both ways, and RAR for decompressing and listing only.
 
+[hd-desktop](hd-desktop.md) depends on it, and [yazi](yazi.md) previews and extracts archives with it, in place of 7-zip.
+
 The package also installs the man pages of the release (`man ouch`) and its completions for bash, zsh and fish.
 
 ## Building the package

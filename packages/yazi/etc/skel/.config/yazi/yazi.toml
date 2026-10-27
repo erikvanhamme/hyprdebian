@@ -22,12 +22,22 @@ imv_open = [
   { run = 'imv-wayland %s', orphan = true, desc = "Open (Imv)" },
 ]
 
+# Archives, with ouch in place of 7-zip. It unpacks next to the archive, in a folder named after it
+# when the archive holds more than one item, and asks what to do when that is there already: rename,
+# merge, overwrite or skip. On an error it waits for Enter, so the message can be read.
+
+ouch_extract = [
+  { run = 'ouch decompress %s || { echo "Press Enter to go back."; read _; }', block = true, desc = "Extract here (ouch)" },
+]
+
 [open]
 
-rules = [
+# Before the rules of yazi, which stay for the rest, such as text and folders.
+prepend_rules = [
   { mime = "video/*", use = "mpv_open" },
   { mime = "audio/*", use = ["audacious_open", "audacious_enqueue"] },
   { mime = "image/*", use = "imv_open" },
+  { mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma}", use = ["ouch_extract", "reveal"] },
 ]
 
 # Disable terminal preview rendering for network paths
@@ -39,6 +49,12 @@ run = "noop"
 [[plugin.prepend_preloaders]]
 url = "/stor/**"
 run = "noop"
+
+# Preview the formats of ouch with the plugin hd-ouch, in place of the archive previewer of yazi,
+# which needs 7-zip.
+[[plugin.prepend_previewers]]
+mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma}"
+run = "hd-ouch"
 
 [mgr]
 show_hidden = true

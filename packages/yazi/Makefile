@@ -28,6 +28,10 @@
 #                 /etc/skel/.config/yazi/yazi.toml
 #                                             the configuration of yazi new
 #                                             users get, a conffile
+#                 /etc/skel/.config/yazi/plugins/hd-ouch.yazi/main.lua
+#                                             the previewer of archives
+#                                             with ouch, of that
+#                                             configuration, a conffile
 #               with the control file deb/control. The version of the
 #               package is the release with DEB_REVISION; raise DEB_REVISION
 #               for a package of the same release that is handed out, and
@@ -42,7 +46,7 @@ BUILD := build
 # The release of yazi, without the v of its tag, and the revision of the
 # package of it.
 YAZI_VERSION := 26.9.1
-DEB_REVISION := 1
+DEB_REVISION := 2
 
 DEB_NAME := yazi
 DEB_VERSION := $(YAZI_VERSION)-$(DEB_REVISION)
@@ -59,7 +63,7 @@ IMAGE := debian:trixie
 COMMANDS := hd-yazi
 MANPAGES := man/hd-yazi.1
 # The files in etc/, installed at the same path as conffiles.
-CONFFILES := etc/skel/.config/yazi/yazi.toml
+CONFFILES := etc/skel/.config/yazi/yazi.toml etc/skel/.config/yazi/plugins/hd-ouch.yazi/main.lua
 
 .PHONY: deb deb-path clean
 
