@@ -7,8 +7,9 @@ The package hd-desktop installs this as /usr/bin/hd-theme.
     hd-theme --add <file> [--no-initramfs]
                                     add the theme in <file>, or replace the one with its name
     hd-theme --delete <name>        delete a theme; not the theme of the system
-    hd-theme --select <name> [--no-initramfs]
-                                    make <name> the theme of the system, or of the user
+    hd-theme --select <name> [--no-initramfs] [--apply [--no-reload]]
+                                    make <name> the theme of the system, or of the user, and with
+                                    --apply apply it at once
     hd-theme --apply [--no-reload]  apply the selected theme to the desktop of the user
     hd-theme --cards                render the cards of all themes again
 
@@ -24,7 +25,8 @@ Who runs hd-theme decides which one --select, --apply and --list work on: root t
 system, any other user their own theme, or the theme of the system while they have none. hd-menu
 and the other programs of the desktop look up the theme in the same way. A user goes back to the
 theme of the system with hd-config-remove hd-theme. Selecting a theme does not change the
-desktops: each user runs hd-theme --apply for their own desktop.
+desktops: each user runs hd-theme --apply for their own desktop, or gives --apply with --select to
+apply the theme they select.
 
 The boot splash and the bootloader use the theme of the system. Selecting it as root, or replacing
 it with --add, renders the splash again with hd-plymouth-render --update-initramfs, which rebuilds
@@ -345,11 +347,12 @@ def render_card(theme_file, card):
     return True
 
 
-def select(name, initramfs):
+def select(name, initramfs, applying):
     """Copies the theme to the configuration of whoever runs hd-theme, with hd-config-update,
     which picks the same configuration as own_config(). For the theme of the system, it also
     renders the boot splash, and with initramfs rebuilds the initramfs when the splash changed and
-    writes the bootloader again, when hd-bootloader is installed."""
+    writes the bootloader again, when hd-bootloader is installed. applying leaves out the hint to
+    run hd-theme --apply, as the caller applies the theme next."""
     theme = load_theme(name)
     result = subprocess.run(["hd-config-update", CONFIG_KEY],
                             input=json.dumps({"name": name, **theme}), text=True)
@@ -366,6 +369,8 @@ def select(name, initramfs):
         if initramfs and os.path.exists(UPDATE_ESPS):
             if subprocess.run([UPDATE_ESPS]).returncode != 0:
                 fail(f"Could not write the bootloader in the theme; run {UPDATE_ESPS} again.")
+    elif applying:
+        print(f"Selected the theme {name} for you.")
     else:
         print(f"Selected the theme {name} for you. Run hd-theme --apply to apply it to your "
               "desktop.")
@@ -681,7 +686,7 @@ def add(path, initramfs):
         print(f"Added the theme {name}.")
     # Users that selected it keep their copy until they select it again.
     if name == system_name():
-        select(name, initramfs)
+        select(name, initramfs, False)
 
 
 def delete(name):
@@ -717,7 +722,7 @@ def render_cards():
 def main():
     parser = argparse.ArgumentParser(
         description=f"Add, delete, list, select and apply the themes of HyprDebian in {THEME_DIR}.")
-    actions = parser.add_mutually_exclusive_group(required=True)
+    actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--list", action="store_true",
                          help="print the themes, * before the selected one, and show their "
                          "cards in imv-wayland")
@@ -728,16 +733,26 @@ def main():
     actions.add_argument("--select", metavar="NAME",
                          help="make NAME the theme of the system when run as root, else the "
                          "theme of the user")
-    actions.add_argument("--apply", action="store_true",
-                         help="apply the selected theme to the desktop of the user")
     actions.add_argument("--cards", action="store_true",
                          help="render the cards of all themes again")
+    # --apply is not in the group, as it also goes with --select, which applies the theme it
+    # selects.
+    parser.add_argument("--apply", action="store_true",
+                        help="apply the selected theme to the desktop of the user; with "
+                        "--select, after selecting it")
     parser.add_argument("--no-reload", action="store_true",
                         help="with --apply: write the theme files, reload nothing")
     parser.add_argument("--no-initramfs", action="store_true",
                         help="with --select or --add as root: render the boot splash, but do "
                         "not rebuild the initramfs")
     args = parser.parse_args()
+    if args.apply:
+        if args.list or args.add is not None or args.delete is not None or args.cards:
+            parser.error("--apply goes alone or with --select")
+    elif not (args.list or args.add is not None or args.delete is not None
+              or args.select is not None or args.cards):
+        parser.error("one of the arguments --list --add --delete --select --apply --cards is "
+                     "required")
     if args.no_reload and not args.apply:
         parser.error("--no-reload goes with --apply")
     if args.no_initramfs and args.select is None and args.add is None:
@@ -746,6 +761,9 @@ def main():
     if args.list:
         list_themes()
         return
+    if args.select is not None:
+        check_name(args.select)
+        select(args.select, not args.no_initramfs, args.apply)
     if args.apply:
         apply(not args.no_reload)
         return
@@ -758,9 +776,6 @@ def main():
     elif args.delete is not None:
         need_root("--delete")
         delete(args.delete)
-    elif args.select is not None:
-        check_name(args.select)
-        select(args.select, not args.no_initramfs)
 
 
 if __name__ == "__main__":

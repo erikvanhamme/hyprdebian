@@ -14,6 +14,8 @@ hd-theme \- add, delete, list, select and apply the themes of HyprDebian
 .B hd-theme \-\-select
 .I name
 .RB [ \-\-no\-initramfs ]
+.RB [ \-\-apply
+.RB [ \-\-no\-reload ]]
 .br
 .B hd-theme \-\-apply
 .RB [ \-\-no\-reload ]
@@ -100,7 +102,11 @@ Programs that read the theme themselves, such as
 .BR hd-menu (1),
 use it at once.
 The desktops do not change until each user runs
-.BR "hd-theme \-\-apply" .
+.BR "hd-theme \-\-apply" ;
+with
+.BR \-\-apply ,
+the theme is applied to the desktop of the user at once, after it is
+selected.
 A user goes back to the theme of the system with
 .BR "hd-config-remove hd-theme" .
 .IP
@@ -123,6 +129,9 @@ user, from the selected theme, and reload the programs whose theme file
 changed; see
 .B APPLYING
 below.
+Alone, or with
+.BR \-\-select ,
+which selects the theme first.
 .TP
 .B \-\-no\-reload
 With
@@ -252,8 +261,7 @@ hd-theme \-\-apply
 A theme for one user only, and back to the theme of the system:
 .PP
 .nf
-hd-theme \-\-select sand
-hd-theme \-\-apply
+hd-theme \-\-select sand \-\-apply
 hd-config-remove hd-theme
 hd-theme \-\-apply
 .fi

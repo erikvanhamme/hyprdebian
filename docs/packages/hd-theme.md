@@ -75,7 +75,7 @@ hd-theme --list                 print the themes and show their cards in imv-way
 hd-theme --add <file> [--no-initramfs]
                                 add the theme in <file>, or replace the one with its name
 hd-theme --delete <name>        delete a theme; not the theme of the system
-hd-theme --select <name> [--no-initramfs]
+hd-theme --select <name> [--no-initramfs] [--apply [--no-reload]]
                                 make <name> the theme of the system, or of the user
 hd-theme --apply [--no-reload]  apply the selected theme to the desktop of the user
 hd-theme --cards                render the cards of all themes again
@@ -83,7 +83,7 @@ hd-theme --cards                render the cards of all themes again
 
 `--add` takes the name of the theme from the file name without `.json`: lower case letters, digits, `-` and `_`. It checks the theme and renders its card before it adds it; when either fails, nothing is added. When it replaces the theme of the system, it selects it again for the system; users who selected it themselves keep the old copy until they select it again. `--delete` refuses the theme of the system; users who selected it themselves keep their copy.
 
-`--select` writes the theme to a configuration with `hd-config-update`, which picks it by who runs it: run as root, the theme becomes the theme of the system in `/etc/hyprdebian/config.json`; run as any other user, the theme of that user in `~/.config/hyprdebian/config.json`. Programs that read the theme themselves, such as hd-menu and hd-message, use the new theme at once; the desktop programs only after the user runs `hd-theme --apply`. A user goes back to the theme of the system with `hd-config-remove hd-theme`.
+`--select` writes the theme to a configuration with `hd-config-update`, which picks it by who runs it: run as root, the theme becomes the theme of the system in `/etc/hyprdebian/config.json`; run as any other user, the theme of that user in `~/.config/hyprdebian/config.json`. Programs that read the theme themselves, such as hd-menu and hd-message, use the new theme at once; the desktop programs only after the user runs `hd-theme --apply`. `--apply` with `--select` does that at once, after the theme is selected. A user goes back to the theme of the system with `hd-config-remove hd-theme`.
 
 Selected as root, the theme is also rendered into the boot splash with `hd-plymouth-render --update-initramfs`, which rebuilds the initramfs of all kernels when the splash changed; that takes a while. Then, when hd-bootloader is installed, it writes the bootloader to the EFI system partitions again with `/usr/lib/hd-bootloader/update-esps`, so the graphical bootloader has the theme. `--no-initramfs` renders the splash without the rebuild and the bootloader; the next rebuild, such as for a new kernel, takes both. See [hd-plymouth](hd-plymouth.md#rendering-the-splash) and [hd-bootloader](hd-bootloader.md#the-look).
 
@@ -105,8 +105,7 @@ hd-theme --apply
 
 To use a theme for yourself only, and to go back to the theme of the system:
 ```
-hd-theme --select sand
-hd-theme --apply
+hd-theme --select sand --apply
 hd-config-remove hd-theme
 hd-theme --apply
 ```
