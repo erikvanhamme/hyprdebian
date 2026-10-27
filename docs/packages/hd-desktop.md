@@ -153,7 +153,7 @@ systemctl --user disable --now hd-reboot-notify.path
 ```
 
 ## Application launcher
-`SUPER + SPACE` opens the application launcher: the menu that `hd-launcher-cache` prints, in [hd-menu](hd-menu.md), 40% of the width and the height of the screen. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
+`SUPER + SPACE` opens the application launcher: the menu that `hd-launcher-cache` prints, in [hd-menu](hd-menu.md), 40% of the width and the height of the screen unless the key `hd-launcher` sets its size, see below. The application or item chosen is started with `uwsm app --`, as a systemd user unit of its own: its own cgroup, its output in the journal and a clean stop at the logout. The other applications of the key bindings, such as the terminal, the browser and VSCodium, are started with `uwsm app` too; the menus and short commands are not.
 
 `hd-launcher-cache`, in `/usr/bin`, works for whoever runs it:
 
@@ -183,7 +183,7 @@ sudo hd-launcher-cache --update
 hd-launcher-cache --update
 ```
 
-The key `hd-launcher` of the configuration leaves applications out and adds items of its own:
+The key `hd-launcher` of the configuration leaves applications out, adds items of its own and sets the size of the menu:
 ```json
 "hd-launcher": {
     "exclude": ["debian-xterm.desktop", "debian-uxterm.desktop", "uuctl.desktop"],
@@ -193,7 +193,9 @@ The key `hd-launcher` of the configuration leaves applications out and adds item
             "command": ["kitty", "-e", "btop"],
             "icon": "utilities-system-monitor"
         }
-    ]
+    ],
+    "width": "60%",
+    "height": 800
 }
 ```
 
@@ -204,6 +206,7 @@ The key `hd-launcher` of the configuration leaves applications out and adds item
 | `add[].name` | | The label. |
 | `add[].command` | | The words of the command, a list of strings, run without a shell. For pipes, variables or `~`, use `["sh", "-c", "..."]`. |
 | `add[].icon` | Optional | The path of a PNG or SVG, or the name of an icon, looked up as the `Icon` of an application. An icon that is not found is reported and left out. |
+| `width`, `height` | Optional | The width and the height of the menu: a number of logical pixels above 0, or a percentage of the output above 0 and at most 100, a string such as `"60%"`. 40% each by default. |
 
 Other members, or a key that is not such an object, are an error, and the menu is not written. Write the key with `hd-config-update`, then the menu; with sudo for the system, without for yourself only:
 ```

@@ -74,8 +74,9 @@ installed, when it has one, and is not left out by the key
 .B hd-launcher
 (see CONFIGURATION).
 .PP
-The menu is 40% of the width and the height of the output; the options that
-do not fit scroll.
+The menu is 40% of the width and the height of the output, unless the key
+.B hd-launcher
+sets its size; the options that do not fit scroll.
 Every application and every item added is an option, with its
 .B Name
 or
@@ -156,7 +157,8 @@ would write, write nothing.
 .SH CONFIGURATION
 The key
 .B hd-launcher
-of the configuration leaves applications out of the menu and adds items of its own:
+of the configuration leaves applications out of the menu, adds items of its own
+and sets the size of the menu:
 .PP
 .RS
 .nf
@@ -168,7 +170,9 @@ of the configuration leaves applications out of the menu and adds items of its o
             "command": ["kitty", "\-e", "btop"],
             "icon": "utilities-system-monitor"
         }
-    ]
+    ],
+    "width": "60%",
+    "height": 800
 }
 .fi
 .RE
@@ -198,6 +202,13 @@ Optional: the path of a PNG or SVG, or the name of an icon, looked up as the
 of an application.
 An icon that is not found is reported and left out.
 .RE
+.TP
+.BR width ", " height
+Optional: the width and the height of the menu, a number of logical pixels
+above 0 or a percentage of the output above 0 and at most 100, a string such
+as
+.BR \(dq60%\(dq ;
+40% each by default.
 .PP
 Other members, or a key that is not such an object, are an error: the menu
 is not written.

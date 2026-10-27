@@ -29,21 +29,25 @@ key binding of the launcher in hyprland.lua pipes it into hd-menu.
 The applications are the .desktop files in /usr/share/applications and its subdirectories, of the
 type Application, that are not hidden, not left out for Hyprland by OnlyShowIn or NotShowIn, and
 whose TryExec, when they have one, is installed. The key hd-launcher of the configuration leaves out
-applications and adds items of its own:
+applications, adds items of its own and sets the size of the menu:
 
     "hd-launcher": {
         "exclude": ["org.gnome.Meld.desktop", "debian-xterm"],
         "add": [
             {"name": "Btop", "command": ["kitty", "-e", "btop"], "icon": "utilities-system-monitor"}
-        ]
+        ],
+        "width": "60%",
+        "height": 800
     }
 
 exclude is a list of desktop file IDs, such as "org.gnome.Settings.desktop"; the .desktop at the
 end may be left out. add is a list of items, each with a name, the label, a command, a list of the
 words of the command, run without a shell, and optionally an icon, the path of a PNG or SVG or the
-name of an icon, looked up as the Icon of a .desktop file. Both are optional.
+name of an icon, looked up as the Icon of a .desktop file. width and height are the size of the
+menu, a number of logical pixels or a percentage of the output, a string such as "60%"; without
+them, the menu is 40% of the width and the height of the output. All four are optional.
 
-The menu is 40% of the width and the height of the output. Every application and every item added
+Every application and every item added
 is an option of it, with its Name or name as the label. The value is the command line that starts
 it, which the launcher runs with sh -c: "uwsm app -- <ID>" for an application and
 "uwsm app -- <command>" for an item added, quoted for the shell. The options are sorted on the
@@ -88,7 +92,7 @@ WARNING_ICON = "/usr/share/hd-desktop/icons/warning.svg"
 ICON_THEMES = ["/usr/share/icons/hicolor", "/usr/share/icons/Adwaita"]
 PIXMAPS = "/usr/share/pixmaps"
 BANNER = "Applications"
-# The size of the menu, as a percentage of the output.
+# The size of the menu, as a percentage of the output, when the key hd-launcher has none.
 WIDTH = "40%"
 HEIGHT = "40%"
 
@@ -102,7 +106,7 @@ DESKTOP = "Hyprland"
 UWSM_APP = ["uwsm", "app", "--"]
 
 # The members of the key hd-launcher, and of an item of add.
-SETTINGS = ["exclude", "add"]
+SETTINGS = ["exclude", "add", "width", "height"]
 ITEM_MEMBERS = ["name", "command", "icon"]
 
 
@@ -182,12 +186,29 @@ def check_item(item, where):
         fail(f"The icon of {where} is not a path or the name of an icon.")
 
 
+def is_size(value):
+    """Whether a value is a size of hd-menu: a number of logical pixels above 0, or a percentage
+    of the output above 0 and at most 100, a string such as "60%"."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return value > 0
+    if not isinstance(value, str):
+        return False
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)%", value)
+    if match is None:
+        return False
+    return 0 < float(match.group(1)) <= 100
+
+
 def launcher_settings():
-    """The desktop file IDs to leave out, with .desktop at the end, and the items to add."""
+    """The desktop file IDs to leave out, with .desktop at the end, the items to add, and the width
+    and the height of the menu."""
     settings, source = lookup(CONFIG_KEY, {})
     where = f"the key {CONFIG_KEY} of {source}"
     if not isinstance(settings, dict):
-        fail(f"The key {CONFIG_KEY} of {source} is not a JSON object with exclude and add.")
+        fail(f"The key {CONFIG_KEY} of {source} is not a JSON object with exclude, add, width "
+             "and height.")
     unknown = [k for k in settings if k not in SETTINGS]
     if unknown:
         fail(f"The key {CONFIG_KEY} of {source} has unknown members {', '.join(unknown)}.")
@@ -199,6 +220,12 @@ def launcher_settings():
         fail(f"The add of {where} is not a list of items.")
     for number, item in enumerate(added, 1):
         check_item(item, f"Item {number} of the add of {where}")
+    width = settings.get("width", WIDTH)
+    height = settings.get("height", HEIGHT)
+    for name, value in (("width", width), ("height", height)):
+        if not is_size(value):
+            fail(f"The {name} of {where} is not a number of pixels or a percentage such as "
+                 "\"60%\".")
 
     ids = set()
     for entry in excluded:
@@ -206,7 +233,7 @@ def launcher_settings():
             ids.add(entry)
         else:
             ids.add(entry + ".desktop")
-    return ids, added
+    return ids, added, width, height
 
 
 def icon_size():
@@ -421,7 +448,7 @@ def added_icon_name(number, name):
 
 def build_menu(icon_dir, dry_run):
     """The menu of hd-menu, and the PNGs in icon_dir that it uses."""
-    excluded, added = launcher_settings()
+    excluded, added, width, height = launcher_settings()
     size = icon_size()
     if not dry_run:
         os.makedirs(icon_dir, mode=0o755, exist_ok=True)
@@ -444,7 +471,7 @@ def build_menu(icon_dir, dry_run):
         options.append(option(item["name"], item["command"], icon))
     options.sort(key=lambda o: (o["label"].casefold(), o["label"], o["value"]))
     used = {o["icon"] for o in options if o.get("icon", "").startswith(icon_dir + "/")}
-    return {"banner": BANNER, "width": WIDTH, "height": HEIGHT, "options": options}, used
+    return {"banner": BANNER, "width": width, "height": height, "options": options}, used
 
 
 def remove_unused(icon_dir, used):
