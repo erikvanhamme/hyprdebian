@@ -205,7 +205,7 @@ hd-issue
 HyprDebian <version> · <suite> · <console>
 ```
 
-with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.sources`, and the name of the console. A system that is not linked to a HyprDebian repository, as after an installation, has no such source; then the suite is the first one of `/etc/apt/sources.list.d/debian.sources`. The message after a login finds the suite in the same way. `HyprDebian` is shown in brown. A value that cannot be found shows as `unknown`. The tests in `packages/hd-base/tests/test_issue.py` cover how the suite is found.
+with the version of HyprDebian from `/etc/hyprdebian/version.json`, the suite of the HyprDebian packages from `/etc/apt/sources.list.d/hyprdebian.sources`, and the name of the console. A system that is not linked to a HyprDebian repository, as after an installation, has no such source; then the suite is the first one of `/etc/apt/sources.list.d/debian.sources`. The message after a login finds the suite in the same way. `HyprDebian` is shown in brown. The banner also shows the cursor of the console, with the escape sequence `\e[?25h`, which agetty prints: the kernel command line of [hd-bootloader](hd-bootloader.md) hides it for the boot splash with `vt.global_cursor_default=0`, and getty resets the console before agetty runs, which hides it again, so only agetty can show it. A value that cannot be found shows as `unknown`. The tests in `packages/hd-base/tests/test_issue.py` cover how the suite is found.
 
 The postinst runs it on every installation and upgrade. Run it as root after changing the suite yourself:
 ```

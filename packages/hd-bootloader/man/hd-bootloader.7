@@ -108,6 +108,17 @@ and
 by default), and
 .BR extra ,
 a list of more arguments.
+With
+.BR splash ,
+the UKIs also get
+.BR vt.global_cursor_default=0 ,
+which hides the cursor of the text console, so it does not blink before
+the splash shows; the recovery entry shows it again for its shell.
+An argument
+.B vt.global_cursor_default=
+in
+.B extra
+comes after it and wins.
 The graphical frontend adds
 .BI video= res_x x res_y
 before those of

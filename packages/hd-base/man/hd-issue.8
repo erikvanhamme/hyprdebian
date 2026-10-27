@@ -23,6 +23,10 @@ installation, has no such source; then the suite is the first one of
 .IR /etc/apt/sources.list.d/debian.sources .
 .B HyprDebian
 is shown in brown.
+The banner also shows the cursor of the console, which the kernel command
+line of hd-bootloader hides for the boot splash with
+.BR vt.global_cursor_default=0 ,
+so the login prompt and the shell after it have a cursor.
 A value that cannot be found shows as
 .BR unknown .
 .PP

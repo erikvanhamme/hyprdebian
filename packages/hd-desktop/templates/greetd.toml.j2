@@ -1,7 +1,9 @@
 # Written by hd-desktop-render, before every start of greetd, from the key hd-desktop of
 # /etc/hyprdebian/config.json. Changes made here are lost; see hd-desktop-render(8).
 [terminal]
-vt = 7
+# The session runs on tty1, which greetd.service gives it with XDG_VTNR; greetd leaves the VT
+# alone, so the boot splash stays on the screen until Hyprland has it.
+vt = "none"
 
 [general]
 runfile=/run/greetd.runfile
@@ -13,5 +15,5 @@ user = "{{ user }}"
 {% endif %}
 
 [default_session]
-command = "sh -c 'rm /run/greetd.runfile; chvt 1; systemctl stop greetd.service'"
+command = "sh -c 'rm /run/greetd.runfile; systemctl --no-block start getty@tty1.service'"
 user = "root"

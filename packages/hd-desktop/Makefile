@@ -31,6 +31,11 @@
 #                                             shows that a reboot is
 #                                             needed, run by
 #                                             hd-reboot-notify.service
+#                 /usr/libexec/hd-desktop/hd-plymouth-handoff
+#                                             hands the boot splash over to
+#                                             Hyprland, run by
+#                                             hd-plymouth-handoff.service
+#                                             and plymouth-quit-wait.service
 #                 /usr/libexec/hd-desktop/hd-shutdown
 #                                             closes the applications of
 #                                             the session, asking with
@@ -111,7 +116,11 @@
 #                 /usr/...                    the files in usr/, at the
 #                                             same path: the drop-in that
 #                                             runs hd-desktop-render before
-#                                             greetd starts, the
+#                                             greetd starts and puts it on
+#                                             tty1, the unit and the drop-in
+#                                             of plymouth-quit-wait.service
+#                                             that hand the boot splash over
+#                                             to Hyprland, the
 #                                             warning icon of
 #                                             hd-launcher-cache, the
 #                                             colour scheme hyprdebian of
@@ -290,7 +299,7 @@ $(ZIP) $(SCP_ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-plymouth-handoff hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
@@ -303,7 +312,7 @@ $(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helpe
 		$(STAGE)$(HOOK_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -s -m 0755 $(PROGRAMS)/hd-menu $(PROGRAMS)/hd-message $(STAGE)/usr/bin/
-	install -m 0755 hd-mount-helper hd-reboot-notify hd-shutdown $(STAGE)$(LIBEXEC_DIR)/
+	install -m 0755 hd-mount-helper hd-reboot-notify hd-plymouth-handoff hd-shutdown $(STAGE)$(LIBEXEC_DIR)/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	install -m 0644 $(THEME_TEMPLATES) $(STAGE)$(THEME_TEMPLATE_DIR)/

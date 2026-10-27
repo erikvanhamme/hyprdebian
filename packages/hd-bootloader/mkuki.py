@@ -5,9 +5,17 @@ The UKI holds the kernel, the initrd and two profiles:
 
     profile 0  the default boot:
                root=ZFS=rpool/hyprdebian ro quiet splash
+               vt.global_cursor_default=0
     profile 1  the ZFS recovery entry, which stops in the BusyBox shell of
                the initramfs before the root file system is mounted:
-               root=ZFS=rpool/hyprdebian ro quiet splash break=premount
+               root=ZFS=rpool/hyprdebian ro quiet splash
+               vt.global_cursor_default=0 break=premount
+               vt.global_cursor_default=1
+
+With splash, vt.global_cursor_default=0 hides the cursor of the text console,
+which would otherwise blink on the screen before the splash shows; an
+argument vt.global_cursor_default= in the extra arguments comes after it and
+wins. The recovery entry shows it again for its shell.
 
 The systemd stub boots profile 0 unless the bootloader passes "@1" as the
 first word of the command line.
@@ -37,7 +45,8 @@ DEFAULT_PROFILE = "ID=default\nTITLE=hyprdebian"
 # Profiles 1 and up: (profile section text, extra command line arguments,
 # suffix of the menu label).
 EXTRA_PROFILES = [
-    ("ID=recovery\nTITLE=ZFS recovery (BusyBox shell)", ["break=premount"], " (recovery)"),
+    ("ID=recovery\nTITLE=ZFS recovery (BusyBox shell)", ["break=premount", "vt.global_cursor_default=1"],
+     " (recovery)"),
 ]
 
 # The suffix of the menu label of each profile, by profile number.
@@ -49,7 +58,7 @@ def base_cmdline(args):
     if args.quiet:
         words.append("quiet")
     if args.splash:
-        words.append("splash")
+        words += ["splash", "vt.global_cursor_default=0"]
     words.extend(args.extra)
     return words
 
@@ -67,7 +76,7 @@ def main():
     parser.add_argument("-o", "--output", type=Path, required=True, help="UKI to write")
     parser.add_argument("--root", default=DEFAULT_ROOT, help=f"value of root= (default: {DEFAULT_ROOT})")
     parser.add_argument("--no-quiet", dest="quiet", action="store_false", help="leave quiet off the command lines")
-    parser.add_argument("--no-splash", dest="splash", action="store_false", help="leave splash off the command lines")
+    parser.add_argument("--no-splash", dest="splash", action="store_false", help="leave splash and vt.global_cursor_default=0 off the command lines")
     parser.add_argument(
         "--extra",
         action="append",

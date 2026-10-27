@@ -39,7 +39,7 @@ Description: HyprDebian desktop
  qt5ct is not a dependency, as the desktop has no Qt 5 applications: install
  qt5ct, qt5-xdgdesktopportal-platformtheme and qtwayland5 for them.
  .
- greetd logs the first user in to Hyprland on tty7 at the boot; the user is
+ greetd logs the first user in to Hyprland on tty1 at the boot; the user is
  the key hd-desktop of /etc/hyprdebian/config.json, written into
  /etc/greetd/config.toml by hd-desktop-render. The package also installs the
  files that new users get in /etc/skel: the configs of Hyprland, hypridle,

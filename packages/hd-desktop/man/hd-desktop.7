@@ -70,13 +70,23 @@ before.
 conflicts with them, replaces and provides them, so an upgrade removes them;
 the themes, the selected theme and the theme files of the users stay.
 .SH BOOTING INTO HYPRLAND
-greetd runs on tty7 and logs a user in to Hyprland at the boot, without a
-password, with
+greetd logs a user in to Hyprland on tty1 at the boot, without a password,
+with
 .BR "uwsm start hyprland.desktop" .
 The output of Hyprland goes to
 .IR /var/log/hyprland.log .
-greetd does this once per boot: after a logout, it switches to the console
-on tty1 and stops.
+greetd does this once per boot: after a logout, it starts the console on
+tty1 and stops.
+.PP
+The session runs on tty1, the VT of the boot splash, in the place of
+.BR getty@tty1.service ,
+so the splash stays on the screen until Hyprland has it; see
+.BR hd-plymouth (7).
+greetd leaves the VT alone, as its config has
+.BR "vt = \(dqnone\(dq" ;
+.B greetd.service
+gives the session tty1 with
+.BR XDG_VTNR .
 .PP
 The config of greetd,
 .IR /etc/greetd/config.toml ,
@@ -390,7 +400,9 @@ The output of Hyprland.
 .I /usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
 Runs
 .B hd-desktop-render
-before greetd starts.
+before greetd starts, and runs the session on tty1, in the place of
+.BR getty@tty1.service ,
+after the boot splash is handed over to it.
 .TP
 .I /etc/dconf/db/local.d
 .TQ

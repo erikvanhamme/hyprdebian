@@ -83,6 +83,37 @@ which hd-bootloader adds by default.
 The bootloader passes its resolution with
 .BR video= ,
 so the splash starts at that resolution.
+.SH HANDING OVER TO HYPRLAND
+At the end of the boot, the screen goes from the splash to Hyprland without
+the console in between.
+.B hd-plymouth-handoff.service
+takes the place of
+.BR plymouth-quit.service ,
+which would show the console.
+greetd wants it, and it runs before greetd starts:
+.B plymouth deactivate
+stops the splash, which stays on the screen.
+greetd starts the session of Hyprland on tty1, the VT of the splash, without
+a VT switch and without setting the VT to text mode; see
+.BR hd-desktop (7).
+Once Hyprland has the display,
+.B plymouth quit \-\-retain\-splash
+leaves the screen to it.
+.PP
+When greetd fails, or logs nobody in and starts the console on tty1, or
+when Hyprland does not have the display after 30 seconds, plymouth quits as
+usual and the console shows.
+.B plymouth-quit-wait.service
+returns at once when the splash is handed over, as greetd starts after it;
+otherwise it waits for plymouth as usual.
+.PP
+Hyprland shows the colour
+.B dark
+of the theme until hyprpaper draws the wallpaper, with
+.B disable_hyprland_logo
+in the config of Hyprland of the user.
+When Hyprland sets another mode than the one of the splash, the screen may
+blank while the mode changes.
 .SH FILES
 .TP
 .I /usr/share/plymouth/themes/hyprdebian/hyprdebian.plymouth
@@ -111,6 +142,13 @@ The config of plymouth, diverted.
 .TP
 .I /usr/share/initramfs-tools/hooks/hd-plymouth
 Renders the splash and puts it and its fonts in the initramfs.
+.TP
+.I /usr/lib/systemd/system/hd-plymouth-handoff.service
+.TQ
+.I /usr/lib/systemd/system/plymouth-quit-wait.service.d/hd-desktop.conf
+.TQ
+.I /usr/libexec/hd-desktop/hd-plymouth-handoff
+Hand the splash over to Hyprland.
 .TP
 .I /usr/share/doc/hd-desktop/copyright
 The copyright and license of the theme.

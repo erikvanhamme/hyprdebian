@@ -11,7 +11,7 @@ before every start, with the drop-in hd-desktop.conf.
 The user is the setting user of the key hd-desktop in /etc/hyprdebian/config.json. Without it, it
 is the user account with the lowest UID from UID_MIN to UID_MAX of /etc/login.defs, the first
 user that was made. Without such an account, or when the user of the setting does not exist,
-greetd logs nobody in: it switches to the console on tty1 and stops.
+greetd logs nobody in: it starts the console on tty1 and stops.
 
 The config is made from the jinja2 template greetd.toml.j2 in /usr/share/hd-desktop/templates.
 The output of Hyprland goes to /var/log/hyprland.log, which is given to the user. Run it as root.

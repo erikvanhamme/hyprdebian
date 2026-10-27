@@ -1,0 +1,16 @@
+# Hands the boot splash over to Hyprland, so the screen goes from the splash to the desktop without
+# the console in between; see hd-plymouth-handoff in /usr/libexec/hd-desktop. greetd.service wants
+# it. It takes the place of plymouth-quit.service, whose plain plymouth quit gives the screen to the
+# console, and comes before plymouth-quit-wait.service, which returns at once when it is active.
+[Unit]
+Description=Hand the boot splash over to the desktop
+After=systemd-user-sessions.service plymouth-start.service
+Before=greetd.service plymouth-quit-wait.service
+Conflicts=plymouth-quit.service
+
+[Service]
+Type=exec
+# plymouth lets go of the display before greetd starts, with the splash still on the screen.
+ExecStartPre=-/usr/bin/plymouth deactivate
+ExecStart=/usr/libexec/hd-desktop/hd-plymouth-handoff quit
+RemainAfterExit=yes

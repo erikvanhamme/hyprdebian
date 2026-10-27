@@ -18,6 +18,11 @@ hl.config({
     decoration = {
         rounding = {{ theme["radius"] }},
     },
+
+    -- The colour behind the wallpaper, which shows from the boot splash until hyprpaper draws.
+    misc = {
+        background_color = "rgb({{ theme["dark"] | hex }})",
+    },
 })
 
 -- Applications without a background opacity of their own are drawn at the opacity of the theme

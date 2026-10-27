@@ -76,7 +76,8 @@ Config keys of every frontend:
                     console of the firmware
     timeout         seconds before the default entry boots
     cmdline         root, quiet, splash and extra (a list) for the kernel
-                    command lines, see mkuki.py; the frontend may add
+                    command lines, see mkuki.py, which adds
+                    vt.global_cursor_default=0 with splash; the frontend may add
                     arguments before those of extra, as the graphical one
                     adds video=<res_x>x<res_y>
     banner_text     text of the banner

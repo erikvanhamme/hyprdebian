@@ -8,7 +8,7 @@ hd-desktop-render \- write the greetd config that boots into Hyprland
 .B hd-desktop-render
 writes
 .IR /etc/greetd/config.toml ,
-with which greetd logs a user in to Hyprland on tty7 at the boot, from the
+with which greetd logs a user in to Hyprland on tty1 at the boot, from the
 template
 .IR /usr/share/hd-desktop/templates/greetd.toml.j2 .
 It gives
@@ -61,7 +61,7 @@ of
 the first user that was made.
 .PP
 Without such an account, or when the user of the setting does not exist,
-greetd logs nobody in: it switches to the console on tty1 and stops.
+greetd logs nobody in: it starts the console on tty1 and stops.
 For example:
 .PP
 .RS

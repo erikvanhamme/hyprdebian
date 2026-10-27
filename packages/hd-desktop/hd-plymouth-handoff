@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+"""Hands the boot splash over to Hyprland, so the screen goes from the splash to the desktop
+without the console in between.
+
+The package hd-desktop installs this as /usr/libexec/hd-desktop/hd-plymouth-handoff.
+
+    hd-plymouth-handoff quit    quit plymouth once the desktop has the display
+    hd-plymouth-handoff wait    wait for the end of plymouth, unless it is handed over
+
+hd-plymouth-handoff.service, which greetd.service wants and starts before it, runs plymouth
+deactivate first: plymouth stops drawing and lets go of the display, but keeps it open, so the last
+frame of the splash stays on the screen. greetd starts the session on tty1, the VT of plymouth,
+without a VT switch, as its config has vt = "none". Then the service runs quit, which waits until
+another process than plymouthd has a DRM card open, as systemd-logind and Hyprland do once
+Hyprland has the display, and runs plymouth quit --retain-splash, which leaves the screen to it.
+
+Without the desktop, the console comes back with a plain plymouth quit: when greetd failed, when
+it logged nobody in and started getty@tty1.service, or after TIMEOUT seconds.
+
+plymouth-quit-wait.service runs wait, with the drop-in hd-desktop.conf. plymouth --wait, which it
+runs otherwise, waits until plymouth is gone, which would hold greetd back until the timeout, as
+greetd.service starts after it. wait returns at once when hd-plymouth-handoff.service is active,
+and runs plymouth --wait when it is not, as when greetd is not started.
+"""
+
+import argparse
+import os
+import subprocess
+import sys
+import time
+
+PLYMOUTH = "/usr/bin/plymouth"
+PLYMOUTH_PID = "/run/plymouth/pid"
+HANDOFF_UNIT = "hd-plymouth-handoff.service"
+GREETD_UNIT = "greetd.service"
+CONSOLE_UNIT = "getty@tty1.service"
+DRM_CARD = "/dev/dri/card"
+TIMEOUT = 30
+INTERVAL = 0.1
+
+
+def plymouth_running():
+    return subprocess.run([PLYMOUTH, "--ping"]).returncode == 0
+
+
+def plymouth_pid():
+    try:
+        with open(PLYMOUTH_PID, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def display_taken(plymouthd):
+    """True when a process other than plymouthd has a DRM card open."""
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit() or pid == plymouthd:
+            continue
+        fd_dir = f"/proc/{pid}/fd"
+        try:
+            fds = os.listdir(fd_dir)
+        except OSError:
+            continue
+        for fd in fds:
+            try:
+                target = os.readlink(os.path.join(fd_dir, fd))
+            except OSError:
+                continue
+            if target.startswith(DRM_CARD):
+                return True
+    return False
+
+
+def unit_state(unit):
+    return subprocess.run(["systemctl", "show", "--property=ActiveState", "--value", unit],
+                          capture_output=True, text=True).stdout.strip()
+
+
+def desktop_gone():
+    """True when greetd failed, or logged nobody in and started the console on tty1."""
+    if unit_state(GREETD_UNIT) == "failed":
+        return True
+    return unit_state(CONSOLE_UNIT) in ("active", "activating")
+
+
+def quit_plymouth():
+    if not plymouth_running():
+        return
+    plymouthd = plymouth_pid()
+    deadline = time.monotonic() + TIMEOUT
+    while time.monotonic() < deadline:
+        if display_taken(plymouthd):
+            print("The desktop has the display; quitting plymouth with the splash on the screen.")
+            subprocess.run([PLYMOUTH, "quit", "--retain-splash"])
+            return
+        if desktop_gone():
+            print("There is no desktop; quitting plymouth for the console.")
+            subprocess.run([PLYMOUTH, "quit"])
+            return
+        time.sleep(INTERVAL)
+    print(f"The desktop did not take the display in {TIMEOUT} seconds; quitting plymouth for the "
+          "console.", file=sys.stderr)
+    subprocess.run([PLYMOUTH, "quit"])
+
+
+def wait_plymouth():
+    if subprocess.run(["systemctl", "--quiet", "is-active", HANDOFF_UNIT]).returncode == 0:
+        return
+    os.execv(PLYMOUTH, [PLYMOUTH, "--wait"])
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Hand the boot splash over to Hyprland.")
+    parser.add_argument("action", choices=["quit", "wait"],
+                        help="quit: quit plymouth once the desktop has the display; wait: wait "
+                             "for the end of plymouth, unless it is handed over")
+    args = parser.parse_args()
+    if args.action == "quit":
+        quit_plymouth()
+    else:
+        wait_plymouth()
+
+
+if __name__ == "__main__":
+    main()

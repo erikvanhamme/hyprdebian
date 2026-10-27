@@ -53,6 +53,10 @@ the group users after every run of dpkg by apt, but not when the package is inst
 alone, so the postinst writes them too. A menu that cannot be written does not fail the
 installation.
 
+Versions before HANDOFF_SINCE showed the logo of Hyprland until hyprpaper drew the wallpaper. An
+upgrade from such a version says how the user gets the colour of the theme in its place, as the
+setting is in the config of Hyprland of the user.
+
 Versions before DROPPED_SINCE also depended on the packages in DROPPED, which are now marked as
 installed automatically and left for apt autoremove. An upgrade from such a version names them and
 says to mark the ones that are still used as installed by hand first, such as git. The postinst
@@ -115,6 +119,10 @@ TOOLKITS_SKEL = [".config/qt5ct", ".config/qt6ct", ".config/hypr/hyprtoolkit.con
 # hyprtoolkit, and the files in /etc/skel that it added for that.
 THEMED_TOOLKITS_SINCE = "1.56~"
 THEMED_TOOLKITS_SKEL = [".config/gtk-3.0/gtk.css", ".config/gtk-4.0/gtk.css"]
+
+# The first version of hd-desktop that hands the boot splash over to Hyprland, with the colour of
+# the theme behind the wallpaper instead of the logo of Hyprland.
+HANDOFF_SINCE = "1.59~"
 
 # The user units of hd-desktop.
 USER_UNITS = ["hd-reboot-notify.path"]
@@ -244,6 +252,11 @@ def main():
                       f"source = ~/.config/hypr/hd-theme-hyprtoolkit.conf in "
                       f"{home}/.config/hypr/hyprtoolkit.conf, without the colours and the "
                       f"fonts below it, as in {SKEL_DIR}. Then run hd-theme --apply.")
+    if previous != "" and older_than(previous, HANDOFF_SINCE):
+        print("The boot splash now stays on the screen until Hyprland has it. For the colour of "
+              "the theme instead of the logo of Hyprland until the wallpaper shows, set "
+              "disable_hyprland_logo = true in the misc section of ~/.config/hypr/hyprland.lua, "
+              f"as in {SKEL_DIR}, and run hd-theme --apply.")
     if previous != "" and older_than(previous, DROPPED_SINCE):
         print(f"hd-desktop no longer depends on {', '.join(DROPPED)}. apt autoremove removes "
               "them; mark the ones you use as installed by hand first, such as apt-mark manual "

@@ -57,6 +57,9 @@ packages/hd-desktop/hd-ask-poweroff, hd-ask-reboot, hd-mode-select, hd-mount, hd
 hd-unmount, hd-volume-down, hd-volume-mute, hd-volume-up
 packages/hd-desktop/etc/...
 packages/hd-desktop/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf
+packages/hd-desktop/usr/lib/systemd/system/hd-plymouth-handoff.service
+packages/hd-desktop/usr/lib/systemd/system/plymouth-quit-wait.service.d/hd-desktop.conf
+packages/hd-desktop/hd-plymouth-handoff
 packages/hd-desktop/usr/share/hd-desktop/icons/warning.svg
 packages/hd-desktop/hd-reboot-notify
 packages/hd-desktop/hd-shutdown
@@ -70,7 +73,9 @@ packages/hd-desktop/man/hd-launcher-cache.1
 The files of the parts are listed on their pages.
 
 ## Booting into Hyprland
-greetd runs on tty7 and logs the user in to Hyprland at the boot, without a password, with `uwsm start hyprland.desktop`. The output of Hyprland goes to `/var/log/hyprland.log`, which belongs to the user. greetd does this once per boot: after a logout from Hyprland, it switches to the console on tty1 and stops.
+greetd logs the user in to Hyprland on tty1 at the boot, without a password, with `uwsm start hyprland.desktop`. The output of Hyprland goes to `/var/log/hyprland.log`, which belongs to the user. greetd does this once per boot: after a logout from Hyprland, it starts the console on tty1 and stops.
+
+The session runs on tty1, the VT of the boot splash, in the place of `getty@tty1.service`, so the splash stays on the screen until Hyprland has it; see [Handing over to Hyprland](hd-plymouth.md#handing-over-to-hyprland). greetd leaves the VT alone, as its config has `vt = "none"`, and `greetd.service` gives the session tty1 with `XDG_VTNR`. Until hyprpaper draws the wallpaper, Hyprland shows the colour `dark` of the theme, which `hd-theme.lua` sets, as `hyprland.lua` in `/etc/skel` turns the logo of Hyprland off.
 
 greetd enables `greetd.service` on its installation. Its config, `/etc/greetd/config.toml`, is written by `hd-desktop-render` from the template `/usr/share/hd-desktop/templates/greetd.toml.j2`; the one of the package greetd is diverted to `/etc/greetd/config.toml.greetd`. The installation runs `hd-desktop-render`, and `greetd.service` runs it before every start, with the drop-in `/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf`. A user that is made after the installation, as by the installer, is thus logged in from the first boot on. When `hd-desktop-render` fails, greetd starts with the config it has.
 
@@ -81,7 +86,7 @@ The settings are the key `hd-desktop` of `/etc/hyprdebian/config.json`. There ar
 | --- | --- | --- |
 | `user` | The user account with the lowest UID from `UID_MIN` to `UID_MAX` of `/etc/login.defs`, the first user that was made. | The user that greetd logs in to Hyprland. |
 
-Without such an account, or when the user of the setting does not exist, greetd logs nobody in: it switches to the console on tty1 and stops. To log in another user from the next boot on:
+Without such an account, or when the user of the setting does not exist, greetd logs nobody in: it starts the console on tty1 and stops. To log in another user from the next boot on:
 ```
 sudo hd-config-update hd-desktop '{"user": "alice"}'
 sudo hd-desktop-render
@@ -239,6 +244,8 @@ An upgrade from a version before 1.28 gives the user who is logged in to Hyprlan
 
 An upgrade from a version before 1.56 gives that user the two files `gtk.css`, and says how to give the theme to their `qt5ct.conf`, `qt6ct.conf` and `hyprtoolkit.conf`: `color_scheme_path` set to `~/.config/qt5ct/colors/hd-theme.conf` and `~/.config/qt6ct/colors/hd-theme.conf`, and `source = ~/.config/hypr/hd-theme-hyprtoolkit.conf` in place of the colours, `font_family` and `font_family_monospace`, as in `/etc/skel`.
 
+An upgrade from a version before 1.59 says to set `disable_hyprland_logo = true` in the `misc` section of `~/.config/hypr/hyprland.lua`, as in `/etc/skel`, and to run `hd-theme --apply`, so that Hyprland shows the colour `dark` of the theme instead of its logo until the wallpaper shows.
+
 ## Removing the package
 Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher-cache`; the settings in `/etc/hyprdebian/config.json` and the caches and settings of the users in their home directories stay.
 
@@ -247,7 +254,8 @@ Removing the package removes the greetd config of `hd-desktop-render` and puts b
 | --- | --- |
 | `/usr/sbin/hd-desktop-render` | Writes the greetd config. |
 | `/usr/share/hd-desktop/templates/greetd.toml.j2` | The template of the greetd config. |
-| `/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf` | Runs `hd-desktop-render` before greetd starts. |
+| `/usr/lib/systemd/system/greetd.service.d/hd-desktop.conf` | Runs `hd-desktop-render` before greetd starts, and runs the session on tty1 in the place of `getty@tty1.service`. |
+| `/usr/lib/systemd/system/hd-plymouth-handoff.service`, `/usr/lib/systemd/system/plymouth-quit-wait.service.d/hd-desktop.conf`, `/usr/libexec/hd-desktop/hd-plymouth-handoff` | Hand the boot splash over to Hyprland; see [hd-plymouth](hd-plymouth.md#handing-over-to-hyprland). |
 | `/etc/greetd/config.toml` | The greetd config, written by `hd-desktop-render`. |
 | `/etc/greetd/config.toml.greetd` | The config of the package greetd, diverted. |
 | `/etc/hyprdebian/config.json` | The settings, in the keys `hd-desktop` and `hd-launcher`. |

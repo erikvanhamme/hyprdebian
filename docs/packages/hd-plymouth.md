@@ -19,6 +19,9 @@ packages/hd-desktop/templates/hd-plymouth/hyprdebian.script.j2
 packages/hd-desktop/hd-plymouth-render
 packages/hd-desktop/plymouth/plymouthd.conf
 packages/hd-desktop/plymouth/initramfs/hd-plymouth
+packages/hd-desktop/hd-plymouth-handoff
+packages/hd-desktop/usr/lib/systemd/system/hd-plymouth-handoff.service
+packages/hd-desktop/usr/lib/systemd/system/plymouth-quit-wait.service.d/hd-desktop.conf
 packages/hd-desktop/deb/triggers
 packages/hd-desktop/deb/postinst
 packages/hd-desktop/deb/postrm
@@ -47,6 +50,17 @@ The initramfs holds the splash. The hook `hd-plymouth` of `hd-desktop` runs `hd-
 The splash of a shutdown or reboot, which plymouthd shows from the root file system, uses the same files in `/var/lib/hd-plymouth/theme`.
 
 The splash shows when the kernel command line has `splash`, which hd-bootloader adds by default. The graphical bootloader passes its resolution with `video=`, so the splash starts at that resolution.
+
+## Handing over to Hyprland
+At the end of the boot, the screen goes from the splash to Hyprland without the console in between, as with GDM:
+
+1. `hd-plymouth-handoff.service`, which `greetd.service` wants, runs before greetd and takes the place of `plymouth-quit.service`, whose `plymouth quit` would give the screen to the console. It runs `plymouth deactivate`: plymouth stops drawing and lets go of the display, but keeps it open, so the splash stays on the screen.
+2. greetd starts the session of Hyprland on tty1, the VT of the splash. It does not switch the VT and does not set it to text mode, which would show the console, as its config has `vt = "none"`; see [hd-desktop](hd-desktop.md#booting-into-hyprland).
+3. `/usr/libexec/hd-desktop/hd-plymouth-handoff quit` waits until another process than plymouthd has a DRM card open, as systemd-logind and Hyprland do once Hyprland has the display, and runs `plymouth quit --retain-splash`, which leaves the screen to Hyprland.
+
+When greetd fails, or logs nobody in and starts the console on tty1, or when Hyprland does not have the display after 30 seconds, it runs a plain `plymouth quit`, and the console shows. `greetd.service` starts after `plymouth-quit-wait.service`, whose `plymouth --wait` waits until plymouth is gone; the drop-in `plymouth-quit-wait.service.d/hd-desktop.conf` has it run `hd-plymouth-handoff wait` instead, which returns at once while the splash is handed over, and runs `plymouth --wait` otherwise, as when the boot does not start greetd.
+
+Hyprland shows the colour `dark` of the theme until hyprpaper draws the wallpaper; see [hd-desktop](hd-desktop.md#booting-into-hyprland). When Hyprland sets another mode than the one of the splash, the screen may blank while the mode changes.
 
 ## Rendering the splash
 ```
@@ -78,4 +92,5 @@ hd-plymouth-render --update-initramfs   render it, and rebuild the initramfs whe
 | `/usr/share/hd-plymouth/plymouthd.conf` | The config of plymouthd that the package copies to `/etc/plymouth/plymouthd.conf`. |
 | `/etc/plymouth/plymouthd.conf.plymouth` | The config of plymouth, diverted. |
 | `/usr/share/initramfs-tools/hooks/hd-plymouth` | Renders the splash and puts it and its fonts in the initramfs. |
+| `/usr/lib/systemd/system/hd-plymouth-handoff.service`, `/usr/lib/systemd/system/plymouth-quit-wait.service.d/hd-desktop.conf`, `/usr/libexec/hd-desktop/hd-plymouth-handoff` | Hand the splash over to Hyprland. |
 | `/usr/share/doc/hd-desktop/copyright` | The copyright and license of the theme. |
