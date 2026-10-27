@@ -19,3 +19,17 @@ hl.config({
         rounding = {{ theme["radius"] }},
     },
 })
+
+-- Applications without a background opacity of their own are drawn at the opacity of the theme
+-- as a whole.
+hl.window_rule({
+    name = "hd-theme-codium-opacity",
+    match = { class = "codium" },
+    opacity = {{ theme["opacity"] }},
+})
+
+hl.window_rule({
+    name = "hd-theme-obsidian-opacity",
+    match = { class = "md.obsidian.Obsidian" },
+    opacity = {{ theme["opacity"] }},
+})

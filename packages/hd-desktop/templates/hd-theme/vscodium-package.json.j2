@@ -1,0 +1,23 @@
+{
+    "name": "{{ vscodium_name }}",
+    "displayName": "HyprDebian theme",
+    "description": "The HyprDebian theme {{ name }}, written by hd-theme --apply. Do not change this extension: hd-theme --apply writes it again.",
+    "publisher": "{{ vscodium_publisher }}",
+    "version": "{{ vscodium_version }}",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Themes"
+    ],
+    "contributes": {
+        "themes": [
+            {
+                "label": "HyprDebian",
+                "uiTheme": "vs-dark",
+                "path": "./hd-theme.json",
+                "_watch": true
+            }
+        ]
+    }
+}

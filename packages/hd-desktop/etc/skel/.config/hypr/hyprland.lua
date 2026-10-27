@@ -115,9 +115,10 @@ hl.config({
     },
 })
 
--- The gaps, borders, border colours and rounding of the HyprDebian theme, written by
--- hd-theme --apply in ~/.config/hypr/hd-theme.lua. Settings after this take the place of the
--- theme. pcall: before hd-theme --apply ran for the first time, the file is not there yet.
+-- The gaps, borders, border colours and rounding of the HyprDebian theme, and the opacity of
+-- VSCodium and Obsidian, written by hd-theme --apply in ~/.config/hypr/hd-theme.lua. Settings
+-- after this take the place of the theme. pcall: before hd-theme --apply ran for the first time,
+-- the file is not there yet.
 -- Forgetting it first makes a reload read it again.
 package.loaded["hd-theme"] = nil
 pcall(require, "hd-theme")
@@ -140,18 +141,6 @@ hl.window_rule({
     name = "imv-floating",
     match = { class = "imv" },
     float = true,
-})
-
-hl.window_rule({
-    name = "codium-transparancy",
-    match = { class = "codium" },
-    opacity = 0.8,
-})
-
-hl.window_rule({
-    name = "obsidian-transparancy",
-    match = { class = "md.obsidian.Obsidian" },
-    opacity = 0.8,
 })
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Dwindle-Layout/ for more

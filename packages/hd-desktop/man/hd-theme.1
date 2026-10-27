@@ -176,6 +176,22 @@ the image of the background that fits the monitors of Hyprland.
 .I ~/.config/mako/hd-theme
 The config of mako has
 .BR include=~/.config/mako/hd-theme .
+.TP
+.I ~/.vscode-oss/extensions/hyprdebian.hd-theme/
+An extension with the colour theme HyprDebian of VSCodium;
+.I ~/.config/VSCodium/User/settings.json
+has
+.BR "\(dqworkbench.colorTheme\(dq: \(dqHyprDebian\(dq" .
+The colours of the syntax are those of Dark+ of VSCodium, which the theme
+includes from
+.I /usr/share/codium
+when VSCodium is installed there.
+When
+.I ~/.vscode-oss/extensions/extensions.json
+is there,
+.B hd-theme
+adds the extension to it, as VSCodium only finds new extensions by itself
+when it makes that file or while it runs.
 .PP
 The configs themselves belong to the user and are never changed; the ones
 that
@@ -192,7 +208,8 @@ reloaded: Hyprland with
 .BR hyprctl ,
 hyprpaper by a restart of its user service, kitty with SIGUSR1 and mako with
 .BR makoctl .
-hyprlock reads its config when it starts.
+hyprlock reads its config when it starts, and VSCodium watches its colour
+theme.
 .SH EXAMPLES
 .nf
 cp /etc/hyprdebian/themes/default.json meadow.json

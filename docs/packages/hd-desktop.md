@@ -101,10 +101,10 @@ New users get these files in their home directory, from `/etc/skel`:
 | `~/.config/kitty`, `mako`, `mpv` | The terminal, the notifications and the media player. |
 | `~/.config/alsa`, `pipewire` | The sound. |
 | `~/.config/qt5ct`, `qt6ct` | The dark theme and the font of the Qt applications, see [Dark theme](#dark-theme). |
-| `~/.config/VSCodium` | The settings of VSCodium. |
+| `~/.config/VSCodium` | The settings of VSCodium: the font of the editor, and the colour theme HyprDebian. |
 | `~/.icons`, `~/Pictures/Screenshots` | Empty directories for the cursor themes and the screenshots. |
 
-The configs of Hyprland, hyprlock, hyprpaper, kitty and mako take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
+The configs of Hyprland, hyprlock, hyprpaper, kitty, mako and VSCodium take their font, colours, borders, radius, gaps and background from the theme files that `hd-theme --apply` of [hd-theme](hd-theme.md) writes next to them, from the theme of the system. The user runs `hd-theme --apply` to write them, and again after another theme is selected. Settings below the line that uses the theme file take the place of the theme.
 
 The installation of the package also gives these files to the user who is logged in to Hyprland, the one that `hd-desktop-render --print-user` prints, when that user exists: it copies the files of `/etc/skel` that are missing from their home directory, as that user, with `cp -a --update=none`. Files that the user has are kept. This is done on the first installation, and on an upgrade from a version before 0.3, which did not do it; later upgrades do not copy again, so a file that the user removed stays away. When the installer runs, the user does not exist yet, and the installer copies `/etc/skel` itself.
 

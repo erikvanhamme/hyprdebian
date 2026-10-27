@@ -41,12 +41,22 @@ program, next to its own config in the home directory of the user:
     ~/.config/hypr/hd-theme-hyprlock.conf   sourced by hyprlock.conf
     ~/.config/hypr/hd-theme-hyprpaper.conf  sourced by hyprpaper.conf
     ~/.config/mako/hd-theme                 included by the config of mako
+    ~/.vscode-oss/extensions/hyprdebian.hd-theme/
+                                            the colour theme HyprDebian of VSCodium, selected
+                                            in ~/.config/VSCodium/User/settings.json
 
 The configs of the programs themselves are the user's and are never changed; the configs that
 hd-desktop puts in /etc/skel use the theme files. A config that does not refer to its theme file
 is reported. A theme file is only written when it changes, and only then is the program reloaded,
 unless --no-reload is given: Hyprland with hyprctl, hyprpaper by a restart of its user service,
-kitty with SIGUSR1 and mako with makoctl. hyprlock reads its config when it starts.
+kitty with SIGUSR1 and mako with makoctl. hyprlock reads its config when it starts, and VSCodium
+watches its colour theme.
+
+The colour theme of VSCodium is an extension of its own. VSCodium registers the extensions in
+~/.vscode-oss/extensions/extensions.json; when that file is there, hd-theme adds the extension to
+it, as VSCodium only finds new extensions by itself when it makes that file or while it runs. The
+theme includes Dark+ of VSCodium, for the colours of the syntax, when VSCodium is installed in
+/usr/share/codium.
 
 Every theme has a card, a PNG rendered by hd-theme-card, in /var/cache/hd-theme/cards/<name>.png.
 --list opens imv-wayland on that directory. --add, --delete and --cards are refused when not run
@@ -58,6 +68,7 @@ import json
 import os
 import pwd
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,6 +82,14 @@ THEME_DIR = "/etc/hyprdebian/themes"
 CARD_DIR = "/var/cache/hd-theme/cards"
 BACKGROUNDS = "/usr/share/backgrounds/hyprdebian"
 TEMPLATE_DIR = "/usr/share/hd-theme/templates"
+VSCODIUM_EXTENSIONS = ".vscode-oss/extensions"
+VSCODIUM_REGISTRY = "extensions.json"
+VSCODIUM_PUBLISHER = "hyprdebian"
+VSCODIUM_NAME = "hd-theme"
+VSCODIUM_VERSION = "1.0.0"
+VSCODIUM_EXTENSION = f"{VSCODIUM_PUBLISHER}.{VSCODIUM_NAME}"
+# The theme of VSCodium whose syntax colours the colour theme includes.
+VSCODIUM_BASE = "/usr/share/codium/resources/app/extensions/theme-defaults/themes/dark_plus.json"
 PLYMOUTH_RENDER = "/usr/sbin/hd-plymouth-render"
 UPDATE_ESPS = "/usr/lib/hd-bootloader/update-esps"
 
@@ -85,7 +104,7 @@ MEMBERS = ["font"] + FONT_SIZES + COLORS + SIZES + ["opacity", "background"]
 
 # The theme files of --apply: the template, the theme file it makes and the config that uses it,
 # both relative to the home directory, the text by which that config refers to the theme file, and
-# what to reload when the theme file changes.
+# what to reload when the theme file changes. A config of None is not checked.
 TARGETS = [
     ("kitty.conf.j2", ".config/kitty/hd-theme.conf", ".config/kitty/kitty.conf",
      "include hd-theme.conf", "kitty"),
@@ -97,6 +116,10 @@ TARGETS = [
      "hd-theme-hyprpaper.conf", "hyprpaper"),
     ("mako.j2", ".config/mako/hd-theme", ".config/mako/config", "~/.config/mako/hd-theme",
      "mako"),
+    ("vscodium-package.json.j2", f"{VSCODIUM_EXTENSIONS}/{VSCODIUM_EXTENSION}/package.json",
+     None, None, None),
+    ("vscodium-theme.json.j2", f"{VSCODIUM_EXTENSIONS}/{VSCODIUM_EXTENSION}/hd-theme.json",
+     ".config/VSCodium/User/settings.json", '"HyprDebian"', None),
 ]
 
 
@@ -429,6 +452,48 @@ def reload(program, instances, uid):
                 warn("Could not reload mako.")
 
 
+def vscodium_base(home):
+    """The path of VSCODIUM_BASE relative to the extension of the colour theme of VSCodium, as its
+    include takes it, or None when VSCodium is not installed there."""
+    if not os.path.exists(VSCODIUM_BASE):
+        return None
+    return os.path.relpath(VSCODIUM_BASE, os.path.join(home, VSCODIUM_EXTENSIONS,
+                                                        VSCODIUM_EXTENSION))
+
+
+def register_vscodium_extension(home):
+    """Adds the extension of the colour theme to the registry of the extensions of VSCodium, when
+    the registry is there and does not have it yet. Without a registry, VSCodium registers all
+    extensions in the directory when it makes one."""
+    extensions = os.path.join(home, VSCODIUM_EXTENSIONS)
+    registry = os.path.join(extensions, VSCODIUM_REGISTRY)
+    text = read_file(registry)
+    if text is None:
+        return
+    try:
+        entries = json.loads(text.strip() or "[]")
+    except ValueError as e:
+        warn(f"Cannot read {registry}: {e}; VSCodium may not find its HyprDebian theme.")
+        return
+    if not isinstance(entries, list):
+        warn(f"{registry} does not hold a list; VSCodium may not find its HyprDebian theme.")
+        return
+    for entry in entries:
+        identifier = entry.get("identifier") if isinstance(entry, dict) else None
+        if (isinstance(identifier, dict)
+                and str(identifier.get("id", "")).lower() == VSCODIUM_EXTENSION):
+            return
+    location = os.path.join(extensions, VSCODIUM_EXTENSION)
+    entries.append({
+        "identifier": {"id": VSCODIUM_EXTENSION},
+        "version": VSCODIUM_VERSION,
+        "location": {"$mid": 1, "path": location, "scheme": "file"},
+        "relativeLocation": VSCODIUM_EXTENSION,
+    })
+    write_file(registry, json.dumps(entries))
+    print(f"Added the HyprDebian theme to {registry}.")
+
+
 def apply(reload_programs):
     """Writes the theme files of the desktop programs in the home directory of the user, from the
     selected theme, and reloads the programs whose theme file changed."""
@@ -450,7 +515,20 @@ def apply(reload_programs):
         # Hyprland puts gaps_in around every window, so two windows are twice as far apart.
         "gaps_in": theme["gap"] // 2,
         "alpha": f"{round(theme['opacity'] * 255):02x}",
+        "vscodium_publisher": VSCODIUM_PUBLISHER,
+        "vscodium_name": VSCODIUM_NAME,
+        "vscodium_version": VSCODIUM_VERSION,
+        "vscodium_base": vscodium_base(home),
     }
+
+    # A running VSCodium registers a new directory in its extensions as soon as it appears, so a new
+    # extension of the colour theme is written under a name that VSCodium skips, with a dot in
+    # front, and renamed when it is whole.
+    extension = os.path.join(home, VSCODIUM_EXTENSIONS, VSCODIUM_EXTENSION)
+    staging = None
+    if not os.path.isdir(extension):
+        staging = os.path.join(home, VSCODIUM_EXTENSIONS, "." + VSCODIUM_EXTENSION)
+        shutil.rmtree(staging, ignore_errors=True)
 
     changed = set()
     for template, target, config, reference, program in TARGETS:
@@ -460,13 +538,20 @@ def apply(reload_programs):
             fail(f"Cannot render {template}: {e}")
         path = os.path.join(home, target)
         if read_file(path) != text:
-            write_file(path, text)
+            if staging is not None and os.path.dirname(path) == extension:
+                write_file(os.path.join(staging, os.path.basename(path)), text)
+            else:
+                write_file(path, text)
             print(f"Wrote {path}.")
             if program is not None:
                 changed.add(program)
-        uses = read_file(os.path.join(home, config))
-        if uses is not None and reference not in uses:
-            print(f"Note: {os.path.join(home, config)} does not use {path}.")
+        if config is not None:
+            uses = read_file(os.path.join(home, config))
+            if uses is not None and reference not in uses:
+                print(f"Note: {os.path.join(home, config)} does not use {path}.")
+    if staging is not None:
+        os.rename(staging, extension)
+    register_vscodium_extension(home)
 
     if reload_programs:
         for program in sorted(changed):

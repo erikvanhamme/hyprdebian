@@ -63,7 +63,7 @@ A theme is a JSON object with all of these members, and no others:
 | `border` | The width of borders, in pixels. |
 | `radius` | The outer radius of corners, in pixels, at least `border`. Anything inside a border has the inner radius, `radius` minus `border`. |
 | `gap` | The distance between windows, in pixels. |
-| `opacity` | The opacity of `dark`, from 0 to 1. Text and borders stay opaque. |
+| `opacity` | The opacity of `dark`, from 0 to 1. Text and borders stay opaque, except in VSCodium and Obsidian, which have no background opacity of their own: Hyprland draws their whole window at `opacity`. |
 | `icon_size` | The size of icons, in pixels. |
 | `background` | A family of images in `/usr/share/backgrounds/hyprdebian` of [hd-art](hd-art.md), named `<family>-<width>x<height>.png`. A screen shows the smallest one that covers it, else the largest. |
 
@@ -121,12 +121,15 @@ hd-theme --apply
 | `~/.config/hypr/hd-theme-hyprlock.conf` | `source` in `hyprlock.conf`, which uses its variables `$hd_font`, `$hd_highlight`, `$hd_normal`, `$hd_light`, `$hd_dark`, `$hd_border`, `$hd_radius` and `$hd_background` |
 | `~/.config/hypr/hd-theme-hyprpaper.conf` | `source` in `hyprpaper.conf`, which uses its variable `$hd_background`, the image of the background that fits the monitors of Hyprland |
 | `~/.config/mako/hd-theme` | `include=~/.config/mako/hd-theme` in the config of mako |
+| `~/.vscode-oss/extensions/hyprdebian.hd-theme/` | `"workbench.colorTheme": "HyprDebian"` in `~/.config/VSCodium/User/settings.json`: an extension with the colour theme HyprDebian of VSCodium |
 
 The configs themselves belong to the user and are never changed; the ones that [hd-desktop](hd-desktop.md) puts in `/etc/skel` use the theme files. A config that does not use its theme file is reported. Settings after the line that uses the theme file take the place of the theme.
 
-A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock reads its config when it starts. `--no-reload` writes the theme files and reloads nothing.
+A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock reads its config when it starts, and VSCodium watches its colour theme. `--no-reload` writes the theme files and reloads nothing.
 
-A new user has no theme files until they run `hd-theme --apply`. Until then, Hyprland and kitty use their own defaults for what the theme sets, and hyprlock and hyprpaper miss the variables of the theme.
+The colour theme of VSCodium sets the colours of all its parts: `dark` behind everything, `light` for text, `normal` for selections, buttons and dividers, and `highlight` for focus, the cursor, the active tab and badges. The colours of the syntax are those of Dark+ of VSCodium, which the theme includes from `/usr/share/codium` when VSCodium is installed there. The font of the editor stays in `settings.json`, as a colour theme cannot set it. VSCodium keeps the extensions in `~/.vscode-oss/extensions/extensions.json`; when that file is there, `hd-theme --apply` adds the extension to it, as VSCodium only finds new extensions by itself when it makes that file or while it runs.
+
+A new user has no theme files until they run `hd-theme --apply`. Until then, Hyprland and kitty use their own defaults for what the theme sets, VSCodium its default colour theme, and hyprlock and hyprpaper miss the variables of the theme.
 
 ## hd-theme-card
 ```
