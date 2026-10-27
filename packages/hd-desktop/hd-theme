@@ -41,16 +41,28 @@ program, next to its own config in the home directory of the user:
     ~/.config/hypr/hd-theme-hyprlock.conf   sourced by hyprlock.conf
     ~/.config/hypr/hd-theme-hyprpaper.conf  sourced by hyprpaper.conf
     ~/.config/mako/hd-theme                 included by the config of mako
+    ~/.config/hypr/hd-theme-hyprtoolkit.conf
+                                            sourced by hyprtoolkit.conf, for the dialogs of
+                                            Hyprland
+    ~/.config/qt5ct/colors/hd-theme.conf    the colour scheme of qt5ct.conf
+    ~/.config/qt6ct/colors/hd-theme.conf    the colour scheme of qt6ct.conf
+    ~/.config/gtk-3.0/hd-theme.css          imported by gtk.css of GTK 3
+    ~/.config/gtk-4.0/hd-theme.css          imported by gtk.css of GTK 4
     ~/.vscode-oss/extensions/hyprdebian.hd-theme/
                                             the colour theme HyprDebian of VSCodium, selected
                                             in ~/.config/VSCodium/User/settings.json
+
+It also sets the font of the GTK applications, of the interface, the documents and the monospaced
+text, to the font of the theme in font-size-small, in the dconf database of the user, with dconf
+write. dconf needs the session bus; without one, the font is left as it is.
 
 The configs of the programs themselves are the user's and are never changed; the configs that
 hd-desktop puts in /etc/skel use the theme files. A config that does not refer to its theme file
 is reported. A theme file is only written when it changes, and only then is the program reloaded,
 unless --no-reload is given: Hyprland with hyprctl, hyprpaper by a restart of its user service,
 kitty with SIGUSR1 and mako with makoctl. hyprlock reads its config when it starts, and VSCodium
-watches its colour theme.
+and hyprtoolkit watch their theme files. The GTK and Qt applications take their colours when they
+start, and the GTK applications that run follow the font at once.
 
 The colour theme of VSCodium is an extension of its own. VSCodium registers the extensions in
 ~/.vscode-oss/extensions/extensions.json; when that file is there, hd-theme adds the extension to
@@ -120,7 +132,23 @@ TARGETS = [
      None, None, None),
     ("vscodium-theme.json.j2", f"{VSCODIUM_EXTENSIONS}/{VSCODIUM_EXTENSION}/hd-theme.json",
      ".config/VSCodium/User/settings.json", '"HyprDebian"', None),
+    ("hyprtoolkit.conf.j2", ".config/hypr/hd-theme-hyprtoolkit.conf",
+     ".config/hypr/hyprtoolkit.conf", "hd-theme-hyprtoolkit.conf", None),
+    ("qtct-colors.conf.j2", ".config/qt5ct/colors/hd-theme.conf", ".config/qt5ct/qt5ct.conf",
+     "colors/hd-theme.conf", None),
+    ("qtct-colors.conf.j2", ".config/qt6ct/colors/hd-theme.conf", ".config/qt6ct/qt6ct.conf",
+     "colors/hd-theme.conf", None),
+    ("gtk3.css.j2", ".config/gtk-3.0/hd-theme.css", ".config/gtk-3.0/gtk.css", "hd-theme.css",
+     None),
+    ("gtk4.css.j2", ".config/gtk-4.0/hd-theme.css", ".config/gtk-4.0/gtk.css", "hd-theme.css",
+     None),
 ]
+
+# The keys of the dconf database that hold the font of the GTK applications, of the interface, the
+# documents and the monospaced text.
+GTK_FONT_KEYS = ["/org/gnome/desktop/interface/font-name",
+                 "/org/gnome/desktop/interface/document-font-name",
+                 "/org/gnome/desktop/interface/monospace-font-name"]
 
 
 def fail(message):
@@ -418,6 +446,43 @@ def rgb_values(color):
     return ", ".join(str(int(color[i:i + 2], 16)) for i in (1, 3, 5))
 
 
+def argb(color):
+    """#rrggbb as #ffrrggbb, opaque, as qt5ct and qt6ct take it."""
+    return "#ff" + hex_digits(color)
+
+
+def mix(color, other, amount):
+    """#rrggbb moved amount, from 0 to 1, of the way to the colour other."""
+    channels = []
+    for i in (1, 3, 5):
+        a = int(color[i:i + 2], 16)
+        b = int(other[i:i + 2], 16)
+        channels.append(round(a + (b - a) * amount))
+    return "#" + "".join(f"{c:02x}" for c in channels)
+
+
+def gvariant_string(text):
+    """text as a string of GVariant, as dconf write takes it."""
+    return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def set_gtk_font(theme):
+    """Sets the font of the GTK applications in the dconf database of the user, when it is not that
+    font yet. dconf needs the session bus."""
+    if "DBUS_SESSION_BUS_ADDRESS" not in os.environ:
+        print("No session bus: the font of the GTK applications is left as it is.")
+        return
+    value = gvariant_string(f"{theme['font']} {theme['font-size-small']}")
+    for key in GTK_FONT_KEYS:
+        current = run(["dconf", "read", key])
+        if current is not None and current.strip() == value:
+            continue
+        if run(["dconf", "write", key, value]) is None:
+            warn(f"Could not set {key} with dconf.")
+        else:
+            print(f"Set {key} to {value}.")
+
+
 def read_file(path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -507,6 +572,8 @@ def apply(reload_programs):
                                    trim_blocks=True, lstrip_blocks=True)
     templates.filters["hex"] = hex_digits
     templates.filters["rgb"] = rgb_values
+    templates.filters["argb"] = argb
+    templates.filters["mix"] = mix
     values = {
         "theme": theme,
         "name": theme.get("name", "unnamed"),
@@ -552,6 +619,7 @@ def apply(reload_programs):
     if staging is not None:
         os.rename(staging, extension)
     register_vscodium_extension(home)
+    set_gtk_font(theme)
 
     if reload_programs:
         for program in sorted(changed):

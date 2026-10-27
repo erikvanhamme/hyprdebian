@@ -1,0 +1,14 @@
+# The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+# Do not change this file: hd-theme --apply writes it again. Settings in hyprtoolkit.conf after
+# the source line take the place of these.
+background = rgb({{ theme["dark"] | hex }})
+base = rgb({{ theme["dark"] | hex }})
+alternate_base = rgb({{ theme["dark"] | mix(theme["light"], 0.05) | hex }})
+text = rgb({{ theme["light"] | hex }})
+bright_text = rgb({{ theme["light"] | hex }})
+accent = rgb({{ theme["normal"] | hex }})
+accent_secondary = rgb({{ theme["highlight"] | hex }})
+font_family = {{ theme["font"] }}
+font_family_monospace = {{ theme["font"] }}
+rounding_large = {{ theme["radius"] }}
+rounding_small = {{ inner_radius }}

@@ -43,6 +43,11 @@ hyprtoolkit of /etc/skel, in TOOLKITS_SKEL, in the same way, and says that the c
 of the user still names the platform theme gtk3, which is gone, and should name qt5ct, as the one
 in /etc/skel.
 
+Versions before THEMED_TOOLKITS_SINCE gave the GTK and Qt applications and the dialogs of Hyprland
+fixed colours. An upgrade from such a version gives that user the files gtk.css of GTK 3 and GTK 4
+of /etc/skel, in THEMED_TOOLKITS_SKEL, in the same way, which import the colours of the theme, and
+says how to give the theme to their settings of qt5ct, qt6ct and hyprtoolkit, as in /etc/skel.
+
 The apt hook of hd-launcher-cache writes the menu in the caches of the system and of the users in
 the group users after every run of dpkg by apt, but not when the package is installed with dpkg
 alone, so the postinst writes them too. A menu that cannot be written does not fail the
@@ -105,6 +110,11 @@ SKEL_SINCE = "0.3"
 # their paths in /etc/skel.
 TOOLKITS_SINCE = "1.28~"
 TOOLKITS_SKEL = [".config/qt5ct", ".config/qt6ct", ".config/hypr/hyprtoolkit.conf"]
+
+# The first version of hd-desktop that gives the theme to the GTK and Qt applications and to
+# hyprtoolkit, and the files in /etc/skel that it added for that.
+THEMED_TOOLKITS_SINCE = "1.56~"
+THEMED_TOOLKITS_SKEL = [".config/gtk-3.0/gtk.css", ".config/gtk-4.0/gtk.css"]
 
 # The user units of hd-desktop.
 USER_UNITS = ["hd-reboot-notify.path"]
@@ -216,13 +226,24 @@ def main():
     subprocess.run(["/usr/sbin/hd-plymouth-render"], check=True)
     if previous == "" or older_than(previous, SKEL_SINCE):
         copy_skel()
-    elif older_than(previous, TOOLKITS_SINCE):
-        home = copy_skel(TOOLKITS_SKEL)
-        if home is not None:
-            print(f"Set QT_QPA_PLATFORMTHEME to qt5ct instead of gtk3 in "
-                  f"{home}/.config/hypr/hyprland.lua, and remove QT_STYLE_OVERRIDE, as in "
-                  f"{SKEL_DIR}/.config/hypr/hyprland.lua, so that the Qt applications get the dark "
-                  "theme.")
+    else:
+        if older_than(previous, TOOLKITS_SINCE):
+            home = copy_skel(TOOLKITS_SKEL)
+            if home is not None:
+                print(f"Set QT_QPA_PLATFORMTHEME to qt5ct instead of gtk3 in "
+                      f"{home}/.config/hypr/hyprland.lua, and remove QT_STYLE_OVERRIDE, as in "
+                      f"{SKEL_DIR}/.config/hypr/hyprland.lua, so that the Qt applications get "
+                      "the dark theme.")
+        if older_than(previous, THEMED_TOOLKITS_SINCE):
+            home = copy_skel(THEMED_TOOLKITS_SKEL)
+            if home is not None:
+                print(f"For the theme in the Qt applications, set color_scheme_path to "
+                      f"~/.config/qt5ct/colors/hd-theme.conf in {home}/.config/qt5ct/qt5ct.conf "
+                      f"and to ~/.config/qt6ct/colors/hd-theme.conf in "
+                      f"{home}/.config/qt6ct/qt6ct.conf; for the dialogs of Hyprland, put "
+                      f"source = ~/.config/hypr/hd-theme-hyprtoolkit.conf in "
+                      f"{home}/.config/hypr/hyprtoolkit.conf, without the colours and the "
+                      f"fonts below it, as in {SKEL_DIR}. Then run hd-theme --apply.")
     if previous != "" and older_than(previous, DROPPED_SINCE):
         print(f"hd-desktop no longer depends on {', '.join(DROPPED)}. apt autoremove removes "
               "them; mark the ones you use as installed by hand first, such as apt-mark manual "

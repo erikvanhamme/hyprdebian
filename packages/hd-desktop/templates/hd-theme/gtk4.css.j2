@@ -1,0 +1,54 @@
+/* The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+   Do not change this file: hd-theme --apply writes it again. gtk.css imports it; rules in gtk.css
+   after the import take the place of these. The colours of libadwaita and of Adwaita of GTK 4:
+   the variables of libadwaita 1.6 and later, and the named colours of the versions before. */
+{% set dark = theme["dark"] %}
+{% set light = theme["light"] %}
+{% set normal = theme["normal"] %}
+{% set highlight = theme["highlight"] %}
+{% set raised = dark | mix(light, 0.05) %}
+{% set colors = [
+    ("accent-color", highlight),
+    ("accent-bg-color", normal),
+    ("accent-fg-color", light),
+    ("window-bg-color", dark),
+    ("window-fg-color", light),
+    ("view-bg-color", dark),
+    ("view-fg-color", light),
+    ("headerbar-bg-color", dark),
+    ("headerbar-fg-color", light),
+    ("headerbar-border-color", normal),
+    ("headerbar-backdrop-color", dark),
+    ("sidebar-bg-color", raised),
+    ("sidebar-fg-color", light),
+    ("sidebar-backdrop-color", raised),
+    ("sidebar-border-color", normal),
+    ("secondary-sidebar-bg-color", raised),
+    ("secondary-sidebar-fg-color", light),
+    ("secondary-sidebar-backdrop-color", raised),
+    ("secondary-sidebar-border-color", normal),
+    ("card-bg-color", raised),
+    ("card-fg-color", light),
+    ("dialog-bg-color", dark),
+    ("dialog-fg-color", light),
+    ("popover-bg-color", dark),
+    ("popover-fg-color", light),
+    ("thumbnail-bg-color", raised),
+    ("thumbnail-fg-color", light),
+] %}
+:root {
+{% for key, color in colors %}
+    --{{ key }}: {{ color }};
+{% endfor %}
+}
+
+{% for key, color in colors %}
+@define-color {{ key | replace("-", "_") }} {{ color }};
+{% endfor %}
+@define-color theme_fg_color {{ light }};
+@define-color theme_text_color {{ light }};
+@define-color theme_bg_color {{ dark }};
+@define-color theme_base_color {{ dark }};
+@define-color theme_selected_bg_color {{ normal }};
+@define-color theme_selected_fg_color {{ light }};
+@define-color borders {{ normal }};

@@ -177,6 +177,19 @@ the image of the background that fits the monitors of Hyprland.
 The config of mako has
 .BR include=~/.config/mako/hd-theme .
 .TP
+.I ~/.config/hypr/hd-theme-hyprtoolkit.conf
+hyprtoolkit.conf sources it, for the dialogs of Hyprland.
+.TP
+.IR ~/.config/qt5ct/colors/hd-theme.conf ", " ~/.config/qt6ct/colors/hd-theme.conf
+The colour scheme of the Qt applications; qt5ct.conf and qt6ct.conf have
+.BR color_scheme_path=~/.config/qt5ct/colors/hd-theme.conf
+and the same for qt6ct.
+.TP
+.IR ~/.config/gtk-3.0/hd-theme.css ", " ~/.config/gtk-4.0/hd-theme.css
+The named colours of Adwaita and libadwaita for the GTK applications; gtk.css
+has
+.BR "@import url(\(dqhd-theme.css\(dq);" .
+.TP
 .I ~/.vscode-oss/extensions/hyprdebian.hd-theme/
 An extension with the colour theme HyprDebian of VSCodium;
 .I ~/.config/VSCodium/User/settings.json
@@ -208,8 +221,24 @@ reloaded: Hyprland with
 .BR hyprctl ,
 hyprpaper by a restart of its user service, kitty with SIGUSR1 and mako with
 .BR makoctl .
-hyprlock reads its config when it starts, and VSCodium watches its colour
-theme.
+hyprlock reads its config when it starts, VSCodium and hyprtoolkit watch
+their theme files, and the GTK and Qt applications take their colours when
+they start.
+.PP
+.B \-\-apply
+also sets the font of the GTK applications, of the interface and of the
+documents and of the monospaced text, to
+.B font
+in
+.BR font-size-small ,
+with
+.B dconf write
+in the dconf database of the user: the keys font-name, document-font-name and
+monospace-font-name of
+.IR /org/gnome/desktop/interface .
+The Qt applications keep
+the font of qt5ct.conf and qt6ct.conf.
+dconf needs the session bus; without one, the font is left as it is.
 .SH EXAMPLES
 .nf
 cp /etc/hyprdebian/themes/default.json meadow.json

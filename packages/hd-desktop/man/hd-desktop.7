@@ -273,8 +273,13 @@ browser and VSCodium, are started with
 too; the menus and short commands are not.
 .SH DARK THEME
 The GTK and the Qt applications and the dialogs of Hyprland look the same:
-dark, in the colours of Adwaita-dark, in JetBrainsMono NFM Medium 11, and
-with the file chooser of GTK.
+dark, in the colours of the HyprDebian theme, in its font, and with the file
+chooser of GTK.
+Their base is the dark Adwaita theme in JetBrainsMono NFM Medium 11;
+.B hd-theme \-\-apply
+puts the colours of the theme over it, and for GTK the font of the theme in
+its size
+.BR font-size-small .
 .PP
 .I /etc/dconf/db/local.d/00-dark-theme
 asks GTK applications for the dark Adwaita theme, and
@@ -299,12 +304,13 @@ loads for Qt 5 and Qt 6 alike:
 .I ~/.config/qt5ct/qt5ct.conf
 and
 .I ~/.config/qt6ct/qt6ct.conf
-give them the style Fusion with the colour scheme hyprdebian, the colours of
-Adwaita-dark, in
-.I /usr/share/qt5ct/colors
+give them the style Fusion with the colour scheme of the theme,
+.I ~/.config/qt5ct/colors/hd-theme.conf
 and
-.IR /usr/share/qt6ct/colors ,
-the font, the Adwaita icons and the file chooser of the desktop portals.
+.IR ~/.config/qt6ct/colors/hd-theme.conf ,
+which
+.B hd-theme \-\-apply
+writes, the font, the Adwaita icons and the file chooser of the desktop portals.
 .B qt5ct
 and
 .B qt6ct
@@ -319,14 +325,37 @@ and
 lets the Qt 6 applications run on Wayland instead of XWayland, which
 .B QT_QPA_PLATFORM=wayland;xcb
 asks for first.
-The dialogs of Hyprland, of hyprland-guiutils, get the same colours and font
-from
-.IR ~/.config/hypr/hyprtoolkit.conf .
+The colour scheme hyprdebian in
+.I /usr/share/qt5ct/colors
+and
+.I /usr/share/qt6ct/colors
+has the colours of Adwaita-dark.
+The font of the Qt applications stays the one in qt5ct.conf and qt6ct.conf.
+.PP
+The GTK applications get the colours of the theme from
+.I ~/.config/gtk-3.0/gtk.css
+and
+.IR ~/.config/gtk-4.0/gtk.css ,
+which import the hd-theme.css that
+.B hd-theme \-\-apply
+writes next to them: the named colours of Adwaita and libadwaita.
+The parts that Adwaita-dark of GTK 3 draws in colours of its own keep them.
+The font of the theme goes in the dconf database of the user.
+.PP
+The dialogs of Hyprland, of hyprland-guiutils, get the same colours, font
+and radius from
+.IR ~/.config/hypr/hyprtoolkit.conf ,
+which sources hd-theme-hyprtoolkit.conf of
+.BR "hd-theme \-\-apply" .
 An upgrade from a version before 1.28 gives the user the settings of qt5ct,
 qt6ct and hyprtoolkit and says to set
 .B QT_QPA_PLATFORMTHEME
 to qt5ct in their config of Hyprland, which still names gtk3, and to remove
 .BR QT_STYLE_OVERRIDE .
+An upgrade from a version before 1.56 gives the user the two files gtk.css,
+and says how to give the theme to their settings of qt5ct, qt6ct and
+hyprtoolkit, as in
+.IR /etc/skel .
 .SH REMOVAL
 Removing the package puts back the config of the package greetd, which
 logs nobody in.

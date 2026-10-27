@@ -1,0 +1,47 @@
+/* The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+   Do not change this file: hd-theme --apply writes it again. gtk.css imports it; rules in gtk.css
+   after the import take the place of these. The named colours of Adwaita-dark for the GTK 3
+   applications; the parts that Adwaita-dark draws in colours of its own keep them. */
+{% set dark = theme["dark"] %}
+{% set light = theme["light"] %}
+{% set normal = theme["normal"] %}
+{% set highlight = theme["highlight"] %}
+@define-color theme_fg_color {{ light }};
+@define-color theme_text_color {{ light }};
+@define-color theme_bg_color {{ dark }};
+@define-color theme_base_color {{ dark }};
+@define-color theme_selected_bg_color {{ normal }};
+@define-color theme_selected_fg_color {{ light }};
+@define-color theme_unfocused_fg_color {{ light }};
+@define-color theme_unfocused_text_color {{ light }};
+@define-color theme_unfocused_bg_color {{ dark }};
+@define-color theme_unfocused_base_color {{ dark }};
+@define-color theme_unfocused_selected_bg_color {{ normal }};
+@define-color theme_unfocused_selected_fg_color {{ light }};
+@define-color insensitive_fg_color {{ light | mix(dark, 0.5) }};
+@define-color insensitive_base_color {{ dark | mix(light, 0.05) }};
+@define-color insensitive_bg_color {{ dark | mix(light, 0.05) }};
+@define-color unfocused_insensitive_color {{ light | mix(dark, 0.5) }};
+@define-color borders {{ normal }};
+@define-color unfocused_borders {{ normal }};
+@define-color content_view_bg {{ dark }};
+@define-color text_view_bg {{ dark }};
+
+/* The applications that use the colours of libadwaita, such as with libhandy. */
+@define-color accent_color {{ highlight }};
+@define-color accent_bg_color {{ normal }};
+@define-color accent_fg_color {{ light }};
+@define-color window_bg_color {{ dark }};
+@define-color window_fg_color {{ light }};
+@define-color view_bg_color {{ dark }};
+@define-color view_fg_color {{ light }};
+@define-color headerbar_bg_color {{ dark }};
+@define-color headerbar_fg_color {{ light }};
+@define-color headerbar_border_color {{ normal }};
+@define-color headerbar_backdrop_color {{ dark }};
+@define-color card_bg_color {{ dark | mix(light, 0.05) }};
+@define-color card_fg_color {{ light }};
+@define-color dialog_bg_color {{ dark }};
+@define-color dialog_fg_color {{ light }};
+@define-color popover_bg_color {{ dark }};
+@define-color popover_fg_color {{ light }};

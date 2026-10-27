@@ -54,7 +54,7 @@ A theme is a JSON object with all of these members, and no others:
 
 | Member | |
 | --- | --- |
-| `font` | The font of all text. |
+| `font` | The font of all text, a monospaced font. |
 | `font-size-big`, `font-size-normal`, `font-size-small` | The sizes of text, in points: banners and input fields, menus and notifications, terminals and small labels. |
 | `dark` | The background of bars, menus and windows, drawn at `opacity`. |
 | `normal` | The background of the selected item, unfocused borders and dividers. |
@@ -121,15 +121,20 @@ hd-theme --apply
 | `~/.config/hypr/hd-theme-hyprlock.conf` | `source` in `hyprlock.conf`, which uses its variables `$hd_font`, `$hd_highlight`, `$hd_normal`, `$hd_light`, `$hd_dark`, `$hd_border`, `$hd_radius` and `$hd_background` |
 | `~/.config/hypr/hd-theme-hyprpaper.conf` | `source` in `hyprpaper.conf`, which uses its variable `$hd_background`, the image of the background that fits the monitors of Hyprland |
 | `~/.config/mako/hd-theme` | `include=~/.config/mako/hd-theme` in the config of mako |
+| `~/.config/hypr/hd-theme-hyprtoolkit.conf` | `source` in `hyprtoolkit.conf`, for the dialogs of Hyprland: the colours, the fonts and the radius |
+| `~/.config/qt5ct/colors/hd-theme.conf`, `~/.config/qt6ct/colors/hd-theme.conf` | `color_scheme_path` in `qt5ct.conf` and `qt6ct.conf`: the colour scheme of the Qt applications |
+| `~/.config/gtk-3.0/hd-theme.css`, `~/.config/gtk-4.0/hd-theme.css` | `@import url("hd-theme.css")` in `gtk.css` of GTK 3 and GTK 4: the named colours of Adwaita and libadwaita |
 | `~/.vscode-oss/extensions/hyprdebian.hd-theme/` | `"workbench.colorTheme": "HyprDebian"` in `~/.config/VSCodium/User/settings.json`: an extension with the colour theme HyprDebian of VSCodium |
 
 The configs themselves belong to the user and are never changed; the ones that [hd-desktop](hd-desktop.md) puts in `/etc/skel` use the theme files. A config that does not use its theme file is reported. Settings after the line that uses the theme file take the place of the theme.
 
-A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock reads its config when it starts, and VSCodium watches its colour theme. `--no-reload` writes the theme files and reloads nothing.
+A theme file is only written when it changes, and only then its program is reloaded: Hyprland with `hyprctl reload`, hyprpaper by a restart of `hyprpaper.service` of the user, kitty with SIGUSR1 and mako with `makoctl reload`. hyprlock reads its config when it starts, VSCodium and hyprtoolkit watch their theme files, and the GTK and Qt applications take their colours when they start. `--no-reload` writes the theme files and reloads nothing.
 
 The colour theme of VSCodium sets the colours of all its parts: `dark` behind everything, `light` for text, `normal` for selections, buttons and dividers, and `highlight` for focus, the cursor, the active tab and badges. The colours of the syntax are those of Dark+ of VSCodium, which the theme includes from `/usr/share/codium` when VSCodium is installed there. The font of the editor stays in `settings.json`, as a colour theme cannot set it. VSCodium keeps the extensions in `~/.vscode-oss/extensions/extensions.json`; when that file is there, `hd-theme --apply` adds the extension to it, as VSCodium only finds new extensions by itself when it makes that file or while it runs.
 
-A new user has no theme files until they run `hd-theme --apply`. Until then, Hyprland and kitty use their own defaults for what the theme sets, VSCodium its default colour theme, and hyprlock and hyprpaper miss the variables of the theme.
+`--apply` also sets the font of the GTK applications, of the interface and of the documents, to `font` in `font-size-small`, with `dconf write` in the dconf database of the user: the keys `font-name`, `document-font-name` and `monospace-font-name` of `/org/gnome/desktop/interface`. The GTK applications that run follow it at once. The Qt applications keep the font of `qt5ct.conf` and `qt6ct.conf`. dconf needs the session bus; without one, as over ssh, the font is left as it is.
+
+A new user has no theme files until they run `hd-theme --apply`. Until then, Hyprland and kitty use their own defaults for what the theme sets, VSCodium its default colour theme, the Qt applications the default colours of Fusion, the GTK applications and the dialogs of Hyprland the colours of Adwaita-dark, and hyprlock and hyprpaper miss the variables of the theme.
 
 ## hd-theme-card
 ```

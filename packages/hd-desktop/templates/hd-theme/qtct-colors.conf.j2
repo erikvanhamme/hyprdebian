@@ -1,0 +1,18 @@
+; The HyprDebian theme {{ name }}, written by hd-theme --apply from /etc/hyprdebian/config.json.
+; Do not change this file: hd-theme --apply writes it again. The colour scheme of qt5ct and qt6ct
+; for the Qt applications, in the order of the roles of QPalette: WindowText, Button, Light,
+; Midlight, Dark, Mid, Text, BrightText, ButtonText, Base, Window, Shadow, Highlight,
+; HighlightedText, Link, LinkVisited, AlternateBase, NoRole, ToolTipBase, ToolTipText and
+; PlaceholderText. Disabled text is half as bright.
+{% set dark = theme["dark"] %}
+{% set light = theme["light"] %}
+{% set normal = theme["normal"] %}
+{% set highlight = theme["highlight"] %}
+{% set button = dark | mix(light, 0.1) %}
+{% set bevel = [button | mix(light, 0.15), button | mix(light, 0.08), button | mix("#000000", 0.5), button | mix("#000000", 0.25)] %}
+{% set placeholder = light | mix(dark, 0.5) %}
+{% set alternate = dark | mix(light, 0.05) %}
+[ColorScheme]
+active_colors={{ ([light, button] + bevel + [light, light, light, dark, dark, "#000000", normal, light, highlight, highlight, alternate, "#000000", dark, light, placeholder]) | map("argb") | join(", ") }}
+disabled_colors={{ ([placeholder, button] + bevel + [placeholder, light, placeholder, alternate, dark, "#000000", normal | mix(dark, 0.5), placeholder, highlight, highlight, alternate, "#000000", dark, light, placeholder | mix(dark, 0.3)]) | map("argb") | join(", ") }}
+inactive_colors={{ ([light, button] + bevel + [light, light, light, dark, dark, "#000000", normal, light, highlight, highlight, alternate, "#000000", dark, light, placeholder]) | map("argb") | join(", ") }}

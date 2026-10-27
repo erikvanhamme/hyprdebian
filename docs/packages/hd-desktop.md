@@ -4,7 +4,7 @@ The package `hd-desktop` is the HyprDebian desktop. It depends on the packages o
 - greetd, which logs the user in to Hyprland at the boot;
 - the desktop portals of Hyprland and GTK, for screen sharing, the file chooser and the dark mode;
 - kitty, mako, PipeWire with wiremix, its PulseAudio server and rtkit, and the screenshot tools grim, slurp and swappy;
-- the dark GTK theme Adwaita-dark, qt6ct and the Wayland plugin `qt6-wayland` for the Qt applications, the colour emoji of `fonts-noto-color-emoji`, and plymouth;
+- the dark GTK theme Adwaita-dark, with the colours of the HyprDebian theme over it, qt6ct and the Wayland plugin `qt6-wayland` for the Qt applications, the colour emoji of `fonts-noto-color-emoji`, and plymouth;
 - yazi with [ouch](ouch.md) for its archives, and the applications audacious with its terminal interface, of [hd-audacious](hd-audacious.md), mpv, imv and firefox.
 
 HyprDebian installs no recommends, see [hd-base](hd-base.md), so the package depends on everything the desktop needs.
@@ -217,19 +217,25 @@ hd-launcher-cache --update
 ```
 
 ## Dark theme
-The GTK and the Qt applications and the dialogs of Hyprland look the same: dark, in the colours of Adwaita-dark, in `JetBrainsMono NFM Medium 11`, and with the file chooser of GTK.
+The GTK and the Qt applications and the dialogs of Hyprland look the same: dark, in the colours of the HyprDebian theme, in its font, and with the file chooser of GTK. Their base is the dark Adwaita theme in `JetBrainsMono NFM Medium 11`; `hd-theme --apply` of [hd-theme](hd-theme.md) puts the colours of the theme over it, and for GTK the font of the theme in its size `font-size-small`.
 
 `/etc/dconf/db/local.d/00-dark-theme` asks GTK applications for the dark Adwaita theme, Adwaita-dark of `gnome-themes-extra-data`, and `01-font` for the font of HyprDebian, `JetBrainsMono NFM Medium 11`, of the interface, the documents and the monospaced text. `/etc/dconf/profile/user` adds the system database `local` to the one of the user, and the installation compiles it with `dconf update`. GTK applications on XWayland have no XSETTINGS and do not read dconf; they get the same from `/etc/gtk-3.0/settings.ini` and `/etc/gtk-4.0/settings.ini`.
 
-The Qt applications get it from qt5ct and qt6ct, which `QT_QPA_PLATFORMTHEME=qt5ct` in `~/.config/hypr/hyprland.lua` loads for Qt 5 and Qt 6 alike: `~/.config/qt5ct/qt5ct.conf` and `~/.config/qt6ct/qt6ct.conf` give them the style Fusion with the colour scheme `hyprdebian`, the colours of Adwaita-dark, in `/usr/share/qt5ct/colors` and `/usr/share/qt6ct/colors`, the font, the Adwaita icons and the file chooser of the desktop portals. The commands `qt5ct` and `qt6ct` change them. The package depends on `qt6ct`, `qt6-xdgdesktopportal-platformtheme` and `qt6-wayland`, which lets the Qt 6 applications run on Wayland instead of XWayland, as `QT_QPA_PLATFORM=wayland;xcb` asks for first. It does not depend on qt5ct, as the desktop has no Qt 5 applications; for those, install:
+The Qt applications get it from qt5ct and qt6ct, which `QT_QPA_PLATFORMTHEME=qt5ct` in `~/.config/hypr/hyprland.lua` loads for Qt 5 and Qt 6 alike: `~/.config/qt5ct/qt5ct.conf` and `~/.config/qt6ct/qt6ct.conf` give them the style Fusion with the colour scheme of the theme, `~/.config/qt5ct/colors/hd-theme.conf` and `~/.config/qt6ct/colors/hd-theme.conf`, which `hd-theme --apply` writes, the font, the Adwaita icons and the file chooser of the desktop portals. The commands `qt5ct` and `qt6ct` change them. The package depends on `qt6ct`, `qt6-xdgdesktopportal-platformtheme` and `qt6-wayland`, which lets the Qt 6 applications run on Wayland instead of XWayland, as `QT_QPA_PLATFORM=wayland;xcb` asks for first. It does not depend on qt5ct, as the desktop has no Qt 5 applications; for those, install:
 
 ```bash
 sudo apt install qt5ct qt5-xdgdesktopportal-platformtheme qtwayland5
 ```
 
-The dialogs of Hyprland, of `hyprland-guiutils`, get the same colours and font from `~/.config/hypr/hyprtoolkit.conf` of hyprtoolkit.
+The colour scheme `hyprdebian` in `/usr/share/qt5ct/colors` and `/usr/share/qt6ct/colors` has the colours of Adwaita-dark, for those who choose it with qt5ct or qt6ct. The font of the Qt applications stays the one in `qt5ct.conf` and `qt6ct.conf`.
+
+The GTK applications get the colours of the theme from `~/.config/gtk-3.0/gtk.css` and `~/.config/gtk-4.0/gtk.css`, which import the `hd-theme.css` that `hd-theme --apply` writes next to them. They set the named colours of Adwaita and libadwaita; the parts that Adwaita-dark of GTK 3 draws in colours of its own keep them. The font of the theme goes in the dconf database of the user.
+
+The dialogs of Hyprland, of `hyprland-guiutils`, get the same colours, font and radius from `~/.config/hypr/hyprtoolkit.conf` of hyprtoolkit, which sources `hd-theme-hyprtoolkit.conf` of `hd-theme --apply`.
 
 An upgrade from a version before 1.28 gives the user who is logged in to Hyprland the folders `~/.config/qt5ct` and `~/.config/qt6ct` and `~/.config/hypr/hyprtoolkit.conf`, as the first installation does, and says to set `QT_QPA_PLATFORMTHEME` to `qt5ct` in their `~/.config/hypr/hyprland.lua`, which still names `gtk3`, and to remove `QT_STYLE_OVERRIDE`, as in `/etc/skel/.config/hypr/hyprland.lua`.
+
+An upgrade from a version before 1.56 gives that user the two files `gtk.css`, and says how to give the theme to their `qt5ct.conf`, `qt6ct.conf` and `hyprtoolkit.conf`: `color_scheme_path` set to `~/.config/qt5ct/colors/hd-theme.conf` and `~/.config/qt6ct/colors/hd-theme.conf`, and `source = ~/.config/hypr/hd-theme-hyprtoolkit.conf` in place of the colours, `font_family` and `font_family_monospace`, as in `/etc/skel`.
 
 ## Removing the package
 Removing the package removes the greetd config of `hd-desktop-render` and puts back the one of the package greetd, which logs nobody in. The files in `/etc/skel`, the dconf files, the sudoers rule, the apt hook and the menu of the launcher stay until the package is purged; the apt hook does nothing without `hd-launcher-cache`; the settings in `/etc/hyprdebian/config.json` and the caches and settings of the users in their home directories stay.
