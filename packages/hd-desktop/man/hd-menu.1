@@ -84,9 +84,14 @@ Move a page, or to the first or the last option.
 .B Enter
 Choose the selected option.
 .TP
-.BR Escape ", " q
-Close the menu without a choice. q is the key with the letter q in the
-keyboard layout, with or without Shift.
+.B Escape
+Close the menu without a choice.
+.TP
+Other keys
+Type the start of a label to select the first option whose label starts with
+it, whatever the case. Each key goes by its character in the keyboard layout,
+and adds it to what was typed; without a matching option, the selection stays.
+A pause of 250 ms, or moving the selection, starts the typing over.
 .PP
 A key that is held repeats at the rate and after the delay of the compositor,
 .B input:repeat_rate

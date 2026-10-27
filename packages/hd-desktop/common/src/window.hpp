@@ -68,6 +68,9 @@ public:
 
     /** @brief Handles the compositor closing the surface. */
     virtual void closed() = 0;
+
+    /** @brief Handles the end of the timer of Window::start_timer(); nothing by default. */
+    virtual void timeout() {}
 };
 
 /** @brief The surface of the program, from the connection to the compositor to the frames on the screen. */
@@ -102,6 +105,18 @@ public:
 
     /** @brief Draws a new frame, now or as soon as a buffer is free. */
     void redraw();
+
+    /**
+     * @brief Calls WindowHandler::timeout() once, after a time.
+     *
+     * A timer that is running starts again from now.
+     *
+     * @param ms Milliseconds from now, at least 1.
+     */
+    void start_timer(int ms);
+
+    /** @brief Stops the timer of start_timer(), if it is running. */
+    void stop_timer();
 
     /**
      * @brief The width of the surface.
@@ -239,6 +254,8 @@ private:
     xkb_state* xkb_state_ = nullptr;
     /** @brief The timerfd of the key repeat, polled in run() next to the connection. */
     int repeat_fd_ = -1;
+    /** @brief The timerfd of start_timer(), polled in run() next to the connection. */
+    int timer_fd_ = -1;
     /** @brief The key that repeats while it is held; 0 for none. */
     uint32_t repeat_key_ = 0;
     /**

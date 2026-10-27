@@ -61,7 +61,7 @@ Window::Window(WindowHandler& handler) : handler_(handler)
     // compositor sends, so that they follow the keyboard layout.
     // A held key repeats at the rate and after the delay of the compositor,
     // those of input:repeat_rate and input:repeat_delay in Hyprland, with a
-    // timer that run() polls.
+    // timer that run() polls. A second timer is the one of start_timer().
     xkb_context_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (xkb_context_ == nullptr) {
         fail("cannot create the xkb context");
@@ -69,6 +69,10 @@ Window::Window(WindowHandler& handler) : handler_(handler)
     repeat_fd_ = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
     if (repeat_fd_ < 0) {
         fail(std::string("cannot create the key repeat timer: ") + std::strerror(errno));
+    }
+    timer_fd_ = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+    if (timer_fd_ < 0) {
+        fail(std::string("cannot create the timer: ") + std::strerror(errno));
     }
     static const wl_keyboard_listener keyboard_listener = {
         .keymap = [](void* data, wl_keyboard*, uint32_t format, int32_t fd, uint32_t size) {
@@ -155,6 +159,9 @@ Window::~Window()
     }
     if (repeat_fd_ >= 0) {
         close(repeat_fd_);
+    }
+    if (timer_fd_ >= 0) {
+        close(timer_fd_);
     }
     if (layer_shell_ != nullptr) {
         zwlr_layer_shell_v1_destroy(layer_shell_);
@@ -282,6 +289,22 @@ void Window::repeat()
     for (uint64_t i = 0; i < expirations && running_ && repeat_key_ != 0; ++i) {
         handler_.key(repeat_key_, keysym(repeat_key_));
     }
+}
+
+void Window::start_timer(int ms)
+{
+    itimerspec spec = {};
+    // A time of 0 would disarm the timer.
+    ms = std::max(ms, 1);
+    spec.it_value.tv_sec = ms / 1000;
+    spec.it_value.tv_nsec = (ms % 1000) * 1000000L;
+    timerfd_settime(timer_fd_, 0, &spec, nullptr);
+}
+
+void Window::stop_timer()
+{
+    const itimerspec off = {};
+    timerfd_settime(timer_fd_, 0, &off, nullptr);
 }
 
 xkb_keysym_t Window::keysym(uint32_t key) const
@@ -426,7 +449,7 @@ void Window::destroy_buffers()
 void Window::run()
 {
     // wl_display_dispatch() would block on the connection alone; this waits
-    // for the connection and the repeat timer together, the way libwayland
+    // for the connection and the two timers together, the way libwayland
     // describes: prepare the read, flush the requests, poll, then read and
     // dispatch the events.
     while (running_) {
@@ -436,8 +459,8 @@ void Window::run()
             }
         }
         wl_display_flush(display_);
-        pollfd fds[2] = {{wl_display_get_fd(display_), POLLIN, 0}, {repeat_fd_, POLLIN, 0}};
-        if (poll(fds, 2, -1) < 0) {
+        pollfd fds[3] = {{wl_display_get_fd(display_), POLLIN, 0}, {repeat_fd_, POLLIN, 0}, {timer_fd_, POLLIN, 0}};
+        if (poll(fds, 3, -1) < 0) {
             wl_display_cancel_read(display_);
             if (errno == EINTR) {
                 continue;
@@ -456,6 +479,13 @@ void Window::run()
         }
         if (running_ && (fds[1].revents & POLLIN) != 0) {
             repeat();
+        }
+        // A key handled above may have started the timer again; then the read
+        // finds nothing, and the timer goes on.
+        uint64_t expirations = 0;
+        if (running_ && (fds[2].revents & POLLIN) != 0 &&
+            read(timer_fd_, &expirations, sizeof expirations) == sizeof expirations) {
+            handler_.timeout();
         }
     }
 }

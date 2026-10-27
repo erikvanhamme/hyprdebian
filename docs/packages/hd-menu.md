@@ -56,7 +56,7 @@ wlr-layer-shell is not in a Debian package, so `common/protocols/` has a copy of
 | `icon` | Optional: the path of a PNG or SVG (`.svg` or `.svgz`) image, shown left of the label at the `icon_size` of the theme. |
 | `default` | Optional: `true` for the option selected at the start; the first option when none has it. |
 
-The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter chooses and Escape or `q` closes the menu without a choice. `q` is the key with the letter q in the keyboard layout, with or without Shift. A key that is held repeats at the rate and after the delay of the compositor, `input:repeat_rate` and `input:repeat_delay` in Hyprland, so that holding Down keeps moving the selection.
+The arrows, Tab, Page Up, Page Down, Home and End move the selection, Enter chooses and Escape closes the menu without a choice. Typing the start of a label selects the first option whose label starts with it, whatever the case: each key goes by its character in the keyboard layout and adds it to what was typed, and without a matching option the selection stays. A pause of 250 ms, or moving the selection, starts the typing over. A key that is held repeats at the rate and after the delay of the compositor, `input:repeat_rate` and `input:repeat_delay` in Hyprland, so that holding Down keeps moving the selection.
 
 ## The theme
 `hd-menu` takes its look from the `hd-theme` key of the configuration of the user, `~/.config/hyprdebian/config.json`, and when that has none, of the configuration of the system, `/etc/hyprdebian/config.json`, of [hd-config](hd-config.md); [hd-theme](hd-theme.md) sets them when a theme is selected. When neither has the key, it uses defaults of its own. Run as root, it only reads the configuration of the system:

@@ -37,6 +37,7 @@
 
 #include <istream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 /** @brief One option of the menu. */
@@ -78,3 +79,19 @@ struct Menu {
  *         options.
  */
 Menu read_menu(std::istream& in);
+
+/**
+ * @brief Lower cases a character, as xkbcommon does for keysyms.
+ * @param c The character, as a Unicode code point.
+ * @return The lower case character; c itself when it has none.
+ */
+char32_t lower_char(char32_t c);
+
+/**
+ * @brief Finds the option that typing selects.
+ * @param menu  The menu.
+ * @param typed What was typed, in lower case (see lower_char()).
+ * @return The index in menu.options of the first option whose label, in
+ *         lower case, starts with typed; -1 when there is none.
+ */
+int find_option(const Menu& menu, std::u32string_view typed);

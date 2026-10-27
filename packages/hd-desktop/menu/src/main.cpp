@@ -5,7 +5,8 @@
 //   echo '{"banner": "Power off system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | hd-menu
 //
 // The arrows, Tab, Page Up, Page Down, Home and End move the selection,
-// Enter chooses and Escape or q cancels; held keys repeat. It exits with 0
+// typing selects the first option whose label starts with what was typed,
+// Enter chooses and Escape cancels; held keys repeat. It exits with 0
 // after a choice, with 1 when the menu is closed without one or another
 // hd-menu is already open, and with 2 on an error.
 //
@@ -47,13 +48,6 @@ public:
 
     void key(uint32_t key, xkb_keysym_t sym) override
     {
-        // q goes by the letter of the keyboard layout, with or without Shift
-        // or Caps Lock.
-        if (xkb_keysym_to_lower(sym) == XKB_KEY_q) {
-            result_ = 1;
-            window_->quit();
-            return;
-        }
         const int last = static_cast<int>(menu_.options.size()) - 1;
         int selected = menu_.selected;
         switch (key) {
@@ -87,11 +81,18 @@ public:
             selected = last;
             break;
         default:
+            type(sym);
             return;
         }
+        // Moving the selection starts the typing over.
+        typed_.clear();
+        window_->stop_timer();
         menu_.selected = std::clamp(selected, 0, last);
         window_->redraw();
     }
+
+    // A pause in the typing starts it over; the selection stays.
+    void timeout() override { typed_.clear(); }
 
     void closed() override
     {
@@ -100,10 +101,36 @@ public:
     }
 
 private:
+    // Typing goes by the character of the key in the keyboard layout, in lower
+    // case, so that it ignores Shift and Caps Lock. Each character is added to
+    // what was typed, and selects the first option whose label, in lower case,
+    // starts with it; without such an option, the selection stays. Keys
+    // without a character, such as Shift, and control characters, such as
+    // Backspace, are ignored.
+    void type(xkb_keysym_t sym)
+    {
+        const char32_t c = lower_char(xkb_keysym_to_utf32(sym));
+        if (c < 0x20 || c == 0x7f) {
+            return;
+        }
+        typed_ += c;
+        window_->start_timer(TYPING_PAUSE_MS);
+        const int found = find_option(menu_, typed_);
+        if (found >= 0 && found != menu_.selected) {
+            menu_.selected = found;
+            window_->redraw();
+        }
+    }
+
+    // The pause in milliseconds after which typing starts over.
+    static constexpr int TYPING_PAUSE_MS = 250;
+
     Menu& menu_;
     const Renderer& renderer_;
     Window* window_ = nullptr;
     int result_ = 1;
+    // What was typed since the last pause, in lower case.
+    std::u32string typed_;
 };
 
 // Only one hd-menu at a time: a lock in the runtime directory of the user in
