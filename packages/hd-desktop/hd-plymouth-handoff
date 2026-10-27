@@ -11,8 +11,15 @@ hd-plymouth-handoff.service, which greetd.service wants and starts before it, ru
 deactivate first: plymouth stops drawing and lets go of the display, but keeps it open, so the last
 frame of the splash stays on the screen. greetd starts the session on tty1, the VT of plymouth,
 without a VT switch, as its config has vt = "none". Then the service runs quit, which waits until
-another process than plymouthd has a DRM card open, as systemd-logind and Hyprland do once
-Hyprland has the display, and runs plymouth quit --retain-splash, which leaves the screen to it.
+Hyprland shows its first frame, and runs plymouth quit --retain-splash, which leaves the screen to
+it. plymouthd must not exit before that: the kernel removes the framebuffers of a process that
+exits, and turns off the planes that show them, so the screen would be black until Hyprland draws.
+
+The DRM files in debugfs tell what is on the screen: state names the framebuffer of every plane
+that is on, and framebuffer names the process that allocated each framebuffer. Hyprland shows its
+first frame when no plane that is on shows a framebuffer of plymouthd. Without debugfs, quit waits
+until another process than plymouthd has a DRM card open, as systemd-logind and Hyprland do once
+Hyprland has the display, which can be a second before its first frame.
 
 Without the desktop, the console comes back with a plain plymouth quit: when greetd failed, when
 it logged nobody in and started getty@tty1.service, or after TIMEOUT seconds.
@@ -25,6 +32,7 @@ and runs plymouth --wait when it is not, as when greetd is not started.
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -35,6 +43,8 @@ HANDOFF_UNIT = "hd-plymouth-handoff.service"
 GREETD_UNIT = "greetd.service"
 CONSOLE_UNIT = "getty@tty1.service"
 DRM_CARD = "/dev/dri/card"
+DRM_DEBUGFS = "/sys/kernel/debug/dri"
+PLYMOUTHD = "plymouthd"
 TIMEOUT = 30
 INTERVAL = 0.1
 
@@ -71,6 +81,72 @@ def display_taken(plymouthd):
     return False
 
 
+def plymouth_framebuffers(drm_dir):
+    """The ids of the framebuffers that plymouthd allocated on a DRM device."""
+    ids = set()
+    current = None
+    with open(os.path.join(drm_dir, "framebuffer"), encoding="utf-8") as f:
+        for line in f:
+            match = re.match(r"framebuffer\[(\d+)\]:", line)
+            if match:
+                current = match.group(1)
+                continue
+            match = re.match(r"\s+allocated by = (.*)", line)
+            if match and current is not None and match.group(1).strip() == PLYMOUTHD:
+                ids.add(current)
+    return ids
+
+
+def shown_framebuffers(drm_dir):
+    """The ids of the framebuffers that the planes of a DRM device that are on show."""
+    ids = set()
+    crtc = None
+    with open(os.path.join(drm_dir, "state"), encoding="utf-8") as f:
+        for line in f:
+            if re.match(r"\S", line):
+                crtc = None
+                continue
+            match = re.match(r"\s+crtc=(.*)", line)
+            if match:
+                crtc = match.group(1).strip()
+                continue
+            match = re.match(r"\s+fb=(\d+)", line)
+            if match and crtc not in (None, "(null)") and match.group(1) != "0":
+                ids.add(match.group(1))
+    return ids
+
+
+def splash_shown():
+    """True when a plane shows a framebuffer of plymouthd, None when debugfs cannot tell."""
+    try:
+        drm_dirs = [os.path.join(DRM_DEBUGFS, d) for d in os.listdir(DRM_DEBUGFS)]
+    except OSError:
+        return None
+    readable = False
+    for drm_dir in drm_dirs:
+        if not os.path.isfile(os.path.join(drm_dir, "state")):
+            continue
+        try:
+            splash = plymouth_framebuffers(drm_dir)
+            shown = shown_framebuffers(drm_dir)
+        except OSError:
+            continue
+        readable = True
+        if splash & shown:
+            return True
+    if not readable:
+        return None
+    return False
+
+
+def desktop_shown(plymouthd):
+    """True when Hyprland shows its first frame, or, without debugfs, has a DRM card open."""
+    shown = splash_shown()
+    if shown is None:
+        return display_taken(plymouthd)
+    return not shown
+
+
 def unit_state(unit):
     return subprocess.run(["systemctl", "show", "--property=ActiveState", "--value", unit],
                           capture_output=True, text=True).stdout.strip()
@@ -89,8 +165,8 @@ def quit_plymouth():
     plymouthd = plymouth_pid()
     deadline = time.monotonic() + TIMEOUT
     while time.monotonic() < deadline:
-        if display_taken(plymouthd):
-            print("The desktop has the display; quitting plymouth with the splash on the screen.")
+        if desktop_shown(plymouthd):
+            print("The desktop is on the screen; quitting plymouth.")
             subprocess.run([PLYMOUTH, "quit", "--retain-splash"])
             return
         if desktop_gone():

@@ -96,12 +96,24 @@ stops the splash, which stays on the screen.
 greetd starts the session of Hyprland on tty1, the VT of the splash, without
 a VT switch and without setting the VT to text mode; see
 .BR hd-desktop (7).
-Once Hyprland has the display,
+Once Hyprland shows its first frame,
 .B plymouth quit \-\-retain\-splash
 leaves the screen to it.
+plymouth must not quit before that: the kernel turns off the planes that
+show the framebuffers of a process that exits, and the screen would be black
+until Hyprland draws.
+The DRM files
+.I state
+and
+.I framebuffer
+in
+.I /sys/kernel/debug/dri
+tell when no plane shows a framebuffer of plymouthd any more.
+Without them, plymouth quits once Hyprland has the display open, which can
+be a moment before its first frame.
 .PP
 When greetd fails, or logs nobody in and starts the console on tty1, or
-when Hyprland does not have the display after 30 seconds, plymouth quits as
+when Hyprland does not show a frame after 30 seconds, plymouth quits as
 usual and the console shows.
 .B plymouth-quit-wait.service
 returns at once when the splash is handed over, as greetd starts after it;
