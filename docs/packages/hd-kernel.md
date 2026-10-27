@@ -12,7 +12,7 @@ For now a system switches when its admin installs `hd-kernel`; `hd-base` still d
 | --- | --- |
 | `linux-image-<release>` | The kernel and its modules. |
 | `zfs-modules-<release>` | `zfs.ko` and `spl.ko` in `/lib/modules/<release>/extra/zfs`. It provides `zfs-modules`, which `zfs-initramfs` takes in place of `zfs-dkms`, and adds the module to the initrd of its kernel. |
-| `hd-kernel` | Depends on the exact versions of both, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64` and `linux-headers-amd64`, and installs the man page `man hd-kernel`. |
+| `hd-kernel` | Depends on the exact versions of both, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, and installs the man page `man hd-kernel`. |
 
 The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, and `<id>` six hex digits of a sha256 of everything the packages are made of: the versions of `linux`, `zfs-linux` and `hd-kernel`, `build-kernel.sh` and the files in `deb/` and `man/`. A build of anything else has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
 
@@ -24,10 +24,13 @@ On a system with `hd-base`:
 sudo apt install hd-kernel
 ```
 
-This installs the kernel and its ZFS module, and removes `linux-image-amd64` and `linux-headers-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader. Once it boots, the kernels of Debian can go:
+This installs the kernel and its ZFS module, and removes `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader. Once it boots, the kernels of Debian can go:
 ```
 sudo apt purge linux-image-<version>-amd64 linux-headers-<version>-amd64
+sudo apt autoremove --purge
 ```
+
+The second command removes the packages that those two pulled in, such as `linux-base-<version>-amd64`, `linux-binary-<version>-amd64` and `linux-modules-<version>-amd64` of the kernels of Debian since forky.
 
 To switch back to the kernel of Debian, which gets its ZFS module from `zfs-dkms` again:
 ```

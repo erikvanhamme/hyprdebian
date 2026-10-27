@@ -5,7 +5,7 @@ Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: linux-image-@RELEASE@ (= @KERNEL_DEB_VERSION@),
  zfs-modules-@RELEASE@ (= @ZFS_DEB_VERSION@)
-Conflicts: linux-image-amd64, linux-headers-amd64
+Conflicts: linux-image-amd64, linux-headers-amd64, linux-base-amd64
 Section: kernel
 Priority: optional
 Description: HyprDebian kernel with a prebuilt ZFS module
@@ -17,5 +17,5 @@ Description: HyprDebian kernel with a prebuilt ZFS module
  thrown away, so a system needs neither DKMS nor a compiler for ZFS, and
  the kernel trusts no other key for its modules.
  .
- It replaces the kernel of Debian: installing it removes linux-image-amd64
- and linux-headers-amd64. See hd-kernel(7).
+ It replaces the kernel of Debian: installing it removes linux-image-amd64,
+ linux-headers-amd64 and linux-base-amd64. See hd-kernel(7).

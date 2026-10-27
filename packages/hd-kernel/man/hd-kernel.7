@@ -50,9 +50,10 @@ sudo apt install hd-kernel
 .RE
 .PP
 This removes
-.B linux-image-amd64
+.BR linux-image-amd64 ,
+.B linux-headers-amd64
 and
-.BR linux-headers-amd64 ,
+.BR linux-base-amd64 ,
 so the kernels of Debian get no more upgrades.
 After the installation the bootloader shows the new kernel at the top of its
 menu, with
@@ -63,7 +64,16 @@ Once it boots, the kernels of Debian can go:
 .PP
 .RS
 sudo apt purge linux-image-<version>-amd64 linux-headers-<version>-amd64
+.br
+sudo apt autoremove --purge
 .RE
+.PP
+The second command removes the packages that those two pulled in, such as
+.BR linux-base- ,
+.B linux-binary-
+and
+.B linux-modules-<version>-amd64
+of the kernels of Debian since forky.
 .PP
 To switch back to the kernel of Debian, which gets its ZFS module from
 .B zfs-dkms
