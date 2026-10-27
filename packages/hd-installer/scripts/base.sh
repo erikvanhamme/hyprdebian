@@ -16,6 +16,31 @@ b_post() {
     return 0
 }
 
+# Sets the clock of the live system from the Date header of the Debian mirror. A wrong clock
+# breaks debootstrap and apt, which refuse Release files that are not yet or no longer valid, and
+# https. The header is fetched over plain http, which works with a wrong clock, from the mirror
+# that debootstrap uses, so no other host has to be reachable. The hardware clock is set too, when
+# hwclock is there, so the new system boots with the right time. It runs on every run, as the
+# live system may have been booted again with the wrong clock.
+b_clock() {
+    local now
+    now="$(python3 -c '
+import urllib.request
+request = urllib.request.Request("http://deb.debian.org/debian/", method="HEAD")
+with urllib.request.urlopen(request, timeout=30) as response:
+    print(response.headers["Date"])
+')" || return 1
+    if [[ -z "${now}" ]]; then
+        echo "ERROR: The Debian mirror sent no date."
+        return 1
+    fi
+
+    date --utc --set="${now}" || return 1
+    if command -v hwclock > /dev/null; then
+        hwclock --systohc || return 1
+    fi
+}
+
 # The base system is the minbase variant of debootstrap: the required packages and apt, without
 # the important ones, such as cron, dhcpcd and vim, which HyprDebian does not use. hd-base depends
 # on the ones it needs. systemd comes along, as b_mount_unit enables units with systemctl before
@@ -336,6 +361,7 @@ b_network() {
 }
 
 add_dependencies "b_main" \
+    "b_clock" \
     "b_bootstrap" \
     "b_templates" \
     "b_fstab" \
@@ -358,5 +384,7 @@ add_dependencies "b_main" \
     "b_utilities" \
     "b_firewall" \
     "b_network" \
+
+always_run "b_clock"
 
 add_dependencies "install_root" "b_pre" "b_main" "b_post"

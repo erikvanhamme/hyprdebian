@@ -192,6 +192,7 @@ The base phase installs Debian on the root of the new system and prepares it:
 
 | Task | What it does |
 | --- | --- |
+| `b_clock` | Sets the clock of the live system from the `Date` header of `http://deb.debian.org/debian/`, and the hardware clock with `hwclock` when the live system has it. A wrong clock breaks debootstrap and apt, which refuse Release files that are not yet or no longer valid. Plain http works with a wrong clock, and the mirror is the one debootstrap needs anyway. It runs on every run, as the live system may have been booted again with the wrong clock. |
 | `b_bootstrap` | Installs the base system of the suite with the `minbase` variant of `debootstrap`: the required packages, apt, `ca-certificates`, `systemd`, which `b_mount_unit` needs, and `whiptail`, so the debconf questions of `b_console` are asked in dialogs. The important packages of the default variant, such as `cron`, `dhcpcd-base` and `vim-tiny`, stay out; `hd-base` depends on the ones HyprDebian uses. |
 | `b_templates` | Writes `/etc/hostname` and `/etc/hosts`. |
 | `b_fstab` | Writes `/etc/fstab` with the swap: `/dev/mapper/swap` with encryption, otherwise the swap partition or array by its UUID. |

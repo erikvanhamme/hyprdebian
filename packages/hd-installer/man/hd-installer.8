@@ -315,6 +315,8 @@ is a folder of the root, as the bootloader reads the kernels from the EFI
 system partitions.
 .TP
 .B base
+Sets the clock of the live system, and the hardware clock, from the date of
+the Debian mirror, on every run, as a wrong clock breaks debootstrap and apt.
 Installs the minimal base of Debian, the
 .B minbase
 variant of
