@@ -193,8 +193,7 @@ The font sizes are rounded to a tenth of a point, the others to whole
 pixels, and a size that is not 0 stays at least 1.
 The themes and the key
 .B hd-theme
-keep their own sizes; the cards, the boot splash and the bootloader are not
-scaled.
+keep their own sizes.
 Without the key, or when it is not valid, which is reported, the factor
 is 1.
 .PP
@@ -203,9 +202,6 @@ pixels: the monitor rule in the
 .I hyprland.lua
 that new users get has scale 1.
 A scale above 1 would scale the theme twice.
-What the applications draw themselves, other than the font of the GTK
-applications, such as their buttons and icons and the font of the Qt
-applications, is not scaled.
 .SH FILES
 .TP
 .I /etc/hyprdebian/themes/<name>.json
