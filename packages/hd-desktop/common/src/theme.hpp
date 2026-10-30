@@ -7,6 +7,10 @@
  * configuration of the system, /etc/hyprdebian/config.json; hd-theme --select
  * sets them. Root only reads the one of the system. Every field that is
  * missing keeps its default.
+ *
+ * The sizes are multiplied by the factor of the key "hd-display" of the
+ * configuration of the system, as hd-theme --apply does, so they look on the
+ * monitor as the theme means them on a screen of 96 dpi seen from 70 cm.
  */
 #pragma once
 
@@ -25,7 +29,7 @@ struct Color {
 /**
  * @brief The settings of the hd-theme that hd-menu and hd-message use, with their defaults.
  *
- * Sizes are in logical pixels.
+ * Sizes are in logical pixels, multiplied by the factor of hd-display.
  */
 struct Theme {
     /** @brief The font of all text, a family name for fontconfig. */
@@ -63,13 +67,18 @@ struct Theme {
 };
 
 /**
- * @brief Reads the theme of the user who runs the program.
+ * @brief Reads the theme of the user who runs the program, scaled for the monitor.
  *
  * The first configuration that has the key "hd-theme" gives the theme. A
  * configuration that does not exist, or has no such key, is skipped
  * quietly; one that cannot be read or is not valid JSON is skipped with a
  * message on stderr. Fields that are missing or invalid keep their default;
- * an invalid colour is reported on stderr.
+ * an invalid colour is reported on stderr. The sizes, also the defaults,
+ * are then multiplied by the factor of the key "hd-display" of
+ * /etc/hyprdebian/config.json: its factor, or else the one from its diagonal
+ * in inches, its distance in centimetres and the preferred mode of the
+ * connected monitor with the most pixels in /sys/class/drm. A key that is not
+ * valid is reported on stderr and leaves the sizes as they are.
  *
  * @return The theme, or the defaults, with a message on stderr, when no
  *         configuration has one.

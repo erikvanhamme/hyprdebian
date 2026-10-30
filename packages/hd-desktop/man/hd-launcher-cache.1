@@ -105,7 +105,15 @@ An SVG is rendered to a PNG of the
 .B icon_size
 of the
 .BR hd-theme ,
-64 without one, in
+64 without one, multiplied by the factor of the key
+.B hd-display
+of the configuration of the system, as
+.BR hd-menu (1)
+draws it; see
+.B SCALING
+in
+.BR hd-theme (7).
+It is rendered in
 .I icons
 of the cache; only when the PNG there was not rendered from that SVG at that size.
 The icons of applications that are gone or left out are removed.
@@ -128,7 +136,9 @@ is only written when that user runs
 .BR "hd-launcher-cache \-\-update" .
 After another theme is selected, with another
 .BR icon_size ,
-or after the settings changed, run it again.
+after the key
+.B hd-display
+changed, or after the settings changed, run it again.
 .SH OPTIONS
 .TP
 .BR \-h ,\  \-\-help

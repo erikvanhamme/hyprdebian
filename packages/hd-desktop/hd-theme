@@ -58,6 +58,11 @@ It also sets the font of the GTK applications, of the interface, the documents a
 text, to the font of the theme in font-size-small, in the dconf database of the user, with dconf
 write. dconf needs the session bus; without one, the font is left as it is.
 
+The sizes in the theme files are those of the theme multiplied by the factor of the key hd-display
+of /etc/hyprdebian/config.json, which /usr/lib/hd-desktop/hd_display.py works out: the font sizes
+to a tenth of a point, border, radius, gap and icon_size to whole pixels. Without the key, the
+factor is 1. The theme in the configuration keeps its own sizes.
+
 The configs of the programs themselves are the user's and are never changed; the configs that
 hd-desktop puts in /etc/skel use the theme files. A config that does not refer to its theme file
 is reported. A theme file is only written when it changes, and only then is the program reloaded,
@@ -88,6 +93,11 @@ import sys
 import tempfile
 
 import jinja2
+
+LIB_DIR = "/usr/lib/hd-desktop"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_display
 
 SYSTEM_CONFIG = "/etc/hyprdebian/config.json"
 USER_CONFIG = ".config/hyprdebian/config.json"
@@ -564,12 +574,28 @@ def register_vscodium_extension(home):
     print(f"Added the HyprDebian theme to {registry}.")
 
 
+def scaled(theme, factor):
+    """The theme with its sizes multiplied by factor. A size that is missing or not a number is
+    left as it is, for the templates to report."""
+    theme = dict(theme)
+    for key in FONT_SIZES:
+        if is_number(theme.get(key)):
+            theme[key] = hd_display.font_size(theme[key], factor)
+    for key in SIZES:
+        if is_number(theme.get(key)):
+            theme[key] = hd_display.pixels(theme[key], factor)
+    return theme
+
+
 def apply(reload_programs):
     """Writes the theme files of the desktop programs in the home directory of the user, from the
-    selected theme, and reloads the programs whose theme file changed."""
+    selected theme scaled for the monitor, and reloads the programs whose theme file changed."""
     uid = os.getuid()
     home = pwd.getpwuid(uid).pw_dir
-    theme = selected_theme()
+    factor = hd_display.factor()
+    theme = scaled(selected_theme(), factor)
+    if factor != 1:
+        print(f"Scaled the sizes of the theme by {factor} for the monitor.")
     instances = hyprland_instances()
 
     templates = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),

@@ -131,6 +131,14 @@ The font size is in points, like in the other programs of the theme;
 .B hd-menu
 draws it at 4/3 logical pixels per point.
 The border, the radius and the icon size are in logical pixels.
+All these sizes are multiplied by the factor of the key
+.B hd-display
+of the configuration of the system, as
+.B hd-theme \-\-apply
+does for the other programs; see
+.B SCALING
+in
+.BR hd-theme (7).
 The scale of the monitor decides how large that is on the screen, so the
 menu has the same size as the other programs on every monitor.
 A setting that is missing has its default; when the file cannot be read, the

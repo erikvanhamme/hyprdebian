@@ -46,6 +46,11 @@
 #                                             launcher in the cache of the
 #                                             system or of the user, and
 #                                             prints it for the launcher
+#                 /usr/lib/hd-desktop/hd_display.py
+#                                             lib/hd_display.py, the scale
+#                                             of the theme on the monitor,
+#                                             shared by hd-theme and
+#                                             hd-launcher-cache
 #                 /usr/sbin/hd-desktop-render writes /etc/greetd/config.toml
 #                 /usr/sbin/hd-plymouth-render
 #                                             renders the boot splash in the
@@ -183,6 +188,7 @@ ARCH := $(shell dpkg --print-architecture)
 DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
 STAGE := $(BUILD)/deb
 LIBEXEC_DIR := /usr/libexec/$(DEB_NAME)
+LIB_DIR := /usr/lib/$(DEB_NAME)
 TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
 DOC := /usr/share/doc/$(DEB_NAME)
 # The files of the system, by their path below etc/ and usr/.
@@ -299,12 +305,12 @@ $(ZIP) $(SCP_ZIP): | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-plymouth-handoff hd-shutdown $(SBIN_COMMANDS) $(TEMPLATES) \
+$(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helper hd-reboot-notify hd-plymouth-handoff hd-shutdown lib/hd_display.py $(SBIN_COMMANDS) $(TEMPLATES) \
 		$(THEME_TEMPLATES) $(THEMES) screensaver.txt $(WALLPAPERS) $(PLYMOUTH_THEME) $(PLYMOUTH_TEMPLATES) \
 		plymouth/plymouthd.conf plymouth/initramfs/hd-plymouth $(ETC) $(USR) deb/control \
 		deb/copyright deb/triggers deb/preinst deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE) $(BUILD)/zip $(BUILD)/scp-zip
-	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(LIBEXEC_DIR) \
+	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(LIBEXEC_DIR) $(STAGE)$(LIB_DIR) \
 		$(STAGE)$(TEMPLATE_DIR) $(STAGE)$(THEME_TEMPLATE_DIR) $(STAGE)$(THEME_DIR) \
 		$(STAGE)$(SCREENSAVER_DIR) $(STAGE)$(BACKGROUNDS) $(STAGE)$(FONTS) $(STAGE)$(FONTS_DOC) \
 		$(STAGE)$(SCP_FONTS) $(STAGE)$(SCP_FONTS_DOC) \
@@ -313,6 +319,7 @@ $(DEB): $(VERSION_FILE) $(PROGRAMS) $(ZIP) $(SCP_ZIP) $(COMMANDS) hd-mount-helpe
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -s -m 0755 $(PROGRAMS)/hd-menu $(PROGRAMS)/hd-message $(STAGE)/usr/bin/
 	install -m 0755 hd-mount-helper hd-reboot-notify hd-plymouth-handoff hd-shutdown $(STAGE)$(LIBEXEC_DIR)/
+	install -m 0644 lib/hd_display.py $(STAGE)$(LIB_DIR)/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	install -m 0644 $(THEME_TEMPLATES) $(STAGE)$(THEME_TEMPLATE_DIR)/

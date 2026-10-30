@@ -130,6 +130,82 @@ the key
 also has the member
 .BR name ,
 the name of the theme.
+.SH SCALING
+The sizes of a theme are made for a screen of 96 pixels per inch seen from
+70 cm.
+The key
+.B hd-display
+of the configuration of the system,
+.IR /etc/hyprdebian/config.json ,
+tells how the monitor of the machine differs from that, so the theme looks
+the same size on every machine.
+Root sets it with
+.BR hd-config-update (1),
+in one of two ways:
+.PP
+.RS
+.nf
+{"diagonal": 42, "distance": 90}
+{"factor": 1.4}
+.fi
+.RE
+.TP
+.BR diagonal ", " distance
+The diagonal of the monitor in inches, and the distance from which it is
+seen, in centimetres.
+The factor is
+.IP
+.RS
+.nf
+dpi = sqrt(width\(S2 + height\(S2) / diagonal
+factor = dpi / 96 \(mu distance / 70
+.fi
+.RE
+.IP
+to two decimals, with the width and the height in pixels of the preferred
+mode of the connected monitor with the most pixels, in
+.IR /sys/class/drm .
+The diagonal is given, not read from the monitor, as monitors often report
+a wrong size.
+.TP
+.B factor
+The factor itself.
+It wins over a diagonal and a distance.
+.PP
+The font sizes,
+.BR border ,
+.BR radius ,
+.B gap
+and
+.B icon_size
+are multiplied by the factor: by
+.B hd-theme \-\-apply
+in the theme files, see
+.BR hd-theme (1),
+by
+.BR hd-menu (1)
+and
+.BR hd-message (1)
+when they start, and by
+.BR hd-launcher-cache (1)
+for the icons of the launcher.
+The font sizes are rounded to a tenth of a point, the others to whole
+pixels, and a size that is not 0 stays at least 1.
+The themes and the key
+.B hd-theme
+keep their own sizes; the cards, the boot splash and the bootloader are not
+scaled.
+Without the key, or when it is not valid, which is reported, the factor
+is 1.
+.PP
+The theme is scaled in the place of Hyprland, so all stays sharp, on whole
+pixels: the monitor rule in the
+.I hyprland.lua
+that new users get has scale 1.
+A scale above 1 would scale the theme twice.
+What the applications draw themselves, other than the font of the GTK
+applications, such as their buttons and icons and the font of the Qt
+applications, is not scaled.
 .SH FILES
 .TP
 .I /etc/hyprdebian/themes/<name>.json
@@ -146,7 +222,17 @@ come with hd-desktop.
 .I /etc/hyprdebian/config.json
 The key
 .B hd-theme
-holds the theme of the system.
+holds the theme of the system, the key
+.B hd-display
+the scale of the theme on the monitor.
+.TP
+.I /usr/lib/hd-desktop/hd_display.py
+Works out the factor of
+.B hd-display
+for
+.B hd-theme
+and
+.BR hd-launcher-cache .
 .TP
 .I ~/.config/hyprdebian/config.json
 The key

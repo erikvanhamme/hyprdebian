@@ -15,11 +15,13 @@
 ------------------
 
 -- See https://wiki.hypr.land/Configuring/Basics/Monitors/
+-- Scale 1: the HyprDebian theme is scaled for the monitor itself, with the key hd-display of
+-- /etc/hyprdebian/config.json (man hd-theme), and stays sharp on whole pixels.
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = "auto",
+    scale    = 1,
 })
 
 

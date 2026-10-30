@@ -55,7 +55,9 @@ label, in ascending order, without regard to case. The icon of an application is
 Icon in the icon themes hicolor and Adwaita and in /usr/share/pixmaps, or taken from its path when it
 is one. A PNG is used as it is; an SVG is rendered to a PNG of the icon_size of the hd-theme in
 icons/ of the cache, only when the PNG there was not rendered from that SVG at that size. Icons of
-applications that are gone are removed. The key hd-theme is looked up as the key hd-launcher.
+applications that are gone are removed. The key hd-theme is looked up as the key hd-launcher. Its
+icon_size is multiplied by the factor of the key hd-display of the configuration of the system, as
+hd-menu and hd-theme --apply do, with /usr/lib/hd-desktop/hd_display.py.
 """
 
 import argparse
@@ -75,6 +77,11 @@ import gi
 
 gi.require_version("Rsvg", "2.0")
 from gi.repository import GLib, Rsvg  # noqa: E402
+
+LIB_DIR = "/usr/lib/hd-desktop"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_display  # noqa: E402
 
 SYSTEM_CONFIG = "/etc/hyprdebian/config.json"
 USER_CONFIG = ".config/hyprdebian/config.json"
@@ -237,13 +244,14 @@ def launcher_settings():
 
 
 def icon_size():
+    """The icon_size of the theme, scaled for the monitor as hd-menu draws it."""
     theme, _ = lookup(THEME_KEY, None)
-    if not isinstance(theme, dict):
-        return ICON_SIZE
-    size = theme.get("icon_size")
-    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
-        return ICON_SIZE
-    return size
+    size = ICON_SIZE
+    if isinstance(theme, dict):
+        value = theme.get("icon_size")
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            size = value
+    return hd_display.pixels(size, hd_display.factor())
 
 
 def desktop_files():

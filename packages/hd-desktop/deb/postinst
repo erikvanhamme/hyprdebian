@@ -57,6 +57,10 @@ Versions before HANDOFF_SINCE showed the logo of Hyprland until hyprpaper drew t
 upgrade from such a version says how the user gets the colour of the theme in its place, as the
 setting is in the config of Hyprland of the user.
 
+Versions before SCALED_SINCE left the scale of the monitor to Hyprland. An upgrade from such a
+version says to give the monitor rule in the config of Hyprland of the user scale 1, as in
+/etc/skel, as the theme is now scaled for the monitor with the key hd-display.
+
 Versions before DROPPED_SINCE also depended on the packages in DROPPED, which are now marked as
 installed automatically and left for apt autoremove. An upgrade from such a version names them and
 says to mark the ones that are still used as installed by hand first, such as git. The postinst
@@ -123,6 +127,9 @@ THEMED_TOOLKITS_SKEL = [".config/gtk-3.0/gtk.css", ".config/gtk-4.0/gtk.css"]
 # The first version of hd-desktop that hands the boot splash over to Hyprland, with the colour of
 # the theme behind the wallpaper instead of the logo of Hyprland.
 HANDOFF_SINCE = "1.59~"
+
+# The first version of hd-desktop that scales the theme for the monitor, with Hyprland at scale 1.
+SCALED_SINCE = "1.61~"
 
 # The user units of hd-desktop.
 USER_UNITS = ["hd-reboot-notify.path"]
@@ -257,6 +264,11 @@ def main():
               "the theme instead of the logo of Hyprland until the wallpaper shows, set "
               "disable_hyprland_logo = true in the misc section of ~/.config/hypr/hyprland.lua, "
               f"as in {SKEL_DIR}, and run hd-theme --apply.")
+    if previous != "" and older_than(previous, SCALED_SINCE):
+        print("The theme is now scaled for the monitor, with the key hd-display of "
+              f"{CONFIG_FILE} (man hd-theme), in the place of Hyprland. Set scale = 1 in the "
+              "monitor rule of ~/.config/hypr/hyprland.lua, as in "
+              f"{SKEL_DIR}, so the theme is not scaled twice, and run hd-theme --apply.")
     if previous != "" and older_than(previous, DROPPED_SINCE):
         print(f"hd-desktop no longer depends on {', '.join(DROPPED)}. apt autoremove removes "
               "them; mark the ones you use as installed by hand first, such as apt-mark manual "

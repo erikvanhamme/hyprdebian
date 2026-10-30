@@ -240,7 +240,7 @@ documents and of the monospaced text, to
 .B font
 in
 .BR font-size-small ,
-with
+scaled as below, with
 .B dconf write
 in the dconf database of the user: the keys font-name, document-font-name and
 monospace-font-name of
@@ -248,6 +248,32 @@ monospace-font-name of
 The Qt applications keep
 the font of qt5ct.conf and qt6ct.conf.
 dconf needs the session bus; without one, the font is left as it is.
+.PP
+The sizes in the theme files are those of the theme multiplied by the factor
+of the key
+.B hd-display
+of
+.IR /etc/hyprdebian/config.json ,
+so the theme looks the same size on every monitor; see
+.B SCALING
+in
+.BR hd-theme (7).
+The font sizes are rounded to a tenth of a point,
+.BR border ,
+.BR radius ,
+.B gap
+and
+.B icon_size
+to whole pixels.
+The theme in the configuration keeps its own sizes.
+When the factor is not 1,
+.B \-\-apply
+prints it.
+After
+.B hd-display
+changed, each user runs
+.B hd-theme \-\-apply
+again.
 .SH EXAMPLES
 .nf
 cp /etc/hyprdebian/themes/default.json meadow.json
@@ -264,6 +290,14 @@ A theme for one user only, and back to the theme of the system:
 hd-theme \-\-select sand \-\-apply
 hd-config-remove hd-theme
 hd-theme \-\-apply
+.fi
+.PP
+A 42 inch monitor seen from 90 cm:
+.PP
+.nf
+sudo hd-config-update hd-display '{"diagonal": 42, "distance": 90}'
+hd-theme \-\-apply
+sudo hd-launcher-cache \-\-update\-all
 .fi
 .SH SEE ALSO
 .BR hd-theme (7),
