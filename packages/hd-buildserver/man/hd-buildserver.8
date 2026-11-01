@@ -27,6 +27,8 @@ and
 .B zfs-linux
 in each suite, which the kernels of
 .BR hd-kernel (7)
+and
+.BR hd-kernel-vm (7)
 are built of;
 .IP 3. 4
 stops when the commit and those versions are those of the last build, in
@@ -41,7 +43,9 @@ build environment, and runs
 .B make iso kernel
 in a container of it, which builds every package and the live ISO, and the
 kernels of
-.BR hd-kernel ,
+.B hd-kernel
+and
+.BR hd-kernel-vm ,
 which
 .B make all
 leaves out; the kernels come from the cache in
@@ -166,8 +170,10 @@ JSON.
 .I /var/lib/hd-buildserver/hd-kernel
 The packages of
 .B hd-kernel
-of the last build of each suite, which a build of the same versions copies
-instead of building them again.
+and
+.B hd-kernel-vm
+of the last build of each suite, in a directory per package, which a build of
+the same versions copies instead of building them again.
 .TP
 .I /var/lib/hd-buildserver/build.lock
 Keeps two runs from building at the same time.
@@ -182,5 +188,6 @@ Run hd-buildserver every night.
 .SH SEE ALSO
 .BR hd-repo (7),
 .BR hd-kernel (7),
+.BR hd-kernel-vm (7),
 .BR hd-config-update (1),
 .BR hd-docker (7)

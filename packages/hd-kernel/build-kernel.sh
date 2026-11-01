@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds the HyprDebian kernel of one suite in a Debian container of that suite; the Makefile runs
-# it with docker. MODE says what it does:
+# Builds a HyprDebian kernel of one suite in a Debian container of that suite; kernel.mk runs it
+# with docker, for hd-kernel and hd-kernel-vm. MODE says what it does:
 #
 #   sources  print the versions of the source packages linux and zfs-linux that a build would use,
 #            the most recent ones in the suite, as "<suite> linux <version> zfs-linux <version>"
@@ -13,12 +13,13 @@
 #
 #   linux-image-<release>_<version>_amd64.deb     the kernel and its modules
 #   zfs-modules-<release>_<version>_amd64.deb     zfs.ko and spl.ko, in extra/zfs
-#   hd-kernel_<version>_amd64.deb                 depends on both, see deb/hd-kernel/control
+#   <PACKAGE>_<version>_amd64.deb                 depends on both, see deb/<PACKAGE>/control
 #
-# The release is <x.y.z>+debNN-hd<id>-amd64: debNN as in the release of the kernel of Debian, and
-# <id> six hex digits of a sha256 of everything the packages are made of: the versions of linux,
-# zfs-linux and hd-kernel, this script and the files in deb/ and man/, and in the mode test the
-# modules in /lsmod. Every build signs the modules with a key of its own, so a build of anything
+# PACKAGE is hd-kernel or hd-kernel-vm. The release is <x.y.z>+debNN-<TAG><id>-amd64: debNN as in
+# the release of the kernel of Debian, TAG hd for hd-kernel and hdvm for hd-kernel-vm, and <id> six
+# hex digits of a sha256 of everything the packages are made of: the versions of linux, zfs-linux
+# and PACKAGE, this script, the templates of zfs-modules, the control file, the man page and the
+# keep list of PACKAGE, and in the mode test the modules in /lsmod. Every build signs the modules with a key of its own, so a build of anything
 # else also gets another release: it installs next to the kernel that runs, whose modules stay
 # signed with the key it trusts.
 #
@@ -33,24 +34,36 @@
 # code where it may not use the kernel's.
 #
 # The config is that of Debian, with these changes:
+#   - with KEEP, the keep list of hd-kernel-vm, only the modules it keeps (make localmodconfig)
 #   - the kernel trusts no keys of Debian, and every module, zfs.ko too, is signed with a key that
 #     the build makes in certs/signing_key.pem and removes once zfs.ko is signed
 #   - the kernel release ends in the suffix above, set as CONFIG_LOCALVERSION
 # and in the mode test also only the modules in /lsmod (make localmodconfig) and no debug info, so
-# no BTF. The mode full checks that every option Debian has on is on in the config, as olddefconfig
-# silently turns off what the tools in the container cannot build, such as Rust.
+# no BTF. The mode full checks that every option Debian has on is on in the config before those
+# changes, as olddefconfig silently turns off what the tools in the container cannot build, such
+# as Rust, and with KEEP that the kernel has every module that the keep list names.
+#
+# The keep list KEEP, a file of /package, has a line per directory of the kernel tree, which ends
+# in /, whose modules all stay, as do those of the directories below it; a ! in front of such a
+# line leaves out that directory. Any other line names a module, as lsmod prints it, that stays.
+# Comments start with #. The modules of a directory are those its Makefiles build.
 #
 # The container gets:
-#   /src    the package directory, read-only: the control files and maintainer scripts in deb/
+#   /src    the directory of this script, read-only: the templates of zfs-modules in
+#           deb/zfs-modules
+#   /package
+#           the package directory of PACKAGE, read-only: its control file in deb/<PACKAGE>,
+#           its man page in man/<PACKAGE>.7 and its keep list; that of hd-kernel is /src
 #   /work   the source packages and the trees, kept for the next build of the same versions, and
 #           the ccache of the compiler
 #   /out    the packages, kept for the next build, which skips the build when they are those of
 #           its release
-#   /cache  only with HD_KERNEL_CACHE in the Makefile: the packages of earlier builds, one
-#           directory per release; a build of a release that is there copies its packages instead
+#   /cache  only with HD_KERNEL_CACHE in the Makefile: the packages of earlier builds, in
+#           <PACKAGE>/<suite>/<release>; a build of a release that is there copies its packages
+#           instead
 #   /lsmod  only in the mode test: the modules, as lsmod prints them
 #
-# HD_VERSION is the version of hd-kernel, SUITE the suite, JOBS the number of jobs. make bindeb-pkg
+# HD_VERSION is the version of PACKAGE, SUITE the suite, JOBS the number of jobs. make bindeb-pkg
 # writes its own debian/ into the kernel tree, over the one of the source package; the patches of
 # Debian are applied by then. Everything in /work, /out and /cache ends up owned by
 # HOST_UID:HOST_GID, the user who runs make.
@@ -80,6 +93,50 @@ latest_source() {
   echo "${latest}"
 }
 
+# Prints the lines of the keep list, without comments and blanks.
+keep_lines() {
+  sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' "/package/${KEEP}"
+}
+
+# Prints the modules that the keep list names, one per line.
+keep_names() {
+  keep_lines | sed -e '/\/$/d'
+}
+
+# Prints the modules that the keep list keeps, one per line, for make localmodconfig: those it
+# names, and those that the Makefiles in its directories build with obj-$(CONFIG_...), with _ for
+# -, as lsmod prints them. Run it in the kernel tree.
+keep_modules() {
+  local line dirs=() prune=()
+  while read -r line; do
+    case "${line}" in
+      "!"*/) prune+=(-path "${line:1:-1}" -prune -o) ;;
+      */) dirs+=("${line%/}") ;;
+    esac
+  done < <(keep_lines)
+  keep_names
+  if (( ${#dirs[@]} > 0 )); then
+    find "${dirs[@]}" "${prune[@]}" \( -name Makefile -o -name Kbuild \) -print \
+      | xargs -r awk '
+          /\\$/ { sub(/\\$/, ""); text = text $0 " "; next }
+          {
+            text = text $0
+            if (text ~ /^[[:space:]]*obj-\$\(CONFIG_[A-Za-z0-9_]+\)[[:space:]]*[+:]?=/) {
+              sub(/^[^=]*=/, "", text)
+              n = split(text, words)
+              for (i = 1; i <= n; i++) {
+                if (words[i] ~ /^[A-Za-z0-9_-]+\.o$/) {
+                  sub(/\.o$/, "", words[i])
+                  gsub(/-/, "_", words[i])
+                  print words[i]
+                }
+              }
+            }
+            text = ""
+          }'
+  fi
+}
+
 # zfs-linux is in contrib, and apt source needs the deb-src entries. The stanzas of the security
 # updates get them too.
 sed -i -e 's/^Types: deb$/Types: deb deb-src/' -e 's/^Components: main$/Components: main contrib/' \
@@ -107,8 +164,13 @@ if [[ -z "${DEBIAN_RELEASE}" ]]; then
   exit 1
 fi
 DEBNN="$(grep -oE '\+deb[0-9]+' <<< "${DEBIAN_RELEASE}")"
-# The sums of the files the packages are made of, by their path in /src.
-inputs="$(cd /src && find build-kernel.sh deb man -type f | LC_ALL=C sort | xargs sha256sum)"
+# The sums of the files the packages are made of, by their path in /src and /package.
+inputs="$(cd /src && find build-kernel.sh deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
+package_files=("deb/${PACKAGE}" "man/${PACKAGE}.7")
+if [[ -n "${KEEP}" ]]; then
+  package_files+=("${KEEP}")
+fi
+inputs="${inputs}"$'\n'"$(cd /package && find "${package_files[@]}" -type f | LC_ALL=C sort | xargs sha256sum)"
 if [[ "${MODE}" == "test" ]]; then
   inputs="${inputs}"$'\n'"$(sha256sum /lsmod)"
 fi
@@ -117,21 +179,22 @@ ID="$(printf '%s %s %s\n%s\n' "${KERNEL_VERSION}" "${ZFS_VERSION}" "${HD_VERSION
 if [[ "${MODE}" == "test" ]]; then
   ID="test${ID}"
 fi
-LOCALVERSION_SUFFIX="${DEBNN}-hd${ID}-amd64"
+LOCALVERSION_SUFFIX="${DEBNN}-${TAG}${ID}-amd64"
 RELEASE="${UPSTREAM}${LOCALVERSION_SUFFIX}"
 KERNEL_DEB_VERSION="${KERNEL_VERSION}+hd${HD_VERSION}"
 ZFS_DEB_VERSION="${ZFS_VERSION}+hd${HD_VERSION}"
-# hd-kernel goes up with each of the three versions, so it pulls in every new build.
+# PACKAGE goes up with each of the three versions, so it pulls in every new build.
 META_DEB_VERSION="${KERNEL_VERSION}+hd${HD_VERSION}+zfs${ZFS_VERSION//-/.}"
 KERNEL_DIR="/work/src/linux-${UPSTREAM}"
 ZFS_DIR="/work/src/zfs-linux-${ZFS_UPSTREAM}"
 PACKAGES=(
   "linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
   "zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
-  "hd-kernel_${META_DEB_VERSION}_amd64.deb"
+  "${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
 )
+CACHE="/cache/${PACKAGE}/${SUITE}"
 
-echo "--> ${SUITE}: linux ${KERNEL_VERSION}, zfs-linux ${ZFS_VERSION}, release ${RELEASE}"
+echo "--> ${PACKAGE} of ${SUITE}: linux ${KERNEL_VERSION}, zfs-linux ${ZFS_VERSION}, release ${RELEASE}"
 
 # True when the directory $1 has the three packages of the release.
 has_packages() {
@@ -151,10 +214,10 @@ fi
 
 rm -f /out/*.deb
 
-if [[ -d /cache ]] && has_packages "/cache/${SUITE}/${RELEASE}"; then
+if [[ -d /cache ]] && has_packages "${CACHE}/${RELEASE}"; then
   echo "--> Copying the packages of ${RELEASE} from the cache..."
   for package in "${PACKAGES[@]}"; do
-    install -m 0644 "/cache/${SUITE}/${RELEASE}/${package}" /out/
+    install -m 0644 "${CACHE}/${RELEASE}/${package}" /out/
   done
   exit 0
 fi
@@ -203,6 +266,25 @@ echo "--> Setting up the config..."
 cd "${KERNEL_DIR}"
 cp /work/config/debian.config .config
 make olddefconfig
+
+if [[ "${MODE}" == "full" ]]; then
+  missing="$(grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' /work/config/debian.config | cut -d= -f1 \
+    | while read -r option; do
+        if ! grep -qE "^${option}=[ym]$" .config; then
+          echo "${option}"
+        fi
+      done)"
+  if [[ -n "${missing}" ]]; then
+    echo "These options of the config of Debian are off in the config of the build:" >&2
+    echo "${missing}" >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "${KEEP}" ]]; then
+  keep_modules > /work/keep.lsmod
+  make LSMOD=/work/keep.lsmod localmodconfig < /dev/null
+fi
 if [[ "${MODE}" == "test" ]]; then
   # localmodconfig asks for the options that are new to the config; with no input it takes the
   # defaults, and says "Error in reading or end of file" for each.
@@ -220,20 +302,6 @@ scripts/config \
   -d LOCALVERSION_AUTO
 make olddefconfig
 
-if [[ "${MODE}" == "full" ]]; then
-  missing="$(grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' /work/config/debian.config | cut -d= -f1 \
-    | while read -r option; do
-        if ! grep -qE "^${option}=[ym]$" .config; then
-          echo "${option}"
-        fi
-      done)"
-  if [[ -n "${missing}" ]]; then
-    echo "These options of the config of Debian are off in the config of the build:" >&2
-    echo "${missing}" >&2
-    exit 1
-  fi
-fi
-
 # A new key for every build: the key of a build that failed before it was removed is removed now,
 # so the build makes another.
 rm -f certs/signing_key.pem certs/signing_key.x509
@@ -242,7 +310,7 @@ echo "--> Building the kernel..."
 rm -f /work/src/*.deb /work/src/*.buildinfo /work/src/*.changes
 export CCACHE_DIR=/work/ccache
 export DEBFULLNAME="${MAINTAINER_NAME}" DEBEMAIL="${MAINTAINER_EMAIL}"
-export KBUILD_BUILD_USER=hyprdebian KBUILD_BUILD_HOST=hd-kernel
+export KBUILD_BUILD_USER=hyprdebian KBUILD_BUILD_HOST="${PACKAGE}"
 time make -j"${JOBS}" CC="ccache gcc" KDEB_PKGVERSION="${KERNEL_DEB_VERSION}" \
   KDEB_CHANGELOG_DIST="${SUITE}" bindeb-pkg
 if [[ "$(make -s kernelrelease)" != "${RELEASE}" ]]; then
@@ -250,6 +318,22 @@ if [[ "$(make -s kernelrelease)" != "${RELEASE}" ]]; then
   exit 1
 fi
 image_deb="/work/src/linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
+
+# The modules of the kernel, from modules.order, and those built in, from modules.builtin, with _
+# for - as lsmod prints them. In the mode test, localmodconfig turned off what /lsmod has not.
+if [[ "${MODE}" == "full" && -n "${KEEP}" ]]; then
+  built="$(sed -e 's|.*/||' -e 's/\.k\?o$//' -e 's/-/_/g' modules.order modules.builtin | sort -u)"
+  missing="$(keep_names | while read -r module; do
+      if ! grep -qxF "${module}" <<< "${built}"; then
+        echo "${module}"
+      fi
+    done)"
+  if [[ -n "${missing}" ]]; then
+    echo "These modules of the keep list are not in the kernel, as a module or built in:" >&2
+    echo "${missing}" >&2
+    exit 1
+  fi
+fi
 
 # configure runs every build, as the kernel tree may have changed since the last one.
 echo "--> Building the ZFS module..."
@@ -277,6 +361,7 @@ fill() {
     -e "s|@ZFS_VERSION@|${ZFS_VERSION}|g" \
     -e "s|@ZFS_UPSTREAM@|${ZFS_UPSTREAM}|g" \
     -e "s|@SUITE@|${SUITE}|g" \
+    -e "s|@PACKAGE@|${PACKAGE}|g" \
     -e "s|@MODDIR@|${moddir}|g" \
     -e "s|@INSTALLED_SIZE@|$(du -sk --apparent-size --exclude=DEBIAN "$3" | cut -f1)|g" \
     "$1" > "$2"
@@ -303,14 +388,14 @@ chmod 0755 "${stage}/DEBIAN/postinst" "${stage}/DEBIAN/postrm"
 zfs_deb="/work/src/zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${zfs_deb}"
 
-echo "--> Packaging hd-kernel..."
+echo "--> Packaging ${PACKAGE}..."
 stage=/work/meta-deb
 rm -rf "${stage}"
 install -d "${stage}/DEBIAN" "${stage}/usr/share/man/man7"
-gzip -9n < /src/man/hd-kernel.7 > "${stage}/usr/share/man/man7/hd-kernel.7.gz"
-chmod 0644 "${stage}/usr/share/man/man7/hd-kernel.7.gz"
-fill /src/deb/hd-kernel/control "${stage}/DEBIAN/control" "${stage}"
-meta_deb="/work/src/hd-kernel_${META_DEB_VERSION}_amd64.deb"
+gzip -9n < "/package/man/${PACKAGE}.7" > "${stage}/usr/share/man/man7/${PACKAGE}.7.gz"
+chmod 0644 "${stage}/usr/share/man/man7/${PACKAGE}.7.gz"
+fill "/package/deb/${PACKAGE}/control" "${stage}/DEBIAN/control" "${stage}"
+meta_deb="/work/src/${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${meta_deb}"
 
 # The packages go to /out last, so a build that stops halfway leaves none there.
@@ -321,10 +406,10 @@ install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" /out/
 # packages.
 if [[ -d /cache ]]; then
   echo "--> Storing the packages of ${RELEASE} in the cache..."
-  rm -rf "/cache/${SUITE}.new"
-  install -d "/cache/${SUITE}.new/${RELEASE}"
-  install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" "/cache/${SUITE}.new/${RELEASE}/"
-  rm -rf "/cache/${SUITE}"
-  mv "/cache/${SUITE}.new" "/cache/${SUITE}"
+  rm -rf "${CACHE}.new"
+  install -d "${CACHE}.new/${RELEASE}"
+  install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" "${CACHE}.new/${RELEASE}/"
+  rm -rf "${CACHE}"
+  mv "${CACHE}.new" "${CACHE}"
 fi
 ccache -s

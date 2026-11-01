@@ -27,7 +27,7 @@
 #                   KERNEL_PACKAGES, as make <package> does, into
 #                   build/<suite>. Apart from make all, as they take long
 #                   to build; a suite whose kernel is built already is not
-#                   built again, see hd-kernel
+#                   built again, see hd-kernel and hd-kernel-vm
 #   make iso        build every package, then the live ISO with them in
 #                   livecd/ (livecd/Makefile): hd-installer installed on the
 #                   live system, and every package as the local repository
@@ -78,7 +78,7 @@ PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix 
 # The package directories of the kernels, which make kernel builds apart from
 # make all. They only go to the package repository, not in the live ISO: the
 # installer does not install them, systems switch to them by hand for now.
-KERNEL_PACKAGES := hd-kernel
+KERNEL_PACKAGES := hd-kernel hd-kernel-vm
 # The package directories with tests.
 TESTS := hd-dashboard hd-report hd-backup hd-base
 # The directory with the package directories.

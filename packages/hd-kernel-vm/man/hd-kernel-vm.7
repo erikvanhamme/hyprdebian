@@ -1,0 +1,111 @@
+.TH HD-KERNEL-VM 7 "November 2026" "hd-kernel-vm" "HyprDebian"
+.SH NAME
+hd-kernel-vm \- the HyprDebian kernel for KVM virtual machines
+.SH DESCRIPTION
+The package
+.B hd-kernel-vm
+depends on the most recent HyprDebian kernel for virtual machines of the
+suite and its ZFS module, so that they are installed and upgraded with it:
+.TP
+.BI linux-image- release
+The kernel of
+.BR hd-kernel (7):
+the kernel of Debian, with the patches and the config of Debian, built by the
+build server of HyprDebian, but with only the modules that a KVM virtual
+machine needs.
+.TP
+.BI zfs-modules- release
+The ZFS module of the
+.B zfs-linux
+of Debian, built against that kernel, in
+.IR /lib/modules/ release /extra/zfs .
+It provides
+.BR zfs-modules ,
+which
+.B zfs-initramfs
+takes in place of
+.BR zfs-dkms .
+.PP
+What the config of Debian builds into the kernel stays, and so do the modules
+that are not drivers: the file systems, the network protocols and netfilter,
+crypto, and kvm, for virtual machines in the virtual machine. Of the drivers
+only these stay:
+.IP \(bu 2
+those of the hardware that QEMU emulates for a KVM virtual machine: virtio for
+disks, network, graphics, sound, input, memory and random numbers; SATA, IDE,
+NVMe and SCSI disks and cd-roms; the network cards e1000, e1000e and RTL8139;
+the USB controllers with keyboards, mice, tablets, storage and audio; the
+standard VGA, QXL and Cirrus graphics; HDA and AC97 sound; the power button
+of ACPI, by which the host shuts the virtual machine down; fw_cfg, pvpanic
+and the KVM clock for PTP;
+.IP \(bu 2
+those of software: loop, zram and nbd, device mapper and RAID, and the network
+devices of containers, virtual machines, VPNs and bonds, such as tun, veth,
+macvlan, vxlan, wireguard and vhost.
+.PP
+The release is
+.IB x.y.z +debNN-hdvm id -amd64\fR,
+such as
+.BR 7.2.12+deb14-hdvm1a2b3c-amd64 ,
+where
+.I id
+comes from the versions of
+.BR linux ,
+.B zfs-linux
+and
+.BR hd-kernel-vm .
+A new build has a new release, so it installs next to the kernel that runs.
+.PP
+Every build signs the modules of the kernel and the ZFS module with a key it
+makes for the build and then throws away; the kernel trusts that key and no
+other for its modules.
+.SH SWITCHING
+To switch a virtual machine to the HyprDebian kernel for virtual machines:
+.PP
+.RS
+sudo apt install hd-kernel-vm
+.RE
+.PP
+This removes
+.BR hd-kernel ,
+.BR linux-image-amd64 ,
+.B linux-headers-amd64
+and
+.BR linux-base-amd64 ,
+so the other kernels get no more upgrades.
+After the installation the bootloader shows the new kernel at the top of its
+menu, with
+.B -hd
+in its name, see
+.BR hd-bootloader-update (8).
+Once it boots, the other kernels can be purged, as
+.BR hd-kernel (7)
+describes for the kernels of Debian.
+.PP
+To switch back to the kernel of
+.BR hd-kernel ,
+or to that of Debian:
+.PP
+.RS
+sudo apt install hd-kernel
+.br
+sudo apt install linux-image-amd64 linux-headers-amd64
+.RE
+.PP
+Either removes
+.BR hd-kernel-vm ;
+its kernels stay until they are purged.
+.SH FILES
+.TP
+.IR /boot/vmlinuz- release
+.TQ
+.IR /lib/modules/ release
+The kernel and its modules.
+.TP
+.IR /lib/modules/ release /extra/zfs
+The ZFS module.
+.SH SEE ALSO
+.BR hd-bootloader-update (8),
+.BR hd-buildserver (8),
+.BR hd-kernel (7),
+.BR zfs (4)

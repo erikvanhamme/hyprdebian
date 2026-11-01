@@ -1,4 +1,4 @@
-.TH HD-KERNEL 7 "October 2026" "hd-kernel" "HyprDebian"
+.TH HD-KERNEL 7 "November 2026" "hd-kernel" "HyprDebian"
 .SH NAME
 hd-kernel \- the HyprDebian kernel with a prebuilt ZFS module
 .SH DESCRIPTION
@@ -54,7 +54,10 @@ This removes
 .B linux-headers-amd64
 and
 .BR linux-base-amd64 ,
-so the kernels of Debian get no more upgrades.
+so the kernels of Debian get no more upgrades, and
+.BR hd-kernel-vm ,
+the HyprDebian kernel for KVM virtual machines, see
+.BR hd-kernel-vm (7).
 After the installation the bootloader shows the new kernel at the top of its
 menu, with
 .B -hd
@@ -98,4 +101,5 @@ The ZFS module.
 .SH SEE ALSO
 .BR hd-bootloader-update (8),
 .BR hd-buildserver (8),
+.BR hd-kernel-vm (7),
 .BR zfs (4)

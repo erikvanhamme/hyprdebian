@@ -1,0 +1,23 @@
+Package: hd-kernel-vm
+Version: @META_DEB_VERSION@
+Architecture: amd64
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: linux-image-@RELEASE@ (= @KERNEL_DEB_VERSION@),
+ zfs-modules-@RELEASE@ (= @ZFS_DEB_VERSION@)
+Conflicts: hd-kernel, linux-image-amd64, linux-headers-amd64, linux-base-amd64
+Section: kernel
+Priority: optional
+Description: HyprDebian kernel for KVM virtual machines
+ Depends on the most recent HyprDebian kernel for vms of @SUITE@ and its ZFS
+ module, so that they are installed and upgraded with it. The kernel is that
+ of hd-kernel, linux @KERNEL_VERSION@ of Debian with its patches and its
+ config, but without the drivers of hardware that a KVM vm does not have; the
+ ZFS module is that of zfs-linux @ZFS_VERSION@, built against it. Both are
+ built on the build server and signed with a key that is made for the build
+ and thrown away, so a system needs neither DKMS nor a compiler for ZFS, and
+ the kernel trusts no other key for its modules.
+ .
+ It replaces the kernel of Debian and hd-kernel: installing it removes
+ hd-kernel, linux-image-amd64, linux-headers-amd64 and linux-base-amd64.
+ See hd-kernel-vm(7).

@@ -3,7 +3,9 @@
 # signed with its key, so a system needs no compiler and no DKMS for ZFS.
 # Each suite in SUITES gets a kernel of its own, built from the most recent
 # linux and zfs-linux of that suite in a container of it, so the build needs
-# docker and a user that may run it. build-kernel.sh does the work, see there.
+# docker and a user that may run it. build-kernel.sh does the work, see there,
+# and kernel.mk runs it, also for hd-kernel-vm, whose Makefile has the same
+# targets.
 #
 #   make deb    build the packages of every suite, into build/<suite>:
 #                 linux-image-<release>_<version>_amd64.deb
@@ -54,68 +56,9 @@
 # compilers need more, the kernel kills the build and not other programs; set
 # JOBS lower for a machine with less memory free.
 
-BUILD := build
-PYTHON := python3
+PACKAGE := hd-kernel
+TAG := hd
+# Every module of the config of Debian.
+KEEP :=
 
-SUITES := trixie unstable
-# The docker image of each suite.
-IMAGE_trixie := debian:trixie
-IMAGE_unstable := debian:sid
-HD_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("version.json")); print("%d.%d" % (v["major"], v["minor"]))')
-# The modules of the test build, as lsmod prints them.
-LSMOD := ../../local-testvm/lsmod-test.txt
-JOBS := $(shell nproc)
-MEMORY := $(shell echo $$(( $(JOBS) * 5 / 8 )))g
-HD_KERNEL_CACHE ?=
-
-.PHONY: deb deb-path sources test-build clean $(addprefix deb-,$(SUITES)) $(addprefix sources-,$(SUITES))
-# One suite at a time, also under make -j of the Makefile in the root: each
-# build already runs JOBS jobs and takes up to MEMORY.
-.NOTPARALLEL:
-
-deb: $(addprefix deb-,$(SUITES))
-
-# Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work
-# directory $(BUILD)/work/$(3) and the packages into $(BUILD)/$(3). It pulls
-# the latest image of the suite every time.
-define run
-	mkdir -p $(BUILD)/work/$(3) $(BUILD)/$(3)
-	docker run --rm --pull always --quiet \
-		--memory $(MEMORY) --memory-swap $(MEMORY) \
-		-e MODE=$(1) \
-		-e SUITE=$(2) \
-		-e HD_VERSION=$(HD_VERSION) \
-		-e JOBS=$(JOBS) \
-		-e HOST_UID=$$(id -u) \
-		-e HOST_GID=$$(id -g) \
-		-v $(CURDIR):/src:ro \
-		-v $(abspath $(LSMOD)):/lsmod:ro \
-		-v $(CURDIR)/$(BUILD)/work/$(3):/work \
-		-v $(CURDIR)/$(BUILD)/$(3):/out \
-		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache) \
-		$(IMAGE_$(2)) bash /src/build-kernel.sh
-endef
-
-$(addprefix deb-,$(SUITES)): deb-%:
-	$(if $(HD_KERNEL_CACHE),mkdir -p $(HD_KERNEL_CACHE))
-	$(call run,full,$*,$*)
-
-deb-path:
-	@for suite in $(SUITES); do \
-		for deb in $(BUILD)/$$suite/*.deb; do \
-			if [ -f "$$deb" ]; then \
-				echo "$$suite:$$deb"; \
-			fi; \
-		done; \
-	done
-
-sources: $(addprefix sources-,$(SUITES))
-
-$(addprefix sources-,$(SUITES)): sources-%:
-	$(call run,sources,$*,$*)
-
-test-build:
-	$(call run,test,unstable,test)
-
-clean:
-	rm -rf $(BUILD)
+include kernel.mk

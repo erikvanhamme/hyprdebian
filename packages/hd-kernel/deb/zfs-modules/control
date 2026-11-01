@@ -11,4 +11,4 @@ Priority: optional
 Description: OpenZFS kernel module for Linux @RELEASE@
  The ZFS module of zfs-linux @ZFS_VERSION@, built for the HyprDebian kernel
  @RELEASE@ and signed with the key the kernel was built with, so no system
- needs DKMS or a compiler for ZFS. See hd-kernel(7).
+ needs DKMS or a compiler for ZFS. See @PACKAGE@(7).

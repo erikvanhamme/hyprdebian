@@ -1,0 +1,131 @@
+# The modules that the kernel of hd-kernel-vm keeps of the config of Debian; make localmodconfig
+# turns off every other module. What the config of Debian builds into the kernel stays. A line is
+# one of:
+#
+#   <dir>/    every module of the directory <dir> of the kernel tree and of those below it
+#   !<dir>/   none of the directory <dir> and of those below it, of a directory kept above
+#   <module>  the module of that name, as lsmod prints it; the build stops when the kernel has no
+#             module of that name, as a module or built in
+#
+# Everything but the drivers stays: file systems, network protocols and netfilter, crypto, and
+# the kvm of the processor for vms in the vm. Of the drivers only those of the hardware that
+# QEMU emulates for a KVM vm stay, and the drivers of software that are not hardware.
+
+# Everything but the drivers, and not the protocols of hardware that a vm has not.
+arch/
+block/
+crypto/
+fs/
+kernel/
+lib/
+mm/
+net/
+!net/6lowpan/
+!net/atm/
+!net/ax25/
+!net/bluetooth/
+!net/caif/
+!net/can/
+!net/dsa/
+!net/ieee802154/
+!net/mac80211/
+!net/mac802154/
+!net/netrom/
+!net/nfc/
+!net/phonet/
+!net/qrtr/
+!net/rfkill/
+!net/rose/
+!net/wireless/
+security/
+virt/
+
+# virtio and the devices of QEMU for a guest.
+virtio_pci
+virtio_blk
+virtio_scsi
+virtio_net
+virtio_console
+virtio_balloon
+virtio_mem
+virtio_pmem
+virtio_input
+virtio_iommu
+virtio_rng
+virtio_gpu
+virtio_snd
+qemu_fw_cfg
+ptp_kvm
+pvpanic_pci
+efi_pstore
+
+# The power button of ACPI, by which libvirt shuts the vm down.
+button
+
+# Disks and cd-roms: SATA (q35), IDE (i440fx), NVMe, SCSI and USB.
+ahci
+ata_piix
+ata_generic
+nvme
+sd_mod
+sr_mod
+sg
+usb_storage
+uas
+
+# Network cards that QEMU emulates other than virtio.
+e1000
+e1000e
+8139cp
+8139too
+
+# USB: the controllers that QEMU emulates, keyboards, mice and tablets.
+xhci_pci
+ehci_pci
+uhci_hcd
+ohci_pci
+usbhid
+hid_generic
+
+# Keyboard, mouse and input of PS/2 and of programs.
+evdev
+joydev
+psmouse
+serio_raw
+uinput
+uhid
+
+# Graphics: virtio, the standard VGA, QXL and Cirrus.
+bochs
+qxl
+cirrus_qemu
+
+# Sound: ALSA, the HDA and AC97 of QEMU, USB audio and a loopback.
+sound/core/
+snd_hda_intel
+snd_hda_codec_generic
+snd_intel8x0
+snd_usb_audio
+snd_aloop
+
+# Drivers of software: block devices, device mapper and RAID, and network devices for
+# containers, vms, VPNs and bonds.
+loop
+zram
+nbd
+drivers/md/
+tun
+tap
+veth
+macvlan
+macvtap
+ipvlan
+vxlan
+geneve
+wireguard
+bonding
+dummy
+ifb
+netconsole
+vhost_net
+vhost_vsock
