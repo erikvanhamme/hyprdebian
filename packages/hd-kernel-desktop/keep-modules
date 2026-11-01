@@ -6,6 +6,8 @@
 #   !<dir>/   none of the directory <dir> and of those below it, of a directory kept above
 #   <module>  the module of that name, as lsmod prints it; the build stops when the kernel has no
 #             module of that name, as a module or built in
+#   <a>|<b>   the names of one module in different kernels, as in trixie and unstable; the
+#             build stops when the kernel has none of them
 #
 # Everything but the drivers stays: file systems, network protocols and netfilter, crypto, and
 # kvm. Of the drivers those of the hardware of the desktops and laptops (hyprdebian, iscsi1,
@@ -56,15 +58,7 @@ mxm_wmi
 asus_wmi
 eeepc_wmi
 gigabyte_wmi
-dcdbas
-dell_smbios
-dell_wmi_descriptor
-dell_pc
-dell_wmi
-dell_rbtn
-dell_laptop
-dell_smo8800
-dell_lis3lv02d
+drivers/platform/x86/dell/
 dell_smm_hwmon
 
 # The AMD chipset and processor: SMBus, GPIO, watchdog, crypto, temperatures and memory errors.
@@ -174,14 +168,12 @@ nvme_auth
 nvme_keyring
 drm
 drm_kms_helper
-drm_client_lib
 drm_display_helper
 drm_buddy
 drm_exec
 drm_gpuvm
 drm_suballoc_helper
 drm_ttm_helper
-drm_panel_backlight_quirks
 ttm
 gpu_sched
 amdxcp
@@ -193,12 +185,10 @@ gpio_generic
 mei
 mlxfw
 dca
-phy_package
 realtek
 mmc_core
 sdhci
 cqhci
-sdhci_uhs2
 mc
 videodev
 uvc

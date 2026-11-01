@@ -6,6 +6,8 @@
 #   !<dir>/   none of the directory <dir> and of those below it, of a directory kept above
 #   <module>  the module of that name, as lsmod prints it; the build stops when the kernel has no
 #             module of that name, as a module or built in
+#   <a>|<b>   the names of one module in different kernels, as in trixie and unstable; the
+#             build stops when the kernel has none of them
 #
 # Everything but the drivers stays: file systems, network protocols and netfilter, crypto, and
 # kvm. Of the drivers only those of the hardware of the servers (technogea and migrate, from the
@@ -159,7 +161,6 @@ ehci_hcd
 hid
 drm
 drm_kms_helper
-drm_client_lib
 drm_shmem_helper
 i2c_algo_bit
 i2c_smbus

@@ -15,6 +15,11 @@
 #   make test       run make test in every package directory in TESTS
 #   make clean      remove build/ and run make clean in every package
 #                   directory
+#   make clean-kernel
+#                   run make clean in every package directory in
+#                   KERNEL_PACKAGES, which removes their kernel trees and the
+#                   ccache of the compiler too, so the next make kernel
+#                   builds them from scratch; the kernels in build/ stay
 #   make provision-vm
 #                   ask for the name, zvol, cpus, memory, bridge and GPU (or
 #                   none) of a vm, then define it in libvirt and start it from
@@ -92,7 +97,7 @@ JOBS ?= $(shell nproc)
 # Prints the repos in the deploy.json given as argument, separated by commas.
 DEPLOY_REPOS := python3 -c 'import json, sys; print(",".join(json.load(open(sys.argv[1]))["repos"]))'
 
-.PHONY: all kernel test clean iso provision-vm switch-vm-gpu update-repo clean-repo list-debs $(PACKAGES) $(KERNEL_PACKAGES) $(addprefix test-,$(TESTS))
+.PHONY: all kernel test clean clean-kernel iso provision-vm switch-vm-gpu update-repo clean-repo list-debs $(PACKAGES) $(KERNEL_PACKAGES) $(addprefix test-,$(TESTS))
 
 all: $(PACKAGES)
 
@@ -171,6 +176,9 @@ $(addprefix test-,$(TESTS)):
 clean:
 	rm -rf $(OUT)
 	for package in $(PACKAGES) $(KERNEL_PACKAGES); do $(MAKE) -C $(SRC)/$$package clean; done
+
+clean-kernel:
+	for package in $(KERNEL_PACKAGES); do $(MAKE) -C $(SRC)/$$package clean; done
 
 provision-vm:
 	python3 vm/provision-vm.py

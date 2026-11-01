@@ -47,7 +47,9 @@
 #
 # The keep list KEEP, a file of /package, has a line per directory of the kernel tree, which ends
 # in /, whose modules all stay, as do those of the directories below it; a ! in front of such a
-# line leaves out that directory. Any other line names a module, as lsmod prints it, that stays.
+# line leaves out that directory. Any other line names a module, as lsmod prints it, that stays,
+# or names separated by |, the names of one module in different kernels, such as
+# cirrus_qemu|cirrus: the kernel has to have one of them.
 # Comments start with #. The modules of a directory are those its Makefiles build.
 #
 # The container gets:
@@ -100,7 +102,8 @@ keep_lines() {
   sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' "/package/${KEEP}"
 }
 
-# Prints the modules that the keep list names, one per line.
+# Prints the lines of the keep list that name modules, one per line: a module, or the names of
+# one module separated by |.
 keep_names() {
   keep_lines | sed -e '/\/$/d'
 }
@@ -116,7 +119,7 @@ keep_modules() {
       */) dirs+=("${line%/}") ;;
     esac
   done < <(keep_lines)
-  keep_names
+  keep_names | tr '|' '\n'
   if (( ${#dirs[@]} > 0 )); then
     find "${dirs[@]}" "${prune[@]}" \( -name Makefile -o -name Kbuild \) -print \
       | xargs -r awk '
@@ -325,9 +328,15 @@ image_deb="/work/src/linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
 # for - as lsmod prints them. In the mode test, localmodconfig turned off what /lsmod has not.
 if [[ "${MODE}" == "full" && -n "${KEEP}" ]]; then
   built="$(sed -e 's|.*/||' -e 's/\.k\?o$//' -e 's/-/_/g' modules.order modules.builtin | sort -u)"
-  missing="$(keep_names | while read -r module; do
-      if ! grep -qxF "${module}" <<< "${built}"; then
-        echo "${module}"
+  missing="$(keep_names | while read -r names; do
+      found=""
+      for module in ${names//|/ }; do
+        if grep -qxF "${module}" <<< "${built}"; then
+          found="${module}"
+        fi
+      done
+      if [[ -z "${found}" ]]; then
+        echo "${names}"
       fi
     done)"
   if [[ -n "${missing}" ]]; then
