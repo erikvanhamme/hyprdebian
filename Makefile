@@ -17,9 +17,11 @@
 #                   directory
 #   make clean-kernel
 #                   run make clean in every package directory in
-#                   KERNEL_PACKAGES, which removes their kernel trees and the
-#                   ccache of the compiler too, so the next make kernel
-#                   builds them from scratch; the kernels in build/ stay
+#                   KERNEL_PACKAGES, which removes the kernel trees, the
+#                   sources and the ccache of the compiler in
+#                   packages/hd-kernel/build/work too, so the next make kernel
+#                   builds them from scratch; the kernels in build/ stay. A
+#                   HD_KERNEL_WORK elsewhere stays
 #   make provision-vm
 #                   ask for the name, zvol, cpus, memory, bridge and GPU (or
 #                   none) of a vm, then define it in libvirt and start it from

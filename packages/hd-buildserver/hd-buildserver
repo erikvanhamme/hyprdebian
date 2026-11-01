@@ -15,7 +15,8 @@ it every night as the user hd-buildserver. A run:
   4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso kernel
      in a container of it, which builds every package and the live ISO, and the kernels of
      hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop, which come from the cache in
-     /var/lib/hd-buildserver/hd-kernel when they were built of the same versions before;
+     /var/lib/hd-buildserver/hd-kernel when they were built of the same versions before, and are
+     built in /var/lib/hd-buildserver/kernel-work otherwise;
   5. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
      the checkout, see hd-repo(7), and stores the commit and the versions as the last build.
 
@@ -48,6 +49,9 @@ LAST_BUILT = f"{STATE_DIR}/last-built"
 # package, which make deb of each copies instead of building them again (HD_KERNEL_CACHE). It is
 # outside the checkout, so git clean leaves it.
 KERNEL_CACHE = f"{STATE_DIR}/hd-kernel"
+# The work of the kernel builds, the sources of each suite, the kernel trees and the ccache
+# (HD_KERNEL_WORK), outside the checkout too, so that the next build only compiles what changed.
+KERNEL_WORK = f"{STATE_DIR}/kernel-work"
 KERNEL_PACKAGE = "packages/hd-kernel"
 LOCK_FILE = f"{STATE_DIR}/build.lock"
 DOCKER_SOCKET = "/var/run/docker.sock"
@@ -175,21 +179,25 @@ def store_last_built(state):
 def build():
     """Runs make iso kernel in the build environment, in the checkout."""
     os.makedirs(KERNEL_CACHE, exist_ok=True)
+    os.makedirs(KERNEL_WORK, exist_ok=True)
 
     print(f"==> Building the build environment {IMAGE}...", flush=True)
     run(["docker", "build", "--pull", "-t", IMAGE, f"{CHECKOUT}/{BUILDENV}"])
 
     print("==> Building the packages, the live ISO and the kernels...", flush=True)
-    # The checkout and the kernel cache have the same paths in the container as on the host, so
-    # the containers that the builds start with the docker of the host get the right paths.
+    # The checkout, the kernel cache and the kernel work have the same paths in the container as on
+    # the host, so the containers that the builds start with the docker of the host get the right
+    # paths.
     run(["docker", "run", "--rm", "--name", CONTAINER,
          "--user", f"{os.getuid()}:{os.getgid()}",
          "--group-add", str(os.stat(DOCKER_SOCKET).st_gid),
          "-e", "HOME=/tmp",
          "-e", f"HD_KERNEL_CACHE={KERNEL_CACHE}",
+         "-e", f"HD_KERNEL_WORK={KERNEL_WORK}",
          "-v", f"{DOCKER_SOCKET}:{DOCKER_SOCKET}",
          "-v", f"{CHECKOUT}:{CHECKOUT}",
          "-v", f"{KERNEL_CACHE}:{KERNEL_CACHE}",
+         "-v", f"{KERNEL_WORK}:{KERNEL_WORK}",
          "-w", CHECKOUT,
          IMAGE, "make", "iso", "kernel"])
 

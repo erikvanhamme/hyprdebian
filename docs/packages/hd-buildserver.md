@@ -57,7 +57,7 @@ The first build takes long: it pulls the images and compiles every package from 
 1. It updates the checkout in `/var/lib/hd-buildserver/checkout` from the git repository with `git fetch`, and clones it the first time. It checks out the head of the branch and removes everything git does not track with `git clean -fdx`, also the downloads and the compiled releases that earlier builds left in `build/`, so every build starts from the sources alone.
 2. It asks `make sources` of `packages/hd-kernel` for the versions of the source packages `linux` and `zfs-linux` in each suite, which the kernels of [hd-kernel](hd-kernel.md) are built of. This starts a container of each suite, which looks them up in its apt sources.
 3. When the commit and those versions are those of the last build, in `/var/lib/hd-buildserver/last-built`, it stops there. A night on which only Debian has a new kernel or ZFS builds too, so their security updates reach the repository the next morning.
-4. Otherwise it builds the image `hd-buildserver-env` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, and runs `make iso kernel` in a container of it, which builds every package and the live ISO, and the kernels of hd-kernel, which `make all` leaves out. The kernels come from the cache in `/var/lib/hd-buildserver/hd-kernel` when they were built of the same versions before, see [The kernel cache](#the-kernel-cache).
+4. Otherwise it builds the image `hd-buildserver-env` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, and runs `make iso kernel` in a container of it, which builds every package and the live ISO, and the kernels of hd-kernel, which `make all` leaves out. The kernels come from the cache in `/var/lib/hd-buildserver/hd-kernel` when they were built of the same versions before, and are built in `/var/lib/hd-buildserver/kernel-work` otherwise, see [The kernel cache](#the-kernel-cache).
 5. It runs `update-repo/update-repo.py` of the checkout with `--host <repo> --yes --only-new --iso livecd/out/hyprdebian-live-amd64.iso`, which uploads the packages that are not in the repository yet and the ISO, see [hd-repo](hd-repo.md#the-hyprdebian-packages). Then it stores the commit and the versions as the last build.
 
 A build that fails leaves the last build as it was, so the next night tries the same commit again. Only one build runs at a time.
@@ -67,7 +67,7 @@ Packages of a version that is already in the repository are never uploaded again
 ### The kernel cache
 Building the kernels of [hd-kernel](hd-kernel.md) takes long, about half an hour per suite on a recent machine and more on an older one, and every build signs them with a key of its own. So a build passes `HD_KERNEL_CACHE=/var/lib/hd-buildserver/hd-kernel` to `make kernel`: `make deb` of hd-kernel copies the packages of a suite from there when they were built of the same versions of `linux`, `zfs-linux` and hd-kernel, and stores every new build there, in place of the one before. A commit that does not touch the kernel then does not build it again. The cache is outside the checkout, so `git clean` leaves it; removing it makes the next build compile the kernels again.
 
-A kernel build needs about 30 GB of disk per suite in the checkout, which the next build removes, and memory for its compilers: the container of each suite gets 5/8 GB per core.
+A build passes `HD_KERNEL_WORK=/var/lib/hd-buildserver/kernel-work` too, outside the checkout, so `git clean` leaves the sources, the kernel trees and the ccache, and the next build only compiles what changed. That takes about 30 GB of disk per suite, plus the ccache. The compilers need memory: the container of each suite gets 5/8 GB per core.
 
 ### The build environment
 `buildenv/Dockerfile` is in the git repository, not in the package, so a new package brings its build dependencies along: add them to the Dockerfile in the same change. It installs what [Build requirements](../HyprDebian/Build%20requirements.md) lists, on trixie, so what is compiled outside a container of its own, such as `blockwrite` of `hd-backup`, also runs on trixie.
@@ -127,5 +127,6 @@ Removing the package stops the timer and keeps the settings, the user, the check
 | `/var/lib/hd-buildserver/checkout` | The checkout of the git repository. |
 | `/var/lib/hd-buildserver/last-built` | The commit and the kernel sources of the last build that was uploaded, as JSON. |
 | `/var/lib/hd-buildserver/hd-kernel` | The packages of hd-kernel of the last build of each suite. |
+| `/var/lib/hd-buildserver/kernel-work` | The work of the kernel builds: the sources of each suite, the kernel trees and the ccache. |
 | `/var/lib/hd-buildserver/build.lock` | Keeps two builds from running at the same time. |
 | `/var/lib/hd-buildserver/.ssh` | The ssh key and the ssh config. |

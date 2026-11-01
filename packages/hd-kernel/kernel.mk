@@ -30,6 +30,11 @@ LSMOD := ../../local-testvm/lsmod-test.txt
 JOBS := $(shell nproc)
 MEMORY := $(shell echo $$(( $(JOBS) * 5 / 8 )))g
 HD_KERNEL_CACHE ?=
+# The work of the kernels of every package, a directory per suite, see
+# build-kernel.sh: the sources of the suite, which they share, the kernel tree
+# of each package and the ccache. Outside the package directory, so that a
+# build server can keep it outside a checkout that it cleans.
+HD_KERNEL_WORK ?= $(KERNEL_SRC)/$(BUILD)/work
 
 .PHONY: deb deb-path sources test-build clean $(addprefix deb-,$(SUITES)) $(addprefix sources-,$(SUITES))
 # One suite at a time, also under make -j of the Makefile in the root: each
@@ -38,15 +43,15 @@ HD_KERNEL_CACHE ?=
 
 deb: $(addprefix deb-,$(SUITES))
 
-# Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work
-# directory $(BUILD)/work/$(3) and the packages into $(BUILD)/$(3), in a
-# container of the build environment of the suite. It builds that first, with
+# Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work of
+# the suite in HD_KERNEL_WORK, the tree of the build in its directory $(4) and
+# the packages into $(BUILD)/$(3), in a container of the build environment of the suite. It builds that first, with
 # the latest image of the suite: docker only installs the build dependencies
 # again when that image has changed. Then it removes the build environments
 # that the new one replaced. Neither prints anything but errors, as make
 # sources prints only the versions.
 define run
-	mkdir -p $(BUILD)/work/$(3) $(BUILD)/$(3)
+	mkdir -p $(HD_KERNEL_WORK)/$(2) $(BUILD)/$(3)
 	docker build --pull --quiet --build-arg IMAGE=$(IMAGE_$(2)) -t $(BUILDENV):$(2) \
 		$(KERNEL_SRC)/buildenv > /dev/null
 	docker image prune --force --filter label=org.hyprdebian.image=$(BUILDENV) > /dev/null
@@ -57,6 +62,7 @@ define run
 		-e PACKAGE=$(PACKAGE) \
 		-e TAG=$(TAG) \
 		-e KEEP=$(KEEP) \
+		-e TREE=$(4) \
 		-e HD_VERSION=$(HD_VERSION) \
 		-e JOBS=$(JOBS) \
 		-e HOST_UID=$$(id -u) \
@@ -64,7 +70,7 @@ define run
 		-v $(KERNEL_SRC):/src:ro \
 		-v $(CURDIR):/package:ro \
 		-v $(abspath $(LSMOD)):/lsmod:ro \
-		-v $(CURDIR)/$(BUILD)/work/$(3):/work \
+		-v $(abspath $(HD_KERNEL_WORK))/$(2):/work \
 		-v $(CURDIR)/$(BUILD)/$(3):/out \
 		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache) \
 		$(BUILDENV):$(2) bash /src/build-kernel.sh
@@ -72,7 +78,7 @@ endef
 
 $(addprefix deb-,$(SUITES)): deb-%:
 	$(if $(HD_KERNEL_CACHE),mkdir -p $(HD_KERNEL_CACHE))
-	$(call run,full,$*,$*)
+	$(call run,full,$*,$*,$(PACKAGE))
 
 deb-path:
 	@for suite in $(SUITES); do \
@@ -86,10 +92,10 @@ deb-path:
 sources: $(addprefix sources-,$(SUITES))
 
 $(addprefix sources-,$(SUITES)): sources-%:
-	$(call run,sources,$*,$*)
+	$(call run,sources,$*,$*,$(PACKAGE))
 
 test-build:
-	$(call run,test,unstable,test)
+	$(call run,test,unstable,test,$(PACKAGE)-test)
 
 clean:
 	rm -rf $(BUILD)

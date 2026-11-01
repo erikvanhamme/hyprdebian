@@ -59,8 +59,19 @@
 #   /package
 #           the package directory of PACKAGE, read-only: its control file in deb/<PACKAGE>,
 #           its man page in man/<PACKAGE>.7 and its keep list; that of hd-kernel is /src
-#   /work   the source packages and the trees, kept for the next build of the same versions, and
-#           the ccache of the compiler
+#   /work   the work of the suite, shared by the kernels of every package, kept for the next build:
+#             src/linux, src/zfs-linux
+#                     the sources of linux and zfs-linux, as apt source unpacks them, with the
+#                     patches of Debian; src/<name>.version holds their version. The kernels
+#                     build out of tree from src/linux, which stays as apt source left it, and
+#                     ZFS builds in src/zfs-linux for one kernel after another
+#             TREE/linux
+#                     the kernel tree of this build, of make O=, with the version of linux in
+#                     TREE/linux.version; it starts anew with another version
+#             TREE    also the config of Debian, the packages of make bindeb-pkg and the stages
+#                     of the other packages
+#             ccache  the ccache of the compiler
+#             lock    keeps a second build of the suite from starting before the first is done
 #   /out    the packages, kept for the next build, which skips the build when they are those of
 #           its release
 #   /cache  only with HD_KERNEL_CACHE in the Makefile: the packages of earlier builds, in
@@ -68,20 +79,26 @@
 #           instead
 #   /lsmod  only in the mode test: the modules, as lsmod prints them
 #
-# HD_VERSION is the version of PACKAGE, SUITE the suite, JOBS the number of jobs. make bindeb-pkg
-# writes its own debian/ into the kernel tree, over the one of the source package; the patches of
-# Debian are applied by then. Everything in /work, /out and /cache ends up owned by
-# HOST_UID:HOST_GID, the user who runs make.
+# HD_VERSION is the version of PACKAGE, SUITE the suite, JOBS the number of jobs, TREE the
+# directory of this build in /work: PACKAGE, or PACKAGE-test in the mode test. make bindeb-pkg
+# writes its own debian/ into the kernel tree of the build, not into src/linux. What the build
+# writes in /work, /out and /cache ends up owned by HOST_UID:HOST_GID, the user who runs make.
 set -euo pipefail
 
 MAINTAINER_NAME="Erik Van Hamme"
 MAINTAINER_EMAIL="erik.vanhamme@gmail.com"
 
-if [[ -d /cache ]]; then
-  trap 'chown -R "${HOST_UID}:${HOST_GID}" /work /out /cache' EXIT
-else
-  trap 'chown -R "${HOST_UID}:${HOST_GID}" /work /out' EXIT
-fi
+# Hands what the build writes to the user who runs make; not all of /work, which also has the
+# trees of the other packages.
+chown_back() {
+  local path
+  for path in /work/src /work/src/*.version "/work/${TREE}" /work/ccache /work/lock /out /cache; do
+    if [[ -e "${path}" ]]; then
+      chown -R "${HOST_UID}:${HOST_GID}" "${path}"
+    fi
+  done
+}
+trap chown_back EXIT
 
 # Prints the most recent version of the source package $1 in the suite.
 latest_source() {
@@ -188,8 +205,12 @@ KERNEL_DEB_VERSION="${KERNEL_VERSION}+hd${HD_VERSION}"
 ZFS_DEB_VERSION="${ZFS_VERSION}+hd${HD_VERSION}"
 # PACKAGE goes up with each of the three versions, so it pulls in every new build.
 META_DEB_VERSION="${KERNEL_VERSION}+hd${HD_VERSION}+zfs${ZFS_VERSION//-/.}"
-KERNEL_DIR="/work/src/linux-${UPSTREAM}"
-ZFS_DIR="/work/src/zfs-linux-${ZFS_UPSTREAM}"
+# The sources, and the directory of this build with its kernel tree. Their paths do not change
+# with the versions.
+KERNEL_DIR=/work/src/linux
+ZFS_DIR=/work/src/zfs-linux
+BUILD_DIR="/work/${TREE}"
+OBJ_DIR="${BUILD_DIR}/linux"
 PACKAGES=(
   "linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
   "zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
@@ -225,13 +246,22 @@ if [[ -d /cache ]] && has_packages "${CACHE}/${RELEASE}"; then
   exit 0
 fi
 
-mkdir -p /work/src /work/ccache
+# One build of the suite at a time, as they share the sources: a build of another package waits
+# here until this one is done.
+exec 9> /work/lock
+if ! flock -n 9; then
+  echo "--> Waiting for the build of another package of ${SUITE}..."
+  flock 9
+fi
+
+mkdir -p /work/src /work/ccache "${BUILD_DIR}"
 cd /work/src
 
-# The trees and source packages of other versions are of no use any more.
-for old in linux-* linux_* zfs-linux-* zfs-linux_*; do
+# Everything else in src is of no use any more: the trees of the layout before src/linux, and
+# what a get_source that stopped halfway left.
+for old in *; do
   case "${old}" in
-    "linux-${UPSTREAM}" | "linux_${UPSTREAM}"* | "zfs-linux-${ZFS_UPSTREAM}" | "zfs-linux_${ZFS_UPSTREAM}"*) ;;
+    linux | linux.version | zfs-linux | zfs-linux.version) ;;
     *)
       if [[ -e "${old}" ]]; then
         rm -rf "${old}"
@@ -240,32 +270,53 @@ for old in linux-* linux_* zfs-linux-* zfs-linux_*; do
   esac
 done
 
-if [[ ! -d "${KERNEL_DIR}" ]]; then
-  echo "--> Getting linux ${KERNEL_VERSION}..."
-  apt-get source --only-source "linux=${KERNEL_VERSION}"
+# Unpacks the source package $1 of the version $2 into /work/src/$1, unless it is there already:
+# apt source unpacks it into $1-<upstream version>, with the patches of Debian, and $1.version
+# says which version /work/src/$1 has. The source packages go once they are unpacked.
+get_source() {
+  local name="$1" version="$2"
+  if [[ -d "${name}" && -f "${name}.version" && "$(< "${name}.version")" == "${version}" ]]; then
+    return 0
+  fi
+  echo "--> Getting ${name} ${version}..."
+  rm -rf "${name}" "${name}.version"
+  apt-get source --only-source "${name}=${version}"
+  mv "${name}-${version%-*}" "${name}"
+  rm -f "${name}_"*
+  echo "${version}" > "${name}.version"
+}
+get_source linux "${KERNEL_VERSION}"
+get_source zfs-linux "${ZFS_VERSION}"
+
+# The kernel tree of this build starts anew with another version of linux: the files of a new
+# source have the times of the source package, which can be older than the objects of the tree.
+if [[ ! -f "${OBJ_DIR}.version" || "$(< "${OBJ_DIR}.version")" != "${KERNEL_VERSION}" ]]; then
+  rm -rf "${OBJ_DIR}"
+  mkdir -p "${OBJ_DIR}"
+  echo "${KERNEL_VERSION}" > "${OBJ_DIR}.version"
 fi
 
-if [[ ! -d "${ZFS_DIR}" ]]; then
-  echo "--> Getting zfs-linux ${ZFS_VERSION}..."
-  apt-get source --only-source "zfs-linux=${ZFS_VERSION}"
-fi
+# Runs make in the kernel tree of this build, with the source in src/linux.
+kmake() {
+  make -C "${KERNEL_DIR}" O="${OBJ_DIR}" "$@"
+}
 
 # The config of Debian for amd64 is in linux-config-<series>, built from the same source.
 echo "--> Getting the config of Debian..."
-rm -rf /work/config
-mkdir -p /work/config
-cd /work/config
+rm -rf "${BUILD_DIR}/config"
+mkdir -p "${BUILD_DIR}/config"
+cd "${BUILD_DIR}/config"
 apt-get download "linux-config-${SERIES}=${KERNEL_VERSION}"
 dpkg-deb -x linux-config-*.deb root
 xz -dc "root/usr/src/linux-config-${SERIES}/config.amd64_none_amd64.xz" > debian.config
 
 echo "--> Setting up the config..."
-cd "${KERNEL_DIR}"
-cp /work/config/debian.config .config
-make olddefconfig
+cd "${OBJ_DIR}"
+cp "${BUILD_DIR}/config/debian.config" .config
+kmake olddefconfig
 
 if [[ "${MODE}" == "full" ]]; then
-  missing="$(grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' /work/config/debian.config | cut -d= -f1 \
+  missing="$(grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' "${BUILD_DIR}/config/debian.config" | cut -d= -f1 \
     | while read -r option; do
         if ! grep -qE "^${option}=[ym]$" .config; then
           echo "${option}"
@@ -279,42 +330,44 @@ if [[ "${MODE}" == "full" ]]; then
 fi
 
 if [[ -n "${KEEP}" ]]; then
-  keep_modules > /work/keep.lsmod
-  make LSMOD=/work/keep.lsmod localmodconfig < /dev/null
+  (cd "${KERNEL_DIR}" && keep_modules) > "${BUILD_DIR}/keep.lsmod"
+  kmake LSMOD="${BUILD_DIR}/keep.lsmod" localmodconfig < /dev/null
 fi
 if [[ "${MODE}" == "test" ]]; then
   # localmodconfig asks for the options that are new to the config; with no input it takes the
   # defaults, and says "Error in reading or end of file" for each.
-  make LSMOD=/lsmod localmodconfig < /dev/null
-  scripts/config \
+  kmake LSMOD=/lsmod localmodconfig < /dev/null
+  "${KERNEL_DIR}/scripts/config" --file .config \
     -d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -d DEBUG_INFO_DWARF4 -d DEBUG_INFO_DWARF5 \
     -e DEBUG_INFO_NONE -d DEBUG_INFO_BTF
 fi
-scripts/config \
+"${KERNEL_DIR}/scripts/config" --file .config \
   --set-str SYSTEM_TRUSTED_KEYS "" \
   --set-str SYSTEM_REVOCATION_KEYS "" \
   -e MODULE_SIG -e MODULE_SIG_ALL \
   --set-str MODULE_SIG_KEY "certs/signing_key.pem" \
   --set-str LOCALVERSION "${LOCALVERSION_SUFFIX}" \
   -d LOCALVERSION_AUTO
-make olddefconfig
+kmake olddefconfig
 
 # A new key for every build: the key of a build that failed before it was removed is removed now,
 # so the build makes another.
 rm -f certs/signing_key.pem certs/signing_key.x509
 
 echo "--> Building the kernel..."
-rm -f /work/src/*.deb /work/src/*.buildinfo /work/src/*.changes
+# make bindeb-pkg puts the packages next to the kernel tree, in the directory of the build.
+rm -f "${BUILD_DIR}"/*.deb "${BUILD_DIR}"/*.buildinfo "${BUILD_DIR}"/*.changes
 export CCACHE_DIR=/work/ccache
 export DEBFULLNAME="${MAINTAINER_NAME}" DEBEMAIL="${MAINTAINER_EMAIL}"
 export KBUILD_BUILD_USER=hyprdebian KBUILD_BUILD_HOST="${PACKAGE}"
-time make -j"${JOBS}" CC="ccache gcc" KDEB_PKGVERSION="${KERNEL_DEB_VERSION}" \
+time kmake -j"${JOBS}" CC="ccache gcc" KDEB_PKGVERSION="${KERNEL_DEB_VERSION}" \
   KDEB_CHANGELOG_DIST="${SUITE}" bindeb-pkg
-if [[ "$(make -s kernelrelease)" != "${RELEASE}" ]]; then
-  echo "The kernel release is $(make -s kernelrelease), not ${RELEASE}" >&2
+kernelrelease="$(kmake -s --no-print-directory kernelrelease)"
+if [[ "${kernelrelease}" != "${RELEASE}" ]]; then
+  echo "The kernel release is ${kernelrelease}, not ${RELEASE}" >&2
   exit 1
 fi
-image_deb="/work/src/linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
+image_deb="${BUILD_DIR}/linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
 
 # The modules of the kernel, from modules.order, and those built in, from modules.builtin, with _
 # for - as lsmod prints them. In the mode test, localmodconfig turned off what /lsmod has not.
@@ -344,7 +397,7 @@ cd "${ZFS_DIR}"
 if [[ ! -x configure ]]; then
   ./autogen.sh
 fi
-./configure --with-config=kernel --with-linux="${KERNEL_DIR}" --with-linux-obj="${KERNEL_DIR}"
+./configure --with-config=kernel --with-linux="${KERNEL_DIR}" --with-linux-obj="${OBJ_DIR}"
 make -C module clean
 time make -j"${JOBS}" -C module modules
 
@@ -371,16 +424,16 @@ fill() {
 }
 
 echo "--> Signing the ZFS module..."
-stage=/work/zfs-deb
+stage="${BUILD_DIR}/zfs-deb"
 rm -rf "${stage}"
 install -d "${stage}/DEBIAN" "${stage}${moddir}extra/zfs"
 find module -name '*.ko' -exec install -m 0644 {} "${stage}${moddir}extra/zfs/" \;
 for module in "${stage}${moddir}"extra/zfs/*.ko; do
   strip --strip-debug "${module}"
-  "${KERNEL_DIR}/scripts/sign-file" sha256 "${KERNEL_DIR}/certs/signing_key.pem" \
-    "${KERNEL_DIR}/certs/signing_key.x509" "${module}"
+  "${OBJ_DIR}/scripts/sign-file" sha256 "${OBJ_DIR}/certs/signing_key.pem" \
+    "${OBJ_DIR}/certs/signing_key.x509" "${module}"
 done
-rm -f "${KERNEL_DIR}/certs/signing_key.pem"
+rm -f "${OBJ_DIR}/certs/signing_key.pem"
 
 echo "--> Packaging the ZFS module..."
 install -D -m 0644 debian/copyright "${stage}/usr/share/doc/zfs-modules-${RELEASE}/copyright"
@@ -388,17 +441,17 @@ fill /src/deb/zfs-modules/control "${stage}/DEBIAN/control" "${stage}"
 fill /src/deb/zfs-modules/postinst "${stage}/DEBIAN/postinst" "${stage}"
 fill /src/deb/zfs-modules/postrm "${stage}/DEBIAN/postrm" "${stage}"
 chmod 0755 "${stage}/DEBIAN/postinst" "${stage}/DEBIAN/postrm"
-zfs_deb="/work/src/zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
+zfs_deb="${BUILD_DIR}/zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${zfs_deb}"
 
 echo "--> Packaging ${PACKAGE}..."
-stage=/work/meta-deb
+stage="${BUILD_DIR}/meta-deb"
 rm -rf "${stage}"
 install -d "${stage}/DEBIAN" "${stage}/usr/share/man/man7"
 gzip -9n < "/package/man/${PACKAGE}.7" > "${stage}/usr/share/man/man7/${PACKAGE}.7.gz"
 chmod 0644 "${stage}/usr/share/man/man7/${PACKAGE}.7.gz"
 fill "/package/deb/${PACKAGE}/control" "${stage}/DEBIAN/control" "${stage}"
-meta_deb="/work/src/${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
+meta_deb="${BUILD_DIR}/${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${meta_deb}"
 
 # The packages go to /out last, so a build that stops halfway leaves none there.

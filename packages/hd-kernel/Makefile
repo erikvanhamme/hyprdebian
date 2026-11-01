@@ -48,11 +48,16 @@
 #               by default, see make localmodconfig) and without debug info;
 #               the release has hdtest<id>. Only for trying out on the test
 #               vm, never for a repository.
-#   make clean  remove build/
+#   make clean  remove build/, with the work of every kernel package when
+#               HD_KERNEL_WORK is not set
 #
-# The kernel trees stay in build/work/<suite>, with the ccache of the
-# compiler, so a build of the same versions only compiles what changed. The
-# container gets at most MEMORY of memory, 5/8 GB per job, so that when the
+# The kernels of every package, of hd-kernel-vm, hd-kernel-server and
+# hd-kernel-desktop too, work in HD_KERNEL_WORK, build/work here by default: a
+# directory per suite, with the sources of linux and zfs-linux of the suite,
+# which they share, the kernel tree of each package and the ccache of the
+# compiler. So a build of the same versions only compiles what changed, and a
+# new version is unpacked once for every package. One build of a suite runs
+# at a time. The container gets at most MEMORY of memory, 5/8 GB per job, so that when the
 # compilers need more, the kernel kills the build and not other programs; set
 # JOBS lower for a machine with less memory free.
 

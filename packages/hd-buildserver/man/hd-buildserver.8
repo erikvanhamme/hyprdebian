@@ -54,7 +54,9 @@ which
 .B make all
 leaves out; the kernels come from the cache in
 .I /var/lib/hd-buildserver/hd-kernel
-when they were built of the same versions before;
+when they were built of the same versions before, and are built in
+.I /var/lib/hd-buildserver/kernel-work
+otherwise;
 .IP 5. 4
 runs
 .B update-repo/update-repo.py
@@ -180,6 +182,11 @@ and
 .B hd-kernel-desktop
 of the last build of each suite, in a directory per package, which a build of
 the same versions copies instead of building them again.
+.TP
+.I /var/lib/hd-buildserver/kernel-work
+The work of the kernel builds: the sources of each suite, the kernel tree of
+each package and the ccache of the compiler, so that a build only compiles what
+changed since the one before.
 .TP
 .I /var/lib/hd-buildserver/build.lock
 Keeps two runs from building at the same time.
