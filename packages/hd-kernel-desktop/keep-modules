@@ -1,0 +1,233 @@
+# The modules that the kernel of hd-kernel-desktop keeps of the config of Debian; make
+# localmodconfig turns off every other module. What the config of Debian builds into the kernel
+# stays. A line is one of:
+#
+#   <dir>/    every module of the directory <dir> of the kernel tree and of those below it
+#   !<dir>/   none of the directory <dir> and of those below it, of a directory kept above
+#   <module>  the module of that name, as lsmod prints it; the build stops when the kernel has no
+#             module of that name, as a module or built in
+#
+# Everything but the drivers stays: file systems, network protocols and netfilter, crypto, and
+# kvm. Of the drivers those of the hardware of the desktops and laptops (hyprdebian, iscsi1,
+# hyprlap and beast, from the survey of lsmod of 2026-11-01) stay, the drivers of software that
+# are not hardware, and whole directories of what people plug in: USB, HID, input, Bluetooth,
+# webcams and USB sound and network.
+
+# Everything but the drivers, and not the protocols of hardware that a desktop has not.
+arch/
+block/
+crypto/
+fs/
+kernel/
+lib/
+mm/
+net/
+!net/6lowpan/
+!net/atm/
+!net/can/
+!net/dsa/
+!net/ieee802154/
+!net/mac802154/
+!net/phonet/
+security/
+virt/
+
+# Not the users of RDMA, which needs InfiniBand: RDS, SMC, NFS and SMB over RDMA, and 9p, of
+# which only the transports over TCP and virtio stay.
+!fs/smb/smbdirect/
+!net/9p/
+!net/rds/
+!net/smc/
+!net/sunrpc/xprtrdma/
+9pnet_fd
+9pnet_virtio
+
+# ACPI and the platform: buttons, battery, AC, fans, backlight, and the drivers of the boards
+# and laptops (Asus of hyprdebian and iscsi1, Gigabyte of beast, Dell of hyprlap).
+button
+battery
+ac
+fan
+video
+efi_pstore
+wmi
+wmi_bmof
+mxm_wmi
+asus_wmi
+eeepc_wmi
+gigabyte_wmi
+dcdbas
+dell_smbios
+dell_wmi_descriptor
+dell_pc
+dell_wmi
+dell_rbtn
+dell_laptop
+dell_smo8800
+dell_lis3lv02d
+dell_smm_hwmon
+
+# The AMD chipset and processor: SMBus, GPIO, watchdog, crypto, temperatures and memory errors.
+i2c_piix4
+gpio_amdpt
+sp5100_tco
+ccp
+k10temp
+amd64_edac
+edac_mce_amd
+amd_atl
+
+# The Intel chipset and processor: SMBus, LPC, watchdog, ME, temperatures, power and memory
+# errors.
+i2c_i801
+lpc_ich
+intel_pmc_bxt
+iTCO_wdt
+mei_me
+mei_hdcp
+mei_pxp
+mei_wdt
+coretemp
+x86_pkg_temp_thermal
+intel_powerclamp
+intel_rapl_msr
+ie31200_edac
+
+# Sensors and the SPD of the memory.
+i2c_dev
+jc42
+ee1004
+at24
+acpi_cpufreq
+
+# Graphics: AMD, Intel (i915, and xe of the newer ones) and Nvidia.
+amdgpu
+i915
+xe
+nouveau
+
+# Sound: ALSA, HDA with its codecs, and USB audio.
+sound/core/
+sound/hda/
+sound/usb/
+
+# Disks and cd-roms: SATA, NVMe, SD cards and USB.
+ahci
+nvme
+sd_mod
+sr_mod
+sg
+sdhci_pci
+usb_storage
+uas
+
+# Network: the wired cards of the desktops and the common ones of Intel, Realtek, Aquantia,
+# Atheros and Broadcom, Mellanox ConnectX, ConnectX-3 too, Brocade with Ethernet
+# and Fibre Channel, Wi-Fi of Intel, Realtek, MediaTek and Qualcomm Atheros, and USB network
+# adapters and tethering.
+r8169
+e1000e
+igb
+igc
+ixgbe
+atlantic
+alx
+tg3
+mlx5_core
+mlx4_en
+bna
+bfa
+drivers/net/wireless/intel/iwlwifi/
+drivers/net/wireless/realtek/rtw88/
+drivers/net/wireless/realtek/rtw89/
+drivers/net/wireless/mediatek/mt76/
+drivers/net/wireless/ath/ath10k/
+drivers/net/wireless/ath/ath11k/
+drivers/net/wireless/ath/ath12k/
+drivers/net/usb/
+
+# USB, HID, input, Bluetooth and webcams: all of them, for what people plug in.
+drivers/usb/
+!drivers/usb/gadget/
+drivers/hid/
+drivers/input/
+drivers/bluetooth/
+drivers/media/usb/uvc/
+
+# Printers on the parallel port.
+parport_pc
+lp
+ppdev
+
+# FireWire.
+firewire_ohci
+
+# The libraries and cores that the drivers above use, as lsmod shows them on the desktops.
+libata
+libahci
+scsi_mod
+scsi_common
+scsi_transport_fc
+cdrom
+nvme_core
+nvme_auth
+nvme_keyring
+drm
+drm_kms_helper
+drm_client_lib
+drm_display_helper
+drm_buddy
+drm_exec
+drm_gpuvm
+drm_suballoc_helper
+drm_ttm_helper
+drm_panel_backlight_quirks
+ttm
+gpu_sched
+amdxcp
+cec
+rc_core
+i2c_algo_bit
+i2c_smbus
+gpio_generic
+mei
+mlxfw
+dca
+phy_package
+realtek
+mmc_core
+sdhci
+cqhci
+sdhci_uhs2
+mc
+videodev
+uvc
+videobuf2_common
+videobuf2_memops
+videobuf2_v4l2
+videobuf2_vmalloc
+soundcore
+parport
+firewire_core
+intel_rapl_common
+watchdog
+
+# Drivers of software: block devices, device mapper and RAID, and network devices for
+# containers, vms, VPNs and bonds.
+loop
+zram
+nbd
+drivers/md/
+tun
+tap
+veth
+macvlan
+macvtap
+ipvlan
+vxlan
+geneve
+wireguard
+bonding
+dummy
+ifb
+drivers/vhost/

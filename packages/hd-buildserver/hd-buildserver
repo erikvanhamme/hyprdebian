@@ -8,14 +8,14 @@ it every night as the user hd-buildserver. A run:
      the first time, checks out the head of the branch and cleans the checkout of everything git
      does not track;
   2. asks make sources of packages/hd-kernel for the versions of the source packages linux and
-     zfs-linux in each suite that the kernels of hd-kernel and hd-kernel-vm are built of;
+     zfs-linux in each suite that the kernels of hd-kernel and its variants are built of;
   3. stops when the commit and those versions are those of the last build, in
      /var/lib/hd-buildserver/last-built, so a night on which only Debian has a new kernel or ZFS
      also builds;
   4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso kernel
      in a container of it, which builds every package and the live ISO, and the kernels of
-     hd-kernel and hd-kernel-vm, which come from the cache in /var/lib/hd-buildserver/hd-kernel
-     when they were built of the same versions before;
+     hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop, which come from the cache in
+     /var/lib/hd-buildserver/hd-kernel when they were built of the same versions before;
   5. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
      the checkout, see hd-repo(7), and stores the commit and the versions as the last build.
 
@@ -44,9 +44,9 @@ DEFAULTS_FILE = "/usr/share/hd-buildserver/defaults.json"
 STATE_DIR = "/var/lib/hd-buildserver"
 CHECKOUT = f"{STATE_DIR}/checkout"
 LAST_BUILT = f"{STATE_DIR}/last-built"
-# The packages of hd-kernel and hd-kernel-vm of earlier builds, a directory per package, which
-# make deb of each copies instead of building them again (HD_KERNEL_CACHE). It is outside the
-# checkout, so git clean leaves it.
+# The packages of the kernels, hd-kernel and its variants, of earlier builds, a directory per
+# package, which make deb of each copies instead of building them again (HD_KERNEL_CACHE). It is
+# outside the checkout, so git clean leaves it.
 KERNEL_CACHE = f"{STATE_DIR}/hd-kernel"
 KERNEL_PACKAGE = "packages/hd-kernel"
 LOCK_FILE = f"{STATE_DIR}/build.lock"

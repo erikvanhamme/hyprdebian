@@ -1,0 +1,124 @@
+.TH HD-KERNEL-SERVER 7 "November 2026" "hd-kernel-server" "HyprDebian"
+.SH NAME
+hd-kernel-server \- the HyprDebian kernel for servers
+.SH DESCRIPTION
+The package
+.B hd-kernel-server
+depends on the most recent HyprDebian kernel for servers of the suite and its
+ZFS module, so that they are installed and upgraded with it:
+.TP
+.BI linux-image- release
+The kernel of
+.BR hd-kernel (7):
+the kernel of Debian, with the patches and the config of Debian, built by the
+build server of HyprDebian, but with only the modules that a server needs.
+.TP
+.BI zfs-modules- release
+The ZFS module of the
+.B zfs-linux
+of Debian, built against that kernel, in
+.IR /lib/modules/ release /extra/zfs .
+It provides
+.BR zfs-modules ,
+which
+.B zfs-initramfs
+takes in place of
+.BR zfs-dkms .
+.PP
+What the config of Debian builds into the kernel stays, and so do the modules
+that are not drivers: the file systems, the network protocols and netfilter,
+crypto, and kvm, for virtual machines; not the protocols of wireless,
+Bluetooth and other hardware that a server has not, and not RDMA and
+InfiniBand. Of the drivers only these stay:
+.IP \(bu 2
+those of the hardware of servers: SATA and NVMe disks; the SAS and RAID cards
+of Intel, Broadcom, Adaptec and HPE, with their enclosures; Fibre Channel of
+QLogic; the network cards of Intel, Broadcom, Realtek, Mellanox ConnectX and
+Brocade, with Fibre Channel; IPMI, the memory errors, temperatures, watchdog
+and SMBus of the Intel chipset; the graphics of the BMC; the platform drivers
+of Dell; USB with keyboards, mice and storage;
+.IP \(bu 2
+those of storage targets: the SCSI target with iSCSI, Fibre Channel over
+Ethernet, loopback and the user space backends of tcmu, Fibre Channel with the
+target mode of QLogic cards, and NVMe over TCP, Fibre Channel and loopback;
+.IP \(bu 2
+those of software: loop, zram and nbd, device mapper and RAID, and the network
+devices of containers, virtual machines, VPNs and bonds, such as tun, veth,
+macvlan, vxlan, wireguard and vhost.
+.PP
+The release is
+.IB x.y.z +debNN-hdserver id -amd64\fR,
+such as
+.BR 7.2.12+deb14-hdserver1a2b3c-amd64 ,
+where
+.I id
+comes from the versions of
+.BR linux ,
+.B zfs-linux
+and
+.BR hd-kernel-server .
+A new build has a new release, so it installs next to the kernel that runs.
+.PP
+Every build signs the modules of the kernel and the ZFS module with a key it
+makes for the build and then throws away; the kernel trusts that key and no
+other for its modules.
+.SH SWITCHING
+To switch a server to the HyprDebian kernel for servers:
+.PP
+.RS
+sudo apt install hd-kernel-server
+.RE
+.PP
+This removes the other HyprDebian kernels,
+.BR hd-kernel ,
+.B hd-kernel-vm
+and
+.BR hd-kernel-desktop ,
+and
+.BR linux-image-amd64 ,
+.B linux-headers-amd64
+and
+.BR linux-base-amd64 ,
+so the other kernels get no more upgrades.
+After the installation the bootloader shows the new kernel at the top of its
+menu, with
+.B -hd
+in its name, see
+.BR hd-bootloader-update (8).
+Before the server boots it, check that the kernel has the drivers of its
+disks and network cards: a driver that is not in
+.IR /lib/modules/ release
+is not in the kernel.
+Once it boots, the other kernels can be purged, as
+.BR hd-kernel (7)
+describes for the kernels of Debian.
+.PP
+To switch back to the kernel of
+.BR hd-kernel ,
+or to that of Debian:
+.PP
+.RS
+sudo apt install hd-kernel
+.br
+sudo apt install linux-image-amd64 linux-headers-amd64
+.RE
+.PP
+Either removes
+.BR hd-kernel-server ;
+its kernels stay until they are purged.
+.SH FILES
+.TP
+.IR /boot/vmlinuz- release
+.TQ
+.IR /lib/modules/ release
+The kernel and its modules.
+.TP
+.IR /lib/modules/ release /extra/zfs
+The ZFS module.
+.SH SEE ALSO
+.BR hd-bootloader-update (8),
+.BR hd-buildserver (8),
+.BR hd-kernel (7),
+.BR hd-kernel-desktop (7),
+.BR hd-kernel-vm (7),
+.BR zfs (4)

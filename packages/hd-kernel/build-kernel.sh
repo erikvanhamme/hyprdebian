@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds a HyprDebian kernel of one suite in a Debian container of that suite; kernel.mk runs it
-# with docker, for hd-kernel and hd-kernel-vm. MODE says what it does:
+# with docker, for hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop. MODE says what
+# it does:
 #
 #   sources  print the versions of the source packages linux and zfs-linux that a build would use,
 #            the most recent ones in the suite, as "<suite> linux <version> zfs-linux <version>"
@@ -15,13 +16,14 @@
 #   zfs-modules-<release>_<version>_amd64.deb     zfs.ko and spl.ko, in extra/zfs
 #   <PACKAGE>_<version>_amd64.deb                 depends on both, see deb/<PACKAGE>/control
 #
-# PACKAGE is hd-kernel or hd-kernel-vm. The release is <x.y.z>+debNN-<TAG><id>-amd64: debNN as in
-# the release of the kernel of Debian, TAG hd for hd-kernel and hdvm for hd-kernel-vm, and <id> six
-# hex digits of a sha256 of everything the packages are made of: the versions of linux, zfs-linux
-# and PACKAGE, this script, the templates of zfs-modules, the control file, the man page and the
-# keep list of PACKAGE, and in the mode test the modules in /lsmod. Every build signs the modules with a key of its own, so a build of anything
-# else also gets another release: it installs next to the kernel that runs, whose modules stay
-# signed with the key it trusts.
+# PACKAGE is one of those four. The release is <x.y.z>+debNN-<TAG><id>-amd64: debNN as in the
+# release of the kernel of Debian, TAG hd for hd-kernel, hdvm for hd-kernel-vm, hdserver for
+# hd-kernel-server and hddesktop for hd-kernel-desktop, and <id> six hex digits of a sha256 of
+# everything the packages are made of: the versions of linux, zfs-linux and PACKAGE, this script,
+# the templates of zfs-modules, the control file, the man page and the keep list of PACKAGE, and
+# in the mode test the modules in /lsmod. Every build signs the modules with a key of its own, so
+# a build of anything else also gets another release: it installs next to the kernel that runs,
+# whose modules stay signed with the key it trusts.
 #
 # A build only builds when it has to. When /out already has the three packages of the release, it
 # stops there: they only get there at the end of a build that went through. A make clean removes
@@ -34,7 +36,7 @@
 # code where it may not use the kernel's.
 #
 # The config is that of Debian, with these changes:
-#   - with KEEP, the keep list of hd-kernel-vm, only the modules it keeps (make localmodconfig)
+#   - with KEEP, the keep list of PACKAGE, only the modules it keeps (make localmodconfig)
 #   - the kernel trusts no keys of Debian, and every module, zfs.ko too, is signed with a key that
 #     the build makes in certs/signing_key.pem and removes once zfs.ko is signed
 #   - the kernel release ends in the suffix above, set as CONFIG_LOCALVERSION

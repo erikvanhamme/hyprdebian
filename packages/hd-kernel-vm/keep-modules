@@ -22,23 +22,29 @@ mm/
 net/
 !net/6lowpan/
 !net/atm/
-!net/ax25/
 !net/bluetooth/
-!net/caif/
 !net/can/
 !net/dsa/
 !net/ieee802154/
 !net/mac80211/
 !net/mac802154/
-!net/netrom/
 !net/nfc/
 !net/phonet/
 !net/qrtr/
 !net/rfkill/
-!net/rose/
 !net/wireless/
 security/
 virt/
+
+# Not the users of RDMA, which needs InfiniBand: RDS, SMC, NFS and SMB over RDMA, and 9p, of
+# which only the transports over TCP and virtio stay.
+!fs/smb/smbdirect/
+!net/9p/
+!net/rds/
+!net/smc/
+!net/sunrpc/xprtrdma/
+9pnet_fd
+9pnet_virtio
 
 # virtio and the devices of QEMU for a guest.
 virtio_pci
@@ -61,6 +67,15 @@ efi_pstore
 
 # The power button of ACPI, by which libvirt shuts the vm down.
 button
+
+# The chipset of q35: SMBus, LPC with its watchdog, and the PC speaker; and the watchdogs that
+# libvirt adds, i6300esb and ib700.
+i2c_i801
+lpc_ich
+iTCO_wdt
+pcspkr
+i6300esb
+ib700wdt
 
 # Disks and cd-roms: SATA (q35), IDE (i440fx), NVMe, SCSI and USB.
 ahci

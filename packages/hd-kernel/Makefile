@@ -4,8 +4,8 @@
 # Each suite in SUITES gets a kernel of its own, built from the most recent
 # linux and zfs-linux of that suite in a container of it, so the build needs
 # docker and a user that may run it. build-kernel.sh does the work, see there,
-# and kernel.mk runs it, also for hd-kernel-vm, whose Makefile has the same
-# targets.
+# and kernel.mk runs it, also for hd-kernel-vm, hd-kernel-server and
+# hd-kernel-desktop, whose Makefiles have the same targets.
 #
 #   make deb    build the packages of every suite, into build/<suite>:
 #                 linux-image-<release>_<version>_amd64.deb

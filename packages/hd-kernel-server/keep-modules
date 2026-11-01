@@ -1,0 +1,191 @@
+# The modules that the kernel of hd-kernel-server keeps of the config of Debian; make
+# localmodconfig turns off every other module. What the config of Debian builds into the kernel
+# stays. A line is one of:
+#
+#   <dir>/    every module of the directory <dir> of the kernel tree and of those below it
+#   !<dir>/   none of the directory <dir> and of those below it, of a directory kept above
+#   <module>  the module of that name, as lsmod prints it; the build stops when the kernel has no
+#             module of that name, as a module or built in
+#
+# Everything but the drivers stays: file systems, network protocols and netfilter, crypto, and
+# kvm. Of the drivers only those of the hardware of the servers (technogea and migrate, from the
+# survey of lsmod of 2026-11-01) stay, and the drivers of software that are not hardware.
+
+# Everything but the drivers, and not the protocols of hardware that a server has not.
+arch/
+block/
+crypto/
+fs/
+kernel/
+lib/
+mm/
+net/
+!net/6lowpan/
+!net/atm/
+!net/bluetooth/
+!net/can/
+!net/dsa/
+!net/ieee802154/
+!net/mac80211/
+!net/mac802154/
+!net/nfc/
+!net/phonet/
+!net/qrtr/
+!net/rfkill/
+!net/wireless/
+security/
+virt/
+
+# Not the users of RDMA, which needs InfiniBand: RDS, SMC, NFS and SMB over RDMA, and 9p, of
+# which only the transports over TCP and virtio stay.
+!fs/smb/smbdirect/
+!net/9p/
+!net/rds/
+!net/smc/
+!net/sunrpc/xprtrdma/
+9pnet_fd
+9pnet_virtio
+
+# ACPI and the platform: power button, power meter, IPMI and the Dell drivers of technogea.
+button
+acpi_ipmi
+acpi_power_meter
+drivers/char/ipmi/
+efi_pstore
+wmi
+dcdbas
+dell_smbios
+dell_wmi_descriptor
+
+# The Intel chipset and processor: SMBus, LPC, watchdog, ME, temperatures, power, memory errors
+# and DMA engine.
+i2c_i801
+lpc_ich
+intel_pmc_bxt
+iTCO_wdt
+mei_me
+coretemp
+x86_pkg_temp_thermal
+intel_powerclamp
+intel_rapl_msr
+sb_edac
+ioatdma
+
+# Graphics of the BMC.
+mgag200
+
+# Disks: SATA, NVMe, SAS (isci of migrate, mpt3sas of technogea) with enclosures, and Fibre
+# Channel (qla2xxx of technogea), and the common SAS and RAID cards of Broadcom, Adaptec and HPE.
+ahci
+nvme
+sd_mod
+sr_mod
+sg
+isci
+mpt3sas
+ses
+qla2xxx
+megaraid_sas
+mpi3mr
+aacraid
+hpsa
+smartpqi
+
+# Storage targets: the SCSI target with iSCSI, Fibre Channel over Ethernet, loopback and the user
+# space backends of tcmu, Fibre Channel with the target mode of qla2xxx, and NVMe over TCP, Fibre
+# Channel and loopback. Not the target over FireWire, which servers have not.
+drivers/target/
+!drivers/target/sbp/
+uio
+tcm_qla2xxx
+nvmet
+nvmet_tcp
+nvmet_fc
+nvme_loop
+
+# Network: Mellanox ConnectX, ConnectX-3 too, Brocade with Ethernet and Fibre
+# Channel, and the common cards of Intel, Broadcom and Realtek.
+mlx5_core
+mlx4_en
+bna
+bfa
+e1000
+e1000e
+igb
+igc
+ixgbe
+ixgbevf
+i40e
+iavf
+ice
+tg3
+bnx2
+bnx2x
+bnxt_en
+r8169
+
+# USB: the controllers, keyboards and mice of the console, and USB disks.
+ehci_pci
+xhci_pci
+usbhid
+hid_generic
+usb_storage
+uas
+
+# Input of the console.
+evdev
+joydev
+pcspkr
+
+# The libraries and cores that the drivers above use, as lsmod shows them on the servers.
+libata
+libahci
+scsi_mod
+scsi_common
+scsi_transport_sas
+scsi_transport_fc
+raid_class
+libsas
+enclosure
+cdrom
+nvme_core
+nvme_fabrics
+nvme_fc
+nvme_auth
+nvme_keyring
+usbcore
+usb_common
+ehci_hcd
+hid
+drm
+drm_kms_helper
+drm_client_lib
+drm_shmem_helper
+i2c_algo_bit
+i2c_smbus
+mei
+mlxfw
+dca
+intel_rapl_common
+watchdog
+
+# Drivers of software: block devices, device mapper and RAID, and network devices for
+# containers, vms, VPNs and bonds.
+loop
+zram
+nbd
+drivers/md/
+tun
+tap
+veth
+macvlan
+macvtap
+ipvlan
+vxlan
+geneve
+wireguard
+bonding
+dummy
+ifb
+netconsole
+drivers/vhost/

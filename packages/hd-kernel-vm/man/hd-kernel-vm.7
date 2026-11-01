@@ -28,16 +28,17 @@ takes in place of
 .PP
 What the config of Debian builds into the kernel stays, and so do the modules
 that are not drivers: the file systems, the network protocols and netfilter,
-crypto, and kvm, for virtual machines in the virtual machine. Of the drivers
-only these stay:
+crypto, and kvm, for virtual machines in the virtual machine; not RDMA and
+InfiniBand. Of the drivers only these stay:
 .IP \(bu 2
 those of the hardware that QEMU emulates for a KVM virtual machine: virtio for
 disks, network, graphics, sound, input, memory and random numbers; SATA, IDE,
 NVMe and SCSI disks and cd-roms; the network cards e1000, e1000e and RTL8139;
 the USB controllers with keyboards, mice, tablets, storage and audio; the
 standard VGA, QXL and Cirrus graphics; HDA and AC97 sound; the power button
-of ACPI, by which the host shuts the virtual machine down; fw_cfg, pvpanic
-and the KVM clock for PTP;
+of ACPI, by which the host shuts the virtual machine down; the SMBus, LPC and
+watchdog of the q35 chipset, the watchdogs i6300esb and ib700, and the PC
+speaker; fw_cfg, pvpanic and the KVM clock for PTP;
 .IP \(bu 2
 those of software: loop, zram and nbd, device mapper and RAID, and the network
 devices of containers, virtual machines, VPNs and bonds, such as tun, veth,
@@ -66,8 +67,12 @@ To switch a virtual machine to the HyprDebian kernel for virtual machines:
 sudo apt install hd-kernel-vm
 .RE
 .PP
-This removes
+This removes the other HyprDebian kernels,
 .BR hd-kernel ,
+.B hd-kernel-server
+and
+.BR hd-kernel-desktop ,
+and
 .BR linux-image-amd64 ,
 .B linux-headers-amd64
 and
@@ -108,4 +113,6 @@ The ZFS module.
 .BR hd-bootloader-update (8),
 .BR hd-buildserver (8),
 .BR hd-kernel (7),
+.BR hd-kernel-desktop (7),
+.BR hd-kernel-server (7),
 .BR zfs (4)

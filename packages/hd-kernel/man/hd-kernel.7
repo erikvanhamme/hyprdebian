@@ -54,10 +54,18 @@ This removes
 .B linux-headers-amd64
 and
 .BR linux-base-amd64 ,
-so the kernels of Debian get no more upgrades, and
+so the kernels of Debian get no more upgrades, and the HyprDebian kernels with
+only the modules of one kind of system:
 .BR hd-kernel-vm ,
-the HyprDebian kernel for KVM virtual machines, see
-.BR hd-kernel-vm (7).
+for KVM virtual machines,
+.BR hd-kernel-server ,
+for servers, and
+.BR hd-kernel-desktop ,
+for desktops and laptops, see
+.BR hd-kernel-vm (7),
+.BR hd-kernel-server (7)
+and
+.BR hd-kernel-desktop (7).
 After the installation the bootloader shows the new kernel at the top of its
 menu, with
 .B -hd
@@ -101,5 +109,7 @@ The ZFS module.
 .SH SEE ALSO
 .BR hd-bootloader-update (8),
 .BR hd-buildserver (8),
+.BR hd-kernel-desktop (7),
+.BR hd-kernel-server (7),
 .BR hd-kernel-vm (7),
 .BR zfs (4)

@@ -5,7 +5,8 @@ Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: linux-image-@RELEASE@ (= @KERNEL_DEB_VERSION@),
  zfs-modules-@RELEASE@ (= @ZFS_DEB_VERSION@)
-Conflicts: hd-kernel, linux-image-amd64, linux-headers-amd64, linux-base-amd64
+Conflicts: hd-kernel, hd-kernel-server, hd-kernel-desktop, linux-image-amd64, linux-headers-amd64,
+ linux-base-amd64
 Section: kernel
 Priority: optional
 Description: HyprDebian kernel for KVM virtual machines
@@ -18,6 +19,7 @@ Description: HyprDebian kernel for KVM virtual machines
  and thrown away, so a system needs neither DKMS nor a compiler for ZFS, and
  the kernel trusts no other key for its modules.
  .
- It replaces the kernel of Debian and hd-kernel: installing it removes
- hd-kernel, linux-image-amd64, linux-headers-amd64 and linux-base-amd64.
+ It replaces the kernel of Debian and the other HyprDebian kernels: installing
+ it removes hd-kernel, hd-kernel-server, hd-kernel-desktop, linux-image-amd64,
+ linux-headers-amd64 and linux-base-amd64.
  See hd-kernel-vm(7).
