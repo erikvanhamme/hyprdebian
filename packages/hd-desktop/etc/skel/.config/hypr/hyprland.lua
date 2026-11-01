@@ -231,6 +231,8 @@ hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(app .. "codium"))
 hl.bind(mainMod .. " + SPACE", hl.dsp.exec_cmd(launcher))
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(app .. terminal .. " -e wiremix"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd([[ notify-send "`date`" ]]))
+-- hd-battery is in hd-laptop; without it the key does nothing.
+hl.bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("/usr/bin/hd-battery"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("/usr/bin/hd-ask-reboot"))
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.exec_cmd("/usr/bin/hd-ask-poweroff"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("/usr/bin/hd-mount"))

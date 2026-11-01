@@ -25,6 +25,7 @@ New users get it as `~/.config/hypr/hyprland.lua`, see [hd-desktop](../packages/
 | `SUPER + SHIFT + R` | Ask to reboot |
 | `SUPER + SHIFT + H` | Ask to power off |
 | `SUPER + SHIFT + T` | Show the date and time in a notification |
+| `SUPER + SHIFT + B` | Show the battery level in a notification ([hd-laptop](../packages/hd-laptop.md); does nothing without it) |
 | `SUPER + SHIFT + M` | Select the display mode of a monitor |
 | `SUPER + M` | Mount a drive |
 | `SUPER + U` | Unmount a drive |

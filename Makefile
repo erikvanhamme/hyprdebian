@@ -74,7 +74,7 @@
 # the same time. JOBS is the number of cores by default; make all JOBS=1
 # builds one target at a time.
 
-PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-buildserver hd-base hd-installer
+PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-laptop hd-buildserver hd-base hd-installer
 # The package directories of the kernels, which make kernel builds apart from
 # make all. They only go to the package repository, not in the live ISO: the
 # installer does not install them, systems switch to them by hand for now.

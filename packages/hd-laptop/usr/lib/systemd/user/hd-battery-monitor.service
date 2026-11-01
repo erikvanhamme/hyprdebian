@@ -1,0 +1,15 @@
+# Shows notifications of the battery level and of the charger in the desktop session. Installed by
+# hd-laptop.
+[Unit]
+Description=Battery Monitor
+Documentation=man:hd-battery(1) man:hd-laptop(7)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/hd-battery --monitor
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target

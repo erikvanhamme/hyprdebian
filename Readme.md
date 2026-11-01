@@ -21,7 +21,7 @@ Feel free to experiment with it.
 8.  An application launcher for the other tools, with hd-menu.
 9.  Basic notification system using mako.
 10. Optional printing support through cups, configured via the cups web interface. See [hd-cups](docs/packages/hd-cups.md).
-11. Some laptop friendly optimization.
+11. Optional laptop support: notifications of the battery level and of the charger. See [hd-laptop](docs/packages/hd-laptop.md).
 12. Optional docker support. See [hd-docker](docs/packages/hd-docker.md).
 13. Optional QEMU/KVM support. See [hd-qemu-kvm](docs/packages/hd-qemu-kvm.md).
 14. Optional backup tool for offline hard drives and LTO tape. See [Backup tool](docs/HyprDebian/Backup%20tool.md).

@@ -1,0 +1,44 @@
+#!/usr/bin/python3
+"""postinst of hd-laptop: enables the user unit hd-battery-monitor.service, which shows
+notifications of the battery level and of the charger in the desktop session.
+
+The unit gets the steps that debhelper adds for a user unit: it is enabled for every user on its
+first installation, by its preset, and keeps the state that the admin gave it over upgrades. It
+starts at the next login. The unmask undoes the mask of a removal, see the postrm.
+"""
+
+import subprocess
+import sys
+
+# The user units of hd-laptop.
+USER_UNITS = ["hd-battery-monitor.service"]
+
+
+def enable_user_units():
+    for unit in USER_UNITS:
+        subprocess.run(["deb-systemd-helper", "--user", "unmask", unit], stdout=subprocess.DEVNULL)
+        if subprocess.run(["deb-systemd-helper", "--user", "--quiet", "was-enabled",
+                           unit]).returncode == 0:
+            subprocess.run(["deb-systemd-helper", "--user", "enable", unit],
+                           stdout=subprocess.DEVNULL)
+        else:
+            subprocess.run(["deb-systemd-helper", "--user", "update-state", unit],
+                           stdout=subprocess.DEVNULL)
+
+
+def main():
+    # configure is the only action that installs the package; the abort-* actions undo a
+    # failed upgrade or removal.
+    if len(sys.argv) < 2 or sys.argv[1] != "configure":
+        return
+
+    # The version that was configured before, empty on the first installation.
+    previous = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    enable_user_units()
+    if previous == "":
+        print("The battery monitor starts at the next login.")
+
+
+if __name__ == "__main__":
+    main()

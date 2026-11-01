@@ -1,0 +1,16 @@
+Package: hd-laptop
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, hd-desktop, libnotify-bin
+Section: admin
+Priority: optional
+Description: HyprDebian laptop support
+ Holds the parts of HyprDebian that only laptops need.
+ .
+ hd-battery shows the battery level in a notification of mako, with the
+ time left until the battery is empty or full; the key binding
+ SUPER + SHIFT + B runs it. The user unit hd-battery-monitor.service runs it
+ in the desktop session to show a notification when the battery falls to
+ 50%, 25%, 10% and 5%, and when the charger is plugged in or pulled out.

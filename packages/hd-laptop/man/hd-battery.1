@@ -1,0 +1,62 @@
+.TH HD-BATTERY 1 "November 2026" "hd-laptop" "HyprDebian"
+.SH NAME
+hd-battery \- show the battery level in a notification
+.SH SYNOPSIS
+.B hd-battery
+.RB [ \-\-monitor ]
+.SH DESCRIPTION
+.B hd-battery
+shows the level of the battery in a notification of mako, with whether the
+charger is plugged in and the battery charges, and the time left until it is
+empty or full.
+The key binding
+.B SUPER + SHIFT + B
+of the config of Hyprland of
+.BR hd-desktop (7)
+runs it; on a system without
+.BR hd-laptop (7)
+the key does nothing.
+.PP
+It reads the batteries and the chargers in
+.IR /sys/class/power_supply .
+Batteries of devices, such as a mouse, do not count; two batteries in a
+laptop count as one.
+The time left comes from the power that the batteries give, as the firmware
+tells it, so it changes with the load.
+A battery that does not tell its power gives only its level.
+.SH OPTIONS
+.TP
+.B \-\-monitor
+Watch the battery until stopped, and show a notification:
+.RS
+.IP \(bu 2
+when the battery falls to 50%, 25%, 10% and 5% on battery power, with the
+time left until it is empty;
+.IP \(bu 2
+when the charger is pulled out, with the level and the time left until the
+battery is empty;
+.IP \(bu 2
+when the charger is plugged in, with the level and the time until the battery
+is full, or that it is full or not charging;
+.IP \(bu 2
+at the start, when the laptop runs on battery power at 50% or less.
+.RE
+.IP
+Each warning is shown once until the charger is plugged in again; the
+warnings of the levels that the battery is already at or below when the
+charger is pulled out are not shown, as that notification gives the level.
+Each notification takes the place of the one before it.
+The batteries are read when the kernel sends an event of a power supply and
+every 30 seconds.
+The user unit
+.B hd-battery-monitor.service
+runs
+.B hd-battery \-\-monitor
+in the desktop session.
+.PP
+The notifications on battery power at 10% and below are critical and have
+the warning icon.
+.SH SEE ALSO
+.BR hd-laptop (7),
+.BR mako (1),
+.BR notify-send (1)

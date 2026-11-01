@@ -1,0 +1,49 @@
+.TH HD-LAPTOP 7 "November 2026" "hd-laptop" "HyprDebian"
+.SH NAME
+hd-laptop \- the parts of HyprDebian for laptops
+.SH DESCRIPTION
+The package
+.B hd-laptop
+holds the parts of HyprDebian that only laptops need.
+It depends on
+.BR hd-desktop (7),
+as its notifications are shown by mako in the desktop session.
+.SS Battery
+.BR hd-battery (1)
+shows the level of the battery in a notification, with the time left until
+it is empty or full.
+The key binding
+.B SUPER + SHIFT + B
+runs it.
+.PP
+The user unit
+.B hd-battery-monitor.service
+runs
+.B hd-battery \-\-monitor
+in the desktop session, which shows a notification when the battery falls to
+50%, 25%, 10% and 5% on battery power, and when the charger is plugged in or
+pulled out.
+The package enables the unit for every user on its first installation; it
+starts at the next login.
+Its messages are in the journal of the user:
+.PP
+.RS
+.B journalctl --user -u hd-battery-monitor
+.RE
+.PP
+To turn it off for a user:
+.PP
+.RS
+.B systemctl --user disable --now hd-battery-monitor
+.RE
+.SH FILES
+.TP
+.I /usr/bin/hd-battery
+Shows the battery level, and watches the battery with
+.BR \-\-monitor .
+.TP
+.I /usr/lib/systemd/user/hd-battery-monitor.service
+The user unit that watches the battery.
+.SH SEE ALSO
+.BR hd-battery (1),
+.BR hd-desktop (7)

@@ -1,0 +1,24 @@
+#!/bin/sh
+# postrm of hd-laptop: a removal masks the user unit hd-battery-monitor.service, whose unit file is
+# gone, so that it keeps its enabled state for a reinstall; a purge forgets that state. Written for
+# sh, as python3 may be gone by then.
+set -e
+
+USER_UNITS="hd-battery-monitor.service"
+
+if [ "$1" = "remove" ] && [ -x /usr/bin/deb-systemd-helper ]; then
+    for unit in $USER_UNITS; do
+        deb-systemd-helper --user mask "$unit" > /dev/null || true
+    done
+fi
+
+if [ "$1" != "purge" ]; then
+    exit 0
+fi
+
+if [ -x /usr/bin/deb-systemd-helper ]; then
+    for unit in $USER_UNITS; do
+        deb-systemd-helper --user purge "$unit" > /dev/null || true
+        deb-systemd-helper --user unmask "$unit" > /dev/null || true
+    done
+fi

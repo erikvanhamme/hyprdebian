@@ -33,7 +33,7 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 ### Per package
 | Package | Needs | Why |
 | --- | --- | --- |
-| `hd-base`, `hd-buildserver`, `hd-cups`, `hd-dashboard`, `hd-docker`, `hd-installer`, `hd-qemu-kvm`, `hd-repo`, `hd-report` | Only the tools above. | They only stage scripts, configs and man pages. |
+| `hd-base`, `hd-buildserver`, `hd-cups`, `hd-dashboard`, `hd-docker`, `hd-installer`, `hd-laptop`, `hd-qemu-kvm`, `hd-repo`, `hd-report` | Only the tools above. | They only stage scripts, configs and man pages. |
 | `hd-backup` | `gcc`, `libc6-dev`, `dpkg-buildflags` (dpkg-dev), `strip` (binutils); all in build-essential | Compiles `blockwrite` from `blockwrite.c` with the hardening flags of Debian, and strips it. |
 | `hd-bootloader` | `clang++` (clang), `lld-link` (lld), the headers in `/usr/include/efi` (gnu-efi) | Compiles the EFI bootloader for the target `x86_64-unknown-windows` and links it as a PE32+ image. Only the headers of gnu-efi are used. Works with gnu-efi 3.0 (trixie) and 4.0. |
 | `orcaslicer` | `wget`, ca-certificates, internet access, an amd64 computer | Downloads the OrcaSlicer 2.4.2 AppImage from GitHub once, checks its sha256 and unpacks it by running it with `--appimage-extract`, which needs no FUSE. |

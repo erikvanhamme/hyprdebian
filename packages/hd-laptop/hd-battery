@@ -1,0 +1,333 @@
+#!/usr/bin/python3
+"""Shows the battery of a laptop in a notification of mako: its level, whether it charges, and
+the time left until it is empty or full, when the battery tells it. The key binding SUPER + SHIFT +
+B of the config of Hyprland of hd-desktop runs it.
+
+With --monitor it watches the battery instead and shows a notification when the charge falls to
+50%, 25%, 10% and 5% on battery power, and when the charger is plugged in or pulled out.
+hd-battery-monitor.service runs it so in the desktop session. It reads the batteries and the
+chargers from /sys/class/power_supply: when the kernel sends an event of a power supply, which it
+does when the charger is plugged in or pulled out, and every POLL seconds, as not every battery
+sends one when its charge changes.
+
+The package hd-laptop installs this as /usr/bin/hd-battery.
+
+The batteries of the system count together; those of devices such as a mouse, with the scope
+Device, do not. The time left comes from the energy and the power that the batteries give, or
+from their charge and current. A battery that tells neither gives only its percentage.
+
+Each warning is shown once per discharge: plugging in the charger arms them again. The warnings
+of the levels that the battery is already at or below when the session starts or the charger is
+pulled out are not shown, as the notification of the start or of pulling out the charger gives
+the level. The notification at the start of the session is only shown on battery power at or below
+the highest level.
+"""
+
+import argparse
+import os
+import select
+import socket
+import subprocess
+import sys
+import time
+
+POWER_SUPPLY = "/sys/class/power_supply"
+ICON = "/usr/share/hd-desktop/icons/warning.svg"
+# The levels, in percent, at which a warning is shown, highest first.
+LEVELS = [50, 25, 10, 5]
+# The level at or below which the notifications are critical, with the warning icon.
+CRITICAL = 10
+# The seconds between two reads of the batteries without an event.
+POLL = 30
+# The seconds to wait after the charger is plugged in or pulled out, so the batteries tell the
+# power of the new state.
+SETTLE = 5
+# The tries to show a notification, and the seconds between them: mako may not be running yet at
+# the start of the session.
+TRIES = 10
+WAIT = 3
+# The netlink protocol of the events of the kernel, and its group.
+NETLINK_KOBJECT_UEVENT = 15
+KERNEL_EVENTS = 1
+# The types of the power supplies that are chargers.
+CHARGERS = ["Mains", "USB"]
+
+
+class State:
+    """The batteries and chargers at one moment."""
+
+    def __init__(self, level, plugged, charging, full, seconds):
+        # The charge of the batteries in percent, or None without a battery.
+        self.level = level
+        # True when a charger is plugged in.
+        self.plugged = plugged
+        # True when a battery is charging.
+        self.charging = charging
+        # True when every battery is full.
+        self.full = full
+        # The seconds until the batteries are empty, or full while charging, or None.
+        self.seconds = seconds
+
+
+def read(supply, name):
+    """An attribute of a power supply, or None when it does not have it."""
+    try:
+        with open(os.path.join(POWER_SUPPLY, supply, name), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def number(supply, name):
+    value = read(supply, name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def energy(supply):
+    """The energy now and when full, in µWh, and the power, in µW, of a battery, or None when it
+    tells neither its energy nor its charge and voltage."""
+    now = number(supply, "energy_now")
+    full = number(supply, "energy_full")
+    power = number(supply, "power_now")
+    if now is not None and full is not None and power is not None:
+        return now, full, abs(power)
+    voltage = number(supply, "voltage_now")
+    now = number(supply, "charge_now")
+    full = number(supply, "charge_full")
+    current = number(supply, "current_now")
+    if voltage is None or now is None or full is None or current is None:
+        return None
+    # The charge is in µAh, the current in µA and the voltage in µV.
+    return now * voltage // 1000000, full * voltage // 1000000, abs(current) * voltage // 1000000
+
+
+def supplies():
+    """The batteries of the system and the chargers, each as a list of names."""
+    try:
+        names = sorted(os.listdir(POWER_SUPPLY))
+    except OSError:
+        return [], []
+    batteries = []
+    chargers = []
+    for name in names:
+        if read(name, "scope") == "Device":
+            continue
+        kind = read(name, "type")
+        if kind == "Battery":
+            if read(name, "present") != "0":
+                batteries.append(name)
+        elif kind in CHARGERS:
+            chargers.append(name)
+    return batteries, chargers
+
+
+def state():
+    batteries, chargers = supplies()
+    statuses = [read(battery, "status") for battery in batteries]
+    charging = "Charging" in statuses
+    if chargers:
+        plugged = any(read(charger, "online") == "1" for charger in chargers)
+    else:
+        plugged = any(status in ("Charging", "Full", "Not charging") for status in statuses)
+    full = bool(statuses) and all(status == "Full" for status in statuses)
+    if not batteries:
+        return State(None, plugged, False, False, None)
+
+    energies = [energy(battery) for battery in batteries]
+    seconds = None
+    if None in energies:
+        capacities = [number(battery, "capacity") for battery in batteries]
+        if None in capacities:
+            return State(None, plugged, charging, full, None)
+        level = round(sum(capacities) / len(capacities))
+    else:
+        now = sum(e[0] for e in energies)
+        total = sum(e[1] for e in energies)
+        power = sum(e[2] for e in energies)
+        if total <= 0:
+            return State(None, plugged, charging, full, None)
+        level = min(100, round(100 * now / total))
+        if power > 0:
+            if charging:
+                seconds = max(0, total - now) * 3600 // power
+            elif not plugged:
+                seconds = now * 3600 // power
+    return State(level, plugged, charging, full, seconds)
+
+
+def duration(seconds):
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min"
+    return f"{minutes // 60} h {minutes % 60} min"
+
+
+def notify(summary, body, critical):
+    """Shows a notification, in the place of the one shown before, so they do not pile up."""
+    print(f"{summary}: {body}")
+    command = ["notify-send", "--app-name=HyprDebian", "--print-id"]
+    if critical:
+        command += [f"--icon={ICON}", "--urgency=critical"]
+    if notify.id is not None:
+        command.append(f"--replace-id={notify.id}")
+    command += [summary, body]
+    for _ in range(TRIES):
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode == 0:
+            if result.stdout.strip().isdigit():
+                notify.id = result.stdout.strip()
+            return
+        time.sleep(WAIT)
+    print(f"Could not show the notification: {result.stderr.strip()}", file=sys.stderr)
+
+
+notify.id = None
+
+
+def notify_power(current):
+    """Shows that the charger was plugged in or pulled out, or the state at the start."""
+    if current.plugged:
+        if current.charging:
+            summary = "Charging"
+            body = f"Battery at {current.level}%"
+            if current.seconds is not None:
+                body += f", full in about {duration(current.seconds)}"
+        elif current.full:
+            summary = "Plugged in"
+            body = "Battery full"
+        else:
+            summary = "Plugged in"
+            body = f"Battery at {current.level}%, not charging"
+    else:
+        summary = "On battery"
+        body = f"Battery at {current.level}%"
+        if current.seconds is not None:
+            body += f", about {duration(current.seconds)} left"
+    notify(summary, body + ".", not current.plugged and current.level <= CRITICAL)
+
+
+def notify_level(current):
+    """Shows the warning of a level."""
+    body = "On battery."
+    if current.seconds is not None:
+        body = f"About {duration(current.seconds)} left."
+    notify(f"Battery at {current.level}%", body, current.level <= CRITICAL)
+
+
+def notify_now(current):
+    """Shows the level and the state of the battery now."""
+    if current.level is None:
+        notify("Battery", "No battery found.", False)
+        return
+    if current.plugged:
+        if current.charging:
+            body = "Charging"
+            if current.seconds is not None:
+                body += f", full in about {duration(current.seconds)}"
+        elif current.full:
+            body = "Plugged in, full"
+        else:
+            body = "Plugged in, not charging"
+    else:
+        body = "On battery"
+        if current.seconds is not None:
+            body += f", about {duration(current.seconds)} left"
+    notify(f"Battery at {current.level}%", body + ".",
+           not current.plugged and current.level <= CRITICAL)
+
+
+def passed(level):
+    """The levels that the charge is at or below."""
+    return {mark for mark in LEVELS if level <= mark}
+
+
+def events():
+    """A socket with the events of the kernel, or None when it cannot be opened, so the batteries
+    are only read every POLL seconds."""
+    try:
+        sock = socket.socket(socket.AF_NETLINK, socket.SOCK_DGRAM, NETLINK_KOBJECT_UEVENT)
+        sock.bind((0, KERNEL_EVENTS))
+    except OSError as error:
+        print(f"Cannot watch the events of the kernel, reading the batteries every {POLL} "
+              f"seconds: {error}", file=sys.stderr)
+        return None
+    sock.setblocking(False)
+    return sock
+
+
+def wait(sock):
+    """Waits for an event of a power supply, or POLL seconds."""
+    deadline = time.monotonic() + POLL
+    while True:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            return
+        if sock is None:
+            time.sleep(left)
+            return
+        ready, _, _ = select.select([sock], [], [], left)
+        if not ready:
+            return
+        found = False
+        while True:
+            try:
+                data = sock.recv(65536)
+            except BlockingIOError:
+                break
+            if b"\0SUBSYSTEM=power_supply\0" in data:
+                found = True
+        if found:
+            return
+
+
+def monitor():
+    sock = events()
+    current = state()
+    warned = set()
+    if current.level is not None and not current.plugged:
+        warned = passed(current.level)
+        if warned:
+            notify_power(current)
+    while True:
+        wait(sock)
+        previous = current
+        current = state()
+        if current.plugged != previous.plugged:
+            time.sleep(SETTLE)
+            current = state()
+            if current.plugged == previous.plugged:
+                continue
+            if current.level is None:
+                continue
+            notify_power(current)
+            warned = set() if current.plugged else passed(current.level)
+            continue
+        if current.level is None or current.plugged:
+            continue
+        new = passed(current.level) - warned
+        if new:
+            notify_level(current)
+            warned |= new
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Show the battery level in a notification, or watch the battery.")
+    parser.add_argument("--monitor", action="store_true",
+                        help="show notifications of the battery level and of the charger "
+                             "when they change, until stopped")
+    args = parser.parse_args()
+
+    if args.monitor:
+        monitor()
+    else:
+        notify_now(state())
+
+
+if __name__ == "__main__":
+    main()
