@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds a HyprDebian kernel of one suite in a Debian container of that suite; kernel.mk runs it
+# Builds a HyprDebian kernel of one suite in a container of the build environment of that suite,
+# hd-kernel-buildenv:<suite> of buildenv/Dockerfile, with its build dependencies; kernel.mk runs it
 # with docker, for hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop. MODE says what
 # it does:
 #
@@ -20,10 +21,10 @@
 # release of the kernel of Debian, TAG hd for hd-kernel, hdvm for hd-kernel-vm, hdserver for
 # hd-kernel-server and hddesktop for hd-kernel-desktop, and <id> six hex digits of a sha256 of
 # everything the packages are made of: the versions of linux, zfs-linux and PACKAGE, this script,
-# the templates of zfs-modules, the control file, the man page and the keep list of PACKAGE, and
-# in the mode test the modules in /lsmod. Every build signs the modules with a key of its own, so
-# a build of anything else also gets another release: it installs next to the kernel that runs,
-# whose modules stay signed with the key it trusts.
+# the Dockerfile of the build environment, the templates of zfs-modules, the control file, the man
+# page and the keep list of PACKAGE, and in the mode test the modules in /lsmod. Every build signs
+# the modules with a key of its own, so a build of anything else also gets another release: it
+# installs next to the kernel that runs, whose modules stay signed with the key it trusts.
 #
 # A build only builds when it has to. When /out already has the three packages of the release, it
 # stops there: they only get there at the end of a build that went through. A make clean removes
@@ -142,10 +143,7 @@ keep_modules() {
   fi
 }
 
-# zfs-linux is in contrib, and apt source needs the deb-src entries. The stanzas of the security
-# updates get them too.
-sed -i -e 's/^Types: deb$/Types: deb deb-src/' -e 's/^Components: main$/Components: main contrib/' \
-  /etc/apt/sources.list.d/debian.sources
+# The build environment has the deb-src entries that apt source needs, but not the newest lists.
 apt-get update -qq
 
 KERNEL_VERSION="$(latest_source linux)"
@@ -170,7 +168,7 @@ if [[ -z "${DEBIAN_RELEASE}" ]]; then
 fi
 DEBNN="$(grep -oE '\+deb[0-9]+' <<< "${DEBIAN_RELEASE}")"
 # The sums of the files the packages are made of, by their path in /src and /package.
-inputs="$(cd /src && find build-kernel.sh deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
+inputs="$(cd /src && find build-kernel.sh buildenv deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
 package_files=("deb/${PACKAGE}" "man/${PACKAGE}.7")
 if [[ -n "${KEEP}" ]]; then
   package_files+=("${KEEP}")
@@ -226,12 +224,6 @@ if [[ -d /cache ]] && has_packages "${CACHE}/${RELEASE}"; then
   done
   exit 0
 fi
-
-echo "--> Installing build dependencies..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  build-essential bc bison flex libssl-dev libelf-dev libdw-dev kmod cpio rsync python3 perl \
-  dpkg-dev debhelper fakeroot xz-utils zstd ccache autoconf automake libtool gawk \
-  rustc rust-src bindgen pahole ca-certificates
 
 mkdir -p /work/src /work/ccache
 cd /work/src

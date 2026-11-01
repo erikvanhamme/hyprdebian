@@ -19,9 +19,11 @@ BUILD := build
 PYTHON := python3
 
 SUITES := trixie unstable
-# The docker image of each suite.
+# The docker image of each suite, which the build environment of the suite,
+# hd-kernel-buildenv:<suite> of buildenv/Dockerfile, is built on.
 IMAGE_trixie := debian:trixie
 IMAGE_unstable := debian:sid
+BUILDENV := hd-kernel-buildenv
 HD_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("version.json")); print("%d.%d" % (v["major"], v["minor"]))')
 # The modules of the test build, as lsmod prints them.
 LSMOD := ../../local-testvm/lsmod-test.txt
@@ -37,11 +39,18 @@ HD_KERNEL_CACHE ?=
 deb: $(addprefix deb-,$(SUITES))
 
 # Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work
-# directory $(BUILD)/work/$(3) and the packages into $(BUILD)/$(3). It pulls
-# the latest image of the suite every time.
+# directory $(BUILD)/work/$(3) and the packages into $(BUILD)/$(3), in a
+# container of the build environment of the suite. It builds that first, with
+# the latest image of the suite: docker only installs the build dependencies
+# again when that image has changed. Then it removes the build environments
+# that the new one replaced. Neither prints anything but errors, as make
+# sources prints only the versions.
 define run
 	mkdir -p $(BUILD)/work/$(3) $(BUILD)/$(3)
-	docker run --rm --pull always --quiet \
+	docker build --pull --quiet --build-arg IMAGE=$(IMAGE_$(2)) -t $(BUILDENV):$(2) \
+		$(KERNEL_SRC)/buildenv > /dev/null
+	docker image prune --force --filter label=org.hyprdebian.image=$(BUILDENV) > /dev/null
+	docker run --rm \
 		--memory $(MEMORY) --memory-swap $(MEMORY) \
 		-e MODE=$(1) \
 		-e SUITE=$(2) \
@@ -58,7 +67,7 @@ define run
 		-v $(CURDIR)/$(BUILD)/work/$(3):/work \
 		-v $(CURDIR)/$(BUILD)/$(3):/out \
 		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache) \
-		$(IMAGE_$(2)) bash /src/build-kernel.sh
+		$(BUILDENV):$(2) bash /src/build-kernel.sh
 endef
 
 $(addprefix deb-,$(SUITES)): deb-%:
