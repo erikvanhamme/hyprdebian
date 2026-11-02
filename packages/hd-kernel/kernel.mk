@@ -31,10 +31,13 @@ JOBS := $(shell nproc)
 MEMORY := $(shell echo $$(( $(JOBS) * 5 / 8 )))g
 HD_KERNEL_CACHE ?=
 # The work of the kernels of every package, a directory per suite, see
-# build-kernel.sh: the sources of the suite, which they share, the kernel tree
-# of each package and the ccache. Outside the package directory, so that a
+# build-kernel.sh: the sources of the suite, which they share, and the kernel
+# tree of each package; and the ccache, for every suite. Outside the package directory, so that a
 # build server can keep it outside a checkout that it cleans.
 HD_KERNEL_WORK ?= $(KERNEL_SRC)/$(BUILD)/work
+# The largest size of the ccache of the compiler, in HD_KERNEL_WORK/ccache,
+# which the kernels of every package and suite share.
+CCACHE_SIZE := 64G
 
 .PHONY: deb deb-path sources test-build clean $(addprefix deb-,$(SUITES)) $(addprefix sources-,$(SUITES))
 # One suite at a time, also under make -j of the Makefile in the root: each
@@ -51,7 +54,7 @@ deb: $(addprefix deb-,$(SUITES))
 # that the new one replaced. Neither prints anything but errors, as make
 # sources prints only the versions.
 define run
-	mkdir -p $(HD_KERNEL_WORK)/$(2) $(BUILD)/$(3)
+	mkdir -p $(HD_KERNEL_WORK)/$(2) $(HD_KERNEL_WORK)/ccache $(BUILD)/$(3)
 	docker build --pull --quiet --build-arg IMAGE=$(IMAGE_$(2)) -t $(BUILDENV):$(2) \
 		$(KERNEL_SRC)/buildenv > /dev/null
 	docker image prune --force --filter label=org.hyprdebian.image=$(BUILDENV) > /dev/null
@@ -65,12 +68,14 @@ define run
 		-e TREE=$(4) \
 		-e HD_VERSION=$(HD_VERSION) \
 		-e JOBS=$(JOBS) \
+		-e CCACHE_SIZE=$(CCACHE_SIZE) \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(KERNEL_SRC):/src:ro \
 		-v $(CURDIR):/package:ro \
 		-v $(abspath $(LSMOD)):/lsmod:ro \
 		-v $(abspath $(HD_KERNEL_WORK))/$(2):/work \
+		-v $(abspath $(HD_KERNEL_WORK))/ccache:/ccache \
 		-v $(CURDIR)/$(BUILD)/$(3):/out \
 		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache) \
 		$(BUILDENV):$(2) bash /src/build-kernel.sh

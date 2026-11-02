@@ -70,8 +70,11 @@
 #                     TREE/linux.version; it starts anew with another version
 #             TREE    also the config of Debian, the packages of make bindeb-pkg and the stages
 #                     of the other packages
-#             ccache  the ccache of the compiler
 #             lock    keeps a second build of the suite from starting before the first is done
+#   /ccache the ccache of the compiler, of every package and suite, of at most CCACHE_SIZE. It
+#           hashes neither the directory of the build nor the paths below /work, so a new
+#           version of linux, whose sources and trees have the same paths, compiles from it what
+#           it did not change
 #   /out    the packages, kept for the next build, which skips the build when they are those of
 #           its release
 #   /cache  only with HD_KERNEL_CACHE in the Makefile: the packages of earlier builds, in
@@ -89,12 +92,14 @@ MAINTAINER_NAME="Erik Van Hamme"
 MAINTAINER_EMAIL="erik.vanhamme@gmail.com"
 
 # Hands what the build writes to the user who runs make; not all of /work, which also has the
-# trees of the other packages.
+# trees of the other packages, and only the files that are not that user's yet, as the ccache
+# has many.
 chown_back() {
   local path
-  for path in /work/src /work/src/*.version "/work/${TREE}" /work/ccache /work/lock /out /cache; do
+  for path in /work/src "/work/${TREE}" /work/lock /ccache /out /cache; do
     if [[ -e "${path}" ]]; then
-      chown -R "${HOST_UID}:${HOST_GID}" "${path}"
+      find "${path}" \( ! -user "${HOST_UID}" -o ! -group "${HOST_GID}" \) \
+        -exec chown -h "${HOST_UID}:${HOST_GID}" {} +
     fi
   done
 }
@@ -254,7 +259,15 @@ if ! flock -n 9; then
   flock 9
 fi
 
-mkdir -p /work/src /work/ccache "${BUILD_DIR}"
+mkdir -p /work/src "${BUILD_DIR}"
+
+# What the layouts before /ccache and the directories per package left in /work.
+for old in ccache config zfs-deb meta-deb keep.lsmod; do
+  if [[ -e "/work/${old}" ]]; then
+    rm -rf "/work/${old:?}"
+  fi
+done
+
 cd /work/src
 
 # Everything else in src is of no use any more: the trees of the layout before src/linux, and
@@ -357,7 +370,9 @@ rm -f certs/signing_key.pem certs/signing_key.x509
 echo "--> Building the kernel..."
 # make bindeb-pkg puts the packages next to the kernel tree, in the directory of the build.
 rm -f "${BUILD_DIR}"/*.deb "${BUILD_DIR}"/*.buildinfo "${BUILD_DIR}"/*.changes
-export CCACHE_DIR=/work/ccache
+export CCACHE_DIR=/ccache CCACHE_MAXSIZE="${CCACHE_SIZE}" CCACHE_NOHASHDIR=true CCACHE_BASEDIR=/work
+# The statistics at the end are those of this build.
+ccache --zero-stats > /dev/null
 export DEBFULLNAME="${MAINTAINER_NAME}" DEBEMAIL="${MAINTAINER_EMAIL}"
 export KBUILD_BUILD_USER=hyprdebian KBUILD_BUILD_HOST="${PACKAGE}"
 time kmake -j"${JOBS}" CC="ccache gcc" KDEB_PKGVERSION="${KERNEL_DEB_VERSION}" \

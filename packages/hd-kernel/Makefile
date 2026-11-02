@@ -54,12 +54,14 @@
 # The kernels of every package, of hd-kernel-vm, hd-kernel-server and
 # hd-kernel-desktop too, work in HD_KERNEL_WORK, build/work here by default: a
 # directory per suite, with the sources of linux and zfs-linux of the suite,
-# which they share, the kernel tree of each package and the ccache of the
-# compiler. So a build of the same versions only compiles what changed, and a
-# new version is unpacked once for every package. One build of a suite runs
-# at a time. The container gets at most MEMORY of memory, 5/8 GB per job, so that when the
-# compilers need more, the kernel kills the build and not other programs; set
-# JOBS lower for a machine with less memory free.
+# which they share, and the kernel tree of each package, and the ccache of the
+# compiler of every suite, of at most 64 GB, which also serves a new version
+# of linux the files that it did not change. So a build of the same versions
+# only compiles what changed, and a new version is unpacked once for every
+# package. One build of a suite runs at a time. The container gets at most
+# MEMORY of memory, 5/8 GB per job, so that when the compilers need more, the
+# kernel kills the build and not other programs; set JOBS lower for a machine
+# with less memory free.
 
 PACKAGE := hd-kernel
 TAG := hd
