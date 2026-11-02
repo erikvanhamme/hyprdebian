@@ -328,13 +328,13 @@ cd "${OBJ_DIR}"
 cp "${BUILD_DIR}/config/debian.config" .config
 kmake olddefconfig
 
+# Prints the options that the config $1 has on, as y or m, sorted.
+options_on() {
+  grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' "$1" | cut -d= -f1 | LC_ALL=C sort -u
+}
+
 if [[ "${MODE}" == "full" ]]; then
-  missing="$(grep -E '^CONFIG_[A-Z0-9_]+=[ym]$' "${BUILD_DIR}/config/debian.config" | cut -d= -f1 \
-    | while read -r option; do
-        if ! grep -qE "^${option}=[ym]$" .config; then
-          echo "${option}"
-        fi
-      done)"
+  missing="$(LC_ALL=C comm -23 <(options_on "${BUILD_DIR}/config/debian.config") <(options_on .config))"
   if [[ -n "${missing}" ]]; then
     echo "These options of the config of Debian are off in the config of the build:" >&2
     echo "${missing}" >&2
