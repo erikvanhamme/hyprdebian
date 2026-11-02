@@ -7,9 +7,16 @@ The ESPs are /boot/efi and, on systems with mirrored drives, /boot/efi2 when it 
 be automounted. All ESPs are checked before any is written, and a missing one fails this
 script, which makes the kernel package or apt fail: a system with a missing drive should not be
 upgraded.
+
+While dpkg switches to the package of the other frontend, this does nothing: the settings are still
+those of the package that is gone until the postinst of the new one stores its own, so no frontend
+can write the ESPs, and another package that rebuilds an initrd in the same run, such as plymouth,
+would fail. That postinst has the ESPs written once dpkg is done. Settings of the other frontend
+with the package configured are an error, which hd-bootloader-update reports.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -17,11 +24,35 @@ import sys
 UPDATE = "/usr/sbin/hd-bootloader-update"
 ESP = "/boot/efi"
 ESP2 = "/boot/efi2"
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+CONFIG_KEY = "hd-bootloader"
+DEFAULTS_FILE = "/usr/share/hd-bootloader/defaults.json"
+# The frontend of settings without the key frontend, as in update-bootloader.py.
+DEFAULT_FRONTEND = "graphical"
+# The states of a package that dpkg unpacked and whose postinst did not finish.
+NOT_CONFIGURED = ["install ok unpacked", "install ok half-configured"]
 
 
 def fail(message):
     print(f"hd-bootloader: {message}", file=sys.stderr)
     sys.exit(1)
+
+
+def switching_frontend():
+    """True when the package is not configured yet and the settings are of the other frontend."""
+    states = subprocess.run(["dpkg-query", "-W", "-f", "${Status}\n", "hd-bootloader-*"],
+                            capture_output=True, text=True).stdout.splitlines()
+    if not any(state in NOT_CONFIGURED for state in states):
+        return False
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            settings = json.load(f)[CONFIG_KEY]
+        with open(DEFAULTS_FILE, encoding="utf-8") as f:
+            frontend = json.load(f)["frontend"]
+        return settings.get("frontend", DEFAULT_FRONTEND) != frontend
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        # hd-bootloader-update says what is wrong with them.
+        return False
 
 
 def check(esp):
@@ -46,6 +77,11 @@ def main():
         description=f"Run {UPDATE} for {ESP} and, when it exists, {ESP2}.").parse_args()
     if os.geteuid() != 0:
         fail("must be run as root")
+
+    if switching_frontend():
+        print("hd-bootloader: the package of the new frontend is not configured yet; "
+              "not updating the EFI system partitions", file=sys.stderr)
+        return
 
     esps = [ESP]
     if os.path.isdir(ESP2):

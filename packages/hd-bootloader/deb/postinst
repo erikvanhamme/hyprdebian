@@ -9,8 +9,11 @@ bootloader in the key hd-bootloader of /etc/hyprdebian/config.json with hd-confi
                                 frontend no longer uses, which are removed: those of the
                                 graphical frontend that the theme of the system replaced
 
-The ESPs are not updated: that happens with the next kernel or initrd, or by running
-/usr/lib/hd-bootloader/update-esps.
+The ESPs are not updated here, as they need not be mounted yet: that happens with the next kernel
+or initrd, or by running /usr/lib/hd-bootloader/update-esps. After a switch of frontend it happens
+at once: the package activates the trigger update-initramfs of initramfs-tools, which rebuilds the
+initrd once dpkg is done, and with it the hook of the bootloader writes the ESPs. update-esps did
+nothing until now, also for the initrd of a package installed in the same run.
 """
 
 import json
@@ -50,6 +53,7 @@ def main():
     with open(DEFAULTS_FILE, encoding="utf-8") as f:
         defaults = json.load(f)
     current = current_settings()
+    switched = False
 
     if not isinstance(current, dict):
         print(f"Storing the default bootloader settings in {CONFIG_FILE}.")
@@ -58,6 +62,7 @@ def main():
         print(f"Storing the bootloader settings of the {defaults['frontend']} frontend in "
               f"{CONFIG_FILE}, keeping {', '.join(COMMON_KEYS)}.")
         settings = dict(defaults)
+        switched = True
         for key in COMMON_KEYS:
             if key in current:
                 settings[key] = current[key]
@@ -73,7 +78,11 @@ def main():
 
     if settings is not None:
         subprocess.run([CONFIG_UPDATE, CONFIG_KEY, json.dumps(settings)], check=True)
-    print(f"The EFI system partitions are not updated now; run {UPDATE_ESPS} to update them.")
+    if switched:
+        subprocess.run(["dpkg-trigger", "--no-await", "update-initramfs"], check=True)
+        print("The EFI system partitions are updated when the initrd is rebuilt, once dpkg is done.")
+    else:
+        print(f"The EFI system partitions are not updated now; run {UPDATE_ESPS} to update them.")
 
 
 if __name__ == "__main__":

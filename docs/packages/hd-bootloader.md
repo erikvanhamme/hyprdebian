@@ -75,6 +75,8 @@ The postinst does not write the ESPs. That happens with the next kernel or initr
 sudo /usr/lib/hd-bootloader/update-esps
 ```
 
+After a switch of frontend it happens at once: the postinst activates the trigger `update-initramfs` of `initramfs-tools`, which rebuilds the initrd once dpkg is done, and the hook of the package then writes the ESPs. Until the postinst has run, the settings are those of the package that is gone, so `update-esps` does nothing; this lets a switch be installed together with packages that rebuild an initrd, as `hd-desktop` with `hd-bootloader-gfx`. Settings of the other frontend with the package configured stay an error.
+
 ## Settings
 The key `hd-bootloader` holds a JSON object, as `hd-bootloader-gfx` stores it:
 ```

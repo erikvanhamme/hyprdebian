@@ -71,6 +71,14 @@ That happens with the next kernel or initrd, or by running:
 .RS
 /usr/lib/hd-bootloader/update-esps
 .RE
+.PP
+After a switch of frontend it happens at once: the postinst has the initrd rebuilt once dpkg is done, which writes the ESPs.
+Until the postinst has run,
+.I update-esps
+does nothing, so the switch can be installed together with packages that rebuild an initrd, as
+.B hd-desktop
+with
+.BR hd-bootloader-gfx .
 .SH SETTINGS
 The key
 .B hd-bootloader

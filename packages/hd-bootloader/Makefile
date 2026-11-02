@@ -45,7 +45,9 @@
 #               with the control file deb/<package>/control and the postinst
 #               deb/postinst, which stores the default settings in the key
 #               hd-bootloader of /etc/hyprdebian/config.json with
-#               hd-config-update. It does not update the ESPs. The gfx
+#               hd-config-update. It does not update the ESPs, but for a
+#               switch of frontend, when it activates the trigger
+#               update-initramfs, whose hook updates them. The gfx
 #               package depends on hd-desktop for the theme of the system,
 #               its backgrounds and its font; the txt package needs none of
 #               them. Raise the
