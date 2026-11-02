@@ -85,7 +85,9 @@ and
 .B linux-headers-amd64
 and
 .BR linux-base-amd64 ,
-so the other kernels get no more upgrades.
+so the other kernels get no more upgrades, and
+.BR zfs-dkms ,
+so DKMS builds no ZFS module that the kernel does not trust.
 After the installation the bootloader shows the new kernel at the top of its
 menu, with
 .B -hd
@@ -106,7 +108,7 @@ or to that of Debian:
 .RS
 sudo apt install hd-kernel
 .br
-sudo apt install linux-image-amd64 linux-headers-amd64
+sudo apt install linux-image-amd64 linux-headers-amd64 zfs-dkms
 .RE
 .PP
 Either removes

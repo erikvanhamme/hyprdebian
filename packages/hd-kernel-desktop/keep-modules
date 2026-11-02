@@ -165,7 +165,6 @@ scsi_transport_fc
 cdrom
 nvme_core
 nvme_auth
-nvme_keyring
 drm
 drm_kms_helper
 drm_display_helper

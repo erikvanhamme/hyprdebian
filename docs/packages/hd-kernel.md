@@ -3,7 +3,7 @@ The package `hd-kernel` switches a HyprDebian system to the HyprDebian kernel: t
 
 Every build signs the modules of the kernel and the ZFS module with a key that it makes for the build and then throws away. The kernel trusts that key and no other for its modules, so under Secure Boot not even root can load a module that the build did not sign. With DKMS, the key the kernel trusts for the ZFS module lies on every system, readable by root.
 
-For now a system switches when its admin installs `hd-kernel`; `hd-base` still depends on `zfs-dkms`, which builds nothing for these kernels as long as their headers are not installed.
+For now a system switches when its admin installs `hd-kernel`. `hd-base` depends on `zfs-dkms` or `zfs-modules`; a system without the HyprDebian kernel gets `zfs-dkms`, and the HyprDebian kernels conflict with it, so DKMS builds no ZFS module that the kernel does not trust, not even when their headers are installed.
 
 ## The packages
 `make deb` builds four packages for each suite, `trixie` and `unstable`, each only for the repository of its suite:
@@ -13,7 +13,7 @@ For now a system switches when its admin installs `hd-kernel`; `hd-base` still d
 | `linux-image-<release>` | The kernel and its modules. |
 | `zfs-modules-<release>` | `zfs.ko` and `spl.ko` in `/lib/modules/<release>/extra/zfs`. It provides `zfs-modules`, which `zfs-initramfs` takes in place of `zfs-dkms`, and adds the module to the initrd of its kernel. |
 | `linux-headers-<release>` | The headers of the kernel, for DKMS, which no package depends on: `sudo apt install linux-headers-$(uname -r)` installs those of the kernel that runs. |
-| `hd-kernel` | Depends on the exact versions of the kernel and its ZFS module, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, and installs the man page `man hd-kernel`. |
+| `hd-kernel` | Depends on the exact versions of the kernel and its ZFS module, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64`, `linux-headers-amd64`, `linux-base-amd64` and `zfs-dkms`, and installs the man page `man hd-kernel`. |
 
 The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, and `<id>` six hex digits of a sha256 of everything the packages are made of: the versions of `linux`, `zfs-linux` and `hd-kernel`, `build-kernel.sh` and the files in `deb/` and `man/`. A build of anything else has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
 
@@ -25,7 +25,7 @@ On a system with `hd-base`:
 sudo apt install hd-kernel
 ```
 
-This installs the kernel and its ZFS module, and removes `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader. Once it boots, the kernels of Debian can go:
+This installs the kernel and its ZFS module, and removes `zfs-dkms`, and `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader. Once it boots, the kernels of Debian can go:
 ```
 sudo apt purge linux-image-<version>-amd64 linux-headers-<version>-amd64
 sudo apt autoremove --purge
@@ -35,10 +35,10 @@ The second command removes the packages that those two pulled in, such as `linux
 
 To switch back to the kernel of Debian, which gets its ZFS module from `zfs-dkms` again:
 ```
-sudo apt install linux-image-amd64 linux-headers-amd64
+sudo apt install linux-image-amd64 linux-headers-amd64 zfs-dkms
 ```
 
-This removes `hd-kernel`; the HyprDebian kernels stay until they are purged.
+This removes `hd-kernel`; the HyprDebian kernels stay until they are purged, with their ZFS modules.
 
 ## Building the packages
 The packages are built from `packages/hd-kernel` in this repository:

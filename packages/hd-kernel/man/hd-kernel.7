@@ -62,7 +62,10 @@ This removes
 .B linux-headers-amd64
 and
 .BR linux-base-amd64 ,
-so the kernels of Debian get no more upgrades, and the HyprDebian kernels with
+so the kernels of Debian get no more upgrades, and
+.BR zfs-dkms ,
+so DKMS builds no ZFS module that the kernel does not trust, not even when its
+headers are installed; and the HyprDebian kernels with
 only the modules of one kind of system:
 .BR hd-kernel-vm ,
 for KVM virtual machines,
@@ -99,12 +102,12 @@ To switch back to the kernel of Debian, which gets its ZFS module from
 again:
 .PP
 .RS
-sudo apt install linux-image-amd64 linux-headers-amd64
+sudo apt install linux-image-amd64 linux-headers-amd64 zfs-dkms
 .RE
 .PP
 This removes
 .BR hd-kernel ;
-the HyprDebian kernels stay until they are purged.
+the HyprDebian kernels stay until they are purged, with their ZFS modules.
 .SH FILES
 .TP
 .IR /boot/vmlinuz- release
