@@ -15,6 +15,9 @@
 #   hd-kernel-server_<version>_amd64.deb
 #               depends on both, with the man page in man/; installing it
 #               switches a server to the kernel of HyprDebian for servers
+#   linux-headers-<release>_<version>_amd64.deb
+#               the headers of the kernel, for DKMS, which nothing depends
+#               on
 #
 # with the control file in deb/. The release is <x.y.z>+debNN-hdserver<id>-amd64,
 # <id> from the versions of linux, zfs-linux and hd-kernel-server, the files

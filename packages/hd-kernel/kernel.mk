@@ -48,11 +48,11 @@ deb: $(addprefix deb-,$(SUITES))
 
 # Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work of
 # the suite in HD_KERNEL_WORK, the tree of the build in its directory $(4) and
-# the packages into $(BUILD)/$(3), in a container of the build environment of the suite. It builds that first, with
-# the latest image of the suite: docker only installs the build dependencies
-# again when that image has changed. Then it removes the build environments
-# that the new one replaced. Neither prints anything but errors, as make
-# sources prints only the versions.
+# the packages into $(BUILD)/$(3), in a container of the build environment of
+# the suite. It builds that first, with the latest image of the suite: docker
+# only installs the build dependencies again when that image has changed. Then
+# it removes the build environments that the new one replaced. Neither prints
+# anything but errors, as make sources prints only the versions.
 define run
 	mkdir -p $(HD_KERNEL_WORK)/$(2) $(HD_KERNEL_WORK)/ccache $(BUILD)/$(3)
 	docker build --pull --quiet --build-arg IMAGE=$(IMAGE_$(2)) -t $(BUILDENV):$(2) \

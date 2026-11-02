@@ -17,6 +17,9 @@
 #               depends on both, with the man page in man/; installing it
 #               switches a desktop or laptop to the kernel of HyprDebian for
 #               desktops
+#   linux-headers-<release>_<version>_amd64.deb
+#               the headers of the kernel, for DKMS, which nothing depends
+#               on
 #
 # with the control file in deb/. The release is
 # <x.y.z>+debNN-hddesktop<id>-amd64, <id> from the versions of linux,

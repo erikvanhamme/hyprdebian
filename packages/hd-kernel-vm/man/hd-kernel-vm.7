@@ -44,6 +44,14 @@ those of software: loop, zram and nbd, device mapper and RAID, and the network
 devices of containers, virtual machines, VPNs and bonds, such as tun, veth,
 macvlan, vxlan, wireguard and vhost.
 .PP
+The headers of each kernel, for DKMS, are in
+.BI linux-headers- release\fR,
+which no package depends on; to build modules for the kernel that runs:
+.PP
+.RS
+sudo apt install linux-headers-$(uname -r)
+.RE
+.PP
 The release is
 .IB x.y.z +debNN-hdvm id -amd64\fR,
 such as

@@ -17,6 +17,9 @@
 #                               depends on both, with the man page in man/;
 #                               installing it switches a system to the
 #                               kernel of HyprDebian
+#                 linux-headers-<release>_<version>_amd64.deb
+#                               the headers of the kernel, for DKMS,
+#                               which nothing depends on
 #               with the control files and maintainer scripts in deb/. The
 #               release is <x.y.z>+debNN-hd<id>-amd64, <id> from the versions
 #               of linux, zfs-linux and hd-kernel; the versions of the

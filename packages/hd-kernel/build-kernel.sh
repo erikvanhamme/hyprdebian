@@ -11,11 +11,13 @@
 #
 # A build gets the source packages and the config of Debian for amd64, linux-config-<series> of the
 # same source, and builds the kernel with the patches of Debian, then the ZFS module against that
-# kernel tree as DKMS would, and makes three packages in /out:
+# kernel tree as DKMS would, and makes four packages in /out:
 #
 #   linux-image-<release>_<version>_amd64.deb     the kernel and its modules
 #   zfs-modules-<release>_<version>_amd64.deb     zfs.ko and spl.ko, in extra/zfs
 #   <PACKAGE>_<version>_amd64.deb                 depends on both, see deb/<PACKAGE>/control
+#   linux-headers-<release>_<version>_amd64.deb   the headers of the kernel, for DKMS, which
+#                                                 nothing depends on
 #
 # PACKAGE is one of those four. The release is <x.y.z>+debNN-<TAG><id>-amd64: debNN as in the
 # release of the kernel of Debian, TAG hd for hd-kernel, hdvm for hd-kernel-vm, hdserver for
@@ -26,7 +28,7 @@
 # the modules with a key of its own, so a build of anything else also gets another release: it
 # installs next to the kernel that runs, whose modules stay signed with the key it trusts.
 #
-# A build only builds when it has to. When /out already has the three packages of the release, it
+# A build only builds when it has to. When /out already has the four packages of the release, it
 # stops there: they only get there at the end of a build that went through. A make clean removes
 # them, and with them the reason to skip. Otherwise, when /cache has them, it copies them from
 # there. Only then does it build, and first removes the packages of other releases from /out.
@@ -218,6 +220,7 @@ BUILD_DIR="/work/${TREE}"
 OBJ_DIR="${BUILD_DIR}/linux"
 PACKAGES=(
   "linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
+  "linux-headers-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
   "zfs-modules-${RELEASE}_${ZFS_DEB_VERSION}_amd64.deb"
   "${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
 )
@@ -225,7 +228,7 @@ CACHE="/cache/${PACKAGE}/${SUITE}"
 
 echo "--> ${PACKAGE} of ${SUITE}: linux ${KERNEL_VERSION}, zfs-linux ${ZFS_VERSION}, release ${RELEASE}"
 
-# True when the directory $1 has the three packages of the release.
+# True when the directory $1 has the four packages of the release.
 has_packages() {
   local package
   for package in "${PACKAGES[@]}"; do
@@ -375,6 +378,9 @@ export CCACHE_DIR=/ccache CCACHE_MAXSIZE="${CCACHE_SIZE}" CCACHE_NOHASHDIR=true 
 ccache --zero-stats > /dev/null
 export DEBFULLNAME="${MAINTAINER_NAME}" DEBEMAIL="${MAINTAINER_EMAIL}"
 export KBUILD_BUILD_USER=hyprdebian KBUILD_BUILD_HOST="${PACKAGE}"
+# Not the package of the debug info, linux-image-<release>-dbg, which goes nowhere: it takes an
+# objcopy of every module, one after the other, and a compression of gigabytes.
+export DEB_BUILD_PROFILES="pkg.linux-upstream.nokerneldbg"
 time kmake -j"${JOBS}" CC="ccache gcc" KDEB_PKGVERSION="${KERNEL_DEB_VERSION}" \
   KDEB_CHANGELOG_DIST="${SUITE}" bindeb-pkg
 kernelrelease="$(kmake -s --no-print-directory kernelrelease)"
@@ -383,6 +389,7 @@ if [[ "${kernelrelease}" != "${RELEASE}" ]]; then
   exit 1
 fi
 image_deb="${BUILD_DIR}/linux-image-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
+headers_deb="${BUILD_DIR}/linux-headers-${RELEASE}_${KERNEL_DEB_VERSION}_amd64.deb"
 
 # The modules of the kernel, from modules.order, and those built in, from modules.builtin, with _
 # for - as lsmod prints them. In the mode test, localmodconfig turned off what /lsmod has not.
@@ -471,7 +478,7 @@ dpkg-deb --root-owner-group --build "${stage}" "${meta_deb}"
 
 # The packages go to /out last, so a build that stops halfway leaves none there.
 echo "--> Copying the packages to /out..."
-install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" /out/
+install -m 0644 "${image_deb}" "${headers_deb}" "${zfs_deb}" "${meta_deb}" /out/
 
 # Into a directory of another name first, so the cache never has a release with only some of its
 # packages.
@@ -479,7 +486,7 @@ if [[ -d /cache ]]; then
   echo "--> Storing the packages of ${RELEASE} in the cache..."
   rm -rf "${CACHE}.new"
   install -d "${CACHE}.new/${RELEASE}"
-  install -m 0644 "${image_deb}" "${zfs_deb}" "${meta_deb}" "${CACHE}.new/${RELEASE}/"
+  install -m 0644 "${image_deb}" "${headers_deb}" "${zfs_deb}" "${meta_deb}" "${CACHE}.new/${RELEASE}/"
   rm -rf "${CACHE}"
   mv "${CACHE}.new" "${CACHE}"
 fi
