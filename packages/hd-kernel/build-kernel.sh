@@ -70,7 +70,10 @@
 #                     ZFS builds in src/zfs-linux for one kernel after another
 #             TREE/linux
 #                     the kernel tree of this build, of make O=, with the version of linux in
-#                     TREE/linux.version; it starts anew with another version
+#                     TREE/linux.version; it starts anew with another version, and when
+#                     TREE/linux.building is there: a build makes that before it changes the tree
+#                     and removes it once its packages are made, so it is left behind by a build
+#                     that stopped halfway, which may have cut off a file of the tree
 #             TREE    also the config of Debian, the packages of make bindeb-pkg and the stages
 #                     of the other packages
 #             lock    keeps a second build of the suite from starting before the first is done
@@ -308,6 +311,13 @@ get_source zfs-linux "${ZFS_VERSION}"
 
 # The kernel tree of this build starts anew with another version of linux: the files of a new
 # source have the times of the source package, which can be older than the objects of the tree.
+# It also does after a build that did not finish, as a file that build cut off would stop every
+# build after it; the ccache makes up for most of the compiling.
+if [[ -e "${OBJ_DIR}.building" ]]; then
+  echo "--> The last build of ${TREE} did not finish, starting its kernel tree anew..."
+  rm -rf "${OBJ_DIR}" "${OBJ_DIR}.version"
+fi
+touch "${OBJ_DIR}.building"
 if [[ ! -f "${OBJ_DIR}.version" || "$(< "${OBJ_DIR}.version")" != "${KERNEL_VERSION}" ]]; then
   rm -rf "${OBJ_DIR}"
   mkdir -p "${OBJ_DIR}"
@@ -477,6 +487,9 @@ chmod 0644 "${stage}/usr/share/man/man7/${PACKAGE}.7.gz"
 fill "/package/deb/${PACKAGE}/control" "${stage}/DEBIAN/control" "${stage}"
 meta_deb="${BUILD_DIR}/${PACKAGE}_${META_DEB_VERSION}_amd64.deb"
 dpkg-deb --root-owner-group --build "${stage}" "${meta_deb}"
+
+# The kernel tree is whole now.
+rm -f "${OBJ_DIR}.building"
 
 # The packages go to /out last, so a build that stops halfway leaves none there.
 echo "--> Copying the packages to /out..."
