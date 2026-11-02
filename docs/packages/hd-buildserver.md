@@ -75,7 +75,7 @@ A build passes `HD_KERNEL_WORK=/var/lib/hd-buildserver/kernel-work` too, outside
 The Rust packages, `hd-desktop`, `hd-audacious` and the live cd build in containers of their own. The build container gets the docker socket of the host for them, and the checkout is at the same path in the container as on the host, so the paths those builds hand to docker are right. With the docker socket, the build can do anything on the build server that root can: only build branches you trust.
 
 ## The timer
-`hd-buildserver.timer` runs `hd-buildserver.service` every night at 3:00, with up to 30 minutes of random delay, and catches up on a night the system was off. The service runs `hd-buildserver` as the user `hd-buildserver`, and stops a build after 12 hours. The timer is enabled on the first installation, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it. To stop the nightly builds:
+`hd-buildserver.timer` runs `hd-buildserver.service` every night at 5:00, after the backups of the virtual machines of `hd-backup-vms.timer` at 3:30 and the upgrade of `hd-up.timer` on Tuesday at 4:30, and catches up on a night the system was off. The service runs `hd-buildserver` as the user `hd-buildserver`, and stops a build after 12 hours. The timer is enabled on the first installation, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it. To stop the nightly builds:
 ```
 sudo systemctl disable --now hd-buildserver.timer
 ```

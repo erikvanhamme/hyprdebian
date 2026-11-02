@@ -71,8 +71,11 @@ same commit again.
 .B hd-buildserver.timer
 runs it through
 .B hd-buildserver.service
-every night at 3:00, with up to 30 minutes of random delay, and catches up on a
-night the system was off.
+every night at 5:00, after the backups of the virtual machines of
+.B hd-backup-vms.timer
+at 3:30 and the upgrade of
+.B hd-up.timer
+on Tuesday at 4:30, and catches up on a night the system was off.
 The package enables the timer on its first installation; after that, it stays
 as the admin left it.
 A build that fails or takes longer than 12 hours fails the service, and the

@@ -2,10 +2,11 @@
 Description=Build HyprDebian and Update the Package Repository Every Night
 Documentation=man:hd-buildserver(8)
 
-# Persistent catches up on a night the system was off.
+# At 5:00, after the backups of the virtual machines of hd-backup-vms.timer at 3:30 and the
+# upgrade of hd-up.timer on Tuesday at 4:30, so a build neither runs during a backup nor during
+# an upgrade of the system or the repository. Persistent catches up on a night the system was off.
 [Timer]
-OnCalendar=*-*-* 03:00
-RandomizedDelaySec=30min
+OnCalendar=*-*-* 05:00
 Persistent=true
 
 [Install]
