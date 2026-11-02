@@ -20,8 +20,9 @@
 #                                                 nothing depends on
 #
 # PACKAGE is one of those four. The release is <x.y.z>+debNN-<TAG><id>-amd64: debNN as in the
-# release of the kernel of Debian, TAG hd for hd-kernel, hdvm for hd-kernel-vm, hdserver for
-# hd-kernel-server and hddesktop for hd-kernel-desktop, and <id> six hex digits of a sha256 of
+# release of the kernel of Debian, with its .N when it has one, such as deb13.1, TAG hd for
+# hd-kernel, hdvm for hd-kernel-vm, hdserver for hd-kernel-server and hddesktop for
+# hd-kernel-desktop, and <id> six hex digits of a sha256 of
 # everything the packages are made of: the versions of linux, zfs-linux and PACKAGE, this script,
 # the Dockerfile of the build environment, the templates of zfs-modules, the control file, the man
 # page and the keep list of PACKAGE, and in the mode test the modules in /lsmod. Every build signs
@@ -181,16 +182,17 @@ fi
 UPSTREAM="${KERNEL_VERSION%-*}"
 SERIES="$(cut -d. -f1-2 <<< "${UPSTREAM}")"
 ZFS_UPSTREAM="${ZFS_VERSION%-*}"
-# The debNN of the release of the kernel of Debian, from the name of its package in the record of
-# that version.
+# The debNN of the release of the kernel of Debian, with its .N when it has one, from the name of
+# its package in the record of that version. No such name is no output of the grep, not a failure
+# of the pipe, so that the message below tells what is wrong.
 DEBIAN_RELEASE="$(apt-cache showsrc --only-source linux \
   | awk -v version="${KERNEL_VERSION}" 'BEGIN { RS = "" } index($0, "\nVersion: " version "\n")' \
-  | grep -oE "linux-image-${UPSTREAM//./\\.}\+deb[0-9]+-amd64" | sed -n 1p)"
+  | { grep -oE "linux-image-${UPSTREAM//./\\.}\+deb[0-9]+(\.[0-9]+)?-amd64" || true; } | sed -n 1p)"
 if [[ -z "${DEBIAN_RELEASE}" ]]; then
   echo "No linux-image-${UPSTREAM}+debNN-amd64 in linux ${KERNEL_VERSION}" >&2
   exit 1
 fi
-DEBNN="$(grep -oE '\+deb[0-9]+' <<< "${DEBIAN_RELEASE}")"
+DEBNN="$(grep -oE '\+deb[0-9]+(\.[0-9]+)?' <<< "${DEBIAN_RELEASE}")"
 # The sums of the files the packages are made of, by their path in /src and /package.
 inputs="$(cd /src && find build-kernel.sh buildenv deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
 package_files=("deb/${PACKAGE}" "man/${PACKAGE}.7")
