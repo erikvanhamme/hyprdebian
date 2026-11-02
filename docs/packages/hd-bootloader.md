@@ -21,7 +21,7 @@ cd packages/hd-bootloader
 make deb
 ```
 
-This builds `build/hd-bootloader-gfx_<version>_amd64.deb` and `build/hd-bootloader-txt_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. Building needs `clang`, `lld`, `gnu-efi` and `systemd-ukify`.
+This builds `build/hd-bootloader-gfx_<version>_amd64.deb` and `build/hd-bootloader-txt_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. `hd-bootloader-gfx` goes only to the repository of `unstable`, as `hd-desktop` that it depends on; `hd-bootloader-txt` goes to `trixie` and `unstable`. Building needs `clang`, `lld`, `gnu-efi` and `systemd-ukify`.
 
 | Package | Depends on |
 | --- | --- |

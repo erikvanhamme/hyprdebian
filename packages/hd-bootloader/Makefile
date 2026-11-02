@@ -53,7 +53,9 @@
 #               out.
 #   make deb-path
 #               print the paths of the packages that make deb builds,
-#               relative to this directory, for the Makefile in the root
+#               relative to this directory, for the Makefile in the root;
+#               a package with REPOS_<package> as <repos>:<path>, as it only
+#               goes to those repos, not to the repos of deploy.json
 #   make clean  remove build/
 
 BUILD := build
@@ -66,6 +68,9 @@ FRONTENDS := graphical text
 PACKAGES := gfx txt
 FRONTEND_gfx := graphical
 FRONTEND_txt := text
+# The repos of a package that does not go to every repo of deploy.json: the gfx
+# package depends on hd-desktop, which only unstable has.
+REPOS_gfx := unstable
 TARGETS := $(FRONTENDS:%=$(BUILD)/bootx64-%.efi)
 ASSETS_STUB := $(BUILD)/assets.efi
 ESP := $(BUILD)/esp
@@ -192,7 +197,7 @@ $(IMAGE): $(ESP_STAMP)
 deb: $(DEBS)
 
 deb-path:
-	@echo $(DEBS)
+	@echo $(foreach package,$(PACKAGES),$(if $(REPOS_$(package)),$(REPOS_$(package)):)$(BUILD)/$(DEB_NAME)-$(package)_$(DEB_VERSION)_amd64.deb)
 
 # Each package is built from a staged root in build/deb-<package>.
 # update-bootloader.py finds its helpers, bootx64-<frontend>.efi and

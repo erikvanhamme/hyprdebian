@@ -3,7 +3,9 @@ The package `hd-kernel` switches a HyprDebian system to the HyprDebian kernel: t
 
 Every build signs the modules of the kernel and the ZFS module with a key that it makes for the build and then throws away. The kernel trusts that key and no other for its modules, so under Secure Boot not even root can load a module that the build did not sign. With DKMS, the key the kernel trusts for the ZFS module lies on every system, readable by root.
 
-For now a system switches when its admin installs `hd-kernel`. `hd-base` depends on `zfs-dkms` or `zfs-modules`; a system without the HyprDebian kernel gets `zfs-dkms`, and the HyprDebian kernels conflict with it, so DKMS builds no ZFS module that the kernel does not trust, not even when their headers are installed.
+Three more packages have the same kernel with only the modules of one kind of system, and are built and installed the same way: [hd-kernel-vm](hd-kernel-vm.md) for KVM virtual machines, [hd-kernel-server](hd-kernel-server.md) for servers and [hd-kernel-desktop](hd-kernel-desktop.md) for desktops and laptops. The four conflict with each other, so a system has one of them.
+
+For now a system switches when its admin installs `hd-kernel` or one of the others. `hd-base` depends on `zfs-dkms` or `zfs-modules`; a system without the HyprDebian kernel gets `zfs-dkms`, and the HyprDebian kernels conflict with it, so DKMS builds no ZFS module that the kernel does not trust, not even when their headers are installed.
 
 ## The packages
 `make deb` builds four packages for each suite, `trixie` and `unstable`, each only for the repository of its suite:
@@ -13,11 +15,23 @@ For now a system switches when its admin installs `hd-kernel`. `hd-base` depends
 | `linux-image-<release>` | The kernel and its modules. |
 | `zfs-modules-<release>` | `zfs.ko` and `spl.ko` in `/lib/modules/<release>/extra/zfs`. It provides `zfs-modules`, which `zfs-initramfs` takes in place of `zfs-dkms`, and adds the module to the initrd of its kernel. |
 | `linux-headers-<release>` | The headers of the kernel, for DKMS, which no package depends on: `sudo apt install linux-headers-$(uname -r)` installs those of the kernel that runs. |
-| `hd-kernel` | Depends on the exact versions of the kernel and its ZFS module, so that the newest build is installed and upgraded with it. It conflicts with `linux-image-amd64`, `linux-headers-amd64`, `linux-base-amd64` and `zfs-dkms`, and installs the man page `man hd-kernel`. |
+| `hd-kernel` | Depends on the exact versions of the kernel and its ZFS module, so that the newest build is installed and upgraded with it. It conflicts with `hd-kernel-vm`, `hd-kernel-server`, `hd-kernel-desktop`, `linux-image-amd64`, `linux-headers-amd64`, `linux-base-amd64` and `zfs-dkms`, and installs the man page `man hd-kernel`. |
 
 The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, and `<id>` six hex digits of a sha256 of everything the packages are made of: the versions of `linux`, `zfs-linux` and `hd-kernel`, `build-kernel.sh` and the files in `deb/` and `man/`. A build of anything else has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
 
 The bootloader names the UKI of such a kernel `HyprDebian-Kernel-<x.y.z>-hd.efi`, so the menu tells it apart from the kernel of Debian, see [hd-bootloader](hd-bootloader.md).
+
+## The keep list
+`hd-kernel` keeps every module of the config of Debian. The other kernels keep only those of their `keep-modules`, a file in their package directory: the build turns every other module off with `make localmodconfig`. What the config of Debian builds into the kernel stays. A line is one of:
+
+| Line | |
+| --- | --- |
+| `<dir>/` | Every module of the directory `<dir>` of the kernel tree and of those below it. |
+| `!<dir>/` | None of the directory `<dir>` and of those below it, of a directory kept above. |
+| `<module>` | The module of that name, as `lsmod` prints it. The build stops when the kernel has no module of that name, as a module or built in. |
+| `<a>\|<b>` | The names of one module in different kernels, as in `trixie` and `unstable`. The build stops when the kernel has none of them. |
+
+Comments start with `#`. The modules of a directory are those its Makefiles build.
 
 ## Switching
 On a system with `hd-base`:
