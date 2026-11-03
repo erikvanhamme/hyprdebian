@@ -131,7 +131,7 @@ The graphical frontend shows the menu as [hd-menu](hd-menu.md) does, in the them
 | `normal` | The divider under the banner, and the bar behind the selected label. |
 | `font` | The font of the texts. |
 
-The sizes of the theme are pixels at a height of 1080: they are scaled with `res_y`, so the menu looks the same at every resolution. The texts take 80% of the height of a row, a tenth of the menu box.
+The sizes of the theme are pixels at a height of 1080: they are scaled with `res_y`, so the menu looks the same at every resolution. The texts take 80% of the height of a row, a tenth of the menu box; the labels take less when the longest does not fit in the menu box, all of them alike.
 
 The menu is in `assets.efi`, so a new theme reaches the bootloader when the ESPs are written again. `sudo hd-theme --select` does that, unless it is given `--no-initramfs`; otherwise the next kernel or initrd does, or run `sudo /usr/lib/hd-bootloader/update-esps`.
 
@@ -146,7 +146,7 @@ hd-bootloader-update [options]
 | --- | --- |
 | `EFI/BOOT/BOOTX64.EFI` | The bootloader of the frontend of the installed package. |
 | `EFI/BOOT/assets.efi` | The settings, the menu rows, the DKMS MOK when there is one and the assets of the frontend, as sections of a PE image that the bootloader loads with LoadImage, so the firmware checks its signature under Secure Boot. |
-| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four most recent kernels in `/boot` with a ZFS module, with a normal and a ZFS recovery profile; `HyprDebian-Kernel-x.y.z-hd.efi` for a kernel of [hd-kernel](hd-kernel.md). A kernel without a ZFS module in `/lib/modules/<version>`, built in or as `zfs.ko` in any directory below it, cannot mount the root and gets no UKI. |
+| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four most recent kernels in `/boot` with a ZFS module, with a normal and a ZFS recovery profile; `HyprDebian-Kernel-x.y.z-<build>.efi` for a kernel of [hd-kernel](hd-kernel.md), with the build as in its release, such as `hdvm1a2b3c`. A kernel without a ZFS module in `/lib/modules/<version>`, built in or as `zfs.ko` in any directory below it, cannot mount the root and gets no UKI, but see [The way back](#the-way-back). |
 
 The files are written in an order that leaves a bootable ESP when it is interrupted: first the UKIs, then `assets.efi` and `BOOTX64.EFI`, and only then are the UKIs of older kernels removed. A file whose contents would not change is not rewritten.
 
@@ -161,6 +161,13 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 | `--bootloader-dir <dir>`, `--assets-stub <file>` | Where the compiled bootloaders and the assets stub are; `/usr/lib/hd-bootloader` by default. |
 
 Run it as root.
+
+## The way back
+Every build of a kernel of [hd-kernel](hd-kernel.md) has a UKI of its own, so a new build or another kind of kernel does not replace the UKI of the one that runs, as long as it is one of the four most recent.
+
+Switching from the kernel of Debian to one of `hd-kernel` removes `zfs-dkms`, and with it the ZFS module of the kernel of Debian. The UKI of that kernel on the ESP still has the module, in its initrd, so it stays as it is, as long as the kernel is in `/boot` and `/var/lib/dkms/mok.pub` is there, which signed the module. Its rows come below those of the other kernels, in the slots that they leave; it goes when the kernel is purged.
+
+Such a UKI is the way back when the new kernel does not boot, and not a kernel to stay on. It is not built again, so it keeps the command line it has and gets no new settings; the module in it does not follow the upgrades of ZFS, so it may not import a pool after `zpool upgrade`. On a system booted from it, `zfs-load-module.service` fails, as `modprobe zfs` finds no module in `/lib/modules`, although the module is loaded; the rest of ZFS runs. To stay on the kernel of Debian, switch back as [hd-kernel](hd-kernel.md#switching) describes.
 
 ## Secure Boot
 `hd-base` generates the Secure Boot keys of the owner in `/etc/hyprdebian/secboot` (see [hd-secboot](hd-secboot.md)). When the keys are there, `hd-bootloader-update` signs the bootloader, `assets.efi` and the UKIs with the db key, using `sbsign`; a file that would not change is signed again when it does not verify with the db certificate, as after the keys were generated. Without the keys, the files are written unsigned, with a message saying so. The message of each file written says whether it is signed or unsigned.

@@ -31,8 +31,9 @@ writes, below the directory given with --esp (default: /boot/efi):
     EFI/Linux/HyprDebian-Kernel-x.y.z.efi
                               multi-profile UKIs (mkuki.py) of the 4 most
                               recent kernels in /boot with a ZFS module;
-                              HyprDebian-Kernel-x.y.z-hd.efi for a kernel
-                              of hd-kernel, whose release has -hd
+                              HyprDebian-Kernel-x.y.z-<build>.efi for a
+                              kernel of hd-kernel, whose release has
+                              -<build>, such as -hdvm1a2b3c
 
 The menu has a row per profile of each of those kernels, newest kernel
 first. With the labels and the file names in assets.efi, Secure Boot covers
@@ -67,7 +68,12 @@ that is gone.
 The most recent kernels are those whose /boot/vmlinuz-* was modified last.
 A kernel without a ZFS module in /lib/modules/<version>, built in or as
 zfs.ko in any directory below it, cannot mount the root and gets no UKI,
-such as a kernel of Debian whose DKMS module is gone. Other
+such as a kernel of Debian whose DKMS module is gone. When the ESP already
+has a UKI of such a kernel, it stays as it is, as long as the kernel is in
+/boot and there is a DKMS MOK: its initrd holds the ZFS module that the kernel
+lost, so it is the way back when the kernel that replaced it does not boot. It
+is never built again, as a new initrd would not have the module, and its rows
+come below those of the other kernels, in the slots that they leave. Other
 HyprDebian-Kernel-*.efi files in EFI/Linux are removed.
 
 Config keys of every frontend:
@@ -118,6 +124,7 @@ import argparse
 import importlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -289,13 +296,16 @@ def uki_name(version):
     """The UKI file name of a kernel version.
 
     HyprDebian-Kernel-x.y.z.efi for a kernel of Debian, such as
-    7.2.10+deb14-amd64, and HyprDebian-Kernel-x.y.z-hd.efi for one of
-    hd-kernel, such as 7.2.10+deb14-hd1a2b3c-amd64, so the menu tells them
-    apart.
+    7.2.10+deb14-amd64, and HyprDebian-Kernel-x.y.z-<build>.efi for one of
+    hd-kernel, such as HyprDebian-Kernel-7.2.10-hdvm1a2b3c.efi for
+    7.2.10+deb14-hdvm1a2b3c-amd64. Every build has its own name, so a new
+    build or another kind of kernel does not replace the UKI of the one that
+    runs, and the menu tells them apart.
     """
     short = version.split("+")[0].split("-")[0]
-    if "-hd" in version:
-        return f"{UKI_PREFIX}{short}-hd.efi"
+    build = re.search(r"-(hd[^-]*)", version)
+    if build:
+        return f"{UKI_PREFIX}{short}-{build.group(1)}.efi"
     return f"{UKI_PREFIX}{short}.efi"
 
 
@@ -399,6 +409,34 @@ def build_ukis(config, frontend, esp, kernels, signing):
             temporary.unlink(missing_ok=True)
         print(f"Wrote {written(signing)} {target}", flush=True)
     return names
+
+
+def keep_ukis(esp, boot_dir, modules_dir, names, signing):
+    """Returns the names of the UKIs on the ESP to keep, newest first, of the kernels in boot_dir
+    without a ZFS module in modules_dir, in the slots that the UKIs in names leave.
+
+    A UKI that does not verify with the db key is signed again, as in build_ukis.
+    """
+    kernels = []
+    for vmlinuz in boot_dir.glob("vmlinuz-*"):
+        version = vmlinuz.name.removeprefix("vmlinuz-")
+        if not has_zfs(modules_dir, version):
+            kernels.append((vmlinuz.stat().st_mtime, uki_name(version)))
+    kernels.sort(reverse=True)
+
+    kept = []
+    for _, name in kernels:
+        uki = esp / "EFI" / "Linux" / name
+        if name in names or name in kept or not uki.is_file():
+            continue
+        if len(names) + len(kept) == KERNEL_COUNT:
+            break
+        if signing is not None and not signed_with(uki, signing):
+            sign(uki, signing)
+            print(f"Signed {uki}", flush=True)
+        print(f"Keeping {uki}: the ZFS module of its kernel is only in its initrd", flush=True)
+        kept.append(name)
+    return kept
 
 
 def mok_signature_list(path):
@@ -574,6 +612,9 @@ def main():
     if not kernels:
         sys.exit(f"no kernels with an initrd and a ZFS module found in {args.boot_dir}")
     uki_names = build_ukis(config, frontend, args.esp, kernels, signing)
+    # The module in a kept UKI is signed with the DKMS MOK.
+    if mok:
+        uki_names += keep_ukis(args.esp, args.boot_dir, args.modules_dir, uki_names, signing)
     rows = menu_rows(uki_names)
 
     # 2. The assets: the config, the menu rows, the DKMS MOK when there is

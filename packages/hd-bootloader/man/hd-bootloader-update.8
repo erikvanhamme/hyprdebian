@@ -27,14 +27,20 @@ firmware checks its signature under Secure Boot;
 multi-profile UKIs of the four most recent kernels in
 .I /boot
 with a ZFS module, with a normal and a ZFS recovery profile;
-.I HyprDebian\-Kernel\-x.y.z\-hd.efi
+.I HyprDebian\-Kernel\-x.y.z\-build.efi
 for a kernel of
-.BR hd-kernel (7).
+.BR hd-kernel (7),
+with the build as in its release, such as
+.BR hdvm1a2b3c .
 A kernel without a ZFS module in
 .IR /lib/modules/ version,
 built in or as
 .I zfs.ko
 in any directory below it, cannot mount the root and gets no UKI.
+When the ESP already has a UKI of such a kernel, it stays as it is, as long as the kernel is in
+.I /boot
+and there is a DKMS MOK: its initrd holds the ZFS module.
+Its rows come below those of the other kernels, in the slots that they leave.
 .PP
 See
 .BR hd-bootloader (7)

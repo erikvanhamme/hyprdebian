@@ -19,7 +19,7 @@ For now a system switches when its admin installs `hd-kernel` or one of the othe
 
 The release is `<x.y.z>+debNN-hd<id>-amd64`, such as `7.2.12+deb14-hd1a2b3c-amd64`: `debNN` as in the release of the kernel of Debian, with its `.N` when it has one, such as `deb13.1`, and `<id>` six hex digits of a sha256 of everything the packages are made of: the versions of `linux`, `zfs-linux` and `hd-kernel`, `build-kernel.sh` and the files in `deb/` and `man/`. A build of anything else has another release, and so installs next to the kernel that runs, whose modules stay signed with the key it trusts. The versions of the packages are those of `linux` and `zfs-linux` with `+hd` and the version of `hd-kernel`; `hd-kernel` itself also has the version of `zfs-linux`, so that it goes up with each of the three.
 
-The bootloader names the UKI of such a kernel `HyprDebian-Kernel-<x.y.z>-hd.efi`, so the menu tells it apart from the kernel of Debian, see [hd-bootloader](hd-bootloader.md).
+The bootloader names the UKI of such a kernel after its build, such as `HyprDebian-Kernel-7.2.12-hd1a2b3c.efi`, so a new build does not replace the UKI of the one that runs and the menu tells them apart, see [hd-bootloader](hd-bootloader.md#the-way-back).
 
 ## The keep list
 `hd-kernel` keeps every module of the config of Debian. The other kernels keep only those of their `keep-modules`, a file in their package directory: the build turns every other module off with `make localmodconfig`. What the config of Debian builds into the kernel stays. A line is one of:
@@ -39,7 +39,7 @@ On a system with `hd-base`:
 sudo apt install hd-kernel
 ```
 
-This installs the kernel and its ZFS module, and removes `zfs-dkms`, and `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader. Once it boots, the kernels of Debian can go:
+This installs the kernel and its ZFS module, and removes `zfs-dkms`, and `linux-image-amd64`, `linux-headers-amd64` and `linux-base-amd64`, so the kernels of Debian get no more upgrades. The new kernel is at the top of the menu of the bootloader, with the kernel of Debian below it as the way back: it has no ZFS module any more, but its UKI on the ESP does, see [The way back](hd-bootloader.md#the-way-back). Once the new kernel boots, the kernels of Debian can go:
 ```
 sudo apt purge linux-image-<version>-amd64 linux-headers-<version>-amd64
 sudo apt autoremove --purge

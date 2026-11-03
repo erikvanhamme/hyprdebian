@@ -46,7 +46,8 @@ The work area holds ten rows. The banner is in the top one, the menu rows
 start half a row below it. Each label image is a bar as wide as the work area,
 less a padding on both sides, and a row high, with the text centred in it: the
 selected one has the bar in normal with rounded corners, the unselected one is
-transparent. The texts are TEXT_SCALE of the height of a row. Images are in
+transparent. The texts are TEXT_SCALE of the height of a row, the labels less
+when the longest does not fit. Images are in
 the raw image format of png2bin.py.
 
 Config keys of the graphical frontend, besides those of every frontend (see
@@ -232,6 +233,15 @@ def background_image(theme, res_x, res_y):
         return scale_to_cover(image.convert("RGB"), res_x, res_y)
 
 
+def fitting_text_height(labels, theme, width, text_height):
+    """The height of the texts of the labels: text_height, or less when the widest label does not
+    fit in width, the same for every label so that the rows look alike."""
+    widest = max(text2png.render(text, theme["light"], theme["font"], text_height).width for text in labels)
+    if widest <= width:
+        return text_height
+    return max(1, text_height * width // widest)
+
+
 def label(text, theme, size, text_height, radius, selected):
     """A label: a bar of size with the text centred in it, in the colour normal with rounded corners
     when selected, else transparent."""
@@ -303,7 +313,8 @@ def sections(config, labels):
         ".area": struct.pack("<4I", *geometry),
         ".banner": to_bin(text2png.render(config["banner_text"], theme["light"], theme["font"], text_height)),
     }
+    label_height = fitting_text_height(labels, theme, bar_size[0] - 2 * padding, text_height)
     for row, text in enumerate(labels, start=1):
-        result[f".lbl{row}"] = to_bin(label(text, theme, bar_size, text_height, inner_radius, False))
-        result[f".lbl{row}s"] = to_bin(label(text, theme, bar_size, text_height, inner_radius, True))
+        result[f".lbl{row}"] = to_bin(label(text, theme, bar_size, label_height, inner_radius, False))
+        result[f".lbl{row}s"] = to_bin(label(text, theme, bar_size, label_height, inner_radius, True))
     return result
