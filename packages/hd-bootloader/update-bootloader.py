@@ -65,7 +65,9 @@ is interrupted: first the UKIs, then assets.efi and BOOTX64.EFI, and only
 then are the UKIs of older kernels removed, so assets.efi never names a UKI
 that is gone.
 
-The most recent kernels are those whose /boot/vmlinuz-* was modified last.
+The most recent kernels are those installed last: their /boot/vmlinuz-* has the
+latest change time, as its modification time is that of the build of the kernel,
+which can be older than the build of the kernel that runs.
 A kernel without a ZFS module in /lib/modules/<version>, built in or as
 zfs.ko in any directory below it, cannot mount the root and gets no UKI,
 such as a kernel of Debian whose DKMS module is gone. When the ESP already
@@ -279,7 +281,7 @@ def find_kernels(boot_dir, modules_dir):
         if not has_zfs(modules_dir, version):
             print(f"Skipping {version}: no ZFS module in {modules_dir / version}", flush=True)
             continue
-        kernels.append((vmlinuz.stat().st_mtime, version, vmlinuz, initrd))
+        kernels.append((vmlinuz.stat().st_ctime, version, vmlinuz, initrd))
     kernels.sort(reverse=True)
 
     found = []
@@ -421,7 +423,7 @@ def keep_ukis(esp, boot_dir, modules_dir, names, signing):
     for vmlinuz in boot_dir.glob("vmlinuz-*"):
         version = vmlinuz.name.removeprefix("vmlinuz-")
         if not has_zfs(modules_dir, version):
-            kernels.append((vmlinuz.stat().st_mtime, uki_name(version)))
+            kernels.append((vmlinuz.stat().st_ctime, uki_name(version)))
     kernels.sort(reverse=True)
 
     kept = []

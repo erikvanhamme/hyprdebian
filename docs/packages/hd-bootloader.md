@@ -1,5 +1,5 @@
 ## Introduction
-The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the unified kernel images (UKIs) of the four most recent kernels, each in a normal and a ZFS recovery profile, and boots the chosen one. It comes in two packages, of which only one can be installed:
+The hyprdebian bootloader is a small UEFI bootloader that shows a menu of the unified kernel images (UKIs) of the four kernels installed last, each in a normal and a ZFS recovery profile, and boots the chosen one. It comes in two packages, of which only one can be installed:
 
 | Package | Frontend |
 | --- | --- |
@@ -146,7 +146,7 @@ hd-bootloader-update [options]
 | --- | --- |
 | `EFI/BOOT/BOOTX64.EFI` | The bootloader of the frontend of the installed package. |
 | `EFI/BOOT/assets.efi` | The settings, the menu rows, the DKMS MOK when there is one and the assets of the frontend, as sections of a PE image that the bootloader loads with LoadImage, so the firmware checks its signature under Secure Boot. |
-| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four most recent kernels in `/boot` with a ZFS module, with a normal and a ZFS recovery profile; `HyprDebian-Kernel-x.y.z-<build>.efi` for a kernel of [hd-kernel](hd-kernel.md), with the build as in its release, such as `hdvm1a2b3c`. A kernel without a ZFS module in `/lib/modules/<version>`, built in or as `zfs.ko` in any directory below it, cannot mount the root and gets no UKI, but see [The way back](#the-way-back). |
+| `EFI/Linux/HyprDebian-Kernel-x.y.z.efi` | Multi-profile UKIs of the four kernels installed last in `/boot` with a ZFS module, the one installed last on top of the menu, with a normal and a ZFS recovery profile; `HyprDebian-Kernel-x.y.z-<build>.efi` for a kernel of [hd-kernel](hd-kernel.md), with the build as in its release, such as `hdvm1a2b3c`. A kernel without a ZFS module in `/lib/modules/<version>`, built in or as `zfs.ko` in any directory below it, cannot mount the root and gets no UKI, but see [The way back](#the-way-back). |
 
 The files are written in an order that leaves a bootable ESP when it is interrupted: first the UKIs, then `assets.efi` and `BOOTX64.EFI`, and only then are the UKIs of older kernels removed. A file whose contents would not change is not rewritten.
 
@@ -163,7 +163,7 @@ The files are written in an order that leaves a bootable ESP when it is interrup
 Run it as root.
 
 ## The way back
-Every build of a kernel of [hd-kernel](hd-kernel.md) has a UKI of its own, so a new build or another kind of kernel does not replace the UKI of the one that runs, as long as it is one of the four most recent.
+Every build of a kernel of [hd-kernel](hd-kernel.md) has a UKI of its own, so a new build or another kind of kernel does not replace the UKI of the one that runs, as long as it is one of the four installed last.
 
 Switching from the kernel of Debian to one of `hd-kernel` removes `zfs-dkms`, and with it the ZFS module of the kernel of Debian. The UKI of that kernel on the ESP still has the module, in its initrd, so it stays as it is, as long as the kernel is in `/boot` and `/var/lib/dkms/mok.pub` is there, which signed the module. Its rows come below those of the other kernels, in the slots that they leave; it goes when the kernel is purged.
 
