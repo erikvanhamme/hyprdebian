@@ -14,9 +14,9 @@
 #                 echo '{"banner": "Power off system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu
 #
 #               It needs g++, make, pkgconf, libwayland-dev,
-#               wayland-protocols, libxkbcommon-dev, libcairo2-dev and
-#               librsvg2-dev on this computer; make deb of ../Makefile only
-#               needs docker.
+#               wayland-protocols, libxkbcommon-dev, libcairo2-dev,
+#               librsvg2-dev and libdav1d-dev on this computer; make deb of
+#               ../Makefile only needs docker.
 #   make clean  remove build/
 
 PROGRAM := hd-menu

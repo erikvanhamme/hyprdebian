@@ -10,7 +10,7 @@ hd-message is part of the package `hd-desktop`, built from `packages/hd-desktop`
 
 To try a change without a package, `make all` in `message/` builds `build/hd-message` there, on the computer itself, which then needs the -dev packages:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev
+sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev libdav1d-dev
 cd packages/hd-desktop/message
 make all
 echo '{"title": "Reboot system?", "text": "Unsaved work is lost.", "buttons": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-message

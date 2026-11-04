@@ -7,7 +7,9 @@
 #   make clean  remove build/
 #
 # It needs g++, make, pkgconf, libwayland-dev, wayland-protocols,
-# libxkbcommon-dev, libcairo2-dev and librsvg2-dev.
+# libxkbcommon-dev, libcairo2-dev, librsvg2-dev and libdav1d-dev. libdav1d-dev
+# is for pkg-config: librsvg-2.0.pc requires dav1d, but librsvg2-dev does not
+# depend on libdav1d-dev.
 #
 # wayland-scanner, of libwayland-bin, turns the XML of each Wayland protocol
 # into a C header and the C tables of its interfaces. wlr-layer-shell is not
@@ -19,7 +21,16 @@ BUILD := build
 COMMON := ../common
 
 PKGS := wayland-client xkbcommon cairo librsvg-2.0
-# Without the -dev packages, as for make deb of ../Makefile, these stay empty, quietly.
+# Only make clean goes without the -dev packages. Anything else stops here with the message of
+# pkg-config, as a package it cannot find leaves all the flags below empty.
+ifneq ($(MAKECMDGOALS),clean)
+PKG_ERRORS := $(shell pkg-config --print-errors --exists $(PKGS) wayland-scanner wayland-protocols 2>&1)
+ifneq ($(PKG_ERRORS),)
+$(error $(PKG_ERRORS))
+endif
+endif
+
+# Without the -dev packages, as for make clean, these stay empty, quietly.
 WAYLAND_SCANNER := $(shell pkg-config --variable=wayland_scanner wayland-scanner 2>/dev/null)
 XDG_SHELL := $(shell pkg-config --variable=pkgdatadir wayland-protocols 2>/dev/null)/stable/xdg-shell/xdg-shell.xml
 LAYER_SHELL := $(COMMON)/protocols/wlr-layer-shell-unstable-v1.xml

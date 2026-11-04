@@ -15,9 +15,9 @@
 #                 echo '{"title": "Reboot system?", "text": "Unsaved work is lost.", "buttons": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-message
 #
 #               It needs g++, make, pkgconf, libwayland-dev,
-#               wayland-protocols, libxkbcommon-dev, libcairo2-dev and
-#               librsvg2-dev on this computer; make deb of ../Makefile only
-#               needs docker.
+#               wayland-protocols, libxkbcommon-dev, libcairo2-dev,
+#               librsvg2-dev and libdav1d-dev on this computer; make deb of
+#               ../Makefile only needs docker.
 #   make clean  remove build/
 
 PROGRAM := hd-message

@@ -14,7 +14,7 @@ hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; s
 
 To try a change without a package, `make all` in `menu/` builds `build/hd-menu` there, on the computer itself, which then needs the -dev packages:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev
+sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev libdav1d-dev
 cd packages/hd-desktop/menu
 make all
 echo '{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu

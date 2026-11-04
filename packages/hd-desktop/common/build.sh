@@ -15,6 +15,8 @@ set -euo pipefail
 
 PROGRAMS=(menu:hd-menu message:hd-message)
 
+# libdav1d-dev is for pkg-config only: librsvg-2.0.pc requires dav1d, but librsvg2-dev does not
+# depend on libdav1d-dev.
 echo "--> Installing build dependencies..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -26,7 +28,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
   wayland-protocols \
   libxkbcommon-dev \
   libcairo2-dev \
-  librsvg2-dev
+  librsvg2-dev \
+  libdav1d-dev
 
 # A copy of the sources, so that the build does not write into /src. The
 # programs find the shared code in ../common, as in the repository.
