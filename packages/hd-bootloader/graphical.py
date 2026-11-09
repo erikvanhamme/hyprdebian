@@ -108,8 +108,8 @@ THEME_DEFAULTS = {
     "normal": "#0066cc",
     "dark": "#071422",
     "light": "#e6edf5",
-    "border": 4,
-    "radius": 10,
+    "border": 3,
+    "radius": 8,
     "opacity": 0.8,
     "background": "emerald",
 }

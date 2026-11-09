@@ -8,7 +8,9 @@ The package hd-desktop installs this as /usr/sbin/hd-plymouth-render.
 
 The theme is the key hd-theme of /etc/hyprdebian/config.json, the theme of the system that
 hd-theme --select sets as root; the themes of the users are not used. A member that is missing or
-not valid takes the value of the theme default, which is also used without a theme.
+not valid takes the value of the theme default, which is also used without a theme. The font
+sizes, border and radius are multiplied by the factor of the key hd-display, as hd-theme --apply
+does for hyprlock, with /usr/lib/hd-desktop/hd_display.py.
 
 The plymouth script cannot read the theme at boot, so it is rendered into the files of the theme,
 in /var/lib/hd-plymouth/theme, which /usr/share/plymouth/themes/hyprdebian/hyprdebian.plymouth
@@ -48,6 +50,11 @@ import jinja2
 gi.require_version("Pango", "1.0")
 from gi.repository import Pango  # noqa: E402
 
+LIB_DIR = "/usr/lib/hd-desktop"
+sys.dont_write_bytecode = True
+sys.path.insert(0, LIB_DIR)
+import hd_display  # noqa: E402
+
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 THEME_KEY = "hd-theme"
 TEMPLATE_DIR = "/usr/share/hd-plymouth/templates"
@@ -61,13 +68,13 @@ PLYMOUTH_THEME = "hyprdebian"
 # The theme default of hd-desktop, for the members that the theme of the system lacks.
 DEFAULTS = {
     "font": "JetBrainsMono NFM Medium",
-    "font-size-normal": 18,
-    "font-size-small": 14,
+    "font-size-normal": 12,
+    "font-size-small": 9.3,
     "highlight": "#ff6600",
     "dark": "#071422",
     "light": "#e6edf5",
-    "border": 4,
-    "radius": 10,
+    "border": 3,
+    "radius": 8,
     "opacity": 0.8,
     "background": "emerald",
 }
@@ -148,6 +155,16 @@ def system_theme():
     if not isinstance(name, str):
         name = "unnamed"
     return result, name
+
+
+def scaled(theme, factor):
+    """The theme with its font sizes, border and radius multiplied by factor."""
+    theme = dict(theme)
+    for key in ("font-size-normal", "font-size-small"):
+        theme[key] = hd_display.font_size(theme[key], factor)
+    for key in ("border", "radius"):
+        theme[key] = hd_display.pixels(theme[key], factor)
+    return theme
 
 
 def rgb(color):
@@ -329,6 +346,8 @@ def write_link(path, target):
 def render():
     """Renders the splash; True when a file changed."""
     theme, name = system_theme()
+    factor = hd_display.factor()
+    theme = scaled(theme, factor)
     fonts = [
         f"{theme['font']} {size(theme['font-size-normal'])}",
         f"{theme['font']} Italic {size(theme['font-size-normal'])}",
@@ -386,7 +405,11 @@ def render():
         changed = True
 
     if changed:
-        print(f"Rendered the boot splash in the theme {name} in {THEME_DIR}.")
+        if factor != 1:
+            print(f"Rendered the boot splash in the theme {name}, scaled by {factor} for the "
+                  f"monitor, in {THEME_DIR}.")
+        else:
+            print(f"Rendered the boot splash in the theme {name} in {THEME_DIR}.")
     return changed
 
 

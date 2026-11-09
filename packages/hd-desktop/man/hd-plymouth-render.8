@@ -24,6 +24,19 @@ The themes of the users are not used.
 A member that is missing or not valid takes the value of the theme
 .BR default ,
 which is also used when the system has no theme.
+The font sizes,
+.B border
+and
+.B radius
+are multiplied by the factor of the key
+.B hd-display
+of the configuration of the system, as
+.B hd-theme \-\-apply
+does for hyprlock; see
+.B SCALING
+in
+.BR hd-theme (7).
+When the factor is not 1, the message that the splash was rendered gives it.
 .PP
 The script of plymouth cannot read the theme at boot, so it is rendered
 into the files of the plymouth theme, in
@@ -114,6 +127,10 @@ the initramfs rebuilt when needed; 1 on an error.
 The theme of the system, in the key
 .BR hd-theme .
 .TP
+.I /usr/lib/hd-desktop/hd_display.py
+Works out the factor of
+.BR hd-display .
+.TP
 .I /usr/share/hd-plymouth/templates/hyprdebian.script.j2
 The template of the script.
 .TP
@@ -123,6 +140,7 @@ The rendered files of the plymouth theme.
 .I /var/lib/hd-plymouth/fonts
 The files of the fonts, for the initramfs.
 .SH SEE ALSO
+.BR hd-config (7),
 .BR hd-plymouth (7),
 .BR hd-theme (1),
 .BR hd-theme (7),

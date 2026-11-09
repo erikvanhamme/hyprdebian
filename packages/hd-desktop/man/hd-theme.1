@@ -273,7 +273,9 @@ After
 .B hd-display
 changed, each user runs
 .B hd-theme \-\-apply
-again.
+again, and root runs
+.B hd-plymouth-render \-\-update\-initramfs
+for the boot splash.
 .SH EXAMPLES
 .nf
 cp /etc/hyprdebian/themes/default.json meadow.json
@@ -298,6 +300,7 @@ A 42 inch monitor seen from 90 cm:
 sudo hd-config-update hd-display '{"diagonal": 42, "distance": 90}'
 hd-theme \-\-apply
 sudo hd-launcher-cache \-\-update\-all
+sudo hd-plymouth-render \-\-update\-initramfs
 .fi
 .SH SEE ALSO
 .BR hd-theme (7),

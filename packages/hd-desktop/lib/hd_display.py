@@ -1,4 +1,5 @@
-"""The scale of the theme on the monitor of this machine, shared by hd-theme and hd-launcher-cache.
+"""The scale of the theme on the monitor of this machine, shared by hd-theme, hd-launcher-cache and
+hd-plymouth-render.
 
 The package hd-desktop installs this as /usr/lib/hd-desktop/hd_display.py.
 

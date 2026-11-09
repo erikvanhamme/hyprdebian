@@ -68,7 +68,7 @@ hd-plymouth-render                      render the splash
 hd-plymouth-render --update-initramfs   render it, and rebuild the initramfs when it changed
 ```
 
-`hd-plymouth-render`, in `/usr/sbin`, renders the splash as root from the key `hd-theme` of `/etc/hyprdebian/config.json`, the theme of the system; the themes of the users are not used. A member that is missing or not valid takes the value of the theme `default`, which is also used when the system has no theme. It writes, in `/var/lib/hd-plymouth/theme`:
+`hd-plymouth-render`, in `/usr/sbin`, renders the splash as root from the key `hd-theme` of `/etc/hyprdebian/config.json`, the theme of the system; the themes of the users are not used. A member that is missing or not valid takes the value of the theme `default`, which is also used when the system has no theme. The font sizes, `border` and `radius` are multiplied by the factor of the key `hd-display` of the configuration of the system, the scale of the theme on the monitor, as `hd-theme --apply` does for hyprlock (`man hd-theme`, SCALING). It writes, in `/var/lib/hd-plymouth/theme`:
 
 | File | Made from |
 | --- | --- |

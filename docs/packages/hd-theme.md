@@ -36,16 +36,16 @@ A theme is a JSON object with all of these members, and no others:
 ```
 {
     "font": "JetBrainsMono NFM Medium",
-    "font-size-big": 24,
-    "font-size-normal": 18,
-    "font-size-small": 14,
+    "font-size-big": 16,
+    "font-size-normal": 12,
+    "font-size-small": 9.3,
     "highlight": "#ff6600",
     "normal": "#0066cc",
     "dark": "#071422",
     "light": "#e6edf5",
-    "border": 4,
-    "radius": 10,
-    "gap": 4,
+    "border": 3,
+    "radius": 8,
+    "gap": 3,
     "opacity": 0.8,
     "icon_size": 48,
     "background": "emerald"

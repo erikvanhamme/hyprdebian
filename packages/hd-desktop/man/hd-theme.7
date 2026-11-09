@@ -52,16 +52,16 @@ A theme is a JSON object with all of these members, and no others:
 .nf
 {
     "font": "JetBrainsMono NFM Medium",
-    "font-size-big": 24,
-    "font-size-normal": 18,
-    "font-size-small": 14,
+    "font-size-big": 16,
+    "font-size-normal": 12,
+    "font-size-small": 9.3,
     "highlight": "#ff6600",
     "normal": "#0066cc",
     "dark": "#071422",
     "light": "#e6edf5",
-    "border": 4,
-    "radius": 10,
-    "gap": 4,
+    "border": 3,
+    "radius": 8,
+    "gap": 3,
     "opacity": 0.8,
     "icon_size": 48,
     "background": "emerald"
@@ -189,6 +189,12 @@ and
 when they start, and by
 .BR hd-launcher-cache (1)
 for the icons of the launcher.
+.BR hd-plymouth-render (8)
+multiplies the font sizes,
+.B border
+and
+.B radius
+of the theme of the system for the boot splash.
 The font sizes are rounded to a tenth of a point, the others to whole
 pixels, and a size that is not 0 stays at least 1.
 The themes and the key
@@ -226,9 +232,10 @@ the scale of the theme on the monitor.
 Works out the factor of
 .B hd-display
 for
-.B hd-theme
+.BR hd-theme ,
+.B hd-launcher-cache
 and
-.BR hd-launcher-cache .
+.BR hd-plymouth-render .
 .TP
 .I ~/.config/hyprdebian/config.json
 The key
@@ -243,6 +250,7 @@ The cards of the themes.
 .BR hd-config (7),
 .BR hd-menu (1),
 .BR hd-message (1),
-.BR hd-plymouth (7)
+.BR hd-plymouth (7),
+.BR hd-plymouth-render (8)
 .SH AUTHOR
 Erik Van Hamme <erik.vanhamme@gmail.com>

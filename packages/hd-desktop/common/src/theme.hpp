@@ -42,9 +42,9 @@ struct Theme {
      * at 96 dpi, the resolution of a logical pixel. The theme also has
      * font-size-small, which neither uses.
      */
-    double font_size_big = 32;  // 24 pt
+    double font_size_big = 64.0 / 3;  // 16 pt
     /** @brief The size of normal text: font-size-normal, of the text and the buttons of hd-message. */
-    double font_size_normal = 24;  // 18 pt
+    double font_size_normal = 16;  // 12 pt
     /** @brief The width and height of the icons of the options and the buttons. */
     double icon_size = 64;
     /** @brief Focus: the outline of the focused window. Never a fill behind text. */
@@ -59,9 +59,9 @@ struct Theme {
     /** @brief All text. */
     Color light = {0xe6 / 255.0, 0xed / 255.0, 0xf5 / 255.0}; // #e6edf5
     /** @brief The width of the outline of the window. */
-    double border = 4;
+    double border = 3;
     /** @brief The corner radius of the outline of the window. */
-    double radius = 10;
+    double radius = 8;
     /** @brief The opacity of the background of the window only, from 0 to 1. */
     double opacity = 0.8;
 };
