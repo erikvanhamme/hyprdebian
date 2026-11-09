@@ -300,6 +300,17 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ action = "toggle" }))
 -- See https://wiki.hypr.land/Configuring/Basics/Window-Rules/
 -- and https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
 
+-- Show the workspace that becomes active as a notification of mako for a second. mako picks the
+-- id of a notification itself, so the id that notify-send prints is kept in the runtime directory,
+-- and the next switch replaces that notification instead of stacking another.
+local workspaceNotify = [[f="$XDG_RUNTIME_DIR/hd-workspace.id"; ]] ..
+    [[notify-send -p -r "$(cat "$f" 2>/dev/null || echo 0)" -a hd-workspace -e -t 1000 "$1" ]] ..
+    [[> "$f.new" && mv "$f.new" "$f"]]
+hl.on("workspace.active", function(ws)
+    local name = ws.name:gsub("'", "'\\''")
+    hl.exec_cmd("sh -c '" .. workspaceNotify .. "' sh 'Workspace " .. name .. "'")
+end)
+
 -- Example window rules that are useful
 
 local suppressMaximizeRule = hl.window_rule({
