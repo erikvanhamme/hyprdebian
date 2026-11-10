@@ -62,6 +62,8 @@ The first build takes long: it pulls the images and compiles every package from 
 
 A build that fails leaves the last build as it was, so the next night tries the same commit again. Only one build runs at a time.
 
+A kernel that Debian has before its ZFS supports it does not fail the build: the kernel of that suite is not built, the repository keeps its last one, and everything else is built and uploaded, see [A kernel newer than ZFS](hd-kernel.md#a-kernel-newer-than-zfs). The versions of `linux` and `zfs-linux` are stored as built all the same, so the suite is built once Debian has a new `zfs-linux` or `linux` for it.
+
 Packages of a version that is already in the repository are never uploaded again: a commit that changes a package without raising its version only reaches the repository with the next raise. The ISO is uploaded with every build.
 
 ### The kernel cache

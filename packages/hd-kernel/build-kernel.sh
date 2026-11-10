@@ -34,6 +34,12 @@
 # them, and with them the reason to skip. Otherwise, when /cache has them, it copies them from
 # there. Only then does it build, and first removes the packages of other releases from /out.
 #
+# A suite whose linux is newer than its zfs-linux supports, the Linux-Maximum of the META of ZFS
+# with the patches of Debian, is not built: ZFS would not build against it. The build says so and
+# stops without an error, and /out keeps what it has, so the other suite, the other packages and
+# their uploads still go through and systems keep the last kernel with ZFS. A new zfs-linux or
+# linux of the suite is built again.
+#
 # ZFS is not copied into the kernel tree: with copy-builtin, the configure of ZFS takes it to be
 # built into the kernel and skips its checks for the symbols that only GPL modules may use, so a
 # zfs.ko built that way does not link. Built apart, configure checks them and zfs.ko uses its own
@@ -249,10 +255,9 @@ if has_packages /out; then
   exit 0
 fi
 
-rm -f /out/*.deb
-
 if [[ -d /cache ]] && has_packages "${CACHE}/${RELEASE}"; then
   echo "--> Copying the packages of ${RELEASE} from the cache..."
+  rm -f /out/*.deb
   for package in "${PACKAGES[@]}"; do
     install -m 0644 "${CACHE}/${RELEASE}/${package}" /out/
   done
@@ -306,8 +311,19 @@ get_source() {
   rm -f "${name}_"*
   echo "${version}" > "${name}.version"
 }
-get_source linux "${KERNEL_VERSION}"
 get_source zfs-linux "${ZFS_VERSION}"
+
+# The newest series of linux that this zfs-linux builds against, with the patches of Debian.
+ZFS_MAXIMUM="$(sed -n 's/^Linux-Maximum:[[:space:]]*//p' zfs-linux/META)"
+if [[ -n "${ZFS_MAXIMUM}" ]] && dpkg --compare-versions "${SERIES}" gt "${ZFS_MAXIMUM}"; then
+  echo "--> zfs-linux ${ZFS_VERSION} supports linux up to ${ZFS_MAXIMUM}, not ${KERNEL_VERSION}:"
+  echo "    ${PACKAGE} of ${SUITE} is not built, the last build stays."
+  exit 0
+fi
+
+rm -f /out/*.deb
+
+get_source linux "${KERNEL_VERSION}"
 
 # The kernel tree of this build starts anew with another version of linux: the files of a new
 # source have the times of the source package, which can be older than the objects of the tree.
