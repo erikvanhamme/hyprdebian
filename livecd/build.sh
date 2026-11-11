@@ -11,7 +11,7 @@
 #      packages.chroot
 #   2. the local repository of the live system, in /srv/hyprdebian/repo, with
 #      every package in DEBS in the suites of its repos; hd-installer installs
-#      the hd-* packages from it
+#      the hd-* packages and the kernel from it
 #   3. the ISO, which is copied to /out/hyprdebian-live-amd64.iso, owned by
 #      HOST_UID and HOST_GID
 set -euo pipefail

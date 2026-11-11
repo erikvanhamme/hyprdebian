@@ -1,12 +1,29 @@
 #!/bin/bash
-# The suites and the defaults of the questions.
+# The suites, the kernels and the defaults of the questions.
 
 # The Debian suites of HyprDebian, in the order they are offered.
 SUITES=(unstable trixie)
 
+# The kinds of HyprDebian kernel, in the order they are offered, the package of each, which the
+# local repository of the live cd has for every suite, and their summary for the question.
+KERNELS=(vm desktop server complete)
+declare -gA KERNEL_PACKAGES=(
+    [vm]="hd-kernel-vm"
+    [desktop]="hd-kernel-desktop"
+    [server]="hd-kernel-server"
+    [complete]="hd-kernel"
+)
+KERNELS_SUMMARY=(
+    "vm:        the drivers of a KVM virtual machine (hd-kernel-vm)"
+    "desktop:   the drivers of desktops and laptops (hd-kernel-desktop)"
+    "server:    the drivers of servers (hd-kernel-server)"
+    "complete:  every driver of the kernel of Debian (hd-kernel)"
+)
+
 # The defaults, keyed by the variable of the question.
 declare -gA DEFAULTS=(
     [Q_SUITE]="unstable"
+    [Q_KERNEL]="complete"
     [Q_ROOT_REDUNDANT]="n"
     [Q_ENCRYPT]="y"
     [Q_SWAP]="2"

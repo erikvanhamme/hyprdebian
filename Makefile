@@ -35,12 +35,14 @@
 #                   build/<suite>. Apart from make all, as they take long
 #                   to build; a suite whose kernel is built already is not
 #                   built again, see hd-kernel
-#   make iso        build every package, then the live ISO with them in
-#                   livecd/ (livecd/Makefile): hd-installer installed on the
-#                   live system, and every package as the local repository
-#                   that the installer installs the hd-* packages from, in
-#                   the suites of the deploy.json of its directory; not the
-#                   kernels
+#   make iso        build every package and the kernels, as make all and
+#                   make kernel do, then the live ISO with them in livecd/
+#                   (livecd/Makefile): hd-installer installed on the live
+#                   system, and every package as the local repository that
+#                   the installer installs the hd-* packages and the kernel
+#                   from, in the suites of the deploy.json of its directory,
+#                   and each kernel in the suite it is built for; not the
+#                   headers of the kernels
 #   make update-repo
 #                   build every package, then ask for the host name of a
 #                   HyprDebian repository and upload every package in
@@ -83,8 +85,7 @@
 
 PACKAGES := hd-repo hd-bootloader hd-dashboard hd-report hd-backup yazi wiremix ouch orcaslicer hd-audacious hd-desktop hd-docker hd-qemu-kvm hd-cups hd-laptop hd-buildserver hd-base hd-installer
 # The package directories of the kernels, which make kernel builds apart from
-# make all. They only go to the package repository, not in the live ISO: the
-# installer does not install them, systems switch to them by hand for now.
+# make all. The installer installs one of them, from the live ISO.
 KERNEL_PACKAGES := hd-kernel hd-kernel-vm hd-kernel-server hd-kernel-desktop
 # The package directories with tests.
 TESTS := hd-dashboard hd-report hd-backup hd-base
@@ -201,16 +202,20 @@ for dir in $(DIRS); do \
 done
 endef
 
-# Hands the live cd the packages of the package directories in PACKAGES, as
-# <repos>:build/<folder>/<package>.deb, so not the kernels that make kernel
-# put in build/.
-iso: all
-	debs=$$($(call DEBS,$(PACKAGES))) || exit 1; \
+# Hands the live cd the packages of the package directories in PACKAGES and
+# KERNEL_PACKAGES, as <repos>:build/<folder>/<package>.deb, but the headers of
+# the kernels, which the installer does not install.
+iso: all kernel
+	debs=$$($(call DEBS,$(PACKAGES) $(KERNEL_PACKAGES))) || exit 1; \
 	isodebs=""; \
 	for entry in $$debs; do \
 		dir=$${entry%%:*}; \
+		deb=$$(basename $${entry#*:}); \
+		case $$deb in \
+			linux-headers-*) continue ;; \
+		esac; \
 		$(FOLDER_REPOS); \
-		isodebs="$$isodebs $$repos:$(OUT)/$$dir/$$(basename $${entry#*:})"; \
+		isodebs="$$isodebs $$repos:$(OUT)/$$dir/$$deb"; \
 	done; \
 	$(MAKE) -C livecd iso DEBS="$$(echo $$isodebs)"
 

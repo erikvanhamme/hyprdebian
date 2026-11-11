@@ -16,8 +16,8 @@ install
 .B hd-desktop
 on it afterwards.
 .PP
-It installs the hd-* packages from the local repository of the HyprDebian
-live cd,
+It installs the hd-* packages and the HyprDebian kernel from the local
+repository of the HyprDebian live cd,
 .IR /srv/hyprdebian/repo ,
 and the Debian packages from the Debian mirrors, so it needs internet access
 but no HyprDebian repository.
@@ -56,6 +56,27 @@ by default.
 .B hd-desktop
 needs packages that are only in
 .BR unstable .
+.TP
+.B Kernel
+The HyprDebian kernel, with its prebuilt ZFS module:
+.B vm
+for KVM virtual machines,
+.B desktop
+for desktops and laptops,
+.B server
+for servers, each with only the modules of that kind of system, or
+.BR complete ,
+with every module of the kernel of Debian;
+.B complete
+by default.
+They are the packages
+.BR hd-kernel-vm ,
+.BR hd-kernel-desktop ,
+.B hd-kernel-server
+and
+.BR hd-kernel ,
+see
+.BR hd-kernel (7).
 .TP
 .B System mirror
 Whether the system, the ZFS pool and the swap, is mirrored on two disks;
@@ -175,6 +196,14 @@ An unknown key, or a key given twice, is an error.
 .B suite
 The suite, a string.
 .TP
+.B kernel
+The kernel:
+.BR vm ,
+.BR desktop ,
+.B server
+or
+.BR complete .
+.TP
 .B encrypt
 .B true
 or
@@ -248,6 +277,7 @@ An example:
 .nf
 {
     "suite": "unstable",
+    "kernel": "vm",
     "encrypt": false,
     "system_disks": ["/dev/vda"],
     "swap": 2,
@@ -345,8 +375,8 @@ of the new system and adds it as a trusted apt source, has apt install no
 recommends and download no translations while it runs, as hd-base does for
 the installed system, adds the Debian repositories, sets the debconf
 selections of the answers file and the defaults, asks the
-locales, the time zone and the keyboard that have no selections, and installs the kernel
-and ZFS.
+locales, the time zone and the keyboard that have no selections, and installs the
+HyprDebian kernel with its ZFS module, and the ZFS tools.
 It marks the other packages for the packages phase:
 .BR hd-base ,
 .BR hd-bootloader-txt ,

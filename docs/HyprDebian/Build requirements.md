@@ -55,7 +55,7 @@ The downloads and the compiled releases are kept in `build/` of their package di
 | `hd-backup` | `python3` and the C compiler of `make deb`, as it builds `blockwrite` first. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
 
 ## The live ISO: make iso
-`make iso` builds every package, then the ISO in a container, see [Live cd](../Livecd/Overview.md). The computer needs everything `make all` needs, and:
+`make iso` builds every package and the kernels, then the ISO in a container, see [Live cd](../Livecd/Overview.md). The computer needs everything `make all` and `make kernel` need, and:
 - `docker` (docker.io) and a user that may run it.
 - Privileged containers: the container runs with `--privileged`, because live-build mounts filesystems and makes device nodes in its chroot.
 - Internet access, for the `debian:trixie` image, the packages of `livecd/Dockerfile` and the packages of the live system.

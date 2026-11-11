@@ -5,7 +5,7 @@ Every build signs the modules of the kernel and the ZFS module with a key that i
 
 Three more packages have the same kernel with only the modules of one kind of system, and are built and installed the same way: [hd-kernel-vm](hd-kernel-vm.md) for KVM virtual machines, [hd-kernel-server](hd-kernel-server.md) for servers and [hd-kernel-desktop](hd-kernel-desktop.md) for desktops and laptops. The four conflict with each other, so a system has one of them.
 
-For now a system switches when its admin installs `hd-kernel` or one of the others. `hd-base` depends on `zfs-dkms` or `zfs-modules`; a system without the HyprDebian kernel gets `zfs-dkms`, and the HyprDebian kernels conflict with it, so DKMS builds no ZFS module that the kernel does not trust, not even when their headers are installed.
+The installer installs the one that is asked, from the live ISO; an existing system switches when its admin installs `hd-kernel` or one of the others. `hd-base` depends on `zfs-dkms` or `zfs-modules`; a system without the HyprDebian kernel gets `zfs-dkms`, and the HyprDebian kernels conflict with it, so DKMS builds no ZFS module that the kernel does not trust, not even when their headers are installed.
 
 ## The packages
 `make deb` builds four packages for each suite, `trixie` and `unstable`, each only for the repository of its suite:
@@ -63,7 +63,7 @@ make deb
 
 This builds the packages of both suites, into `build/trixie` and `build/unstable`; `make deb-trixie` or `make deb-unstable` builds one.
 
-In the root of the repository, `make kernel` does the same and puts them in `build/<suite>` there too; `make all` leaves the kernels out, as they take long to build. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`, and removes the kernels of an older release from its `build/<suite>`. `make update-repo` and `make list-debs` then also give the kernels that `make kernel` built, each only for its suite, but do not build them: run `make kernel` first for new ones. The live ISO does not get them, as the installer does not install them yet.
+In the root of the repository, `make kernel` does the same and puts them in `build/<suite>` there too; `make all` leaves the kernels out, as they take long to build. The Makefile in the root takes them from `make deb-path`, which prints each as `<suite>:build/<suite>/<package>.deb`, and removes the kernels of an older release from its `build/<suite>`. `make update-repo` and `make list-debs` then also give the kernels that `make kernel` built, each only for its suite, but do not build them: run `make kernel` first for new ones. `make iso` builds them too and puts them in the local repository of the live ISO, but the headers, which the installer does not install.
 
 Raise the version in `version.json` for every change of the packages.
 

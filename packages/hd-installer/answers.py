@@ -93,6 +93,7 @@ def debconf(key, value):
 # read, as that needs the host name.
 KEYS = {
     "suite": (text, "Q_SUITE"),
+    "kernel": (text, "Q_KERNEL"),
     "encrypt": (yes_no, "Q_ENCRYPT"),
     "system_disks": (system_disks, None),
     "swap": (swap, None),

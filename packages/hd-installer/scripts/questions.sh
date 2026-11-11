@@ -21,6 +21,20 @@ q_suite() {
     ask_options Q_SUITE "Which suite are you installing" "${default}" "${SUITES[@]}"
 }
 
+# The HyprDebian kernel, with its prebuilt ZFS module: the one with every module of the kernel of
+# Debian, or one with only the modules of a kind of system.
+q_kernel() {
+    local default line
+    default="$(get_default Q_KERNEL)" || return 1
+    if ! answered Q_KERNEL; then
+        echo "Kernels:"
+        for line in "${KERNELS_SUMMARY[@]}"; do
+            printf '    %s\n' "${line}"
+        done
+    fi
+    ask_options Q_KERNEL "Which kernel are you installing" "${default}" "${KERNELS[@]}"
+}
+
 # The system, the ZFS pool and the swap, goes on one disk, or is mirrored on two.
 q_root_redundant() {
     local default
@@ -235,6 +249,7 @@ q_wipe() {
 
 add_dependencies "q_main" \
     "q_suite" \
+    "q_kernel" \
     "q_root_redundant" \
     "q_encrypt" \
     "q_root_disks" \

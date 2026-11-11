@@ -4,7 +4,7 @@ HyprDebian has its own live ISO. It is a small Debian trixie live system to inst
 The live cd contains:
 - A text console, no desktop. The live user `user` is logged in on the console automatically, and has sudo.
 - The package `hd-installer`, built from this repository, and the tools it runs on the live system: debootstrap, dosfstools, gdisk, mdadm and parted.
-- A local repository in `/srv/hyprdebian/repo` with every package built from this repository, in the suites of the `deploy.json` of its package directory. The kernels of [hd-kernel](../packages/hd-kernel.md), which `make all` leaves out and the installer does not install, are not in it. `hd-installer` installs the hd-* packages from it, so an installation needs no HyprDebian repository. The Debian packages still come from the Debian mirrors.
+- A local repository in `/srv/hyprdebian/repo` with every package built from this repository, in the suites of the `deploy.json` of its package directory. The kernels of [hd-kernel](../packages/hd-kernel.md), [hd-kernel-vm](../packages/hd-kernel-vm.md), [hd-kernel-server](../packages/hd-kernel-server.md) and [hd-kernel-desktop](../packages/hd-kernel-desktop.md) are in it too, each in the suite it is built for, without their headers. `hd-installer` installs the hd-* packages and the kernel from it, so an installation needs no HyprDebian repository. The Debian packages still come from the Debian mirrors.
 - ZFS support. The ZFS kernel module is built with DKMS while the ISO is built and is loaded at boot.
 - An ssh server, started at boot, which allows logging in with a password, so the installation can also be done from another machine.
 - NetworkManager. Wired networks come up by themselves, `nmtui` sets up wifi.
@@ -19,7 +19,7 @@ The ISO is built with live-build, in a debian:trixie docker container, so live-b
 make iso
 ```
 
-This builds every package into `build/` first, as `make all` does, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its folder there: `build/both` for trixie and unstable, `build/trixie` or `build/unstable` for one. The kernels of `make kernel` are left out. `make -C livecd iso` alone stops with an error, as it has no packages.
+This builds every package and the kernels into `build/` first, as `make all` and `make kernel` do, then hands them to `livecd/Makefile` in `DEBS`, each with the suites of its folder there: `build/both` for trixie and unstable, `build/trixie` or `build/unstable` for one. The headers of the kernels are left out. `make -C livecd iso` alone stops with an error, as it has no packages.
 
 The finished ISO is written to:
 ```

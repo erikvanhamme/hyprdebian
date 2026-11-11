@@ -1,7 +1,7 @@
 #!/bin/bash
 # The base phase: installs the base system with debootstrap on the ZFS pool, writes the files that
 # depend on the disks and the answers, adds the Debian repositories and the local repository of the
-# live cd, and installs the kernel and ZFS. The other packages are marked with add_packages and installed by the
+# live cd, and installs the HyprDebian kernel and ZFS. The other packages are marked with add_packages and installed by the
 # packages phase.
 
 b_pre() {
@@ -182,13 +182,21 @@ b_mount() {
     mount --bind /run/systemd/journal/dev-log "${TARGET_DIR}/run/systemd/journal/dev-log"
 }
 
-# The local repository of the live cd, which the hd-* packages come from. It is bound into /run of
-# the new system, a tmpfs, so none of it ends up on the disks. Its apt source is trusted, as the
-# repository comes with the installer; c_live_repo removes it again.
+# The local repository of the live cd, which the hd-* packages and the kernel come from. It is
+# bound into /run of the new system, a tmpfs, so none of it ends up on the disks. Its apt source is
+# trusted, as the repository comes with the installer; c_live_repo removes it again.
 b_live_repo() {
+    local kernel="${KERNEL_PACKAGES[${Q_KERNEL}]}"
+
     if [[ ! -d "${LIVE_REPO_DIR}/dists/${Q_SUITE}" ]]; then
         echo "ERROR: ${LIVE_REPO_DIR} has no suite ${Q_SUITE}. Run the installer from the" \
             "HyprDebian live cd."
+        return 1
+    fi
+    if ! grep -qx "Package: ${kernel}" \
+        "${LIVE_REPO_DIR}/dists/${Q_SUITE}/main/binary-amd64/Packages"; then
+        echo "ERROR: ${LIVE_REPO_DIR} has no ${kernel} in the suite ${Q_SUITE}. Run the" \
+            "installer from a HyprDebian live cd with the kernels."
         return 1
     fi
 
@@ -272,8 +280,7 @@ b_console() {
     done
 }
 
-# initramfs-tools with zstd, so every initramfs is compressed with zstd from the start. The kernel
-# headers bring the compiler that DKMS builds the ZFS module with.
+# initramfs-tools with zstd, so every initramfs is compressed with zstd from the start.
 b_initramfs() {
     # Deployed before the kernel is installed, so no initramfs ever waits for a resume device.
     file_deploy deploy/etc/initramfs-tools/conf.d/resume || return 1
@@ -281,13 +288,18 @@ b_initramfs() {
     in_target apt install -y initramfs-tools zstd
 }
 
+# The HyprDebian kernel of Q_KERNEL, from the local repository of the live cd, with its ZFS module,
+# built and signed with the kernel, so the system needs neither DKMS nor a compiler. Its package
+# depends on the kernel and the module of the newest build, and conflicts with the kernel of Debian
+# and zfs-dkms.
 b_kernel() {
-    in_target apt install -y linux-image-amd64 linux-headers-amd64
+    in_target apt install -y "${KERNEL_PACKAGES[${Q_KERNEL}]}"
 }
 
+# The ZFS tools and the initramfs hook, which adds the module of the kernel to its initrd. The
+# module itself comes with the kernel, as zfs-modules, which hd-base takes in place of zfs-dkms.
 b_zfs_support() {
-    in_target env DEBIAN_FRONTEND=noninteractive apt install -y zfs-dkms zfsutils-linux \
-        zfs-initramfs
+    in_target env DEBIAN_FRONTEND=noninteractive apt install -y zfsutils-linux zfs-initramfs
 }
 
 # Mounts the EFI system partitions in the target, where the bootloader writes its files in the
@@ -316,9 +328,9 @@ b_firmware() {
 }
 
 # The base system gets the text-only bootloader. Its postinst
-# does not write the ESPs: pkg_esps does that once all packages are installed, with the DKMS MOK
-# that zfs-dkms created in b_zfs_support and the Secure Boot keys of hd-base. pkg_boot_entries
-# then adds its firmware boot entries.
+# does not write the ESPs: pkg_esps does that once all packages are installed, with the Secure Boot
+# keys of hd-base. There is no DKMS MOK, as the kernel trusts the key its ZFS module was signed
+# with. pkg_boot_entries then adds its firmware boot entries.
 b_bootloader() {
     add_packages hd-bootloader-txt
 

@@ -5,7 +5,7 @@ It has the questions, disk, partition, filesystem, base, packages, user and clea
 
 It depends on `python3` and `python3-jinja2`, to render the files it writes in the new system.
 
-It installs the hd-* packages from the local repository of the HyprDebian live cd, in `/srv/hyprdebian/repo`, and the Debian packages from the Debian mirrors, so it needs internet access but no HyprDebian repository. The installed system keeps only the Debian repositories; to get updates of the hd-* packages, link it to a HyprDebian repository after the first boot with `hd-link-repo <url> --suite <suite>`, see [hd-base](hd-base.md).
+It installs the hd-* packages and the HyprDebian kernel from the local repository of the HyprDebian live cd, in `/srv/hyprdebian/repo`, and the Debian packages from the Debian mirrors, so it needs internet access but no HyprDebian repository. The installed system keeps only the Debian repositories; to get updates of the hd-* packages, link it to a HyprDebian repository after the first boot with `hd-link-repo <url> --suite <suite>`, see [hd-base](hd-base.md).
 
 The package comes with a man page: `man hd-installer`.
 
@@ -75,7 +75,7 @@ It exits with 0 when the installation is done, 1 when a task failed and 2 on wro
 | `scripts/constants.sh` | The mount point of the new system, the local repository of the live cd and where it is bound in the new system, the numbers of the partitions, the state directory, the directories of the disk names and of the network interfaces, and the colors. |
 | `scripts/config.sh` | `load_config` and `save_config`: the answers and the task dependencies, kept in `/tmp/hd-installer/config` as variable assignments. |
 | `scripts/answers.sh` | `load_answers`, which reads the answers file with `answers.py` into `ANSWERS`, by the variable of each question, and saves its path in the config; `answered`, which tells whether the file answers a question; `show_answer`, which shows such an answer in place of the question; and `debconf_answered`, which tells whether the file has debconf selections of a package. |
-| `scripts/defaults.sh` | The suites and the defaults of the questions. |
+| `scripts/defaults.sh` | The suites, the kernels and their packages, and the defaults of the questions. |
 | `scripts/dependencies.sh` | `add_dependencies`, `execute_task` and `always_run`: the tree of tasks, each marked done in `/tmp/hd-installer/<task>.done`. |
 | `scripts/helpers.sh` | Asking questions: `ask`, which asks for a line of text; `ask_valid`, which asks until a check function accepts the answer and only stores a valid one; `ask_password`, which asks for a password twice without showing or saving it; `ask_options`, which asks to pick one of a list of options; `ask_yes_no`, which asks a yes or no question and stores `true` or `false`; `confirm`, which asks to confirm something that cannot be undone, without a default and without saving the answer; and `set_answer`, which stores an answer that follows from earlier ones. Also `log_status`, which logs the start and end of a task; `add_packages`, which marks packages for the packages phase; `add_user_groups`, which adds groups for the user; `in_target`, which runs a command in the new system; `file_deploy`, which copies a file from `deploy/` into the new system; and `template_render`, which renders a template from `templates/` into the new system with `render.py`, with the answers except the password and the variables given. |
 | `scripts/helpers-disk.sh` | `disk_name`, which names a disk by its WWN, its NVMe EUI or its kernel node; `list_disks`, which lists the whole disks by that name; `ask_disk`, which asks to pick one of them; `unique_disks`, which lists the disks picked, each once; `root_disks`, `esp_disks` and `all_disks`, which list the disks of the system, of the EFI system partitions and both; `part`, which names a partition of a disk; `unmount_target`, which unmounts everything below `/mnt`, deepest first; `can_discard`, which tells whether a disk supports discard; and `valid_swap`, the check of the swap size. |
@@ -102,6 +102,7 @@ A task is a shell function. Tasks run without `set -e`, as they run inside an `i
 | Question | Variable | Answers |
 | --- | --- | --- |
 | Suite | `Q_SUITE` | `unstable` or `trixie`, the suites of HyprDebian; `unstable` by default. `hd-desktop` needs packages that are only in `unstable`. |
+| Kernel | `Q_KERNEL` | The HyprDebian kernel, with its prebuilt ZFS module: `vm`, `desktop`, `server` or `complete`, the packages [hd-kernel-vm](hd-kernel-vm.md), [hd-kernel-desktop](hd-kernel-desktop.md), [hd-kernel-server](hd-kernel-server.md) and [hd-kernel](hd-kernel.md), with only the modules of a KVM vm, of desktops and laptops, of servers, or every module of the kernel of Debian; `complete` by default. The kinds are shown with their package before the question. |
 | System mirror | `Q_ROOT_REDUNDANT` | `true` when the system, the ZFS pool and the swap, is mirrored on two disks; not by default. |
 | Encryption | `Q_ENCRYPT` | `true` when the ZFS pool is encrypted, with the password of the user as its passphrase; by default. |
 | System disks | `Q_ROOT_DISK_A`, `Q_ROOT_DISK_B` | The disk for the system, and with the mirror the second one; `Q_ROOT_DISK_B` is empty without it. |
@@ -132,6 +133,7 @@ The ask helpers in `scripts/helpers.sh`, `helpers-disk.sh` and `helpers-network.
 | Key | Questions | Value |
 | --- | --- | --- |
 | `suite` | `Q_SUITE` | `unstable` or `trixie`. |
+| `kernel` | `Q_KERNEL` | `vm`, `desktop`, `server` or `complete`. |
 | `encrypt` | `Q_ENCRYPT` | `true` or `false`. |
 | `system_disks` | `Q_ROOT_REDUNDANT`, `Q_ROOT_DISK_A`, `Q_ROOT_DISK_B` | A list of one disk, or two for a mirror. A disk may be named by any path, such as `/dev/vdb`; it is stored by its name in the list of disks. |
 | `swap` | `Q_SWAP` | The swap size in GiB, a whole number, 0 for no swap. |
@@ -153,6 +155,7 @@ An example, `test.json`:
 ```json
 {
     "suite": "unstable",
+    "kernel": "vm",
     "encrypt": false,
     "system_disks": ["/dev/vda"],
     "swap": 2,
@@ -213,13 +216,13 @@ The base phase installs Debian on the root of the new system and prepares it:
 | `b_zfs_cache` | Copies the cache file of the ZFS pool into the new system. |
 | `b_mount` | Binds `/dev`, `/proc` and `/sys` and the journal socket into the new system. |
 | `b_mount_unit` | Writes and enables the automount units of the EFI system partitions on `/boot/efi` and, on mirrored ESP disks, `/boot/efi2`, by their UUID. |
-| `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository or not the suite. |
+| `b_live_repo` | Binds the local repository of the live cd, `/srv/hyprdebian/repo`, read-only on `/run/hd-installer/repo` in the new system, a tmpfs, and adds it as the trusted apt source `hyprdebian-live.sources` for the suite. Fails when the live system has no such repository, not the suite, or not the package of the kernel in the suite. |
 | `b_apt_init` | Copies `deploy/etc/apt/apt.conf.d/00hd-installer` into the new system, so apt installs no recommends and downloads no translations of the descriptions while the installer runs, as `hd-base` sets for the installed system. Then it adds the Debian repositories, with the updates and security repositories for a stable suite, and updates the package lists. |
 | `b_debconf` | Sets the debconf selections of the answers file, if any, and with `Q_DEBCONF_DEFAULTS` the defaults of the packages it has none of, in the new system. |
 | `b_console` | Installs and asks the locales, the time zone, the keyboard and the console font; a package with debconf selections, from the answers file or the defaults, is configured with them, without questions. |
-| `b_initramfs` | Installs `initramfs-tools` with `zstd`, so every initramfs is compressed with zstd, and makes the initramfs not wait for a resume device. The kernel headers of `b_kernel` bring the compiler that DKMS builds the ZFS module with. |
-| `b_kernel` | Installs the kernel and its headers, `linux-image-amd64` and `linux-headers-amd64`. |
-| `b_zfs_support` | Installs ZFS, with its module built by DKMS. |
+| `b_initramfs` | Installs `initramfs-tools` with `zstd`, so every initramfs is compressed with zstd, and makes the initramfs not wait for a resume device. |
+| `b_kernel` | Installs the package of the kernel of `Q_KERNEL` from the local repository, which depends on the kernel and the ZFS module of its newest build, `linux-image-<release>` and `zfs-modules-<release>`. The module is built and signed with the kernel, so the system needs neither DKMS nor a compiler, and there is no DKMS MOK. |
+| `b_zfs_support` | Installs the ZFS tools and the initramfs hook, `zfsutils-linux` and `zfs-initramfs`. The module comes with the kernel, as `zfs-modules`, which `hd-base` takes in place of `zfs-dkms`. |
 | `b_esp` | Mounts the EFI system partitions on `/boot/efi` and `/boot/efi2` in the new system. |
 | `b_firmware` | Adds `pkg_firmware`, before `pkg_esps`, so the UKIs have the firmware in their initrd. |
 | `b_bootloader` | Marks `hd-bootloader-txt` and `efibootmgr`. |

@@ -1,5 +1,6 @@
 {
     "suite": "unstable",
+    "kernel": "desktop",
     "encrypt": true,
     "system_disks": ["/dev/disk/by-id/nvme-eui.0025384441a17e73"],
     "swap": 16,
