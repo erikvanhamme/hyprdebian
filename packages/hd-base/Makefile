@@ -55,8 +55,9 @@
 #                                             lib/hd_network.py, the code
 #                                             the hd-network commands share
 #                 /etc/...                    the files in etc/, at the
-#                                             same path and with the same
-#                                             mode, conffiles: the files
+#                                             same path, 0755 when they are
+#                                             executable and 0644 when not,
+#                                             conffiles: the files
 #                                             new users get in /etc/skel,
 #                                             the PATH of /etc/profile.d,
 #                                             the apt preferences, the apt
@@ -157,7 +158,8 @@ $(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(TEMPLATES) $(NETWORK_TEMP
 	install -m 0644 $(NETWORK_TEMPLATES) $(STAGE)$(NETWORK_TEMPLATE_DIR)/
 	install -m 0644 lib/hd_network.py $(STAGE)$(NETWORK_LIB_DIR)/
 	for file in $(ETC); do \
-		install -D -m $$(stat -c %a $$file) $$file $(STAGE)/$$file; \
+		if [ -x $$file ]; then mode=0755; else mode=0644; fi; \
+		install -D -m $$mode $$file $(STAGE)/$$file; \
 		echo /$$file >> $(STAGE)/DEBIAN/conffiles; \
 	done
 	for file in $(USR); do \
