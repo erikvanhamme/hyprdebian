@@ -48,6 +48,16 @@ virt/
 9pnet_fd
 9pnet_virtio
 
+# Not the network protocols that the kernel loads when any user opens a socket of them, which
+# HyprDebian does not use: SCTP and TIPC. Not the file systems that are rarely used and have had
+# holes: cramfs, freevxfs, jffs2 and hfs; hfsplus and udf stay, for disks of macOS and for DVDs.
+!net/sctp/
+!net/tipc/
+!fs/cramfs/
+!fs/freevxfs/
+!fs/jffs2/
+!fs/hfs/
+
 # ACPI and the platform: power button, power meter, IPMI and the Dell drivers of technogea.
 button
 acpi_ipmi

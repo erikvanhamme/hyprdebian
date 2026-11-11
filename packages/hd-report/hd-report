@@ -33,6 +33,8 @@ APT_HISTORY = "/var/log/apt/history.log"
 APT_LISTS = "/var/lib/apt/lists"
 ROOT_DATASET = "rpool/hyprdebian"
 EFIVARS = "/sys/firmware/efi/efivars"
+# Shows what is hardened as JSON, see hd-harden(8) of hd-base.
+HD_HARDEN = ("/usr/sbin/hd-harden", "--json")
 GLOBAL_GUID = "8be4df61-93ca-11d2-aa0d-00e098032b8c"
 # The timers in the report: those of the admin in /etc, and those of the hyprdebian packages.
 TIMER_GLOBS = ["/etc/systemd/system/*.timer", "/usr/lib/systemd/system/hd-*.timer"]
@@ -401,6 +403,19 @@ def secure_boot_state(efivars=EFIVARS):
     return "off"
 
 
+def parse_hardening(output):
+    """The state of each part that hd-harden hardens, from the JSON object of hd-harden --json,
+    such as {"ssh": "on", "ufw": "unknown"}; None when there is none."""
+    try:
+        hardening = json.loads(output or "")
+    except ValueError:
+        return None
+    if not isinstance(hardening, dict):
+        return None
+    return {part: state for part, state in hardening.items()
+            if isinstance(part, str) and isinstance(state, str)}
+
+
 def fqdn():
     """The fully qualified domain name, or nothing when the system has none."""
     name = socket.getfqdn()
@@ -454,6 +469,7 @@ def collect():
         },
         "snapshot": parse_snapshots(snapshots),
         "timers": collect_timers(),
+        "hardening": parse_hardening(run(*HD_HARDEN)),
     }
 
 

@@ -1,0 +1,4 @@
+# The modules that are never loaded, also not with modprobe. Written by hd-harden --modules.
+{% for module in modules %}
+install {{ module }} /bin/false
+{% endfor %}

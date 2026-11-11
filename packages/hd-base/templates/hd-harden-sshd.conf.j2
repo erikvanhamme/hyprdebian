@@ -1,0 +1,7 @@
+# The hardening of the SSH server. Written by hd-harden --ssh.
+# sshd takes the first value it reads, and this file comes before sshd_config and the later
+# files of sshd_config.d.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+X11Forwarding no

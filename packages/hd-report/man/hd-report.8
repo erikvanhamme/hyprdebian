@@ -91,7 +91,12 @@ and the enabled timers in
 .I /etc/systemd/system
 and the
 .B hd-*
-timers of the packages, with the result of their last run.
+timers of the packages, with the result of their last run, and the state of
+each part that
+.BR hd-harden (8)
+hardens, as
+.B hd-harden \-\-json
+prints it.
 .SH EXIT STATUS
 0 when the report was sent or printed, 1 on an error, 2 on wrong arguments.
 .SH FILES
@@ -113,5 +118,6 @@ Run hd-report every 15 minutes.
 .SH SEE ALSO
 .BR hd-dashboard (7),
 .BR hd-config-update (1),
+.BR hd-harden (8),
 .BR hd-secboot (8),
 .BR hd-up (1)

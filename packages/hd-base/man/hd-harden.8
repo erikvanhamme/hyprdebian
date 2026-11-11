@@ -1,0 +1,244 @@
+.TH HD-HARDEN 8 "November 2026" "hd-base" "HyprDebian"
+.SH NAME
+hd-harden \- harden the SSH server, the kernel, the home directories and the firewall
+.SH SYNOPSIS
+.B hd-harden
+.RB [ \-\-ssh ]
+.RB [ \-\-sysctl ]
+.RB [ \-\-modules ]
+.RB [ \-\-zfs ]
+.RB [ \-\-ufw ]
+.RB [ \-\-all ]
+.RB [ \-\-json ]
+.RB [ \-\-network
+.IR cidr ]...
+.SH DESCRIPTION
+.B hd-harden
+hardens the parts of the system that its options name; they can be combined.
+Running it again changes nothing.
+Run it as root.
+.PP
+Without options it shows for each part whether it is hardened:
+.B on
+or
+.BR off ,
+or
+.B changed
+when the file it writes has other content, as after an edit by hand or
+from an older
+.BR hd-harden .
+The state of ufw shows only for root, who can read its rules; for other
+users it is
+.BR unknown .
+With
+.B \-\-json
+it prints the same as a JSON object, with the state of each part, which
+.BR hd-report (8)
+sends to the dashboard:
+.PP
+.RS
+.nf
+{"ssh": "on", "sysctl": "on", "modules": "changed", "zfs": "off", "ufw": "on"}
+.fi
+.RE
+.SH OPTIONS
+.TP
+.B \-\-ssh
+Turns off password logins, root logins and X11 forwarding of the SSH
+server, with
+.BR "PasswordAuthentication no" ,
+.BR "KbdInteractiveAuthentication no" ,
+.B PermitRootLogin no
+and
+.B X11Forwarding no
+in
+.IR /etc/ssh/sshd_config.d/10\-hd\-harden.conf .
+.BR sshd (8)
+takes the first value it reads, and the file comes before
+.I sshd_config
+and the later files of
+.IR sshd_config.d .
+It stops before writing when no user of the group
+.BR sudo ,
+as a member or by their own group, has an
+.I ~/.ssh/authorized_keys
+that is not empty, as nobody could get root over ssh then.
+It checks the config with
+.BR "sshd \-t" ,
+puts the old file back when that fails, and reloads the SSH server.
+.TP
+.B \-\-sysctl
+Writes
+.I /etc/sysctl.d/90\-hd\-harden.conf
+and loads it:
+.B kernel.yama.ptrace_scope
+1, so a process can only ptrace its children,
+.B kernel.kptr_restrict
+1, which hides the kernel addresses in
+.I /proc
+from users without
+.BR CAP_SYSLOG ,
+and
+.B dev.tty.ldisc_autoload
+0, so only root can load the module of a line discipline.
+.TP
+.B \-\-modules
+Writes
+.I /etc/modprobe.d/hd\-harden.conf
+with
+.B install
+.I module
+.B /bin/false
+for each module that is never loaded, also not with
+.BR modprobe (8):
+the network protocols
+.BR dccp ,
+.BR sctp ,
+.B rds
+and
+.BR tipc ,
+which the kernel loads when any user opens a socket of them, the line
+discipline
+.BR n_hdlc ,
+which any user can attach to a tty, and the rarely used file systems
+.BR cramfs ,
+.BR freevxfs ,
+.B jffs2
+and
+.BR hfs .
+.B hfsplus
+and
+.B udf
+stay, for disks of macOS and for DVDs.
+A module that is loaded already stays loaded until a reboot;
+.B hd-harden
+names it.
+.TP
+.B \-\-zfs
+Sets
+.B setuid=off
+and
+.B devices=off
+on the ZFS dataset mounted at
+.IR /home ,
+so no program below
+.I /home
+runs with the rights of its owner and no device file there opens a device.
+The datasets of the users below it inherit that, and ZFS mounts them again
+with the new options at once.
+.B exec
+stays on, for
+.IR ~/.local/bin .
+.TP
+.B \-\-ufw
+Lets ssh in from the local IPv4 networks alone.
+It adds a rule
+.B allow from
+.I network
+.B to any port 22 proto tcp
+to
+.BR ufw (8)
+for each IPv4 network of the global addresses of the interfaces that
+systemd-networkd configures, as
+.B networkctl list
+shows them, or for each network given with
+.BR \-\-network .
+Then it deletes the rules of
+.B ufw show added
+that let ssh in from anywhere, by the name
+.BR SSH ,
+.BR OpenSSH ,
+.B 22
+or
+.BR 22/tcp ,
+such as the
+.B ufw allow SSH
+of the installer.
+That covers IPv4 and IPv6, so ssh no longer comes in over IPv6.
+The new rules come first, so a connection from a local network is never
+refused, and connections that are open stay open, as ufw lets established
+connections through.
+.TP
+.B \-\-all
+All of
+.BR \-\-ssh ,
+.BR \-\-sysctl ,
+.BR \-\-modules ,
+.B \-\-zfs
+and
+.BR \-\-ufw .
+.TP
+.B \-\-json
+Show what is hardened as a JSON object, without the options that harden.
+.TP
+.BR \-\-network " " \fIcidr\fR
+With
+.B \-\-ufw
+or
+.BR \-\-all ,
+an IPv4 network to let ssh in from, such as
+.BR 192.168.1.0/24 ,
+in place of those of the interfaces.
+It may be given more than once.
+.TP
+.BR \-h ", " \-\-help
+Show a short help and exit.
+.SH EXIT STATUS
+0 when everything was hardened or the state was shown, 1 when a step
+failed, and 2 for wrong arguments.
+The steps before the one that failed stay done.
+.SH EXAMPLES
+Show what is hardened:
+.PP
+.RS
+.nf
+sudo hd-harden
+.fi
+.RE
+.PP
+Harden all of it:
+.PP
+.RS
+.nf
+sudo hd-harden \-\-all
+.fi
+.RE
+.PP
+Let ssh in from one network alone:
+.PP
+.RS
+.nf
+sudo hd-harden \-\-ufw \-\-network 192.168.1.0/24
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/ssh/sshd_config.d/10\-hd\-harden.conf
+The hardening of the SSH server, written by
+.BR \-\-ssh .
+.TP
+.I /etc/sysctl.d/90\-hd\-harden.conf
+The hardening sysctls, written by
+.BR \-\-sysctl .
+.TP
+.I /etc/modprobe.d/hd\-harden.conf
+The modules that are never loaded, written by
+.BR \-\-modules .
+.TP
+.I /usr/share/hd-base/templates/hd\-harden\-sshd.conf.j2
+.TQ
+.I /usr/share/hd-base/templates/hd\-harden\-sysctl.conf.j2
+.TQ
+.I /usr/share/hd-base/templates/hd\-harden\-modprobe.conf.j2
+The templates of those files.
+.SH SEE ALSO
+.BR hd-base (7),
+.BR hd-report (8),
+.BR sshd_config (5),
+.BR sysctl.d (5),
+.BR modprobe.d (5),
+.BR zfsprops (7),
+.BR ufw (8),
+.BR networkctl (1)
+.SH AUTHOR
+Erik Van Hamme <erik.vanhamme@gmail.com>

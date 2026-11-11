@@ -1,0 +1,7 @@
+# The hardening sysctls of the kernel. Written by hd-harden --sysctl.
+# Only a parent process can ptrace its children.
+kernel.yama.ptrace_scope = 1
+# The kernel addresses in /proc are hidden from users without CAP_SYSLOG.
+kernel.kptr_restrict = 1
+# Only root can load the module of a line discipline.
+dev.tty.ldisc_autoload = 0

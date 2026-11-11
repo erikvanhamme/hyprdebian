@@ -48,7 +48,8 @@ Description: HyprDebian base system
  the pools, the RAID arrays and the failed units. Above the login prompt it
  shows the version and the suite, written in
  /etc/issue by hd-issue. hd-link-repo switches the HyprDebian repository and
- suite that apt gets the hd-* packages from.
+ suite that apt gets the hd-* packages from. hd-harden hardens the SSH
+ server, the kernel, the home directories and the firewall, each on request.
  .
  It keeps the hyprdebian configuration in /etc/hyprdebian/config.json, where
  hyprdebian packages write their settings under a key of their own with

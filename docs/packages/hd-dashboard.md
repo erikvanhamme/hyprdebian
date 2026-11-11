@@ -106,6 +106,7 @@ The connection is plain HTTP, meant for the local network.
 | `updates` | `upgradable`, the number of packages that can be upgraded, `lists_time`, `last_upgrade` and `reboot_required`. |
 | `snapshot` | `name` and `time` of the newest snapshot of the system. |
 | `timers` | Per timer: `unit`, `service`, `last`, `next` and `result`. |
+| `hardening` | The state of each part that `hd-harden` of hd-base hardens, as `hd-harden --json` prints it: `ssh`, `sysctl`, `modules`, `zfs` and `ufw`, each `on`, `off`, `changed` or, for `ufw` without root, `unknown`, see [hd-harden](hd-base.md#hd-harden); `null` when it cannot be read. |
 
 Times are Unix timestamps. Parts that are missing are left out of the pages. Raise `FORMAT` in both `hd-dashboard` and `hd-report` when the layout changes in a way the dashboard must know about, and update the dashboard before the systems.
 

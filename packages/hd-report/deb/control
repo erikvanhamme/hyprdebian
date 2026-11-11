@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd, hd-base (>= 1.22)
+Depends: python3, systemd, hd-base (>= 1.86)
 Suggests: hd-dashboard
 Section: admin
 Priority: optional
@@ -11,8 +11,9 @@ Description: HyprDebian status reports for the dashboard
  Sends the state of the system to the hyprdebian dashboard of hd-dashboard
  every 15 minutes: the HyprDebian and Debian versions, the kernel, the state
  of Secure Boot, the load, the memory, the ZFS pools, the mdadm arrays, the
- failed units, the pending upgrades and reboots, the last snapshot of hd-up
- and the timers. The system only makes outgoing connections.
+ failed units, the pending upgrades and reboots, the last snapshot of hd-up,
+ the timers and what hd-harden of hd-base hardened. The system only makes
+ outgoing connections.
  .
  The URL of the dashboard is the key hd-report in
  /etc/hyprdebian/config.json; the token of the system is generated on the

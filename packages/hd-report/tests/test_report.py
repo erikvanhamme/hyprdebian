@@ -144,6 +144,19 @@ class TestParsing(unittest.TestCase):
 
         self.assertEqual(arrays, [{"name": "swap", "state": "clean", "degraded": 1}])
 
+    def test_hardening(self):
+        output = '{"ssh": "on", "sysctl": "off", "modules": "changed", "zfs": "on", "ufw": "unknown"}\n'
+        self.assertEqual(report.parse_hardening(output),
+                         {"ssh": "on", "sysctl": "off", "modules": "changed", "zfs": "on", "ufw": "unknown"})
+
+    def test_no_hardening(self):
+        for output in (None, "", "not json", "[]", '"on"'):
+            with self.subTest(output=output):
+                self.assertIsNone(report.parse_hardening(output))
+
+    def test_hardening_leaves_out_what_is_not_a_state(self):
+        self.assertEqual(report.parse_hardening('{"ssh": "on", "zfs": 1, "ufw": null}'), {"ssh": "on"})
+
     def test_secure_boot_state(self):
         cases = [
             ({"SecureBoot": b"\x01", "SetupMode": b"\x00"}, "on"),

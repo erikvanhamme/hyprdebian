@@ -43,6 +43,9 @@
 #                 /usr/sbin/hd-firmware       finds and installs the
 #                                             firmware packages that the
 #                                             hardware needs
+#                 /usr/sbin/hd-harden         hardens the SSH server, the
+#                                             kernel, the home directories
+#                                             and the firewall
 #                 /usr/share/hd-base/templates/*
 #                                             the jinja2 templates in
 #                                             templates/, rendered by
@@ -119,8 +122,8 @@ USR := $(shell find usr -type f)
 COMMANDS := hd-up hd-reboot-check hd-reboot hd-poweroff hd-sync-skel hd-config-update hd-config-remove
 # The commands for root, installed in /usr/sbin.
 SBIN_COMMANDS := hd-issue hd-link-repo hd-network-render \
-	hd-network-iface hd-network-bridge hd-secboot hd-firmware
-# The jinja2 templates of hd-link-repo.
+	hd-network-iface hd-network-bridge hd-secboot hd-firmware hd-harden
+# The jinja2 templates of hd-link-repo and hd-harden.
 TEMPLATE_DIR := /usr/share/$(DEB_NAME)/templates
 TEMPLATES := $(wildcard templates/*.j2)
 # The jinja2 templates of hd-network-render, and the code the hd-network commands share.
@@ -129,7 +132,7 @@ NETWORK_TEMPLATES := $(wildcard templates/hd-network/*.j2)
 NETWORK_LIB_DIR := /usr/lib/hd-network
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
 MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot-check.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
-	man/hd-issue.8 man/hd-link-repo.8 man/hd-firmware.8 \
+	man/hd-issue.8 man/hd-link-repo.8 man/hd-firmware.8 man/hd-harden.8 \
 	man/hd-config.7 man/hd-config-update.1 man/hd-config-remove.1 \
 	man/hd-network.7 man/hd-network-render.8 man/hd-network-iface.8 man/hd-network-bridge.8 \
 	man/hd-secboot.7 man/hd-secboot.8

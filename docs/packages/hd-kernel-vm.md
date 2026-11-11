@@ -6,6 +6,8 @@ What the config of Debian builds into the kernel stays, and so do the modules th
 - those of the hardware that QEMU emulates for a KVM virtual machine: virtio for disks, network, graphics, sound, input, memory and random numbers; SATA, IDE, NVMe and SCSI disks and cd-roms; the network cards e1000, e1000e and RTL8139; the USB controllers with keyboards, mice, tablets, storage and audio; the standard VGA, QXL and Cirrus graphics; HDA and AC97 sound; the power button of ACPI, by which the host shuts the virtual machine down; the SMBus, LPC and watchdog of the q35 chipset, the watchdogs i6300esb and ib700, and the PC speaker; fw_cfg, pvpanic and the KVM clock for PTP;
 - those of software: loop, zram and nbd, device mapper and RAID, and the network devices of containers, virtual machines, VPNs and bonds, such as tun, veth, macvlan, vxlan, wireguard and vhost.
 
+The network protocols SCTP and TIPC, which the kernel loads when any user opens a socket of them, and the rarely used file systems cramfs, freevxfs, jffs2 and hfs are left out, as they have had holes and HyprDebian does not use them; `hd-harden --modules` of [hd-base](hd-base.md#hd-harden) keeps them from being loaded with the other kernels. hfsplus and udf stay.
+
 `keep-modules` in the package directory lists them, see [The keep list](hd-kernel.md#the-keep-list).
 
 ## The packages

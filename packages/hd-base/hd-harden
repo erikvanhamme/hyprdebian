@@ -1,0 +1,371 @@
+#!/usr/bin/python3
+"""Hardens the system: the SSH server, the kernel, the home directories and the firewall.
+
+The package hd-base installs this as /usr/sbin/hd-harden.
+
+    hd-harden                            show what is hardened
+    hd-harden --json                     the same as a JSON object, for hd-report
+    hd-harden --ssh                      no password logins, no root logins and no X11
+                                         forwarding for ssh
+    hd-harden --sysctl                   the sysctls that limit ptrace, kernel pointers and
+                                         line disciplines
+    hd-harden --modules                  no loading of the modules of rare network protocols
+                                         and old file systems
+    hd-harden --zfs                      no setuid programs and device files below /home
+    hd-harden --ufw [--network <cidr>]   ssh from the local IPv4 networks alone, in place of
+                                         from anywhere
+    hd-harden --all [--network <cidr>]   all of the above
+
+--ssh writes /etc/ssh/sshd_config.d/10-hd-harden.conf from a jinja2 template in
+/usr/share/hd-base/templates, checks it with sshd -t and reloads the SSH server. It stops before
+that when no user of the group sudo has an ~/.ssh/authorized_keys, as nobody could get root over
+ssh then. --sysctl
+writes /etc/sysctl.d/90-hd-harden.conf from a template and loads it. --modules writes
+/etc/modprobe.d/hd-harden.conf from a template, which keeps the modules from being loaded; one
+that is loaded already stays until a reboot. --zfs sets setuid=off and devices=off on the ZFS
+dataset mounted at /home, which the datasets below it inherit. --ufw adds a rule of ufw
+that lets ssh in from each IPv4 network of the interfaces that systemd-networkd configures, or
+from the networks given with --network, and then deletes the rules that let ssh in from
+anywhere. The options can be combined, and running them again changes nothing. Run it as root.
+
+Without options it shows for each of them whether it is on: off, on, or changed when the file
+it writes has other content, as after an edit by hand or from an older hd-harden; the state of
+ufw is unknown but for root. With --json it prints an object with the state of each part, such as
+{"ssh": "on", "sysctl": "off", ...}, which hd-report sends to the dashboard.
+"""
+
+import argparse
+import grp
+import ipaddress
+import json
+import os
+import pwd
+import re
+import subprocess
+import sys
+
+import jinja2
+
+SSHD_CONF = "/etc/ssh/sshd_config.d/10-hd-harden.conf"
+SYSCTL_CONF = "/etc/sysctl.d/90-hd-harden.conf"
+MODPROBE_CONF = "/etc/modprobe.d/hd-harden.conf"
+# The modules that --modules keeps from being loaded: network protocols that the kernel loads
+# when any user opens a socket of them, a line discipline that any user can attach to a tty, and
+# file systems that are rarely used. hfsplus and udf stay, for disks of macOS and for DVDs.
+MODULES = ("dccp", "sctp", "rds", "tipc", "n_hdlc", "cramfs", "freevxfs", "jffs2", "hfs")
+PROC_MODULES = "/proc/modules"
+HOME = "/home"
+ZFS_PROPERTIES = ("setuid=off", "devices=off")
+# The group whose users can become root, who need a key to log in when root cannot.
+ADMIN_GROUP = "sudo"
+SSH_PORT = "22"
+# The ways a rule of ufw can name ssh: the service of /etc/services, the application profile of
+# openssh-server and the port. Compared in lower case.
+SSH_NAMES = ("ssh", "openssh", "22", "22/tcp")
+# An added rule that lets ssh in from anywhere, as `ufw show added` prints it, such as
+# "ufw allow SSH": allow or limit, maybe with in, and nothing but the name.
+OPEN_SSH_RULE = re.compile(r"ufw ((?:allow|limit)(?: in)? (\S+))")
+
+TEMPLATE_DIR = "/usr/share/hd-base/templates"
+TEMPLATES = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
+                               undefined=jinja2.StrictUndefined, keep_trailing_newline=True,
+                               trim_blocks=True, lstrip_blocks=True)
+
+
+def fail(message):
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def read(path):
+    """The content of a file, None when it does not exist."""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+
+def write(path, content):
+    """Replaces a file with the content, with mode 0644, or removes it for None."""
+    if content is None:
+        if os.path.exists(path):
+            os.remove(path)
+        return
+    tmp = path + ".hd-harden"
+    with open(tmp, "wb") as f:
+        f.write(content)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def render(template, **values):
+    return TEMPLATES.get_template(template).render(**values).encode("utf-8")
+
+
+def admin_group():
+    """The members and the id of ADMIN_GROUP; no members and None when it does not exist."""
+    try:
+        group = grp.getgrnam(ADMIN_GROUP)
+    except KeyError:
+        return [], None
+    return group.gr_mem, group.gr_gid
+
+
+def admins_with_keys(users=None, group=None):
+    """The names of the users of ADMIN_GROUP, as a member or by their own group, that have a
+    ~/.ssh/authorized_keys that is not empty; not root, who cannot log in over ssh."""
+    members, gid = group if group is not None else admin_group()
+    names = []
+    for user in users if users is not None else pwd.getpwall():
+        if user.pw_uid == 0:
+            continue
+        if user.pw_name not in members and (gid is None or user.pw_gid != gid):
+            continue
+        keys = os.path.join(user.pw_dir, ".ssh", "authorized_keys")
+        try:
+            if os.path.getsize(keys) > 0:
+                names.append(user.pw_name)
+        except OSError:
+            pass
+    return names
+
+
+def harden_ssh():
+    users = admins_with_keys()
+    if not users:
+        fail(f"No user of the group {ADMIN_GROUP} has an ~/.ssh/authorized_keys; without "
+             "passwords and root logins nobody could get root over ssh.")
+    old = read(SSHD_CONF)
+    write(SSHD_CONF, render("hd-harden-sshd.conf.j2"))
+    result = subprocess.run(["sshd", "-t"], check=False)
+    if result.returncode != 0:
+        write(SSHD_CONF, old)
+        fail(f"sshd does not accept {SSHD_CONF}; the old config is back.")
+    subprocess.run(["systemctl", "try-reload-or-restart", "ssh.service"], check=False)
+    print(f"ssh: no password logins, no root logins and no X11 forwarding, in {SSHD_CONF}. "
+          f"Users of {ADMIN_GROUP} with a key: {', '.join(users)}.")
+
+
+def harden_sysctl():
+    write(SYSCTL_CONF, render("hd-harden-sysctl.conf.j2"))
+    result = subprocess.run(["sysctl", "-q", "-p", SYSCTL_CONF], check=False)
+    if result.returncode != 0:
+        fail(f"sysctl could not load {SYSCTL_CONF}.")
+    print(f"sysctl: the hardening sysctls are set, in {SYSCTL_CONF}.")
+
+
+def loaded_modules(proc_modules):
+    """The modules of MODULES in the content of /proc/modules."""
+    loaded = {line.split()[0] for line in proc_modules.splitlines() if line.strip()}
+    return [module for module in MODULES if module in loaded]
+
+
+def harden_modules():
+    write(MODPROBE_CONF, render("hd-harden-modprobe.conf.j2", modules=MODULES))
+    print(f"modules: {', '.join(MODULES)} are no longer loaded, in {MODPROBE_CONF}.")
+    loaded = loaded_modules((read(PROC_MODULES) or b"").decode())
+    if loaded:
+        print(f"modules: {', '.join(loaded)} stay loaded until a reboot.")
+
+
+def home_dataset(zfs_list, mountpoint=HOME):
+    """The ZFS file system mounted at /home, from `zfs list -H -o name,mountpoint`; None when
+    there is none."""
+    for line in zfs_list.splitlines():
+        name, _, mount = line.partition("\t")
+        if mount == mountpoint:
+            return name
+    return None
+
+
+def find_home_dataset():
+    """The ZFS file system mounted at /home; None when there is none or zfs fails."""
+    result = subprocess.run(["zfs", "list", "-H", "-o", "name,mountpoint", "-t", "filesystem"],
+                            capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        return None
+    return home_dataset(result.stdout)
+
+
+def harden_zfs():
+    dataset = find_home_dataset()
+    if dataset is None:
+        fail(f"No ZFS dataset is mounted at {HOME}.")
+    result = subprocess.run(["zfs", "set", *ZFS_PROPERTIES, dataset], check=False)
+    if result.returncode != 0:
+        fail(f"zfs set failed for {dataset}.")
+    print(f"zfs: {' and '.join(ZFS_PROPERTIES)} on {dataset} and the datasets below it.")
+
+
+def local_networks(links):
+    """The IPv4 networks of the global addresses of the links that systemd-networkd configures,
+    from the Interfaces of `networkctl list --json=short`, sorted and without duplicates."""
+    networks = set()
+    for link in links:
+        if link.get("AdministrativeState") != "configured":
+            continue
+        for address in link.get("Addresses") or []:
+            if address.get("Family") != 2 or address.get("ScopeString") != "global":
+                continue
+            interface = ipaddress.ip_interface(
+                f"{address['AddressString']}/{address['PrefixLength']}")
+            networks.add(interface.network)
+    return [str(network) for network in sorted(networks)]
+
+
+def open_ssh_rules(added):
+    """The rules of `ufw show added` that let ssh in from anywhere, as the arguments that follow
+    `ufw delete`, such as ["allow", "SSH"]."""
+    rules = []
+    for line in added.splitlines():
+        match = OPEN_SSH_RULE.fullmatch(line.strip())
+        if match and match.group(2).lower() in SSH_NAMES:
+            rule = match.group(1).split()
+            if rule not in rules:
+                rules.append(rule)
+    return rules
+
+
+def ufw(*args):
+    result = subprocess.run(["ufw", *args], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        fail(f"ufw {' '.join(args)} failed: {(result.stderr or result.stdout).strip()}")
+    return result.stdout
+
+
+def harden_ufw(networks):
+    if not networks:
+        output = subprocess.run(["networkctl", "list", "--json=short"], capture_output=True,
+                                text=True, check=False).stdout
+        try:
+            links = json.loads(output).get("Interfaces") or []
+        except ValueError:
+            links = []
+        networks = local_networks(links)
+        if not networks:
+            fail("No interface of systemd-networkd has an IPv4 network; give it with --network.")
+    # The rules for the local networks come first, so a connection from there is never
+    # refused. Connections that are open stay open: ufw lets established connections through.
+    for network in networks:
+        ufw("allow", "from", network, "to", "any", "port", SSH_PORT, "proto", "tcp")
+    for rule in open_ssh_rules(ufw("show", "added")):
+        ufw("delete", *rule)
+    print(f"ufw: ssh comes in from {', '.join(networks)} alone.")
+
+
+def file_state(path, content):
+    """off when the file is missing, on when it has the content, changed when it has another."""
+    current = read(path)
+    if current is None:
+        return "off"
+    return "on" if current == content else "changed"
+
+
+def zfs_state():
+    """The state of --zfs, with the dataset of /home."""
+    dataset = find_home_dataset()
+    if dataset is None:
+        return "off", f"no ZFS dataset at {HOME}"
+    result = subprocess.run(["zfs", "get", "-H", "-o", "value", "setuid,devices", dataset],
+                            capture_output=True, text=True, check=False)
+    values = result.stdout.split()
+    return ("on" if values == ["off", "off"] else "off"), dataset
+
+
+def ufw_state():
+    """The state of --ufw: on when no rule lets ssh in from anywhere. Only root can read it."""
+    if os.geteuid() != 0:
+        return "unknown", "only root can read the rules"
+    result = subprocess.run(["ufw", "show", "added"], capture_output=True, text=True,
+                            check=False)
+    if result.returncode != 0:
+        return "unknown", "ufw show added failed"
+    return ("off" if open_ssh_rules(result.stdout) else "on"), ""
+
+
+def collect_state():
+    """The state of each part, as rows of the part, the state and a detail."""
+    return [
+        ("ssh", file_state(SSHD_CONF, render("hd-harden-sshd.conf.j2")), SSHD_CONF),
+        ("sysctl", file_state(SYSCTL_CONF, render("hd-harden-sysctl.conf.j2")), SYSCTL_CONF),
+        ("modules", file_state(MODPROBE_CONF, render("hd-harden-modprobe.conf.j2",
+                                                      modules=MODULES)), MODPROBE_CONF),
+        ("zfs", *zfs_state()),
+        ("ufw", *ufw_state()),
+    ]
+
+
+def show_state(as_json):
+    rows = collect_state()
+    if as_json:
+        print(json.dumps({part: state for part, state, _ in rows}))
+        return
+    for part, state, detail in rows:
+        print(f"{part:<8} {state:<8} {detail}".rstrip())
+
+
+def network(value):
+    """An IPv4 network for --network, such as 192.168.1.0/24."""
+    try:
+        return str(ipaddress.IPv4Network(value, strict=False))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value} is not an IPv4 network, such as "
+                                         "192.168.1.0/24") from None
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Harden the SSH server, the kernel, the home directories and the firewall. "
+        "Without options, show what is hardened.")
+    parser.add_argument("--ssh", action="store_true",
+                        help="turn off password logins, root logins and X11 forwarding of the "
+                        "SSH server")
+    parser.add_argument("--sysctl", action="store_true",
+                        help="set the sysctls that limit ptrace, kernel pointers and line "
+                        "disciplines")
+    parser.add_argument("--modules", action="store_true",
+                        help="keep the modules of rare network protocols and old file systems "
+                        "from being loaded")
+    parser.add_argument("--zfs", action="store_true",
+                        help="no setuid programs and device files on the ZFS dataset of /home")
+    parser.add_argument("--ufw", action="store_true",
+                        help="let ssh in from the local IPv4 networks alone, in place of from "
+                        "anywhere")
+    parser.add_argument("--all", action="store_true",
+                        help="all of --ssh, --sysctl, --modules, --zfs and --ufw")
+    parser.add_argument("--json", action="store_true",
+                        help="show what is hardened as a JSON object, for hd-report")
+    parser.add_argument("--network", action="append", type=network, default=[],
+                        help="with --ufw or --all, a network to let ssh in from, such as "
+                        "192.168.1.0/24, in place of those of the interfaces; may be given "
+                        "more than once")
+    args = parser.parse_args()
+
+    if args.all:
+        args.ssh = args.sysctl = args.modules = args.zfs = args.ufw = True
+    if args.network and not args.ufw:
+        parser.error("--network goes with --ufw or --all")
+    harden = args.ssh or args.sysctl or args.modules or args.zfs or args.ufw
+    if args.json and harden:
+        parser.error("--json shows the state, without the options that harden")
+    if not harden:
+        show_state(args.json)
+        return
+    if os.geteuid() != 0:
+        fail("This script must be run as root.")
+
+    if args.ssh:
+        harden_ssh()
+    if args.sysctl:
+        harden_sysctl()
+    if args.modules:
+        harden_modules()
+    if args.zfs:
+        harden_zfs()
+    if args.ufw:
+        harden_ufw(args.network)
+
+
+if __name__ == "__main__":
+    main()

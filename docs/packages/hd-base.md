@@ -1,7 +1,7 @@
 ## Introduction
 The package `hd-base` depends on the packages that every hyprdebian system has, so that they are installed with it and stay installed. Besides the settings below, a package it pulls in is set up the way that package does it.
 
-It installs `hd-up`, which upgrades the system after a ZFS snapshot, by hand and every week, `hd-reboot-check`, which tells whether a reboot is needed, as after a new kernel, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, `hd-firmware`, which finds and installs the firmware packages that the hardware needs, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
+It installs `hd-up`, which upgrades the system after a ZFS snapshot, by hand and every week, `hd-reboot-check`, which tells whether a reboot is needed, as after a new kernel, `hd-reboot` and `hd-poweroff`, which reboot and power off the system on a desktop and without one, `hd-issue`, which writes the login banner, `hd-link-repo`, which switches the HyprDebian repository and suite of apt, `hd-firmware`, which finds and installs the firmware packages that the hardware needs, `hd-harden`, which hardens the SSH server, the kernel, the home directories and the firewall, the files that new users get in their home directory, from `/etc/skel`, with `hd-sync-skel`, which brings them into an existing home directory, and a few settings of the system. The files of the package are in `etc/` and `usr/` in this repository, at the path they are installed to; those in `etc/` are conffiles.
 
 It also holds the parts that every hyprdebian system shares, each with a page of its own:
 - [hd-config](hd-config.md): the hyprdebian configuration in `/etc/hyprdebian/config.json`, where hyprdebian packages keep their settings, and that of each user in `~/.config/hyprdebian/config.json`, with `hd-config-update` and `hd-config-remove`;
@@ -12,7 +12,7 @@ These were the packages `hd-config`, `hd-network` and `hd-secboot` before. `hd-b
 
 When a package becomes part of every hyprdebian system, it is added to the `Depends` of `hd-base`, to its man page and to this page.
 
-The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot-check`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue`, `man hd-link-repo` and `man hd-firmware` the commands. The man pages of the shared parts are listed on their pages.
+The package comes with man pages: `man hd-base` describes the package, `man hd-up`, `man hd-reboot-check`, `man hd-reboot` (also `man hd-poweroff`), `man hd-sync-skel`, `man hd-issue`, `man hd-link-repo`, `man hd-firmware` and `man hd-harden` the commands. The man pages of the shared parts are listed on their pages.
 
 ## Building the package
 The package is built from `packages/hd-base` in this repository:
@@ -38,7 +38,11 @@ packages/hd-base/hd-sync-skel
 packages/hd-base/hd-issue
 packages/hd-base/hd-link-repo
 packages/hd-base/hd-firmware
+packages/hd-base/hd-harden
 packages/hd-base/templates/hyprdebian.sources.j2
+packages/hd-base/templates/hd-harden-sshd.conf.j2
+packages/hd-base/templates/hd-harden-sysctl.conf.j2
+packages/hd-base/templates/hd-harden-modprobe.conf.j2
 packages/hd-base/etc/skel/.bash_aliases
 packages/hd-base/etc/skel/.config/nano/nanorc
 packages/hd-base/etc/profile.d/local-bin-path.sh
@@ -80,14 +84,14 @@ packages/hd-base/tests/test_up.py
 
 The files of the shared parts are listed on their pages: [hd-config](hd-config.md#building-the-package), [hd-network](hd-network.md#building-the-package) and [hd-secboot](hd-secboot.md#building-the-package).
 
-`make test` runs the tests in `packages/hd-base/tests`, see [Firmware](#firmware), [hd-up](#hd-up), [hd-reboot-check](#hd-reboot-check), [hd-issue](#hd-issue) and [hd-secboot](hd-secboot.md#tests).
+`make test` runs the tests in `packages/hd-base/tests`, see [Firmware](#firmware), [hd-up](#hd-up), [hd-reboot-check](#hd-reboot-check), [hd-issue](#hd-issue), [hd-harden](#hd-harden) and [hd-secboot](hd-secboot.md#tests).
 
 ## Packages
 The installer starts from the minimal base of Debian, the `minbase` variant of debootstrap, so these are all the packages besides the required ones of Debian.
 
 | Group | Packages |
 | --- | --- |
-| hyprdebian | `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo` and `hd-network-render`; `kbd`, for Num Lock on the console; `kmod`, for `hd-firmware`. |
+| hyprdebian | `python3` and `sudo`, for `hd-up`; `python3-jinja2`, for `hd-link-repo`, `hd-harden` and `hd-network-render`; `kbd`, for Num Lock on the console; `kmod`, for `hd-firmware`. |
 | Init | `systemd`, also for the network, `systemd-sysv` and `udev`. |
 | Secure Boot | `openssl`, `efitools` and `sbsigntool`, which make the keys, enroll them and sign EFI files with them; see [hd-secboot](hd-secboot.md). |
 | Remote access and firewall | `openssh-server` and `openssh-client`, the ssh server and client, which `openssh-server` no longer pulls in; `kitty-terminfo` so that the kitty terminal works over ssh; `ufw`, the firewall. |
@@ -231,6 +235,39 @@ hd-link-repo
 sudo hd-link-repo http://repo.example/ --suite unstable
 ```
 
+## hd-harden
+```
+hd-harden [--ssh] [--sysctl] [--modules] [--zfs] [--ufw] [--all] [--json] [--network <cidr>]...
+```
+
+`hd-harden` hardens the parts of the system that each option names; they can be combined, and `--all` takes all of them. Running it again changes nothing. Run it as root. Without options it shows for each part whether it is hardened: `on` or `off`, or `changed` when the file it writes has other content, as after an edit by hand or from an older `hd-harden`. The state of ufw shows only for root, who can read its rules:
+```
+ssh      on       /etc/ssh/sshd_config.d/10-hd-harden.conf
+sysctl   on       /etc/sysctl.d/90-hd-harden.conf
+modules  changed  /etc/modprobe.d/hd-harden.conf
+zfs      off      rpool/home
+ufw      on
+```
+
+With `--json`, without the options that harden, it prints the same as a JSON object with the state of each part, which [hd-report](hd-report.md) sends to the dashboard; for other users than root the state of ufw is `unknown`:
+```
+{"ssh": "on", "sysctl": "on", "modules": "changed", "zfs": "off", "ufw": "on"}
+```
+
+- `--ssh` turns off password logins, root logins and X11 forwarding of the SSH server, with `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no` and `X11Forwarding no` in `/etc/ssh/sshd_config.d/10-hd-harden.conf`, from the jinja2 template `/usr/share/hd-base/templates/hd-harden-sshd.conf.j2`. sshd takes the first value it reads, and the file comes before `sshd_config` and the later files of `sshd_config.d`. It stops before writing when no user of the group `sudo`, as a member or by their own group, has a `~/.ssh/authorized_keys` that is not empty, as nobody could get root over ssh then. It checks the config with `sshd -t`, puts the old file back when that fails, and reloads the SSH server.
+- `--sysctl` writes `/etc/sysctl.d/90-hd-harden.conf` from `hd-harden-sysctl.conf.j2` and loads it: `kernel.yama.ptrace_scope` 1, so a process can only ptrace its children, `kernel.kptr_restrict` 1, which hides the kernel addresses in `/proc` from users without `CAP_SYSLOG`, and `dev.tty.ldisc_autoload` 0, so only root can load the module of a line discipline.
+- `--modules` writes `/etc/modprobe.d/hd-harden.conf` from `hd-harden-modprobe.conf.j2`, with `install <module> /bin/false` for each module that is never loaded, also not with `modprobe`: the network protocols `dccp`, `sctp`, `rds` and `tipc`, which the kernel loads when any user opens a socket of them, the line discipline `n_hdlc`, which any user can attach to a tty, and the rarely used file systems `cramfs`, `freevxfs`, `jffs2` and `hfs`. Each has had holes that let a user become root. `hfsplus` and `udf` stay, for disks of macOS and for DVDs. A module that is loaded already stays loaded until a reboot; `hd-harden` names it.
+- `--zfs` sets `setuid=off` and `devices=off` on the ZFS dataset mounted at `/home`, `rpool/home` after an installation, so no program below `/home` runs with the rights of its owner and no device file there opens a device. The datasets of the users below it inherit that; `/tmp` and `/dev/shm` already have `nosuid` and `nodev`. ZFS mounts them again with the new options at once. `exec` stays on, for `~/.local/bin`.
+- `--ufw` lets ssh in from the local IPv4 networks alone. It adds a rule `allow from <network> to any port 22 proto tcp` for each IPv4 network of the global addresses of the interfaces that systemd-networkd configures, as `networkctl list` shows them, or for each network given with `--network`. Then it deletes the rules of `ufw show added` that let ssh in from anywhere, by the name `SSH`, `OpenSSH`, `22` or `22/tcp`, such as the `ufw allow SSH` of the installer; that covers IPv4 and IPv6, so ssh no longer comes in over IPv6. The new rules come first, so a connection from a local network is never refused, and connections that are open stay open, as ufw lets established connections through.
+
+```
+sudo hd-harden
+sudo hd-harden --all
+sudo hd-harden --ufw --network 192.168.1.0/24
+```
+
+The tests in `packages/hd-base/tests/test_harden.py` cover the users of `sudo` who can log in with a key, the state of a file it writes, the modules that are loaded already, the ZFS dataset of `/home`, the networks from `networkctl` and the rules of ufw that let ssh in from anywhere.
+
 ## Skel files
 New users get these files in their home directory, from `/etc/skel`. They are conffiles, so local changes are kept on upgrades. Versions before 1.26 also had `.gitconfig`, with delta for git.
 
@@ -280,7 +317,9 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/sbin/hd-issue` | Writes the login banner in `/etc/issue`. |
 | `/usr/sbin/hd-link-repo` | Switches the HyprDebian repository and suite of apt. |
 | `/usr/sbin/hd-firmware` | Finds and installs the firmware packages that the hardware needs. |
+| `/usr/sbin/hd-harden` | Hardens the SSH server, the kernel, the home directories and the firewall. |
 | `/usr/share/hd-base/templates/hyprdebian.sources.j2` | The template of the apt source of `hd-link-repo`. |
+| `/usr/share/hd-base/templates/hd-harden-sshd.conf.j2`, `hd-harden-sysctl.conf.j2`, `hd-harden-modprobe.conf.j2` | The templates of `/etc/ssh/sshd_config.d/10-hd-harden.conf`, `/etc/sysctl.d/90-hd-harden.conf` and `/etc/modprobe.d/hd-harden.conf`, which `hd-harden` writes. |
 | `/etc/hyprdebian/version.json` | The version of HyprDebian, `version.json` of the root of this repository, which is also the version of hd-base. The banners show it. A conffile. |
 | `/etc/issue` | The login banner, written by `hd-issue`. The one of base-files is diverted to `/etc/issue.debian`. |
 | `/etc/skel/.bash_aliases`, `/etc/skel/.config/nano/nanorc` | The files new users get, conffiles. |
@@ -300,4 +339,4 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/bin/hd-config-*`, `/etc/hyprdebian/config.json` | The hyprdebian configuration, see [hd-config](hd-config.md#files). |
 | `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
 | `/usr/sbin/hd-secboot`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
-| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot-check.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz`, `/usr/share/man/man8/hd-firmware.8.gz` | The man pages. |
+| `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot-check.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz`, `/usr/share/man/man8/hd-firmware.8.gz`, `/usr/share/man/man8/hd-harden.8.gz` | The man pages. |

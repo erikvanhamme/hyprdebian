@@ -63,7 +63,9 @@ otherwise,
 .BR hd-link-repo (8),
 which switches the HyprDebian repository and suite of apt,
 .BR hd-firmware (8),
-which finds and installs the firmware packages that the hardware needs, and
+which finds and installs the firmware packages that the hardware needs,
+.BR hd-harden (8),
+which hardens the SSH server, the kernel, the home directories and the firewall, and
 the files
 that new users
 get in their home directory, from
@@ -284,7 +286,8 @@ for
 .BR hd-up (1);
 .BR python3-jinja2 ,
 for
-.BR hd-link-repo (8)
+.BR hd-link-repo (8),
+.BR hd-harden (8)
 and
 .BR hd-network-render (8);
 .BR kbd ,
@@ -468,6 +471,9 @@ Boot on and off.
 .I /usr/sbin/hd-firmware
 Finds and installs the firmware packages that the hardware needs.
 .TP
+.I /usr/sbin/hd-harden
+Hardens the SSH server, the kernel, the home directories and the firewall.
+.TP
 .I /etc/hyprdebian/config.json
 The hyprdebian configuration.
 .TP
@@ -477,6 +483,14 @@ The Secure Boot keys.
 .I /usr/share/hd-base/templates/hyprdebian.sources.j2
 The template of the apt source of
 .BR hd-link-repo .
+.TP
+.I /usr/share/hd-base/templates/hd\-harden\-sshd.conf.j2
+.TQ
+.I /usr/share/hd-base/templates/hd\-harden\-sysctl.conf.j2
+.TQ
+.I /usr/share/hd-base/templates/hd\-harden\-modprobe.conf.j2
+The templates of the files of
+.BR hd-harden .
 .TP
 .I /etc/hyprdebian/version.json
 The version of HyprDebian, a conffile.
@@ -547,6 +561,7 @@ Name the network interfaces by their path.
 .BR hd-issue (8),
 .BR hd-link-repo (8),
 .BR hd-firmware (8),
+.BR hd-harden (8),
 .BR hd-config (7),
 .BR hd-network (7),
 .BR hd-secboot (7),
