@@ -32,9 +32,11 @@ pkg_firmware() {
 }
 
 # Gives root the files in /etc/skel, such as the aliases and the nano config of hd-base, as the
-# user gets them in u_skel.
+# user gets them in u_skel. cp -a gives /root the mode of /etc/skel, 755, so the mode is set back to
+# 700 afterwards.
 pkg_root_skel() {
-    in_target cp -a /etc/skel/. /root/
+    in_target cp -a /etc/skel/. /root/ || return 1
+    in_target chmod 700 /root
 }
 
 # Turns on the firewall, which lets in ssh and blocks the rest. ssh is allowed before the firewall
