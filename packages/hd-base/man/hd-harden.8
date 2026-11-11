@@ -124,8 +124,19 @@ on the ZFS dataset mounted at
 so no program below
 .I /home
 runs with the rights of its owner and no device file there opens a device.
-The datasets of the users below it inherit that, and ZFS mounts them again
-with the new options at once.
+The datasets of the users below it inherit that.
+ZFS mounts only the dataset it set them on again with
+.B nosuid
+and
+.BR nodev ,
+so
+.B hd-harden
+mounts again those below it that are mounted without them.
+The state of
+.B \-\-zfs
+is
+.B off
+as long as one of them is mounted without them, and names it.
 .B exec
 stays on, for
 .IR ~/.local/bin .

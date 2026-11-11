@@ -1,6 +1,8 @@
 # Tests for hd-harden, on the parts that decide what it changes and what it shows: the users of
-# sudo who can log in with a key, the state of a file it writes, the modules that are loaded already, the ZFS dataset of /home, the local IPv4 networks from
-# networkctl, the rules of ufw that let ssh in from anywhere, and the networks of --network.
+# sudo who can log in with a key, the state of a file it writes, the modules that are loaded
+# already, the ZFS dataset of /home and its mounts without nosuid or nodev, the local IPv4
+# networks from networkctl, the rules of ufw that let ssh in from anywhere, and the networks of
+# --network.
 
 import argparse
 import importlib.machinery
@@ -114,6 +116,27 @@ class TestHomeDataset(unittest.TestCase):
 
     def test_no_home(self):
         self.assertIsNone(harden.home_dataset("rpool\t/\nrpool/hyprdebian\t/\n"))
+
+
+class TestUnhardenedMounts(unittest.TestCase):
+    MOUNTINFO = (
+        "32 1 0:46 / / rw,noatime shared:1 - zfs rpool/hyprdebian rw,xattr,posixacl\n"
+        "56 32 0:48 / /home rw,nosuid,nodev,noatime shared:124 - zfs rpool/home rw,xattr\n"
+        "60 56 0:49 / /home/rsq rw,noatime shared:128 - zfs rpool/home/rsq rw,xattr\n"
+        "61 56 0:50 / /home/two\\040words rw,nodev shared:129 - zfs rpool/home/two\\040words rw\n"
+        "62 32 0:51 / /homework rw shared:130 - zfs rpool/homework rw\n"
+        "70 32 0:30 / /home rw,nosuid,nodev - tmpfs tmpfs rw\n")
+
+    def test_unhardened(self):
+        self.assertEqual(harden.unhardened_mounts(self.MOUNTINFO, 'rpool/home'),
+                         ['/home/rsq', '/home/two words'])
+
+    def test_hardened(self):
+        mountinfo = "56 32 0:48 / /home rw,nosuid,nodev,noatime shared:124 - zfs rpool/home rw\n"
+        self.assertEqual(harden.unhardened_mounts(mountinfo, 'rpool/home'), [])
+
+    def test_not_mounted(self):
+        self.assertEqual(harden.unhardened_mounts('', 'rpool/home'), [])
 
 
 class TestLocalNetworks(unittest.TestCase):

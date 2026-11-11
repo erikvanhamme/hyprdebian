@@ -255,6 +255,12 @@ which
 .BR run-parts (8)
 skips, as the banner already shows the kernel; a removal of the package
 puts it back.
+An upgrade from a version before 1.88 takes the write permission of the
+group and of others off the conffiles of the package: versions before 1.85
+installed the files of
+.I etc/
+with the mode of the checkout, and dpkg leaves a conffile as it is when its
+content did not change.
 It diverts
 .I /etc/issue
 of base-files to

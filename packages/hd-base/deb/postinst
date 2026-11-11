@@ -2,8 +2,9 @@
 """postinst of hd-base: masks the units that HyprDebian does not use, points /etc/resolv.conf at
 the name servers of systemd-resolved, leaves the message after a login to 00-hyprdebian, writes
 the login banner in /etc/issue, generates the Secure Boot keys, removes the files that dpkg leaves
-out on HyprDebian from the packages installed before, and enables the timers that scrub and trim
-the ZFS pools and upgrade the system every week.
+out on HyprDebian from the packages installed before, takes the group write permission off the
+conffiles of older versions, and enables the timers that scrub and trim the ZFS pools and upgrade
+the system every week.
 
 The units are masked on the first installation only, or on an upgrade from a version before
 MASKED_SINCE, which did not mask them, so a unit that the admin unmasked stays unmasked on later
@@ -53,6 +54,12 @@ decides, as for dpkg. Directories that are left empty go too.
 hd-zfs-scrub.timer, hd-zfs-trim.timer and hd-up.timer get the steps that debhelper adds for a timer: they are
 enabled on the first installation, by their preset, and keep the enabled state that the admin gave
 them over upgrades. The unmask undoes the mask of a removal, see the postrm.
+
+Versions before 1.85 installed the files of etc/ with the mode of the checkout, which a umask
+of 002 left group-writable. They are conffiles, and dpkg leaves a conffile whose content did not
+change as it is on an upgrade, mode and all, so a system upgraded to 1.85 or later from before
+keeps those modes. An upgrade from a version before MODES_SINCE, the first whose postinst fixes
+them, takes the write permission of the group and of others off the conffiles of hd-base.
 
 The Secure Boot keys in /etc/hyprdebian/secboot are generated with hd-secboot --generate when
 they are not there yet. Existing keys are never replaced, so an upgrade or a reinstall keeps keys
@@ -108,6 +115,9 @@ DROPPED_SINCE = "1.26"
 EXCLUDES = "/etc/dpkg/dpkg.cfg.d/hyprdebian-excludes"
 EXCLUDES_SINCE = "1.26"
 DPKG_INFO = "/var/lib/dpkg/info"
+
+# The first version of hd-base whose postinst takes the group write permission off its conffiles.
+MODES_SINCE = "1.88"
 
 # The timers of hd-base.
 TIMERS = ["hd-zfs-scrub.timer", "hd-zfs-trim.timer", "hd-up.timer"]
@@ -228,6 +238,26 @@ def remove_excluded():
     print(f"Removed {count} files ({size / 2**20:.0f} MiB) that dpkg leaves out, see {EXCLUDES}.")
 
 
+def conffiles():
+    """The conffiles of hd-base, from the list dpkg keeps of them."""
+    path = os.path.join(DPKG_INFO, "hd-base.conffiles")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return [line.split()[0] for line in f if line.strip()]
+
+
+def fix_modes():
+    """Takes the write permission of the group and of others off the conffiles of hd-base."""
+    for path in conffiles():
+        if os.path.islink(path) or not os.path.exists(path):
+            continue
+        mode = os.stat(path).st_mode & 0o7777
+        if mode & 0o022:
+            os.chmod(path, mode & ~0o022)
+            print(f"Took the write permission of the group and others off {path}.")
+
+
 def enable_timers():
     for unit in TIMERS:
         subprocess.run(["deb-systemd-helper", "unmask", unit], stdout=subprocess.DEVNULL)
@@ -265,6 +295,8 @@ def main():
               "nfs-common for NFS mounts.")
     if previous == "" or older_than(previous, EXCLUDES_SINCE):
         remove_excluded()
+    if previous != "" and older_than(previous, MODES_SINCE):
+        fix_modes()
     link_resolv_conf()
     divert(UNAME, UNAME_DIVERTED)
     divert(ISSUE, ISSUE_DIVERTED)

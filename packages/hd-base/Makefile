@@ -90,7 +90,9 @@
 #               writes the login banner with hd-issue, generates the
 #               Secure Boot keys in /etc/hyprdebian/secboot when they are not
 #               there yet, removes the files that dpkg leaves out from the
-#               packages installed before it and enables the timers,
+#               packages installed before it, takes the group write
+#               permission off the conffiles on an upgrade from before 1.88 and
+#               enables the timers,
 #               deb/prerm, which stops the timers on a removal, deb/postrm,
 #               which undoes the diversions and masks the timers on a
 #               removal and unmasks the units on a purge, and deb/triggers,
