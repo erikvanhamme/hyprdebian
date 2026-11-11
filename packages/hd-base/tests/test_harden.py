@@ -131,6 +131,15 @@ class TestLocalNetworks(unittest.TestCase):
                   'Addresses': [address('172.17.0.1', 16)]}]
         self.assertEqual(harden.local_networks(links), [])
 
+    def test_docker_bridges(self):
+        links = [{'Name': 'br0', 'AdministrativeState': 'configured',
+                  'Addresses': [address('172.16.1.110', 16)]},
+                 {'Name': 'docker0', 'AdministrativeState': 'unmanaged',
+                  'Addresses': [address('192.168.253.1', 24)]},
+                 {'Name': 'br-3f2a9c1d7e4b', 'AdministrativeState': 'unmanaged',
+                  'Addresses': [address('192.168.240.1', 24)]}]
+        self.assertEqual(harden.local_networks(links), ['172.16.0.0/16'])
+
     def test_several_networks(self):
         links = [{'Name': 'br0', 'AdministrativeState': 'configured',
                   'Addresses': [address('192.168.1.5', 24), address('10.0.0.5', 8)]},
@@ -159,6 +168,16 @@ class TestOpenSshRules(unittest.TestCase):
                  "ufw allow from 172.16.0.0/16 to any port 22 proto tcp\n"
                  "ufw allow 80/tcp\n"
                  "ufw deny SSH\n")
+        self.assertEqual(harden.open_ssh_rules(added), [])
+
+    def test_docker_rules(self):
+        # The route rules of the containers of hd-docker, and the rules for the networks of
+        # Docker, are not rules that let ssh in from anywhere.
+        added = ("Added user rules (see 'ufw status' for running firewall):\n"
+                 "ufw route allow proto tcp to any port 22\n"
+                 "ufw route allow 22/tcp\n"
+                 "ufw allow in on docker0 to any port 22 proto tcp\n"
+                 "ufw allow from 192.168.240.0/20 to any port 22 proto tcp\n")
         self.assertEqual(harden.open_ssh_rules(added), [])
 
     def test_duplicates(self):
