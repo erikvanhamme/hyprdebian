@@ -24,3 +24,17 @@ The version of HyprDebian is in `version.json` in the root of the repository (`{
 - **Only increment the minor number** (e.g. `1.4` → `1.5`). Never change the major number; that decision belongs to the owner.
 
 Every other `hd-*` package also has a `version.json` of its own, in its folder in `packages/`, with the version of that package. Bump its minor number when that package changes, once per set of working changes, in the same way. `hd-base` and `hd-desktop` have none: their version is the one in the root.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage labels are used as-is (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
