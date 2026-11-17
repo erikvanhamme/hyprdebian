@@ -31,7 +31,8 @@ def load_hd_dashboard():
 
 dash = load_hd_dashboard()
 
-DEFAULTS = {"listen": "0.0.0.0", "port": 80, "stale_minutes": 45, "offline_days": 14, "history_days": 30}
+DEFAULTS = {"listen": "0.0.0.0", "port": 80, "stale_minutes": 45, "offline_days": 14, "history_days": 30,
+            "hardening_exceptions": {}}
 
 
 def healthy(host="box", version="1.3"):
@@ -55,6 +56,7 @@ def healthy(host="box", version="1.3"):
         "snapshot": {"name": "hd-up-2026-10-01_100000", "time": NOW - 86400},
         "timers": [{"unit": "backup-vms.timer", "service": "backup-vms.service", "last": NOW - 3600,
                     "next": NOW + 3600, "result": "success"}],
+        "hardening": {"ssh": "on", "sysctl": "on", "modules": "on", "zfs": "on", "ufw": "on"},
     }
 
 
@@ -162,6 +164,35 @@ class TestAssess(unittest.TestCase):
                 report["os"]["secure_boot"] = state
                 self.assertEqual(self.messages(report), [("bad", message)])
 
+    def test_parts_that_are_not_hardened_are_warnings(self):
+        report = healthy()
+        report["hardening"] = {"ssh": "off", "sysctl": "changed", "modules": "on", "zfs": "off", "ufw": "unknown"}
+        self.assertEqual(self.messages(report), [("warn", "Not hardened: ssh, zfs"), ("warn", "Hardening changed: sysctl"),
+                                                 ("info", "Hardening unknown: ufw")])
+
+    def test_a_report_without_hardening_is_a_warning(self):
+        for hardening in [None, {}]:
+            report = healthy()
+            report["hardening"] = hardening
+            self.assertEqual(self.messages(report), [("warn", "Hardening not reported")])
+
+    def test_exceptions_are_not_judged(self):
+        report = healthy()
+        report["hardening"] = {"ssh": "on", "sysctl": "off", "ufw": "changed"}
+        self.assertEqual(dash.assess(report, NOW, NOW, 45, 14, "1.3", ["sysctl"]), [("warn", "Hardening changed: ufw")])
+
+    def test_exceptions_are_per_host(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = dash.connect(f"{tmp}/dashboard.db")
+            for host in ["beast", "box"]:
+                report = healthy(host)
+                report["hardening"]["sysctl"] = "off"
+                post(db, report, token=host * 8)
+            with unittest.mock.patch.object(dash, "hyprdebian_version", return_value=None):
+                issues = {host["name"]: host["issues"] for host in dash.load_hosts(db, NOW, 45, 14, {"beast": ["sysctl"]})}
+            db.close()
+        self.assertEqual(issues, {"beast": [], "box": [("warn", "Not hardened: sysctl")]})
+
     def test_a_report_without_secure_boot_is_an_error(self):
         report = healthy()
         del report["os"]["secure_boot"]
@@ -235,6 +266,31 @@ class TestPages(unittest.TestCase):
             self.assertNotIn("<script>", body)
             self.assertIn("&lt;script&gt;", body)
 
+    def test_hardening_shows_each_part_with_its_state(self):
+        report = healthy()
+        report["hardening"] = {"ssh": "on", "sysctl": "changed", "zfs": "off", "ufw": "unknown"}
+        post(self.db, report)
+
+        body = dash.overview_page(self.db, NOW, 45, 14)
+        self.assertIn('<td>Hardening</td><td><span class="ok">ssh</span> <span class="warn">sysctl changed</span> '
+                      '<span class="warn">zfs off</span> <span class="dim">ufw unknown</span></td>', body)
+
+    def test_hardening_is_left_out_when_not_reported(self):
+        for hardening in [None, {}]:
+            report = healthy()
+            report["hardening"] = hardening
+            post(self.db, report)
+            self.assertNotIn("<td>Hardening</td>", dash.overview_page(self.db, NOW, 45, 14))
+
+    def test_an_exception_shows_in_grey(self):
+        report = healthy()
+        report["hardening"] = {"ssh": "on", "sysctl": "off"}
+        post(self.db, report)
+
+        body = dash.overview_page(self.db, NOW, 45, 14, {"box": ["ssh", "sysctl"]})
+        self.assertIn('<td>Hardening</td><td><span class="ok">ssh, exception</span> '
+                      '<span class="dim">sysctl off, exception</span></td>', body)
+
     def test_unknown_host_has_no_page(self):
         self.assertIsNone(dash.host_page(self.db, "nope", NOW, 45, 14, 30))
 
@@ -260,6 +316,10 @@ class TestConfig(unittest.TestCase):
             {"hd-dashboard": {"listen": ""}},
             {"hd-dashboard": {"history_days": 0}},
             {"hd-dashboard": {"offline_days": 0}},
+            {"hd-dashboard": {"hardening_exceptions": []}},
+            {"hd-dashboard": {"hardening_exceptions": {"beast": "sysctl"}}},
+            {"hd-dashboard": {"hardening_exceptions": {"beast": ["trace"]}}},
+            {"hd-dashboard": {"hardening_exceptions": {"bad name": ["sysctl"]}}},
         ]
 
         for config in cases:

@@ -3,5 +3,6 @@
     "port": 80,
     "stale_minutes": 45,
     "offline_days": 14,
-    "history_days": 30
+    "history_days": 30,
+    "hardening_exceptions": {}
 }

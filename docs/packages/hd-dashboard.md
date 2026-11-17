@@ -52,7 +52,7 @@ journalctl -u hd-dashboard.service
 ## Settings
 The settings are the key `hd-dashboard` of `/etc/hyprdebian/config.json`. The installation stores the defaults there, from `/usr/share/hd-dashboard/defaults.json`, when the key is missing; a setting that is missing from the key has its default value. Change them with `hd-config-update`, which replaces the key as a whole, and restart the service:
 ```
-sudo hd-config-update hd-dashboard '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14, "history_days": 30}'
+sudo hd-config-update hd-dashboard '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14, "history_days": 30, "hardening_exceptions": {"beast": ["sysctl"]}}'
 sudo systemctl restart hd-dashboard.service
 ```
 
@@ -63,6 +63,7 @@ sudo systemctl restart hd-dashboard.service
 | `stale_minutes` | `45` | A system that did not report for this long is offline, which is a note. Systems report every 15 minutes. |
 | `offline_days` | `14` | A system that did not report for this many days is an error, so a laptop that is off for a while does not turn red. |
 | `history_days` | `30` | How long the history is kept. |
+| `hardening_exceptions` | `{}` | The parts of `hd-harden` that are not judged, per host name, from `ssh`, `sysctl`, `modules`, `zfs` and `ufw`. `{"beast": ["sysctl"]}` gives no warning when the sysctls of beast, such as `ptrace_scope`, are not hardened. |
 
 The service does not start when a setting has the wrong type; the journal says which one.
 
@@ -106,7 +107,7 @@ The connection is plain HTTP, meant for the local network.
 | `updates` | `upgradable`, the number of packages that can be upgraded, `lists_time`, `last_upgrade` and `reboot_required`. |
 | `snapshot` | `name` and `time` of the newest snapshot of the system. |
 | `timers` | Per timer: `unit`, `service`, `last`, `next` and `result`. |
-| `hardening` | The state of each part that `hd-harden` of hd-base hardens, as `hd-harden --json` prints it: `ssh`, `sysctl`, `modules`, `zfs` and `ufw`, each `on`, `off`, `changed` or, for `ufw` without root, `unknown`, see [hd-harden](hd-base.md#hd-harden); `null` when it cannot be read. |
+| `hardening` | The state of each part that `hd-harden` of hd-base hardens, as `hd-harden --json` prints it: `ssh`, `sysctl`, `modules`, `zfs` and `ufw`, each `on`, `off`, `changed` or, for `ufw` without root, `unknown`, see [hd-harden](hd-base.md#hd-harden); `null` when it cannot be read. The card shows each part: a part that is on by its name in green, one that is off or changed with its state in orange, one that is unknown with its state in grey. A part in `hardening_exceptions` is grey, with `exception`. |
 
 Times are Unix timestamps. Parts that are missing are left out of the pages. Raise `FORMAT` in both `hd-dashboard` and `hd-report` when the layout changes in a way the dashboard must know about, and update the dashboard before the systems.
 
@@ -135,10 +136,12 @@ Each system is judged on its last report. The card gets the color of its worst i
 | Warning | A pool that is 80% full or more. |
 | Warning | The last completed scrub of a pool repaired bytes: the pool healed itself, but a drive may be failing. The warning stays until a scrub repairs nothing. |
 | Warning | The system is starting or stopping. |
+| Warning | A part of `hd-harden` that is off or changed, or no `hardening` in the report, as from an `hd-report` before it had it. The parts in `hardening_exceptions` of the system are not judged. |
 | Warning | A reboot is pending: `reboot_required`, or a newer kernel than the running one. |
 | Warning | No upgrade for 14 days, or never. |
 | Warning | A HyprDebian version older than the version on the system of the dashboard, from `/etc/hyprdebian/version.json`. A system with a newer version, like a test machine, gets no warning; without that file no versions are judged. |
 | Note | No report for longer than `stale_minutes`: the system is offline. |
+| Note | A part of `hd-harden` whose state is unknown. |
 | Note | Upgradable packages. Notes do not change the color of the card: on unstable there almost always are some. |
 
 ## hd-dashboard

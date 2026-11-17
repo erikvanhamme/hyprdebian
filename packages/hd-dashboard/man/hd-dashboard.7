@@ -75,7 +75,8 @@ Restart the service after a change:
 .RS
 .nf
 sudo hd-config-update hd-dashboard \e
-    '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14, "history_days": 30}'
+    '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14,
+      "history_days": 30, "hardening_exceptions": {"beast": ["sysctl"]}}'
 sudo systemctl restart hd-dashboard.service
 .fi
 .RE
@@ -98,6 +99,20 @@ a laptop that is off for a while does not turn red.
 .TP
 .B history_days
 How many days the history is kept, default 30.
+.TP
+.B hardening_exceptions
+The parts of
+.BR hd-harden (8)
+that are not judged, per host name, from
+.BR ssh ,
+.BR sysctl ,
+.BR modules ,
+.B zfs
+and
+.BR ufw ,
+default {}.
+.B {"beast": ["sysctl"]}
+gives no warning when the sysctls of beast are not hardened.
 .SH PAGES
 .TP
 .B POST /report
@@ -136,9 +151,14 @@ The other parts are
 .BR arrays ,
 .BR units ,
 .BR updates ,
-.B snapshot
+.BR snapshot ,
+.B timers
 and
-.BR timers ;
+.BR hardening ,
+the state of each part that
+.BR hd-harden (8)
+hardens, which the card shows in green when it is on, in orange when it is
+off or changed and in grey when it is unknown or an exception;
 the documentation in the repository describes them.
 .PP
 The first report of a host name registers its token.
@@ -159,14 +179,18 @@ not on or not reported, see
 .PP
 Warnings: a pool that is 80% full or more, bytes repaired by the last
 completed scrub of a pool, a system that is starting or
-stopping, a pending reboot, no upgrade for 14 days or never, and a HyprDebian
+stopping, a part of
+.BR hd-harden (8)
+that is off or changed and not in
+.BR hardening_exceptions ,
+or no hardening in the report, a pending reboot, no upgrade for 14 days or never, and a HyprDebian
 version older than the one on the system of the dashboard, from
 .IR /etc/hyprdebian/version.json .
 A newer version gets no warning; without that file, versions are not judged.
 .PP
 Notes: a system that did not report for longer than
 .BR stale_minutes ,
-and upgradable packages.
+a part of hd-harden whose state is unknown, and upgradable packages.
 Notes do not change the color of the card.
 .SH REMOVAL
 Removing the package stops the service and keeps the settings and the
