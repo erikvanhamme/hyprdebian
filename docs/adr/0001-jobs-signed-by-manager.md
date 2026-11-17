@@ -1,0 +1,11 @@
+# Jobs are signed by the manager, the dashboard only relays them
+
+Jobs that make managed systems run commands are signed by a manager, a system of the estate with `hd-manager`, with a passphrase-protected Ed25519 key in `~/.ssh` of the owner. The dashboard only stores and hands out jobs, and refuses those whose signature does not verify; it cannot make or change one. Every agent trusts the list of manager keys in its own configuration, and nothing else; the estate can have several managers, and a job signed by any key on the list is valid. This keeps the dashboard, which listens on the LAN over plain HTTP with unauthenticated pages, from being a way to run commands on every system: neither a compromised dashboard nor a forged reply on the network can make an agent run a job, and the commands an agent runs are a closed set it knows by name.
+
+Agents fetch their jobs in the reply to their report, so no managed system listens on a port. A job carries a sequence number that only goes up across the estate; an agent accepts a job only when its number is higher than that of the last job it accepted, so a signed job cannot be replayed. The check is on acceptance, not on running, as jobs are scheduled ahead and may run out of order. An estate has several managers but exactly one dashboard, as every agent reports to one URL. The sequence is one for the estate: a manager takes the next number above the highest the dashboard has seen, and the dashboard refuses a number it already has, so a manager that collides with another signs again. A sequence per manager key was rejected, to keep one order of all jobs across the estate.
+
+## Considered Options
+
+- **The dashboard signs the jobs.** Rejected: the signature would then only prove that a job passed through the dashboard, and anyone who can reach its pages, or takes over its host, could schedule commands on every system.
+- **Scheduling from the pages of the dashboard, without authentication.** Rejected for the same reason; the pages show jobs, read-only.
+- **Agents learn the key of the manager on first use.** Rejected in favour of setting it in their configuration, so a dashboard that is spoofed on the first contact cannot plant its own key.
