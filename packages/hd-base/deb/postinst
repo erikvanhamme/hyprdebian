@@ -38,7 +38,7 @@ system that mounts NFS shares.
 
 Versions before SOURCES_SINCE named the apt source of hd-link-repo hyprdebian.local.sources. An
 upgrade from such a version renames it to hyprdebian.sources, unless that one already exists, so
-hd-link-repo, hd-issue and hd-report find it.
+hd-link-repo, hd-issue and hd-agent find it.
 
 /etc/issue of base-files is diverted to /etc/issue.debian, and hd-issue writes the HyprDebian
 banner in its place, on every installation and upgrade, so it shows the version that is installed.

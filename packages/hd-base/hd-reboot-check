@@ -3,7 +3,7 @@
 
 The package hd-base installs this as /usr/bin/hd-reboot-check. hd-up runs it after an upgrade,
 the kernel hook /etc/kernel/postinst.d/zz-hd-reboot-check after a kernel is installed, the
-message after a login, hd-report and the notification of hd-desktop to show why.
+message after a login, hd-agent and the notification of hd-desktop to show why.
 
     hd-reboot-check          print why a reboot is needed, one reason per line, or nothing
     hd-reboot-check --write  also write /run/reboot-required when one is, as root

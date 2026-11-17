@@ -143,7 +143,7 @@ def prune():
 
 def check_reboot():
     """Says why a reboot is needed, if it is, and has hd-reboot-check write /run/reboot-required
-    for the login message, hd-report and the notification of the desktop."""
+    for the login message, hd-agent and the notification of the desktop."""
     result = run("hd-reboot-check", "--write", check=False, capture=True)
     if result.returncode != 0:
         print(f"Warning: Could not check for a reboot: {result.stderr.strip()}", file=sys.stderr)

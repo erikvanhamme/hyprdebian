@@ -1,6 +1,6 @@
 [Unit]
 Description=Send a Status Report to the HyprDebian Dashboard Every 15 Minutes
-Documentation=man:hd-report(8)
+Documentation=man:hd-agent(8)
 
 [Timer]
 OnBootSec=2min

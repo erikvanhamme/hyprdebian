@@ -1,5 +1,5 @@
 ## Introduction
-The package `hd-dashboard` turns a hyprdebian system into the hyprdebian dashboard, which shows the state of every hyprdebian system on one page. Each system with the package `hd-report` sends a status report to the dashboard every 15 minutes, see [hd-report](hd-report.md). The systems only make outgoing connections, so no system needs an open port for it.
+The package `hd-dashboard` turns a hyprdebian system into the hyprdebian dashboard, which shows the state of every hyprdebian system on one page. Each system with the package `hd-agent` sends a status report to the dashboard every 15 minutes, see [hd-agent](hd-agent.md). The dashboard also accepts the reports of `hd-report`, which `hd-agent` replaces, from the systems that are not switched to `hd-agent` yet. The systems only make outgoing connections, so no system needs an open port for it.
 
 The dashboard keeps the latest report of every system, and a history of the load, the memory and the fullest pool, 30 days by default. It judges each system on its last report and colors its card by its worst issue.
 
@@ -91,7 +91,7 @@ After changing the port in the settings, change the rule as well.
 The connection is plain HTTP, meant for the local network.
 
 ## Reports
-`hd-report` POSTs the report of a system to `http://<dashboard>/report` as a JSON object, with its token in the header `Authorization: Bearer <token>`. The token is 16 to 128 letters and digits, generated once on the system and kept there. A report is at most 256 KiB.
+`hd-agent` POSTs the report of a system to `http://<dashboard>/report` as a JSON object, with its token in the header `Authorization: Bearer <token>`. The token is 16 to 128 letters and digits, generated once on the system and kept there. A report is at most 256 KiB.
 
 | Part | Content |
 | --- | --- |
@@ -109,7 +109,7 @@ The connection is plain HTTP, meant for the local network.
 | `timers` | Per timer: `unit`, `service`, `last`, `next` and `result`. |
 | `hardening` | The state of each part that `hd-harden` of hd-base hardens, as `hd-harden --json` prints it: `ssh`, `sysctl`, `modules`, `zfs` and `ufw`, each `on`, `off`, `changed` or, for `ufw` without root, `unknown`, see [hd-harden](hd-base.md#hd-harden); `null` when it cannot be read. The card shows each part: a part that is on by its name in green, one that is off or changed with its state in orange, one that is unknown with its state in grey. A part in `hardening_exceptions` is grey, with `exception`. |
 
-Times are Unix timestamps. Parts that are missing are left out of the pages. Raise `FORMAT` in both `hd-dashboard` and `hd-report` when the layout changes in a way the dashboard must know about, and update the dashboard before the systems.
+Times are Unix timestamps. Parts that are missing are left out of the pages. Raise `FORMAT` in both `hd-dashboard` and `hd-agent` when the layout changes in a way the dashboard must know about, and update the dashboard before the systems.
 
 ### Tokens
 The first report of a host name registers its token. Later reports of that host name must have the same token, otherwise they are refused with 403. The dashboard only stores a hash of the token.

@@ -1,0 +1,135 @@
+## Introduction
+The package `hd-agent` sends the state of a hyprdebian system to the hyprdebian dashboard every 15 minutes, see [hd-dashboard](hd-dashboard.md). The system only makes outgoing connections, so it needs no open port for it.
+
+Installing the package sets everything up:
+- the default settings, in the key `hd-agent` of `/etc/hyprdebian/config.json`, when there are none yet: the URL of the dashboard, `http://dash.rsq-online.ddns.net/`;
+- the token of the system in `/etc/hyprdebian/hd-agent/token`, when there is none yet;
+- `hd-agent.timer`, which is enabled and started.
+
+The timer starts right away, and as the system has been up for more than 2 minutes, the first report goes out within a minute of the installation. Installed by the installer, without a running systemd, the first report goes out 2 minutes after the first boot.
+
+It replaces `hd-report`, see [Switching from hd-report](#switching-from-hd-report).
+
+The package comes with the man page `man hd-agent`.
+
+## Building the package
+The package is built from `packages/hd-agent` in this repository:
+```
+cd packages/hd-agent
+make deb
+```
+
+This builds `build/hd-agent_<version>_all.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. It depends on `python3`, `systemd` and `hd-base`, and suggests `hd-dashboard`. On a system with `hd-base` before 1.1, which kept services from being enabled on their installation, enable `hd-agent.timer` by hand after installing it: `sudo systemctl enable --now hd-agent.timer`. Install it with:
+```
+sudo apt install ./build/hd-agent_<version>_all.deb
+```
+
+The files involved are:
+```
+packages/hd-agent/Makefile
+packages/hd-agent/version.json
+packages/hd-agent/hd-agent
+packages/hd-agent/defaults.json
+packages/hd-agent/hd-agent.service
+packages/hd-agent/hd-agent.timer
+packages/hd-agent/deb/control
+packages/hd-agent/deb/postinst
+packages/hd-agent/deb/prerm
+packages/hd-agent/deb/postrm
+packages/hd-agent/man/hd-agent.8
+packages/hd-agent/tests/test_agent.py
+```
+
+## Switching from hd-report
+`hd-agent` replaces `hd-report`; the systems are switched by hand, one by one. The package conflicts with `hd-report`, replaces it and provides it, so installing it removes `hd-report`:
+```
+sudo apt install hd-agent
+```
+
+On its first installation, it takes over what `hd-report` leaves behind:
+- the token in `/etc/hyprdebian/hd-report/token`, which moves to `/etc/hyprdebian/hd-agent/token`, so the dashboard keeps accepting the reports of the system;
+- the key `hd-report` of `/etc/hyprdebian/config.json`, which becomes the key `hd-agent`, unless that one is there already;
+- the enabled state of `hd-report.timer`: `hd-agent.timer` is only enabled when `hd-report.timer` was.
+
+The report stays the same, so the dashboard shows the system as before. It also accepts the reports of the systems that still run `hd-report`.
+
+## The timer
+`hd-agent.timer` runs `hd-agent.service` 2 minutes after the boot and then every 15 minutes, with up to a minute of random delay. The service runs `hd-agent` as root. The timer is enabled on the first installation, as Debian enables services, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it, also over upgrades. To stop sending reports:
+```
+sudo systemctl disable --now hd-agent.timer
+```
+
+When the dashboard cannot be reached or refuses the report, `hd-agent.service` fails, and the error is in the journal:
+```
+journalctl -u hd-agent.service
+```
+
+## Settings
+The settings are the key `hd-agent` of `/etc/hyprdebian/config.json`. The installation stores the defaults there, from `/usr/share/hd-agent/defaults.json`, when the key is missing; a setting that is missing from the key has its default value. The next report uses a change.
+
+| Key | Default | |
+| --- | --- | --- |
+| `url` | `"http://dash.rsq-online.ddns.net/"` | The URL of the dashboard, `http://` or `https://`. The report goes to `<url>/report`. |
+
+```
+sudo hd-config-update hd-agent '{"url": "http://dash.example/"}'
+```
+
+## The token
+The token of the system is in `/etc/hyprdebian/hd-agent/token`, 64 hexadecimal digits, readable by root only. It is not in `config.json`, which every user can read. The installation generates it when there is none, and never replaces it: the dashboard accepts the first token it sees for a host name, and only that token afterwards. A purge keeps it too, so a new installation takes it over.
+
+When the token is lost, as on a reinstalled system, the dashboard refuses the reports with 403. Forget the host on the dashboard, and the next report registers the new token:
+```
+sudo hd-dashboard forget <host>
+```
+
+## hd-agent
+```
+hd-agent [--print]
+```
+
+`hd-agent` collects the report and POSTs it as JSON to `<url>/report`, with the header `Authorization: Bearer <token>`. Run it as root. With `--print`, it only prints the report, without sending it; that also works as a normal user, with some parts missing:
+```
+sudo hd-agent --print
+```
+
+It exits with 0 when the report was sent or printed, 1 on an error and 2 on wrong arguments.
+
+### What a report holds
+The layout is described in [hd-dashboard](hd-dashboard.md#reports); `hd-agent` fills it in like this:
+
+| Part | Source |
+| --- | --- |
+| Host name, FQDN | The host name, by which the dashboard knows the system, and the FQDN from the name resolution, empty when the system has none. |
+| HyprDebian version, suite | `/etc/hyprdebian/version.json` of `hd-base`, and the suite in `/etc/apt/sources.list.d/hyprdebian.sources`. |
+| Debian version, kernel | `/etc/debian_version`, the running kernel, and the newest kernel in `/boot`, the one whose `vmlinuz` was modified last, as `hd-reboot-check` picks it. |
+| Secure Boot | The EFI variables `SecureBoot` and `SetupMode` in `/sys/firmware/efi/efivars`, read as `hd-secboot --status` reads them, see [hd-secboot](hd-secboot.md#--status). |
+| Boot time, load, CPUs, memory | `/proc`. |
+| Pools | `zpool list`, and the last completed scrub from the scan line of `zpool status`: the bytes it repaired, the errors it found and when it ended. A scrub that is running, paused or was canceled, and a resilver, leave it out. |
+| Arrays | The mdadm arrays in `/sys/block`, named as in `/dev/md`. |
+| Units | `systemctl is-system-running` and the failed units. |
+| Updates | The packages `apt full-upgrade` would upgrade, from the package lists apt has now (`hd-agent` does not run `apt update`), when the lists were updated, the last upgrade in the apt history, and whether a reboot is pending, as `hd-reboot-check` of hd-base finds it: a newer kernel, a new ZFS module, or `/run/reboot-required`. |
+| Snapshot | The newest `hd-up-` snapshot of `rpool/hyprdebian`, see `hd-up` in [hd-base](hd-base.md). |
+| Timers | The enabled timers in `/etc/systemd/system`, those of the admin, and the `hd-*` timers of the packages in `/usr/lib/systemd/system`, with the last and next run and the result of their service. `hd-agent.timer` itself is left out. |
+
+## Removing the package
+Removing the package stops the timer and keeps the settings and the token. Purging it also removes the key `hd-agent` of `/etc/hyprdebian/config.json`; the token stays.
+
+## Tests
+The tests are in `packages/hd-agent/tests`: parsing what the system tools print, the version and suite, the scrubs of the pools, the state of Secure Boot, the apt history with rotated logs, the settings, a report of the system the tests run on, which `hd-dashboard` must accept, and sending a report to a local test server. They run as a normal user:
+```
+cd packages/hd-agent
+make test
+```
+
+`make test` in the root of this repository runs them with the tests of the other packages.
+
+## Files
+| Path | Purpose |
+| --- | --- |
+| `/usr/sbin/hd-agent` | Collects and sends the report. |
+| `/usr/lib/systemd/system/hd-agent.service` | Runs `hd-agent` as root. |
+| `/usr/lib/systemd/system/hd-agent.timer` | Runs the service every 15 minutes. |
+| `/usr/share/hd-agent/defaults.json` | The default settings. |
+| `/etc/hyprdebian/config.json` | The settings, in the key `hd-agent`. |
+| `/etc/hyprdebian/hd-agent/token` | The token of the system, mode 0600. |

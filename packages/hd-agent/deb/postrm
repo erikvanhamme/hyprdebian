@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# postrm of hd-report: a removal masks hd-report.timer, whose unit file is gone, so that it keeps
+# postrm of hd-agent: a removal masks hd-agent.timer, whose unit file is gone, so that it keeps
 # its enabled state for a reinstall. A purge also forgets that state and removes the settings in
-# /etc/hyprdebian/config.json. The token in /etc/hyprdebian/hd-report stays: the dashboard only
+# /etc/hyprdebian/config.json. The token in /etc/hyprdebian/hd-agent stays: the dashboard only
 # accepts that token for this system, and a reinstall takes it over.
 set -euo pipefail
 
-CONFIG_KEY="hd-report"
-UNIT="hd-report.timer"
+CONFIG_KEY="hd-agent"
+UNIT="hd-agent.timer"
 
 case "${1:-}" in
     remove | purge) ;;

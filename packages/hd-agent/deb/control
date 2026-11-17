@@ -1,13 +1,16 @@
-Package: hd-report
+Package: hd-agent
 Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
 Depends: python3, systemd, hd-base (>= 1.86)
 Suggests: hd-dashboard
+Conflicts: hd-report
+Replaces: hd-report
+Provides: hd-report
 Section: admin
 Priority: optional
-Description: HyprDebian status reports for the dashboard
+Description: HyprDebian agent for the dashboard
  Sends the state of the system to the hyprdebian dashboard of hd-dashboard
  every 15 minutes: the HyprDebian and Debian versions, the kernel, the state
  of Secure Boot, the load, the memory, the ZFS pools, the mdadm arrays, the
@@ -15,7 +18,10 @@ Description: HyprDebian status reports for the dashboard
  the timers and what hd-harden of hd-base hardened. The system only makes
  outgoing connections.
  .
- The URL of the dashboard is the key hd-report in
+ The URL of the dashboard is the key hd-agent in
  /etc/hyprdebian/config.json; the token of the system is generated on the
- first installation in /etc/hyprdebian/hd-report/token. Installing the
- package enables hd-report.timer.
+ first installation in /etc/hyprdebian/hd-agent/token. Installing the
+ package enables hd-agent.timer.
+ .
+ It replaces hd-report: installing it removes hd-report and takes over its
+ token, its settings and the enabled state of hd-report.timer.

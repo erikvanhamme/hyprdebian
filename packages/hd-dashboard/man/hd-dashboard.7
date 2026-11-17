@@ -7,9 +7,16 @@ The package
 turns a hyprdebian system into the hyprdebian dashboard, which shows the state
 of every hyprdebian system on one page.
 Each system with the package
-.B hd-report
+.B hd-agent
 sends a status report to the dashboard every 15 minutes, see
-.BR hd-report (8).
+.BR hd-agent (8).
+The dashboard also accepts the reports of
+.BR hd-report ,
+which
+.B hd-agent
+replaces, from the systems that are not switched to
+.B hd-agent
+yet.
 The systems only make outgoing connections, so no system needs an open port
 for it.
 .PP
@@ -223,7 +230,7 @@ The SQLite database, kept by systemd in
 .IR /var/lib/private/hd-dashboard .
 .SH SEE ALSO
 .BR hd-dashboard (8),
-.BR hd-report (8),
+.BR hd-agent (8),
 .BR hd-secboot (8),
 .BR hd-config (7),
 .BR hd-config-update (1),

@@ -4,7 +4,7 @@
 The package hd-base installs this as /usr/sbin/hd-harden.
 
     hd-harden                            show what is hardened
-    hd-harden --json                     the same as a JSON object, for hd-report
+    hd-harden --json                     the same as a JSON object, for hd-agent
     hd-harden --ssh                      no password logins, no root logins and no X11
                                          forwarding for ssh
     hd-harden --sysctl                   the sysctls that limit ptrace, kernel pointers and
@@ -33,7 +33,7 @@ anywhere. The options can be combined, and running them again changes nothing. R
 Without options it shows for each of them whether it is on: off, on, or changed when the file
 it writes has other content, as after an edit by hand or from an older hd-harden; the state of
 ufw is unknown but for root. With --json it prints an object with the state of each part, such as
-{"ssh": "on", "sysctl": "off", ...}, which hd-report sends to the dashboard.
+{"ssh": "on", "sysctl": "off", ...}, which hd-agent sends to the dashboard.
 """
 
 import argparse
@@ -59,7 +59,7 @@ PROC_MODULES = "/proc/modules"
 HOME = "/home"
 ZFS_PROPERTIES = ("setuid=off", "devices=off")
 # The mount options of those properties, which a mounted dataset only gets when it is mounted
-# again. The mounts of PID 1, as the sandbox of hd-report.service has its own without /home.
+# again. The mounts of PID 1, as the sandbox of hd-agent.service has its own without /home.
 MOUNT_OPTIONS = ("nosuid", "nodev")
 MOUNTINFO = ("/proc/1/mountinfo", "/proc/self/mountinfo")
 # The group whose users can become root, who need a key to log in when root cannot.
@@ -392,7 +392,7 @@ def main():
     parser.add_argument("--all", action="store_true",
                         help="all of --ssh, --sysctl, --modules, --zfs and --ufw")
     parser.add_argument("--json", action="store_true",
-                        help="show what is hardened as a JSON object, for hd-report")
+                        help="show what is hardened as a JSON object, for hd-agent")
     parser.add_argument("--network", action="append", type=network, default=[],
                         help="with --ufw or --all, a network to let ssh in from, such as "
                         "192.168.1.0/24, in place of those of the interfaces; may be given "

@@ -1,19 +1,19 @@
-.TH HD-REPORT 8 "October 2026" "hd-report" "HyprDebian"
+.TH HD-AGENT 8 "November 2026" "hd-agent" "HyprDebian"
 .SH NAME
-hd-report \- send the state of the system to the hyprdebian dashboard
+hd-agent \- send the state of the system to the hyprdebian dashboard
 .SH SYNOPSIS
-.B hd-report
+.B hd-agent
 .RB [ \-\-print ]
 .SH DESCRIPTION
-.B hd-report
+.B hd-agent
 collects the state of the system and POSTs it as a JSON report to the
 hyprdebian dashboard, see
 .BR hd-dashboard (7).
 The system only makes outgoing connections.
 .PP
-.B hd-report.timer
+.B hd-agent.timer
 runs it through
-.B hd-report.service
+.B hd-agent.service
 2 minutes after the boot and then every 15 minutes, with up to a minute of
 random delay.
 The package enables the timer on its first installation; after that, it stays
@@ -22,10 +22,24 @@ When the dashboard cannot be reached or refuses the report, the service fails
 and the error is in its journal:
 .PP
 .RS
-journalctl \-u hd-report.service
+journalctl \-u hd-agent.service
 .RE
 .PP
 Run it as root: the token is only readable by root.
+.PP
+The package replaces
+.BR hd-report :
+installing it removes
+.BR hd-report ,
+and takes over its token from
+.IR /etc/hyprdebian/hd-report/token ,
+its settings, the key
+.BR hd-report ,
+which becomes the key
+.BR hd-agent ,
+and the enabled state of
+.BR hd-report.timer .
+The dashboard keeps accepting the reports of the system.
 .SH OPTIONS
 .TP
 .BR \-h ,\  \-\-help
@@ -35,13 +49,13 @@ Show a short help and exit.
 Only print the report, without sending it.
 .SH SETTINGS
 The settings are the key
-.B hd-report
+.B hd-agent
 of
 .IR /etc/hyprdebian/config.json ,
 see
 .BR hd-config (7).
 A setting that is missing has its default value, from
-.IR /usr/share/hd-report/defaults.json .
+.IR /usr/share/hd-agent/defaults.json .
 .TP
 .B url
 The URL of the dashboard, with
@@ -56,11 +70,11 @@ The default is
 For example:
 .PP
 .RS
-sudo hd-config-update hd-report '{"url": "http://dash.example/"}'
+sudo hd-config-update hd-agent '{"url": "http://dash.example/"}'
 .RE
 .SH TOKEN
 The token of the system is in
-.IR /etc/hyprdebian/hd-report/token ,
+.IR /etc/hyprdebian/hd-agent/token ,
 mode 0600.
 The installation generates it when there is none, and never replaces it:
 the dashboard accepts the first token it sees for a host name, and only that
@@ -103,18 +117,18 @@ prints it.
 .TP
 .I /etc/hyprdebian/config.json
 The settings, in the key
-.BR hd-report .
+.BR hd-agent .
 .TP
-.I /usr/share/hd-report/defaults.json
+.I /usr/share/hd-agent/defaults.json
 The default settings.
 .TP
-.I /etc/hyprdebian/hd-report/token
+.I /etc/hyprdebian/hd-agent/token
 The token of the system.
 .TP
-.I /usr/lib/systemd/system/hd-report.timer
+.I /usr/lib/systemd/system/hd-agent.timer
 .TQ
-.I /usr/lib/systemd/system/hd-report.service
-Run hd-report every 15 minutes.
+.I /usr/lib/systemd/system/hd-agent.service
+Run hd-agent every 15 minutes.
 .SH SEE ALSO
 .BR hd-dashboard (7),
 .BR hd-config-update (1),

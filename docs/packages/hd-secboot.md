@@ -87,7 +87,7 @@ It exits with 0 when it is done, 1 on an error, and 2 on wrong arguments; `--sta
 | unsupported | The firmware has no Secure Boot. |
 | legacy | The system was not booted with UEFI. |
 
-Then it lists what PK, KEK and db hold: the subject of each certificate and each SHA-256 hash. With `-q` or `--quiet`, it says nothing and only sets the exit status. `hd-report` sends the same state to the dashboard, which shows a system without Secure Boot as an error, see [hd-dashboard](hd-dashboard.md#issues).
+Then it lists what PK, KEK and db hold: the subject of each certificate and each SHA-256 hash. With `-q` or `--quiet`, it says nothing and only sets the exit status. `hd-agent` sends the same state to the dashboard, which shows a system without Secure Boot as an error, see [hd-dashboard](hd-dashboard.md#issues).
 
 ### --generate
 `hd-secboot --generate` generates the keys in `/etc/hyprdebian/secboot`, unless that directory exists already. The postinst runs it, so the installer has keys to sign the bootloader with.
