@@ -89,19 +89,32 @@ def sign(job, key):
     """Signs a job with the private key in the file key, which asks for its passphrase on the
     terminal. Returns the signed job. Raises JobError when the job is malformed or the signing
     fails."""
-    check(job)
+    return sign_all([job], key)[0]
+
+
+def sign_all(jobs, key):
+    """Signs a list of jobs with the private key in the file key, in one run of ssh-keygen, so
+    its passphrase is asked for once. Returns the signed jobs, in the same order. Raises
+    JobError when a job is malformed or the signing fails."""
+    for job in jobs:
+        check(job)
     with tempfile.TemporaryDirectory(prefix="hd-job-") as directory:
-        # A file to sign, not stdin, so the passphrase is still read from the terminal.
-        data = os.path.join(directory, "job.json")
-        with open(data, "wb") as f:
-            f.write(canonical(job))
-        result = subprocess.run([SSH_KEYGEN, "-Y", "sign", "-n", NAMESPACE, "-f", key, data],
+        # Files to sign, not stdin, so the passphrase is still read from the terminal.
+        files = []
+        for number, job in enumerate(jobs):
+            data = os.path.join(directory, f"job-{number}.json")
+            with open(data, "wb") as f:
+                f.write(canonical(job))
+            files.append(data)
+        result = subprocess.run([SSH_KEYGEN, "-Y", "sign", "-n", NAMESPACE, "-f", key] + files,
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         if result.returncode != 0:
             raise JobError(f"signing with {key} failed: {result.stderr.strip()}")
-        with open(data + ".sig") as f:
-            signature = f.read()
-    return {"job": job, "signature": signature}
+        signed = []
+        for job, data in zip(jobs, files):
+            with open(data + ".sig") as f:
+                signed.append({"job": job, "signature": f.read()})
+    return signed
 
 
 def allowed_signers(manager_keys):

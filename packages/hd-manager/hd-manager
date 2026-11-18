@@ -1,0 +1,362 @@
+#!/usr/bin/python3
+"""Makes the jobs of the estate, signs them with the manager key and sends them to the dashboard,
+see hd-manager(1) and hd-dashboard(7).
+
+The package hd-manager installs this as /usr/bin/hd-manager. It runs as the user, never as root:
+the manager key is a passphrase-protected Ed25519 key in ~/.ssh, and the settings are the key
+hd-manager of ~/.config/hyprdebian/config.json. The dashboard only relays the jobs; the agents
+run a job when it is signed by one of their manager_keys.
+
+    hd-manager key                       make the manager key when there is none, and print its
+                                         public key
+    hd-manager schedule upgrade <host>... | all [--at <time>] [--expires <time>]
+                                         make, sign and send a job for each host
+    hd-manager jobs [<host>]             list the jobs and their states
+"""
+
+import argparse
+import datetime
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+# The format of the jobs and their signatures, from hd-base, or from the repository when
+# hd-manager runs from there.
+sys.dont_write_bytecode = True
+try:
+    from hyprdebian import job
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hd-base", "lib"))
+    from hyprdebian import job
+
+CONFIG_KEY = "hd-manager"
+DEFAULTS_FILE = "/usr/share/hd-manager/defaults.json"
+# A job may run from its not_before for this long, unless --expires is given.
+EXPIRY = 24 * 3600
+# How often the jobs are signed again with new sequence numbers when another manager took them.
+TRIES = 3
+# The format of the reports of hd-agent, which runs jobs. Systems that still run hd-report send
+# format 1 and are left out.
+AGENT_FORMAT = 2
+TIME_OF_DAY = re.compile(r"^(\d{1,2}):(\d{2})$")
+
+
+class Failure(Exception):
+    """An error that stops the command, with the message to print."""
+
+
+def config_file():
+    return os.path.expanduser("~/.config/hyprdebian/config.json")
+
+
+def sequence_file():
+    """The highest sequence number this manager used, so it never uses one twice, even when the
+    dashboard lost its jobs."""
+    return os.path.expanduser("~/.local/state/hd-manager/sequence")
+
+
+def defaults_file():
+    """The defaults of the package, or those next to this program when it runs from the
+    repository."""
+    if os.path.exists(DEFAULTS_FILE):
+        return DEFAULTS_FILE
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "defaults.json")
+
+
+def load_json(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as error:
+        raise Failure(f"Cannot read {path}: {error}")
+
+
+def parse_config(config, defaults):
+    """Returns the settings: the key hd-manager of the configuration over the defaults, with the
+    path of the key expanded. Raises Failure on a wrong value."""
+    settings = dict(defaults) if isinstance(defaults, dict) else {}
+
+    if isinstance(config, dict) and config.get(CONFIG_KEY) is not None:
+        if not isinstance(config[CONFIG_KEY], dict):
+            raise Failure(f"The key {CONFIG_KEY} in {config_file()} is not a JSON object.")
+        settings.update(config[CONFIG_KEY])
+
+    url = settings.get("url")
+    if not isinstance(url, str) or not re.match(r"^https?://\S+$", url):
+        raise Failure(f"The key {CONFIG_KEY} in {config_file()} needs a url, http:// or https://.")
+
+    key = settings.get("key")
+    if not isinstance(key, str) or not key:
+        raise Failure(f"The key {CONFIG_KEY} in {config_file()} needs a key, the path of the manager key.")
+
+    return {"url": url, "key": os.path.expanduser(key)}
+
+
+def load_config():
+    return parse_config(load_json(config_file()), load_json(defaults_file()))
+
+
+# --- The dashboard ------------------------------------------------------------------------------
+
+class Taken(Exception):
+    """The dashboard refused the jobs with 409: a sequence number is taken."""
+
+
+def request(url, path, data=None):
+    """GETs a path of the dashboard, or POSTs data to it. Returns the body of the reply. Raises
+    Taken on 409 and Failure on any other refusal or when the dashboard cannot be reached."""
+    headers = {"Content-Type": "application/json"} if data is not None else {}
+    req = urllib.request.Request(url.rstrip("/") + path, data=data, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return response.read().decode()
+    except urllib.error.HTTPError as error:
+        with error:
+            message = error.read().decode(errors="replace").strip()
+        if error.code == 409:
+            raise Taken(message)
+        raise Failure(f"The dashboard at {url} refused {path}: {error.code} {message or error.reason}")
+    except (urllib.error.URLError, OSError) as error:
+        raise Failure(f"Unable to reach the dashboard at {url}: {error}")
+
+
+def request_json(url, path):
+    try:
+        return json.loads(request(url, path))
+    except ValueError:
+        raise Failure(f"The dashboard at {url} sent no JSON for {path}.")
+
+
+def dashboard_sequence(url):
+    """The highest sequence number the dashboard has seen."""
+    value = request_json(url, "/sequence")
+    if not isinstance(value, dict) or not job.is_integer(value.get("sequence")):
+        raise Failure(f"The dashboard at {url} sent no sequence number.")
+    return value["sequence"]
+
+
+# --- The sequence numbers -----------------------------------------------------------------------
+
+def read_sequence():
+    """The highest sequence number this manager used, 0 when it has none."""
+    try:
+        with open(sequence_file(), encoding="utf-8") as f:
+            text = f.read().strip()
+    except FileNotFoundError:
+        return 0
+    except OSError as error:
+        raise Failure(f"Cannot read {sequence_file()}: {error}")
+
+    if not text.isdigit():
+        raise Failure(f"{sequence_file()} holds no sequence number.")
+    return int(text)
+
+
+# Writes a temporary file next to it and moves it into place, so it is never seen half written.
+def write_sequence(sequence):
+    path = sequence_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(f"{sequence}\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+# --- Scheduling ---------------------------------------------------------------------------------
+
+def parse_time(text, now):
+    """A time of --at or --expires as a Unix timestamp: HH:MM, the next time the clock shows it,
+    or a date with an optional time, such as 2026-11-19 03:00, in local time unless it has a time
+    zone. Raises Failure when it is neither."""
+    match = TIME_OF_DAY.match(text)
+    if match:
+        try:
+            moment = datetime.datetime.fromtimestamp(now).replace(
+                hour=int(match.group(1)), minute=int(match.group(2)), second=0, microsecond=0)
+        except ValueError:
+            raise Failure(f"{text} is not a time of day.")
+        if moment.timestamp() <= now:
+            moment += datetime.timedelta(days=1)
+        return int(moment.timestamp())
+
+    try:
+        return int(datetime.datetime.fromisoformat(text).timestamp())
+    except ValueError:
+        raise Failure(f"{text} is not a time: give HH:MM, or a date such as 2026-11-19 03:00.")
+
+
+def show_time(timestamp):
+    if timestamp is None:
+        return "-"
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(timestamp))
+
+
+def pick_hosts(hosts, targets):
+    """The hosts to make jobs for: the targets of the command line, or with all, every host whose
+    last report is from hd-agent. hosts is what GET /api/hosts gives. Raises Failure for a host
+    the dashboard does not know or that still runs hd-report."""
+    formats = {host.get("name"): host.get("format") for host in hosts if isinstance(host, dict)}
+
+    if "all" in targets:
+        if targets != ["all"]:
+            raise Failure("all cannot be given together with host names.")
+        picked = sorted(name for name, value in formats.items() if value == AGENT_FORMAT)
+        if not picked:
+            raise Failure("The dashboard knows no system that runs hd-agent.")
+        return picked
+
+    picked = []
+    for name in targets:
+        if name not in formats:
+            raise Failure(f"The dashboard does not know {name}.")
+        if formats[name] != AGENT_FORMAT:
+            raise Failure(f"{name} still runs hd-report, which runs no jobs.")
+        if name not in picked:
+            picked.append(name)
+    return picked
+
+
+def schedule(settings, command, targets, at=None, expires=None, now=None):
+    """Makes a job with the command for each target, signs them all with one passphrase prompt
+    and sends them to the dashboard. Takes new sequence numbers and signs again when another
+    manager took them. Returns the jobs."""
+    url = settings["url"]
+    now = int(time.time()) if now is None else now
+
+    not_before = now
+    if at is not None:
+        not_before = parse_time(at, now)
+        if not_before < now:
+            raise Failure(f"--at {at} is in the past.")
+
+    until = not_before + EXPIRY
+    if expires is not None:
+        until = parse_time(expires, now)
+        if until <= max(now, not_before):
+            raise Failure(f"--expires {expires} is not after the time the job may run, {show_time(not_before)}.")
+
+    hosts = request_json(url, "/api/hosts")
+    if not isinstance(hosts, list):
+        raise Failure(f"The dashboard at {url} sent no list of hosts.")
+    picked = pick_hosts(hosts, targets)
+
+    for _ in range(TRIES):
+        # The sequence is one for the estate: above the highest the dashboard has seen, and above
+        # the highest this manager used, in case the dashboard lost its jobs.
+        first = max(dashboard_sequence(url), read_sequence()) + 1
+        jobs = [{"sequence": first + number, "host": host, "command": command, "not_before": not_before,
+                 "expires": until} for number, host in enumerate(picked)]
+        try:
+            signed = job.sign_all(jobs, settings["key"])
+        except job.JobError as error:
+            raise Failure(str(error))
+
+        # Stored before sending, so a number is never used twice, even when the reply is lost.
+        write_sequence(jobs[-1]["sequence"])
+        try:
+            request(url, "/jobs", json.dumps(signed).encode())
+            return jobs
+        except Taken as error:
+            print(f"The dashboard refused the sequence numbers: {error}. Signing again with new numbers.",
+                  file=sys.stderr)
+
+    raise Failure(f"The sequence numbers were taken {TRIES} times; no jobs were stored.")
+
+
+# --- Commands -----------------------------------------------------------------------------------
+
+def make_key(path):
+    """Makes the manager key with ssh-keygen when there is none, which asks for a passphrase.
+    Returns the public key."""
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        # What ssh-keygen prints goes to stderr, so stdout has only the public key.
+        result = subprocess.run([job.SSH_KEYGEN, "-t", "ed25519", "-C", f"hd-manager@{socket.gethostname()}",
+                                 "-f", path], stdout=sys.stderr)
+        if result.returncode != 0:
+            raise Failure(f"Making the key {path} failed.")
+
+    try:
+        with open(path + ".pub", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        pass
+
+    # A key without its .pub file: ssh-keygen derives the public key, which asks for the passphrase.
+    result = subprocess.run([job.SSH_KEYGEN, "-y", "-f", path], stdout=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise Failure(f"Reading the public key of {path} failed.")
+    return result.stdout.strip()
+
+
+def print_jobs(jobs):
+    if not jobs:
+        print("No jobs.")
+        return
+
+    print(f"{'SEQUENCE':>8}  {'HOST':<20} {'COMMAND':<8} {'STATE':<9}  {'NOT BEFORE':<16}  {'EXPIRES':<16}  "
+          f"{'STARTED':<16}  ENDED")
+    for value in jobs:
+        print(f"{value['sequence']:>8}  {value['host']:<20} {value['command']:<8} {value['state']:<9}  "
+              f"{show_time(value['not_before']):<16}  {show_time(value['expires']):<16}  "
+              f"{show_time(value.get('started')):<16}  {show_time(value.get('ended'))}")
+
+
+def list_jobs(settings, host=None):
+    jobs = request_json(settings["url"], "/api/jobs")
+    if not isinstance(jobs, list):
+        raise Failure(f"The dashboard at {settings['url']} sent no list of jobs.")
+    print_jobs([value for value in jobs if host is None or value.get("host") == host])
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Make the jobs of the estate, sign them with the manager key "
+                                     "and send them to the hyprdebian dashboard.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("key", help="make the manager key when there is none, and print its public key")
+    schedule_parser = commands.add_parser("schedule", help="make, sign and send a job for each host")
+    schedule_parser.add_argument("job_command", metavar="command", choices=job.COMMANDS,
+                                 help=f"the command to run: {', '.join(job.COMMANDS)}")
+    schedule_parser.add_argument("targets", metavar="host", nargs="+",
+                                 help="the hosts, or all for every system that runs hd-agent")
+    schedule_parser.add_argument("--at", metavar="time",
+                                 help="when the job may run, HH:MM or a date such as 2026-11-19 03:00; default now")
+    schedule_parser.add_argument("--expires", metavar="time",
+                                 help="when the job expires if it has not run, as --at; default 24 hours after it")
+    jobs_parser = commands.add_parser("jobs", help="list the jobs and their states")
+    jobs_parser.add_argument("host", nargs="?", help="only the jobs of this host")
+    args = parser.parse_args()
+
+    try:
+        if os.geteuid() == 0:
+            raise Failure("Run hd-manager as your own user, not as root: the manager key is in your ~/.ssh.")
+
+        settings = load_config()
+
+        if args.command == "key":
+            print(make_key(settings["key"]))
+        elif args.command == "schedule":
+            for value in schedule(settings, args.job_command, args.targets, args.at, args.expires):
+                print(f"Stored job {value['sequence']}: {value['command']} on {value['host']}, "
+                      f"from {show_time(value['not_before'])} until {show_time(value['expires'])}.")
+        else:
+            list_jobs(settings, args.host)
+    except Failure as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

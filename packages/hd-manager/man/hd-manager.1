@@ -1,0 +1,135 @@
+.TH HD-MANAGER 1 "November 2026" "hd-manager" "HyprDebian"
+.SH NAME
+hd-manager \- make and sign the jobs of the hyprdebian estate
+.SH SYNOPSIS
+.B hd-manager key
+.br
+.B hd-manager schedule upgrade
+.IR host ...\ | \ all
+.RB [ \-\-at
+.IR time ]
+.RB [ \-\-expires
+.IR time ]
+.br
+.B hd-manager jobs
+.RI [ host ]
+.SH DESCRIPTION
+.B hd-manager
+makes the jobs of the estate, signs them with the manager key and sends them
+to the hyprdebian dashboard, see
+.BR hd-dashboard (7).
+The dashboard hands them out to the agents of
+.BR hd-agent (8),
+which run a job only when it is signed by one of their
+.BR manager_keys .
+.PP
+Run it as your own user, never as root: the manager key is a
+passphrase-protected Ed25519 key in
+.IR ~/.ssh .
+.SH COMMANDS
+.TP
+.B key
+Make the manager key with
+.B ssh-keygen \-t ed25519
+when there is none, which asks for its passphrase, and print its public key.
+Put that in
+.B manager_keys
+of the key
+.B hd-agent
+on the managed systems and of the key
+.B hd-dashboard
+on the dashboard, in
+.IR /etc/hyprdebian/config.json .
+.TP
+.BI "schedule upgrade " host ...
+Make a job for each host, sign them all with one passphrase prompt, and send
+them to the dashboard.
+With
+.BR all ,
+every host whose last report is from
+.BR hd-agent ;
+the systems that still run
+.B hd-report
+are left out.
+A host that the dashboard does not know or that still runs
+.B hd-report
+is refused.
+.RS
+.PP
+The sequence numbers are the next above both the highest the dashboard has
+seen and the highest this manager used, in
+.IR ~/.local/state/hd-manager/sequence .
+When the dashboard refuses them because another manager took them, the jobs
+get new numbers and are signed again, up to 3 times.
+.RE
+.TP
+.BI "jobs " \fR[\fIhost\fR]
+List the jobs and their states, of all hosts or of one.
+.SH OPTIONS
+.TP
+.BR \-h ,\  \-\-help
+Show a short help and exit.
+.TP
+.BI \-\-at " time"
+When the job may run; the default is now.
+.I time
+is
+.IR HH:MM ,
+the next time the clock shows it, or a date with an optional time, such as
+.IR "2026-11-19 03:00" ,
+in local time.
+.TP
+.BI \-\-expires " time"
+When the job expires if it has not run, as
+.BR \-\-at ;
+the default is 24 hours after the time it may run.
+.SH SETTINGS
+The settings are the key
+.B hd-manager
+of
+.IR ~/.config/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+A setting that is missing has its default value, from
+.IR /usr/share/hd-manager/defaults.json .
+.TP
+.B url
+The URL of the dashboard, with
+.B http://
+or
+.BR https:// .
+The default is
+.BR http://dash.rsq\-online.ddns.net/ .
+.TP
+.B key
+The private manager key; the default is
+.IR ~/.ssh/hd-manager .
+.PP
+For example, without sudo:
+.PP
+.RS
+hd-config-update hd-manager '{"url": "http://dash.example/"}'
+.RE
+.SH EXIT STATUS
+0 on success, 1 on an error, 2 on wrong arguments.
+.SH FILES
+.TP
+.I ~/.config/hyprdebian/config.json
+The settings, in the key
+.BR hd-manager .
+.TP
+.I /usr/share/hd-manager/defaults.json
+The default settings.
+.TP
+.I ~/.ssh/hd-manager
+.TQ
+.I ~/.ssh/hd-manager.pub
+The manager key.
+.TP
+.I ~/.local/state/hd-manager/sequence
+The highest sequence number this manager used.
+.SH SEE ALSO
+.BR hd-dashboard (7),
+.BR hd-agent (8),
+.BR hd-config-update (1),
+.BR ssh-keygen (1)

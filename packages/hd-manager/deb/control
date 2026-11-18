@@ -1,0 +1,19 @@
+Package: hd-manager
+Version: @VERSION@
+Architecture: all
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: python3, openssh-client, hd-base (>= 1.93)
+Suggests: hd-dashboard
+Section: admin
+Priority: optional
+Description: HyprDebian manager of the jobs of the estate
+ Makes the jobs of the estate, signs them with the manager key, a
+ passphrase-protected Ed25519 key in ~/.ssh, and sends them to the hyprdebian
+ dashboard of hd-dashboard, which hands them out to the agents of hd-agent.
+ An agent only runs a job that is signed by one of its manager_keys.
+ .
+ hd-manager key makes the key and prints its public key, hd-manager schedule
+ upgrade schedules an upgrade of some systems or of all that run hd-agent,
+ and hd-manager jobs lists the jobs and their states. It runs as the user,
+ with the settings in the key hd-manager of ~/.config/hyprdebian/config.json.

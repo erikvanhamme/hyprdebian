@@ -3,7 +3,7 @@ The package `hd-dashboard` turns a hyprdebian system into the hyprdebian dashboa
 
 The dashboard keeps the latest report of every system, and a history of the load, the memory and the fullest pool, 30 days by default. It judges each system on its last report and colors its card by its worst issue.
 
-It also relays the jobs of the estate, see [Jobs](#jobs): a manager sends the jobs it signed with `hd-manager`, and the dashboard hands them out to the agents in the replies to their reports. It cannot make or change a job, and refuses every job whose signature does not verify against its `manager_keys`, see [ADR 0001](../adr/0001-jobs-signed-by-manager.md). Its pages show the jobs read-only; nothing is scheduled from them.
+It also relays the jobs of the estate, see [Jobs](#jobs): a manager sends the jobs it signed with [hd-manager](hd-manager.md), and the dashboard hands them out to the agents in the replies to their reports. It cannot make or change a job, and refuses every job whose signature does not verify against its `manager_keys`, see [ADR 0001](../adr/0001-jobs-signed-by-manager.md). Its pages show the jobs read-only; nothing is scheduled from them.
 
 Installing the package sets everything up:
 - the default settings, in the key `hd-dashboard` of `/etc/hyprdebian/config.json`, when there are none yet;

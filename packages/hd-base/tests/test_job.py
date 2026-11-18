@@ -96,6 +96,15 @@ class TestSignatures(unittest.TestCase):
     def tearDownClass(cls):
         cls.directory.cleanup()
 
+    def test_jobs_signed_in_one_go(self):
+        jobs = [dict(JOB, sequence=sequence, host=host) for sequence, host in [(413, "beast"), (414, "box")]]
+        signed = job.sign_all(jobs, self.key)
+
+        self.assertEqual([value["job"] for value in signed], jobs)
+        self.assertEqual([job.verify(value, [self.public_key]) for value in signed], jobs)
+        with self.assertRaises(job.JobError):
+            job.sign_all([JOB, dict(JOB, command="reboot")], self.key)
+
     def test_signed_job(self):
         self.assertEqual(self.signed["job"], JOB)
         self.assertTrue(self.signed["signature"].startswith("-----BEGIN SSH SIGNATURE-----\n"))

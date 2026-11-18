@@ -346,7 +346,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot-check.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz`, `/usr/share/man/man8/hd-firmware.8.gz`, `/usr/share/man/man8/hd-harden.8.gz` | The man pages. |
 
 ## Jobs
-`hd-base` installs the Python package `hyprdebian` in `/usr/lib/python3/dist-packages/hyprdebian`, with the code that other hd-* packages share. Its module `hyprdebian.job` holds the format of the jobs of the estate and their signatures, see [ADR 0001](../adr/0001-jobs-signed-by-manager.md); `hd-agent`, `hd-dashboard` and `hd-manager` import it and depend on `hd-base` 1.91 or later. A job is one command for one host, to run once, not before `not_before` and not after `expires`:
+`hd-base` installs the Python package `hyprdebian` in `/usr/lib/python3/dist-packages/hyprdebian`, with the code that other hd-* packages share. Its module `hyprdebian.job` holds the format of the jobs of the estate and their signatures, see [ADR 0001](../adr/0001-jobs-signed-by-manager.md); `hd-agent`, `hd-dashboard` and `hd-manager` import it and depend on `hd-base` 1.91 or later, `hd-manager` on 1.93, which brings `sign_all`. A job is one command for one host, to run once, not before `not_before` and not after `expires`:
 ```json
 {
     "job": {"sequence": 412, "host": "beast", "command": "upgrade", "not_before": 1795000000, "expires": 1795086400},
@@ -357,6 +357,7 @@ Services are enabled on their installation as on Debian: a package that comes wi
 - `check` checks the fields: exactly these five, `sequence` a positive integer, `host` a host name, `command` one of the known commands, only `upgrade` for now, and `not_before` and `expires` integers, `expires` after `not_before`.
 - `canonical` gives the canonical JSON of a job, which is what is signed: sorted keys, no spaces.
 - `sign` signs a job with `ssh-keygen -Y sign -n hd-job` and a private key, which asks for its passphrase on the terminal.
+- `sign_all` signs a list of jobs in one run of `ssh-keygen`, so the passphrase is asked for once, as `hd-manager` does, see [hd-manager](hd-manager.md).
 - `verify` checks a signed job against a list of Ed25519 public keys, the `manager_keys`, with `ssh-keygen -Y verify` and an allowed-signers file in a temporary directory, which gives every key the principal `hd-manager` for the namespace `hd-job` only. It raises `SignatureError` when the signature does not verify against any of the keys, so for a job signed by another key, a changed field, another namespace or a malformed signature, and `JobError` when the job or a key is malformed.
 
 The tests in `packages/hd-base/tests/test_job.py` sign jobs with test keys that they make in a temporary directory.
