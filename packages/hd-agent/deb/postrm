@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # postrm of hd-agent: a removal masks hd-agent.timer, whose unit file is gone, so that it keeps
 # its enabled state for a reinstall. A purge also forgets that state and removes the settings in
-# /etc/hyprdebian/config.json. The token in /etc/hyprdebian/hd-agent stays: the dashboard only
+# /etc/hyprdebian/config.json and the stored jobs in /var/lib/hd-agent. The token in /etc/hyprdebian/hd-agent stays: the dashboard only
 # accepts that token for this system, and a reinstall takes it over.
 set -euo pipefail
 
 CONFIG_KEY="hd-agent"
+STATE_DIR="/var/lib/hd-agent"
 UNIT="hd-agent.timer"
 
 case "${1:-}" in
@@ -24,6 +25,7 @@ fi
 
 deb-systemd-helper purge "${UNIT}" > /dev/null || true
 deb-systemd-helper unmask "${UNIT}" > /dev/null || true
+rm -rf "${STATE_DIR}"
 
 # hd-base may already be removed, see hd-config(7).
 if [[ -x /usr/bin/hd-config-remove ]]; then

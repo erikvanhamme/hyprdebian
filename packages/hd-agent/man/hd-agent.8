@@ -1,15 +1,24 @@
 .TH HD-AGENT 8 "November 2026" "hd-agent" "HyprDebian"
 .SH NAME
-hd-agent \- send the state of the system to the hyprdebian dashboard
+hd-agent \- send the state of the system to the hyprdebian dashboard and run its jobs
 .SH SYNOPSIS
 .B hd-agent
 .RB [ \-\-print ]
+.br
+.B hd-agent run
+.I sequence
 .SH DESCRIPTION
 .B hd-agent
 collects the state of the system and POSTs it as a JSON report to the
 hyprdebian dashboard, see
 .BR hd-dashboard (7).
 The system only makes outgoing connections.
+The reply has the jobs for the system, made by
+.BR hd-manager (1),
+which
+.B hd-agent
+accepts and runs at their time, see
+.BR JOBS .
 .PP
 .B hd-agent.timer
 runs it through
@@ -47,6 +56,13 @@ Show a short help and exit.
 .TP
 .B \-\-print
 Only print the report, without sending it.
+That also works as a normal user, without the parts only root can read, the
+jobs among them.
+.SH COMMANDS
+.TP
+.BI run\  sequence
+Run the stored job with that sequence number; its timer does that, see
+.BR JOBS .
 .SH SETTINGS
 The settings are the key
 .B hd-agent
@@ -66,11 +82,22 @@ the report goes to
 .IR <url>/report .
 The default is
 .BR http://dash.rsq\-online.ddns.net/ .
+.TP
+.B manager_keys
+The public keys of the managers, as
+.B hd-manager key
+prints them: Ed25519 keys, one per string.
+A job must be signed by one of them.
+The default is
+.BR [] :
+without keys the agent sends its reports, but accepts no jobs.
+.B hd-agent run
+reads them again, so a job whose key is taken off the list no longer runs.
 .PP
 For example:
 .PP
 .RS
-sudo hd-config-update hd-agent '{"url": "http://dash.example/"}'
+sudo hd-config-update hd-agent '{"url": "http://dash.example/", "manager_keys": ["ssh-ed25519 AAAA... hd-manager@beast"]}'
 .RE
 .SH TOKEN
 The token of the system is in
@@ -111,8 +138,79 @@ each part that
 hardens, as
 .B hd-harden \-\-json
 prints it.
+And the stored jobs: those that have not ended as
+.BR scheduled ,
+also a running one, and the ended ones with their result, start and end
+time.
+This is report format 2.
+.SH JOBS
+A job is one command for one system, to run once, not before
+.B not_before
+and not after
+.BR expires ,
+signed by a manager.
+.B hd-agent
+accepts a job of the reply when its signature verifies against one of
+.BR manager_keys ,
+its host is the host name of this system, and its sequence number is higher
+than that of the last job it accepted.
+It ignores any other job; one it accepted before silently, the others with a
+line in the journal.
+.PP
+An accepted job is stored in
+.IR /var/lib/hd-agent/jobs/<sequence>.json ,
+as
+.BR scheduled .
+A newer job with the same command cancels a job that is still scheduled; a
+running job is never cancelled.
+.PP
+The timer
+.BI hd-agent-job- sequence .timer\fR,
+a transient unit of
+.BR systemd-run (1),
+starts the service
+.BI hd-agent-job- sequence .service
+at
+.BR not_before ,
+which runs
+.BI "hd-agent run " sequence\fR.
+A reboot loses the transient timers, so every run of
+.B hd-agent
+makes them again, before it sends the report.
+A job whose
+.B not_before
+passed, as while the system was off, runs at once; one whose expiry passed is
+.BR expired ;
+one that was running when the system went down
+.BR failed .
+.PP
+.B hd-agent run
+checks the signature and the expiry again, runs the command and stores the
+result:
+.B ok
+when it ended with 0,
+.B failed
+otherwise, and also when the signature no longer verifies.
+The command
+.B upgrade
+runs
+.BR "hd-up \-\-unattended" ,
+which never reboots.
+The output is in the journal:
+.PP
+.RS
+journalctl \-u hd-agent-job-<sequence>.service
+.RE
+.PP
+The report has every stored job.
+An ended job is removed from the store once it is no longer in
+.B open
+of a reply, the jobs the dashboard has no end for.
 .SH EXIT STATUS
 0 when the report was sent or printed, 1 on an error, 2 on wrong arguments.
+.B hd-agent run
+exits with 0 when the job ended ok, and 1 when it did not run or did not end
+ok.
 .SH FILES
 .TP
 .I /etc/hyprdebian/config.json
@@ -125,12 +223,19 @@ The default settings.
 .I /etc/hyprdebian/hd-agent/token
 The token of the system.
 .TP
+.I /var/lib/hd-agent/jobs/<sequence>.json
+A stored job, with its state.
+.TP
+.I /var/lib/hd-agent/sequence
+The highest sequence number accepted.
+.TP
 .I /usr/lib/systemd/system/hd-agent.timer
 .TQ
 .I /usr/lib/systemd/system/hd-agent.service
 Run hd-agent every 15 minutes.
 .SH SEE ALSO
 .BR hd-dashboard (7),
+.BR hd-manager (1),
 .BR hd-config-update (1),
 .BR hd-harden (8),
 .BR hd-secboot (8),

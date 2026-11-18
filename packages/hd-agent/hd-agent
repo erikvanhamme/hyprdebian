@@ -1,16 +1,25 @@
 #!/usr/bin/python3
-"""Sends the state of this system to the hyprdebian dashboard, see hd-dashboard(7).
+"""Sends the state of this system to the hyprdebian dashboard, see hd-dashboard(7), and runs the
+jobs the dashboard hands out in its reply.
 
 The package hd-agent installs this as /usr/sbin/hd-agent, and hd-agent.timer runs it as root
 every 15 minutes. The system only makes outgoing connections: it POSTs a JSON report to the URL in
 the key hd-agent of /etc/hyprdebian/config.json, with the token of this system from
 /etc/hyprdebian/hd-agent/token.
 
-    hd-agent           collect and send a report
-    hd-agent --print   only print the report, without sending it
+The reply has the jobs for this system. A job is accepted when it is signed by one of the
+manager_keys of the settings, is for this host and has a sequence number above that of the last
+job accepted; it is stored in /var/lib/hd-agent/jobs, and a transient timer of systemd-run runs it
+at its time. Every run makes the timers of the stored jobs again, as a reboot loses them.
+
+    hd-agent             collect and send a report, and accept the jobs of the reply
+    hd-agent --print     only print the report, without sending it
+    hd-agent run <seq>   run the stored job with that sequence number, for its timer
 """
 
 import argparse
+import contextlib
+import fcntl
 import glob
 import gzip
 import json
@@ -22,6 +31,15 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+# The format of the jobs and their signatures, from hd-base, or from the repository when the
+# agent runs from there.
+sys.dont_write_bytecode = True
+try:
+    from hyprdebian import job
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hd-base", "lib"))
+    from hyprdebian import job
 
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 CONFIG_KEY = "hd-agent"
@@ -42,8 +60,20 @@ TIMER_GLOBS = ["/etc/systemd/system/*.timer", "/usr/lib/systemd/system/hd-*.time
 OWN_TIMER = "hd-agent.timer"
 
 # The layout of the report, see FORMAT in hd-dashboard. The dashboard refuses reports with a newer
-# format than it knows.
-FORMAT = 1
+# format than it knows. Format 2 adds the jobs.
+FORMAT = 2
+
+# The jobs the agent accepted, see Store.
+STATE_DIR = "/var/lib/hd-agent"
+HD_AGENT = "/usr/sbin/hd-agent"
+# What each command of a job runs, see COMMANDS in hyprdebian.job. hd-up never reboots.
+COMMANDS = {"upgrade": ["/usr/bin/hd-up", "--unattended"]}
+# The transient units of a job: hd-agent-job-<sequence>.timer and hd-agent-job-<sequence>.service.
+JOB_UNIT = "hd-agent-job-{}"
+# The states of a stored job. A running job is reported as scheduled: it has not ended yet.
+SCHEDULED = "scheduled"
+RUNNING = "running"
+ENDED_STATES = ["ok", "failed", "expired", "cancelled"]
 
 # The scan line of `zpool status` after a completed scrub, like
 # "scrub repaired 1.50M in 00:12:01 with 0 errors on Sun Oct 11 00:36:02 2026".
@@ -425,8 +455,8 @@ def fqdn():
     return name
 
 
-def collect():
-    """Collects the report."""
+def collect(jobs=()):
+    """Collects the report, with the jobs of reported_jobs."""
     memory = parse_meminfo(read_file("/proc/meminfo"))
     uptime = float((read_file("/proc/uptime") or "0").split()[0])
     history = read_history(APT_HISTORY)
@@ -470,15 +500,23 @@ def collect():
         "snapshot": parse_snapshots(snapshots),
         "timers": collect_timers(),
         "hardening": parse_hardening(run(*HD_HARDEN)),
+        "jobs": list(jobs),
     }
 
 
-def dashboard_url(config, defaults):
-    """The URL of the dashboard: the key hd-agent of the configuration over the defaults."""
+
+
+def read_settings(config, defaults):
+    """The settings: the key hd-agent of the configuration over the defaults."""
     settings = dict(defaults) if isinstance(defaults, dict) else {}
     if isinstance(config, dict) and isinstance(config.get(CONFIG_KEY), dict):
         settings.update(config[CONFIG_KEY])
 
+    return settings
+
+
+def dashboard_url(settings):
+    """The URL of the dashboard in the settings, or None when it is missing or wrong."""
     url = settings.get("url")
     if not isinstance(url, str) or not re.match(r"^https?://\S+$", url):
         return None
@@ -487,7 +525,7 @@ def dashboard_url(config, defaults):
 
 
 def send(report, url, token):
-    """POSTs the report to the dashboard."""
+    """POSTs the report to the dashboard. Returns the body of the reply."""
     request = urllib.request.Request(
         url.rstrip("/") + "/report",
         data=json.dumps(report).encode(),
@@ -495,43 +533,366 @@ def send(report, url, token):
         method="POST")
 
     with urllib.request.urlopen(request, timeout=30) as response:
-        response.read()
+        return response.read()
+
+
+# --- The jobs ------------------------------------------------------------------------------------
+
+def show_time(timestamp):
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(timestamp))
+
+
+class Store:
+    """The jobs the agent accepted, each in <directory>/jobs/<sequence>.json as
+    {"signed": <the signed job>, "state": ..., "started": ..., "ended": ...}, and the highest
+    sequence number it accepted, in <directory>/sequence. An ended job stays until the dashboard
+    has its end.
+
+    Hold lock() while reading or changing them. A job that runs also holds its own lock,
+    job_lock(), from before it is running until its result is stored, so a running job whose
+    lock is free was broken off."""
+
+    def __init__(self, directory=STATE_DIR):
+        self.directory = directory
+        self.jobs_dir = os.path.join(directory, "jobs")
+
+    def make(self):
+        os.makedirs(self.directory, mode=0o700, exist_ok=True)
+        os.makedirs(self.jobs_dir, mode=0o700, exist_ok=True)
+
+    @contextlib.contextmanager
+    def lock(self):
+        self.make()
+        with open(os.path.join(self.directory, "lock"), "a") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            yield
+
+    def job_lock(self, sequence):
+        """Takes the lock of a job without waiting. Returns the open lock file, which holds the
+        lock until it is closed, or None when the job holds it."""
+        self.make()
+        f = open(os.path.join(self.jobs_dir, f"{sequence}.lock"), "a")
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            f.close()
+            return None
+
+        return f
+
+    def jobs(self):
+        """The stored jobs, by sequence number, in order. A file that cannot be read is left out."""
+        jobs = {}
+
+        for path in glob.glob(os.path.join(self.jobs_dir, "*.json")):
+            name = os.path.basename(path)[:-len(".json")]
+            entry = read_json(path)
+            if name.isdigit() and isinstance(entry, dict) and isinstance(entry.get("signed"), dict):
+                jobs[int(name)] = entry
+
+        return dict(sorted(jobs.items()))
+
+    def save(self, entry):
+        path = os.path.join(self.jobs_dir, f"{entry['signed']['job']['sequence']}.json")
+        with open(path + ".new", "w") as f:
+            json.dump(entry, f, indent=4)
+        os.replace(path + ".new", path)
+
+    def remove(self, sequence):
+        for name in (f"{sequence}.json", f"{sequence}.lock"):
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(os.path.join(self.jobs_dir, name))
+
+    def highest(self):
+        """The highest sequence number accepted, or 0."""
+        value = read_json(os.path.join(self.directory, "sequence"))
+
+        return value if job.is_integer(value) else 0
+
+    def set_highest(self, sequence):
+        path = os.path.join(self.directory, "sequence")
+        with open(path + ".new", "w") as f:
+            f.write(f"{sequence}\n")
+        os.replace(path + ".new", path)
+
+
+class Units:
+    """The transient units of the jobs, made with systemd-run: a timer that starts the service at
+    the time of the job, or the service alone, to run the job at once. The service runs
+    hd-agent run <sequence>."""
+
+    def active(self, sequence):
+        """True when the timer of the job is waiting, or its service is running."""
+        unit = JOB_UNIT.format(sequence)
+        # is-active fails when a unit is not active, but still prints the state of each.
+        states = (run("systemctl", "is-active", unit + ".timer", unit + ".service", check=False) or "").split()
+
+        return any(state in ("active", "activating", "reloading") for state in states)
+
+    def start(self, sequence, command, at):
+        """Starts the job at the Unix time at, or at once when at is None."""
+        args = ["systemd-run", "--quiet", "--collect", "--unit=" + JOB_UNIT.format(sequence),
+                f"--description=HyprDebian Job {sequence}: {command}",
+                "--property=Wants=network-online.target", "--property=After=network-online.target",
+                "--property=Nice=10"]
+        if at is not None:
+            # The timer is gone once it started the service, so it is not taken for a waiting one.
+            args += ["--on-calendar=" + time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(at)),
+                     "--timer-property=AccuracySec=1s", "--timer-property=RemainAfterElapse=no"]
+        args += [HD_AGENT, "run", str(sequence)]
+
+        try:
+            result = subprocess.run(args, capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            print(f"Error: Unable to start job {sequence}: {error}", file=sys.stderr)
+            return
+        if result.returncode != 0:
+            print(f"Error: Unable to start job {sequence}: {result.stderr.strip()}", file=sys.stderr)
+
+    def stop(self, sequence):
+        """Stops the timer of the job; a running service is left alone."""
+        run("systemctl", "stop", JOB_UNIT.format(sequence) + ".timer", check=False)
+
+
+def end(store, entry, state, now):
+    entry["state"] = state
+    entry["ended"] = now
+    store.save(entry)
+
+
+def schedule(store, units, now):
+    """Brings the stored jobs up to date at the time now, with the lock of the store. A scheduled
+    job whose expiry has passed is expired; one whose time has passed runs at once, also when it
+    passed while the system was off; the others get their timer again, as a reboot loses them. A
+    running job whose run was broken off, as by a power cut, failed."""
+    for sequence, entry in store.jobs().items():
+        value = entry["signed"]["job"]
+
+        if entry["state"] == RUNNING:
+            lock = store.job_lock(sequence)
+            if lock is not None:
+                lock.close()
+                print(f"Job {sequence} was broken off while it ran.")
+                end(store, entry, "failed", now)
+            continue
+
+        if entry["state"] != SCHEDULED:
+            continue
+
+        if now > value["expires"]:
+            units.stop(sequence)
+            print(f"Job {sequence} expired before it could run.")
+            end(store, entry, "expired", now)
+        elif not units.active(sequence):
+            units.start(sequence, value["command"], value["not_before"] if value["not_before"] > now else None)
+
+
+def reported_jobs(jobs):
+    """The jobs for the report: every job that has not ended, as scheduled, and every ended one,
+    with its start and end time. An ended job is only stored as long as it is in open of the
+    replies, so the dashboard learns every end."""
+    reported = []
+
+    for sequence, entry in jobs.items():
+        if entry["state"] in ENDED_STATES:
+            reported.append({"sequence": sequence, "state": entry["state"],
+                             "started": entry.get("started"), "ended": entry.get("ended")})
+        else:
+            reported.append({"sequence": sequence, "state": SCHEDULED})
+
+    return reported
+
+
+def accept(store, units, signed, manager_keys, host, now):
+    """Accepts a job of the reply when it is signed by one of the manager_keys, is for this host
+    and has a sequence number above that of the last job accepted, and stores it as scheduled. It
+    cancels a scheduled job with the same command; a running one is left alone. Any other job is
+    ignored, with a line in the log unless it was accepted before."""
+    try:
+        value = job.verify(signed, manager_keys)
+    except job.JobError as error:
+        print(f"Ignoring a job of the dashboard: {error}.", file=sys.stderr)
+        return
+
+    sequence = value["sequence"]
+    stored = store.jobs()
+    if sequence in stored:
+        return
+
+    if value["host"] != host:
+        print(f"Ignoring job {sequence}: it is for {value['host']}, not for {host}.", file=sys.stderr)
+        return
+
+    highest = store.highest()
+    if sequence <= highest:
+        print(f"Ignoring job {sequence}: its sequence number is not above {highest}, that of the "
+              "last job accepted.", file=sys.stderr)
+        return
+
+    for other, entry in stored.items():
+        if entry["state"] == SCHEDULED and entry["signed"]["job"]["command"] == value["command"]:
+            units.stop(other)
+            print(f"Job {other} is cancelled for job {sequence}.")
+            end(store, entry, "cancelled", now)
+
+    store.save({"signed": signed, "state": SCHEDULED, "started": None, "ended": None})
+    store.set_highest(sequence)
+    print(f"Accepted job {sequence}: {value['command']}, not before {show_time(value['not_before'])}, "
+          f"expires {show_time(value['expires'])}.")
+
+
+def take_reply(store, units, reply, manager_keys, host, now):
+    """Takes the reply of the dashboard to a report, with the lock of the store: forgets the ended
+    jobs that are not in open, as the dashboard has their end, then accepts the jobs in jobs and
+    schedules them. Without manager_keys no job is accepted. Returns False when the reply or
+    manager_keys is malformed."""
+    if not isinstance(reply, dict) or not isinstance(reply.get("jobs"), list) or not isinstance(reply.get("open"), list):
+        print("Error: The reply of the dashboard has no list of jobs and of open jobs.", file=sys.stderr)
+        return False
+
+    for sequence, entry in store.jobs().items():
+        if entry["state"] in ENDED_STATES and sequence not in reply["open"]:
+            store.remove(sequence)
+
+    if not reply["jobs"]:
+        return True
+
+    if not manager_keys:
+        print(f"Ignoring the jobs of the dashboard: the key {CONFIG_KEY} in {CONFIG_FILE} has no manager_keys.",
+              file=sys.stderr)
+        return True
+
+    try:
+        job.allowed_signers(manager_keys)
+    except job.JobError as error:
+        print(f"Error: Not accepting jobs: {error}.", file=sys.stderr)
+        return False
+
+    for signed in reply["jobs"]:
+        accept(store, units, signed, manager_keys, host, now)
+
+    schedule(store, units, now)
+    return True
+
+
+def run_job(store, sequence, manager_keys):
+    """Runs a stored job, for its timer: checks its signature and expiry again, runs its command
+    and stores the result, ok when the command ends with 0, failed otherwise. A job whose
+    signature no longer verifies failed, one whose expiry has passed is expired. Returns the exit
+    status."""
+    lock = store.job_lock(sequence)
+    if lock is None:
+        print(f"Error: Job {sequence} is running already.", file=sys.stderr)
+        return 1
+
+    with lock:
+        with store.lock():
+            entry = store.jobs().get(sequence)
+            if entry is None or entry["state"] != SCHEDULED:
+                state = "not stored" if entry is None else entry["state"]
+                print(f"Error: Job {sequence} is not scheduled, but {state}.", file=sys.stderr)
+                return 1
+
+            now = int(time.time())
+            try:
+                value = job.verify(entry["signed"], manager_keys)
+            except job.JobError as error:
+                print(f"Error: Job {sequence} failed: {error}.", file=sys.stderr)
+                end(store, entry, "failed", now)
+                return 1
+
+            if now > value["expires"]:
+                print(f"Job {sequence} expired before it could run.")
+                end(store, entry, "expired", now)
+                return 1
+
+            if now < value["not_before"]:
+                print(f"Error: Job {sequence} may not run before {show_time(value['not_before'])}.",
+                      file=sys.stderr)
+                return 1
+
+            entry["state"] = RUNNING
+            entry["started"] = now
+            store.save(entry)
+
+        print(f"Running job {sequence}: {value['command']}.", flush=True)
+        try:
+            status = subprocess.run(COMMANDS[value["command"]]).returncode
+        except OSError as error:
+            print(f"Error: Unable to run {COMMANDS[value['command']][0]}: {error}", file=sys.stderr)
+            status = 1
+
+        state = "ok" if status == 0 else "failed"
+        with store.lock():
+            end(store, entry, state, int(time.time()))
+        print(f"Job {sequence} ended {state}.")
+
+    return 0 if state == "ok" else 1
+
+
+def report_and_take_jobs(store, units, settings, token):
+    """Brings the stored jobs up to date, sends the report and takes the jobs of the reply.
+    Returns the exit status."""
+    with store.lock():
+        # Before anything can fail, so the jobs run without the dashboard too.
+        schedule(store, units, int(time.time()))
+
+        url = dashboard_url(settings)
+        if url is None:
+            print(f"Error: The key {CONFIG_KEY} in {CONFIG_FILE} needs a url, http:// or https://.",
+                  file=sys.stderr)
+            return 1
+
+        report = collect(reported_jobs(store.jobs()))
+
+        try:
+            body = send(report, url, token)
+        except urllib.error.HTTPError as error:
+            print(f"Error: The dashboard at {url} refused the report: {error.code} {error.reason}", file=sys.stderr)
+            return 1
+        except (urllib.error.URLError, OSError) as error:
+            print(f"Error: Unable to reach the dashboard at {url}: {error}", file=sys.stderr)
+            return 1
+
+        try:
+            reply = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            print(f"Error: The reply of the dashboard at {url} is not JSON.", file=sys.stderr)
+            return 1
+
+        if not take_reply(store, units, reply, settings.get("manager_keys"), report["host"], int(time.time())):
+            return 1
+
+    return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Send the state of this system to the hyprdebian dashboard.")
+        description="Send the state of this system to the hyprdebian dashboard, and run the jobs it hands out.")
     parser.add_argument("--print", action="store_true",
                         help="only print the report, without sending it")
+    commands = parser.add_subparsers(dest="command", metavar="run")
+    run_parser = commands.add_parser("run", help="run a stored job, for its timer")
+    run_parser.add_argument("sequence", type=int, help="the sequence number of the job")
     args = parser.parse_args()
 
-    report = collect()
+    settings = read_settings(read_json(CONFIG_FILE), read_json(DEFAULTS_FILE))
+    store = Store()
+
+    if args.command == "run":
+        return run_job(store, args.sequence, settings.get("manager_keys"))
 
     if args.print:
-        print(json.dumps(report, indent=2))
+        # Without the lock: as a normal user the jobs cannot be read, and are left out.
+        print(json.dumps(collect(reported_jobs(store.jobs())), indent=2))
         return 0
-
-    url = dashboard_url(read_json(CONFIG_FILE), read_json(DEFAULTS_FILE))
-    if url is None:
-        print(f"Error: The key {CONFIG_KEY} in {CONFIG_FILE} needs a url, http:// or https://.",
-              file=sys.stderr)
-        return 1
 
     token = (read_file(TOKEN_FILE) or "").strip()
     if not token:
         print(f"Error: Cannot read the token in {TOKEN_FILE}. Run this as root.", file=sys.stderr)
         return 1
 
-    try:
-        send(report, url, token)
-    except urllib.error.HTTPError as error:
-        print(f"Error: The dashboard at {url} refused the report: {error.code} {error.reason}", file=sys.stderr)
-        return 1
-    except (urllib.error.URLError, OSError) as error:
-        print(f"Error: Unable to reach the dashboard at {url}: {error}", file=sys.stderr)
-        return 1
-
-    return 0
+    return report_and_take_jobs(store, Units(), settings, token)
 
 
 if __name__ == "__main__":

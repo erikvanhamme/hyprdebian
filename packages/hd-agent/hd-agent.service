@@ -1,11 +1,12 @@
 [Unit]
-Description=Send a Status Report to the HyprDebian Dashboard
+Description=Send a Status Report to the HyprDebian Dashboard and Take Its Jobs
 Documentation=man:hd-agent(8)
 Wants=network-online.target
 After=network-online.target
 
-# Runs as root: the token in /etc/hyprdebian/hd-agent is only readable by root, and the report
-# reads the state of ZFS, apt and systemd.
+# Runs as root: the token in /etc/hyprdebian/hd-agent is only readable by root, the report
+# reads the state of ZFS, apt and systemd, and the jobs are stored in /var/lib/hd-agent and run
+# by transient units of systemd-run, outside of this service.
 [Service]
 Type=oneshot
 ExecStart=/usr/sbin/hd-agent

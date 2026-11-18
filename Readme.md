@@ -124,6 +124,6 @@ The `docs` folder has more documentation:
 - [Backup tool](docs/HyprDebian/Backup%20tool.md): the HyprDebian backup tool.
 - [Desktop](docs/packages/hd-desktop.md): the Hyprland desktop and the login with greetd.
 - [Boot splash](docs/packages/hd-plymouth.md): the boot splash, which looks like the lock screen and asks for the ZFS password.
-- [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, [hd-agent](docs/packages/hd-agent.md), which sends their status reports, and [hd-manager](docs/packages/hd-manager.md), which schedules their jobs.
+- [Dashboard](docs/packages/hd-dashboard.md): the dashboard that shows the systems, [hd-agent](docs/packages/hd-agent.md), which sends their status reports and runs their jobs, and [hd-manager](docs/packages/hd-manager.md), which schedules their jobs.
 - [Build server](docs/packages/hd-buildserver.md): the build server that builds HyprDebian every night and updates the package repository with it.
 - [Kernel](docs/packages/hd-kernel.md): the HyprDebian kernel, the kernel of Debian with a prebuilt ZFS module, which a system switches to by installing `hd-kernel`, or one with only the modules of its kind of system: [hd-kernel-vm](docs/packages/hd-kernel-vm.md) for virtual machines, [hd-kernel-server](docs/packages/hd-kernel-server.md) for servers and [hd-kernel-desktop](docs/packages/hd-kernel-desktop.md) for desktops and laptops.

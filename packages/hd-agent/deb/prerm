@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# prerm of hd-agent: stops hd-agent.timer and a report that is being sent when the package is
-# removed.
+# prerm of hd-agent: stops hd-agent.timer, a report that is being sent and the timers of the jobs
+# when the package is removed. A job that is running is left alone.
 set -euo pipefail
 
 if [[ "${1:-}" != "remove" ]]; then
@@ -9,4 +9,5 @@ fi
 
 if [[ -z "${DPKG_ROOT:-}" && -d /run/systemd/system ]]; then
     deb-systemd-invoke stop hd-agent.timer hd-agent.service > /dev/null || true
+    systemctl stop 'hd-agent-job-*.timer' > /dev/null 2>&1 || true
 fi

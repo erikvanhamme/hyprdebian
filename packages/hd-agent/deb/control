@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd, hd-base (>= 1.86)
+Depends: python3, systemd, hd-base (>= 1.91)
 Suggests: hd-dashboard
 Conflicts: hd-report
 Replaces: hd-report
@@ -17,6 +17,12 @@ Description: HyprDebian agent for the dashboard
  failed units, the pending upgrades and reboots, the last snapshot of hd-up,
  the timers and what hd-harden of hd-base hardened. The system only makes
  outgoing connections.
+ .
+ It also runs the jobs the dashboard hands out in its reply, made by
+ hd-manager: each job is one command, like upgrade, which runs hd-up
+ --unattended at the time of the job. A job only runs when it is signed by
+ one of the manager_keys in the key hd-agent of /etc/hyprdebian/config.json;
+ without them, no job runs.
  .
  The URL of the dashboard is the key hd-agent in
  /etc/hyprdebian/config.json; the token of the system is generated on the

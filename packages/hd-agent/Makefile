@@ -1,10 +1,12 @@
 # Builds the package hd-agent, which sends the state of the system to the
-# hyprdebian dashboard of hd-dashboard every 15 minutes.
+# hyprdebian dashboard of hd-dashboard every 15 minutes, and runs the jobs the
+# dashboard hands out in its reply.
 #
 #   make deb    build build/hd-agent_$(DEB_VERSION)_all.deb, with the
 #               version from version.json. It installs:
 #                 /usr/sbin/hd-agent          collects the report and sends
-#                                             it to the dashboard
+#                                             it to the dashboard, accepts
+#                                             the jobs and runs them
 #                 /usr/share/hd-agent/defaults.json
 #                                             defaults.json, the default
 #                                             settings
@@ -22,16 +24,19 @@
 #               the token in /etc/hyprdebian/hd-agent/token when there is
 #               none, and enables and starts the timer. On an installation
 #               over hd-report, it takes over its token, settings and the
-#               state of its timer instead. The prerm stops the timer on
-#               a removal; the postrm masks it on a removal, and on a purge
-#               removes the settings but keeps the token. Raise the version
+#               state of its timer instead. The prerm stops the timer and
+#               the timers of the jobs on a removal; the postrm masks the
+#               timer on a removal, and on a purge removes the settings and
+#               the stored jobs in /var/lib/hd-agent but keeps the token. Raise the version
 #               in version.json for every package that is handed out.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
 #   make test   run the unittest tests in tests/test_agent.py, which need
-#               Python only; they also load ../hd-dashboard/hd-dashboard,
-#               which must accept the reports
+#               Python and ssh-keygen only; they also load
+#               ../hd-dashboard/hd-dashboard, which must accept the reports,
+#               and take hyprdebian.job from ../hd-base/lib when hd-base is
+#               not installed
 #   make clean  remove build/
 
 BUILD := build
