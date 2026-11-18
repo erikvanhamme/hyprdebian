@@ -39,8 +39,9 @@ Lists the systems with their level, HyprDebian version and address, and when
 they last reported.
 .TP
 .B forget \fIhost\fR
-Removes a system, its token and its history, so that its next report
-registers a new token.
+Removes a system, its token, its history and its jobs, so that its next
+report registers a new token.
+The highest sequence number seen stays.
 .PP
 Run
 .B hosts

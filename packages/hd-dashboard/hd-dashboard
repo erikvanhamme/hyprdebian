@@ -1,11 +1,15 @@
 #!/usr/bin/python3
 
 # The hyprdebian dashboard. Every hyprdebian system POSTs a status report to it every 15 minutes,
-# and it shows the latest report of every system on one page, with a short history.
+# and it shows the latest report of every system on one page, with a short history. It also relays
+# the jobs of the estate: a manager POSTs jobs it signed, and the dashboard hands them out to the
+# agents in the replies to their reports. It cannot make or change a job: it refuses any job whose
+# signature does not verify against its manager_keys.
 #
 #   hd-dashboard serve           runs the dashboard, see hd-dashboard.service
 #   hd-dashboard hosts           lists the known hosts and when they last reported
-#   hd-dashboard forget <host>   forgets a host and its token, so it can report with a new token
+#   hd-dashboard forget <host>   forgets a host, its token and its jobs, so it can report with a
+#                                new token
 #
 # A host is known by its host name. The first report of a host name registers its token, and
 # later reports must bring the same token. A reinstalled system has a new token: forget the host
@@ -26,6 +30,15 @@ import urllib.parse
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# The format of the jobs and their signatures, from hd-base, or from the repository when the
+# dashboard runs from there.
+sys.dont_write_bytecode = True
+try:
+    from hyprdebian import job
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hd-base", "lib"))
+    from hyprdebian import job
+
 CONFIG_FILE = "/etc/hyprdebian/config.json"
 CONFIG_KEY = "hd-dashboard"
 DEFAULTS_FILE = "/usr/share/hd-dashboard/defaults.json"
@@ -36,9 +49,12 @@ VERSION_FILE = "/etc/hyprdebian/version.json"
 DATABASE = "/var/lib/hd-dashboard/dashboard.db"
 
 # The newest layout of a report this dashboard knows. Reports with a newer format are refused.
-FORMAT = 1
+# Format 2, from hd-agent, adds the jobs; format 1 is that of hd-report.
+FORMAT = 2
 
 MAX_REPORT_SIZE = 256 * 1024
+# The largest integer SQLite stores; a sequence number or time above it is refused.
+MAX_INTEGER = 2 ** 63 - 1
 HOST_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,62}$")
 TOKEN = re.compile(r"^[A-Za-z0-9]{16,128}$")
 
@@ -65,6 +81,17 @@ HARDENING = {"on": "ok", "changed": "warn", "off": "warn", "unknown": "dim"}
 # The levels of the issues, from good to bad.
 LEVELS = ["ok", "info", "warn", "bad"]
 
+# The states of a job. The dashboard sets waiting, and expired for a waiting job whose expiry
+# passed; the agent reports the others. The ended ones are kept for history_days.
+REPORTED_STATES = ["scheduled", "ok", "failed", "expired", "cancelled"]
+ENDED_STATES = ["ok", "failed", "expired", "cancelled"]
+# The results that a report cannot change any more. An expired job can: the dashboard marks a
+# waiting job expired on its own, while the agent may have fetched it before.
+FINAL_STATES = ["ok", "failed", "cancelled"]
+# The colors of the states of a job on the page of a host.
+JOB_STATES = {"waiting": "info", "scheduled": "info", "ok": "ok", "failed": "bad", "expired": "warn",
+              "cancelled": "dim"}
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS hosts (
     name TEXT PRIMARY KEY,
@@ -82,6 +109,24 @@ CREATE TABLE IF NOT EXISTS history (
     pool REAL
 );
 CREATE INDEX IF NOT EXISTS history_host_time ON history (host, time);
+CREATE TABLE IF NOT EXISTS jobs (
+    sequence INTEGER PRIMARY KEY,
+    host TEXT NOT NULL,
+    command TEXT NOT NULL,
+    expires INTEGER NOT NULL,
+    signed TEXT NOT NULL,
+    state TEXT NOT NULL,
+    started INTEGER,
+    ended INTEGER,
+    stored INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jobs_host ON jobs (host);
+-- The highest sequence number seen, in the jobs stored and in the reports. It stays when jobs are
+-- removed, so it only goes up.
+CREATE TABLE IF NOT EXISTS sequence (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    highest INTEGER NOT NULL
+);
 """
 
 
@@ -125,6 +170,12 @@ def parse_config(config, defaults):
             raise ConfigError(f"hardening_exceptions has {host}, which is not a host name")
         if not isinstance(parts, list) or not all(part in HARDENING_PARTS for part in parts):
             raise ConfigError(f"hardening_exceptions of {host} is not a list of {', '.join(HARDENING_PARTS)}")
+
+    # The public keys of the managers, which the jobs must be signed with.
+    try:
+        job.allowed_signers(settings.get("manager_keys"))
+    except job.JobError as error:
+        raise ConfigError(str(error))
 
     return settings
 
@@ -179,7 +230,7 @@ def hash_token(token):
 # --- Receiving reports ---------------------------------------------------------------------------
 
 class Refused(Exception):
-    """A report that is not accepted, with the HTTP status to answer."""
+    """A report or a job that is not accepted, with the HTTP status to answer."""
 
     def __init__(self, status, message):
         super().__init__(message)
@@ -215,8 +266,75 @@ def metrics(report):
     return load, memory, pool
 
 
+def check_reported_jobs(jobs):
+    """Checks the jobs of a report of format 2: each with its sequence number and state, and for
+    an ended job its start and end time. Raises Refused when they are malformed."""
+    if not isinstance(jobs, list):
+        raise Refused(400, "the report has no list of jobs")
+
+    for entry in jobs:
+        if (not isinstance(entry, dict) or not job.is_integer(entry.get("sequence"))
+                or not 1 <= entry["sequence"] <= MAX_INTEGER or entry.get("state") not in REPORTED_STATES):
+            raise Refused(400, "a job of the report has no sequence number or state")
+        for key in ("started", "ended"):
+            if entry.get(key) is not None and (not job.is_integer(entry[key]) or abs(entry[key]) > MAX_INTEGER):
+                raise Refused(400, f"{key} of job {entry['sequence']} of the report is not a time")
+
+
+def record_sequence(db, sequence):
+    db.execute("INSERT INTO sequence (id, highest) VALUES (1, ?) "
+               "ON CONFLICT (id) DO UPDATE SET highest = max(highest, excluded.highest)", (sequence,))
+
+
+def highest_sequence(db):
+    """The highest sequence number seen, in the jobs and in the reports, or 0."""
+    return db.execute("SELECT max(coalesce((SELECT highest FROM sequence), 0), "
+                      "coalesce((SELECT max(sequence) FROM jobs), 0))").fetchone()[0]
+
+
+def update_jobs(db, host, reported, now):
+    """Takes the states of the jobs of a host from its report. A job of another host, an unknown
+    one and one that has ended ok, failed or cancelled already are left alone; an ended job
+    without an end time ends now. Every sequence number in the report counts as seen, so a new
+    dashboard learns the highest from the agents."""
+    for entry in reported:
+        row = db.execute("SELECT state FROM jobs WHERE sequence = ? AND host = ?", (entry["sequence"], host)).fetchone()
+        if row is None or row["state"] in FINAL_STATES:
+            continue
+
+        if entry["state"] == "scheduled":
+            db.execute("UPDATE jobs SET state = 'scheduled' WHERE sequence = ?", (entry["sequence"],))
+        else:
+            ended = entry.get("ended")
+            if ended is None:
+                ended = now
+            db.execute("UPDATE jobs SET state = ?, started = ?, ended = ? WHERE sequence = ?",
+                       (entry["state"], entry.get("started"), ended, entry["sequence"]))
+
+    if reported:
+        record_sequence(db, max(entry["sequence"] for entry in reported))
+
+
+def tidy_jobs(db, now, history_days):
+    """Marks the waiting jobs whose expiry has passed as expired, as no agent will report them,
+    and removes the jobs that ended more than history_days ago. Run it in a transaction."""
+    db.execute("UPDATE jobs SET state = 'expired', ended = expires WHERE state = 'waiting' AND expires < ?", (now,))
+    db.execute(f"DELETE FROM jobs WHERE state IN ({', '.join('?' * len(ENDED_STATES))}) AND ended < ?",
+               ENDED_STATES + [now - history_days * 86400])
+
+
+def reply_to(db, host):
+    """The reply to a report: jobs, the waiting jobs of the host as they were signed, in order of
+    sequence, and open, the sequence numbers of its jobs that have not ended."""
+    rows = db.execute("SELECT sequence, signed, state FROM jobs WHERE host = ? AND state IN ('waiting', 'scheduled') "
+                      "ORDER BY sequence", (host,)).fetchall()
+    return {"jobs": [json.loads(row["signed"]) for row in rows if row["state"] == "waiting"],
+            "open": [row["sequence"] for row in rows]}
+
+
 def accept_report(db, body, authorization, address, now, history_days):
-    """Checks a report and stores it. Returns the host name. Raises Refused when it is refused."""
+    """Checks a report and stores it, with the states of its jobs. Returns the reply, see
+    reply_to. Raises Refused when it is refused."""
     match = re.match(r"^Bearer (\S+)$", authorization or "")
     if not match or not TOKEN.match(match.group(1)):
         raise Refused(401, "missing or malformed token")
@@ -237,6 +355,12 @@ def accept_report(db, body, authorization, address, now, history_days):
     if not isinstance(report.get("format"), int) or report["format"] > FORMAT:
         raise Refused(400, "unknown report format")
 
+    # The reports of hd-report, format 1, have no jobs.
+    reported = []
+    if report["format"] >= 2:
+        reported = report.get("jobs")
+        check_reported_jobs(reported)
+
     with db:
         row = db.execute("SELECT token FROM hosts WHERE name = ?", (host,)).fetchone()
 
@@ -253,7 +377,79 @@ def accept_report(db, body, authorization, address, now, history_days):
                    (host, now) + metrics(report))
         db.execute("DELETE FROM history WHERE time < ?", (now - history_days * 86400,))
 
-    return host
+        update_jobs(db, host, reported, now)
+        tidy_jobs(db, now, history_days)
+        return reply_to(db, host)
+
+
+def accept_jobs(db, body, manager_keys, now):
+    """Checks the signed jobs a manager sends, a JSON array, and stores them as waiting: all of
+    them or none. Returns their sequence numbers. Raises Refused with 400 when they are
+    malformed, 403 when the signature of one does not verify against manager_keys, 422 when one
+    is for a host the dashboard has no token for, and 409 when the sequence number of one is
+    taken: not above the highest seen."""
+    try:
+        signed_jobs = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise Refused(400, "the jobs are not JSON")
+
+    if not isinstance(signed_jobs, list) or not signed_jobs:
+        raise Refused(400, "the jobs are not a JSON array of signed jobs")
+
+    jobs = []
+    for signed in signed_jobs:
+        try:
+            jobs.append((job.verify(signed, manager_keys), signed))
+        except job.SignatureError as error:
+            raise Refused(403, str(error))
+        except job.JobError as error:
+            raise Refused(400, str(error))
+
+    for value, _ in jobs:
+        if max(value["sequence"], value["expires"], -value["not_before"]) > MAX_INTEGER:
+            raise Refused(400, f"job {value['sequence']} has a number too large to store")
+
+    jobs.sort(key=lambda pair: pair[0]["sequence"])
+    with db:
+        highest = highest_sequence(db)
+        for value, signed in jobs:
+            if db.execute("SELECT 1 FROM hosts WHERE name = ?", (value["host"],)).fetchone() is None:
+                raise Refused(422, f"the dashboard has no token for {value['host']}")
+            if value["sequence"] <= highest:
+                raise Refused(409, f"the sequence number {value['sequence']} is taken, the highest seen is {highest}")
+
+            db.execute("INSERT INTO jobs (sequence, host, command, expires, signed, state, stored) "
+                       "VALUES (?, ?, ?, ?, ?, 'waiting', ?)",
+                       (value["sequence"], value["host"], value["command"], value["expires"], json.dumps(signed), now))
+            highest = value["sequence"]
+
+        record_sequence(db, highest)
+
+    return [value["sequence"] for value, _ in jobs]
+
+
+def load_jobs(db, host=None):
+    """Returns the jobs, of one host or of all, in order of sequence."""
+    query = "SELECT sequence, host, command, signed, state, started, ended, stored FROM jobs"
+    rows = db.execute(query + (" WHERE host = ?" if host else "") + " ORDER BY sequence", (host,) if host else ())
+
+    jobs = []
+    for row in rows:
+        signed = json.loads(row["signed"])
+        jobs.append({
+            "sequence": row["sequence"],
+            "host": row["host"],
+            "command": row["command"],
+            "not_before": signed["job"]["not_before"],
+            "expires": signed["job"]["expires"],
+            "state": row["state"],
+            "started": row["started"],
+            "ended": row["ended"],
+            "stored": row["stored"],
+            "signed": signed,
+        })
+
+    return jobs
 
 
 # --- Judging the state of a host ----------------------------------------------------------------
@@ -365,6 +561,25 @@ def assess(report, last_seen, now, stale_minutes, offline_days, dashboard_versio
     return issues
 
 
+def assess_jobs(jobs):
+    """Returns the issues of the jobs of a host, in order of sequence: a failed job is an error, an
+    expired one a warning, each until a newer job with the same command ends ok. Cancelled jobs
+    are not judged."""
+    issues = []
+
+    for value in jobs:
+        if value["state"] not in ("failed", "expired"):
+            continue
+        if any(newer["command"] == value["command"] and newer["sequence"] > value["sequence"] and newer["state"] == "ok"
+               for newer in jobs):
+            continue
+
+        level = "bad" if value["state"] == "failed" else "warn"
+        issues.append((level, f"{value['command'].capitalize()} job {value['sequence']} {value['state']}"))
+
+    return issues
+
+
 def level_of(issues):
     """The level of a host: its worst issue. Notes, like upgradable packages, leave a host good."""
     worst = "ok"
@@ -377,8 +592,8 @@ def level_of(issues):
 
 
 def load_hosts(db, now, stale_minutes, offline_days, hardening_exceptions=None):
-    """Returns the hosts with their report, history and issues, the worst first.
-    hardening_exceptions has the parts of hd-harden that are not judged per host."""
+    """Returns the hosts with their report, the format of the report, their jobs and issues, the
+    worst first. hardening_exceptions has the parts of hd-harden that are not judged per host."""
     hosts = []
     # Read for every page, so an upgrade of the dashboard's system shows without a restart.
     dashboard_version = hyprdebian_version()
@@ -394,13 +609,21 @@ def load_hosts(db, now, stale_minutes, offline_days, hardening_exceptions=None):
             "first_seen": row["first_seen"],
             "last_seen": row["last_seen"],
             "address": row["address"],
+            # 1 from hd-report, 2 from hd-agent, so hd-manager can leave out the systems that cannot
+            # run jobs.
+            "format": report.get("format") if isinstance(report, dict) else None,
             "report": report,
         })
 
+    jobs = {}
+    for value in load_jobs(db):
+        jobs.setdefault(value["host"], []).append(value)
+
     for host in hosts:
+        host["jobs"] = jobs.get(host["name"], [])
         host["hardening_exceptions"] = (hardening_exceptions or {}).get(host["name"], [])
-        host["issues"] = assess(host["report"], host["last_seen"], now, stale_minutes, offline_days, dashboard_version,
-                                host["hardening_exceptions"])
+        host["issues"] = (assess(host["report"], host["last_seen"], now, stale_minutes, offline_days, dashboard_version,
+                                 host["hardening_exceptions"]) + assess_jobs(host["jobs"]))
         host["level"] = level_of(host["issues"])
 
     hosts.sort(key=lambda host: (-LEVELS.index(host["level"]), host["name"]))
@@ -439,6 +662,8 @@ h2 { margin: 0; font-size: 17px; }
 table { border-collapse: collapse; width: 100%; margin-top: 8px; }
 td { padding: 2px 0; vertical-align: top; }
 td:first-child { color: var(--dim); width: 90px; }
+th { padding: 2px 8px 2px 0; text-align: left; font-weight: normal; color: var(--dim); }
+table.jobs td { padding-right: 8px; }
 ul.issues { margin: 8px 0 0; padding: 0; list-style: none; }
 ul.issues li { padding: 1px 0; }
 .ok { color: var(--ok); } .info { color: var(--info); } .warn { color: var(--warn); } .bad { color: var(--bad); }
@@ -598,6 +823,25 @@ def host_rows(host, history, now):
     return "".join(f"<tr><td>{label}</td><td>{value}</td></tr>" for label, value in rows)
 
 
+def job_table(jobs, now):
+    """The jobs of a host, the newest first."""
+    if not jobs:
+        return '<p class="dim">No jobs.</p>'
+
+    def time_of(timestamp):
+        return '<span class="dim">-</span>' if timestamp is None else when(timestamp, now)
+
+    rows = "".join(
+        f'<tr><td>{value["sequence"]}</td><td>{esc(value["command"])}</td>'
+        f'<td class="{JOB_STATES.get(value["state"], "dim")}">{esc(value["state"])}</td>'
+        f'<td>{time_of(value["not_before"])}</td><td>{time_of(value["expires"])}</td>'
+        f'<td>{time_of(value["started"])}</td><td>{time_of(value["ended"])}</td></tr>'
+        for value in reversed(jobs))
+
+    return ('<table class="jobs"><tr><th>Job</th><th>Command</th><th>State</th><th>Not before</th>'
+            f'<th>Expires</th><th>Started</th><th>Ended</th></tr>{rows}</table>')
+
+
 def issue_list(issues):
     if not issues:
         return '<ul class="issues"><li class="ok">All good</li></ul>'
@@ -649,6 +893,7 @@ def host_page(db, name, now, stale_minutes, offline_days, history_days, hardenin
             f'<section>{chart(history, "load", now, history_days, None, "Load per CPU")}</section>'
             f'<section>{chart(history, "memory", now, history_days, 100, "Memory %")}</section>'
             f'<section>{chart(history, "pool", now, history_days, 100, "Fullest pool %")}</section>'
+            f'<section><h2>Jobs</h2>{job_table(host["jobs"], now)}</section>'
             f'<section><h2>Last report</h2><pre>{esc(json.dumps(host["report"], indent=2))}</pre></section>')
 
     return page(f"{name} · HyprDebian Dashboard", body)
@@ -677,7 +922,8 @@ class Handler(BaseHTTPRequestHandler):
         return connect(self.database_path)
 
     def do_POST(self):
-        if self.path != "/report":
+        # A report from an agent, or signed jobs from a manager.
+        if self.path not in ("/report", "/jobs"):
             return self.text(404, "not found")
 
         try:
@@ -686,20 +932,28 @@ class Handler(BaseHTTPRequestHandler):
             return self.text(411, "Content-Length needed")
 
         if length < 0 or length > MAX_REPORT_SIZE:
-            return self.text(413, "report too large")
+            return self.text(413, "too large")
 
         body = self.rfile.read(length)
+        now = int(time.time())
         db = self.database()
         try:
-            host = accept_report(db, body, self.headers.get("Authorization"), self.client_address[0],
-                                 int(time.time()), self.config["history_days"])
+            if self.path == "/report":
+                reply = accept_report(db, body, self.headers.get("Authorization"), self.client_address[0], now,
+                                      self.config["history_days"])
+            else:
+                stored = accept_jobs(db, body, self.config["manager_keys"], now)
         except Refused as refused:
-            self.log_message("refused report from %s: %s", self.client_address[0], refused)
+            self.log_message("refused %s from %s: %s", self.path[1:], self.client_address[0], refused)
             return self.text(refused.status, str(refused))
         finally:
             db.close()
 
-        self.text(200, f"report of {host} stored")
+        if self.path == "/report":
+            return self.respond(200, "application/json", json.dumps(reply))
+
+        self.log_message("stored jobs %s from %s", ", ".join(map(str, stored)), self.client_address[0])
+        self.text(200, "stored jobs " + ", ".join(map(str, stored)))
 
     def do_GET(self):
         path = urllib.parse.urlsplit(self.path).path
@@ -710,12 +964,21 @@ class Handler(BaseHTTPRequestHandler):
 
         db = self.database()
         try:
+            with db:
+                tidy_jobs(db, now, self.config["history_days"])
+
             if path == "/":
                 return self.respond(200, "text/html; charset=utf-8", overview_page(db, now, stale, offline, exceptions))
 
             if path == "/api/hosts":
                 hosts = load_hosts(db, now, stale, offline, exceptions)
                 return self.respond(200, "application/json", json.dumps(hosts, indent=2))
+
+            if path == "/api/jobs":
+                return self.respond(200, "application/json", json.dumps(load_jobs(db), indent=2))
+
+            if path == "/sequence":
+                return self.respond(200, "application/json", json.dumps({"sequence": highest_sequence(db)}))
 
             if path.startswith("/host/"):
                 name = urllib.parse.unquote(path[6:])
@@ -728,9 +991,9 @@ class Handler(BaseHTTPRequestHandler):
         self.text(404, "not found")
 
     def log_message(self, format, *args):
-        # Reports arrive every 15 minutes from every host. Only refusals and errors are worth a line
-        # in the journal.
-        if args and isinstance(args[0], str) and args[0].startswith(("POST /report", "GET ")):
+        # Reports arrive every 15 minutes from every host. Only refusals, errors and the jobs that
+        # are stored are worth a line in the journal.
+        if args and isinstance(args[0], str) and args[0].startswith(("POST /report", "POST /jobs", "GET ")):
             return
 
         sys.stderr.write("%s - %s\n" % (self.address_string(), format % args))
@@ -749,6 +1012,8 @@ def serve(config, database):
 def list_hosts(config, database):
     db = connect_existing(database)
     now = int(time.time())
+    with db:
+        tidy_jobs(db, now, config["history_days"])
     for host in load_hosts(db, now, config["stale_minutes"], config["offline_days"], config["hardening_exceptions"]):
         version = (host["report"].get("hyprdebian") or {}).get("version") or "?"
         print(f'{host["name"]:<24} {host["level"]:<5} {version:<8} {host["address"]:<16} seen {age(now - host["last_seen"])} ago')
@@ -760,12 +1025,13 @@ def forget(database, name):
     with db:
         removed = db.execute("DELETE FROM hosts WHERE name = ?", (name,)).rowcount
         db.execute("DELETE FROM history WHERE host = ?", (name,))
+        db.execute("DELETE FROM jobs WHERE host = ?", (name,))
 
     if not removed:
         print(f"Error: Unknown host {name}.", file=sys.stderr)
         return 1
 
-    print(f"Forgot {name}. Its next report registers its token again.")
+    print(f"Forgot {name} and its jobs. Its next report registers its token again.")
     return 0
 
 
@@ -778,7 +1044,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("serve", help="run the dashboard, as hd-dashboard.service does")
     commands.add_parser("hosts", help="list the known hosts and when they last reported")
-    forget_parser = commands.add_parser("forget", help="forget a host and its token")
+    forget_parser = commands.add_parser("forget", help="forget a host, its token and its jobs")
     forget_parser.add_argument("host", help="the host name")
     args = parser.parse_args()
 

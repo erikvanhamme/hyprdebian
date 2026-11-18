@@ -25,6 +25,17 @@ load, the memory and the fullest pool.
 It judges each system on its last report and colors its card by its worst
 issue.
 .PP
+It also relays the jobs of the estate, see
+.BR JOBS :
+a manager sends the jobs it signed with
+.BR hd-manager ,
+and the dashboard hands them out to the agents in the replies to their
+reports.
+It cannot make or change a job, and refuses every job whose signature does not
+verify against its
+.BR manager_keys .
+Its pages show the jobs read-only.
+.PP
 Installing the package sets everything up:
 .IP \(bu 2
 the default settings, in the key
@@ -60,7 +71,8 @@ and may only write
 It is enabled on the first installation; after that, it stays as the admin
 left it.
 An upgrade restarts it when it is enabled.
-Only refused reports and errors get a line in its journal:
+Only refused reports and jobs, the jobs it stores and errors get a line in
+its journal:
 .PP
 .RS
 journalctl \-u hd-dashboard.service
@@ -83,7 +95,8 @@ Restart the service after a change:
 .nf
 sudo hd-config-update hd-dashboard \e
     '{"listen": "0.0.0.0", "port": 8080, "stale_minutes": 45, "offline_days": 14,
-      "history_days": 30, "hardening_exceptions": {"beast": ["sysctl"]}}'
+      "history_days": 30, "hardening_exceptions": {"beast": ["sysctl"]},
+      "manager_keys": ["ssh\-ed25519 AAAA..."]}'
 sudo systemctl restart hd-dashboard.service
 .fi
 .RE
@@ -105,7 +118,7 @@ A system that did not report for this many days is an error, default 14, so
 a laptop that is off for a while does not turn red.
 .TP
 .B history_days
-How many days the history is kept, default 30.
+How many days the history and the ended jobs are kept, default 30.
 .TP
 .B hardening_exceptions
 The parts of
@@ -120,20 +133,42 @@ and
 default {}.
 .B {"beast": ["sysctl"]}
 gives no warning when the sysctls of beast are not hardened.
+.TP
+.B manager_keys
+The public keys of the managers, as
+.B hd-manager key
+prints them: Ed25519 keys, one per string, default [].
+A job must be signed by one of them; without keys every job is refused.
 .SH PAGES
 .TP
 .B POST /report
 Stores a report.
+The reply has the jobs of the system, see
+.BR JOBS .
+.TP
+.B POST /jobs
+Stores signed jobs from a manager, see
+.BR JOBS .
 .TP
 .B GET /
 The overview: a card per system, the worst first.
 Refreshes every minute.
 .TP
 .B GET /host/<name>
-One system, with the charts of its history and its last report.
+One system, with the charts of its history, its jobs and its last report.
 .TP
 .B GET /api/hosts
-The systems, their reports and issues as JSON.
+The systems, their reports, the
+.B format
+of their last report, their jobs and issues as JSON.
+.TP
+.B GET /api/jobs
+All jobs and their states as JSON.
+.TP
+.B GET /sequence
+The highest sequence number the dashboard has seen, as
+.BR {"sequence":\ 412} ;
+0 when it has seen none.
 .PP
 The connection is plain HTTP, meant for the local network.
 .SH REPORTS
@@ -144,7 +179,11 @@ as a JSON object, at most 256 KiB, with its token in the header
 The token is 16 to 128 letters and digits.
 The report has a
 .B format
-number, now 1; reports with a newer format are refused.
+number: 1 from
+.BR hd-report ,
+2 from
+.BR hd-agent ;
+reports with a newer format are refused.
 .B host
 is the host name, by which the dashboard knows the system.
 The other parts are
@@ -167,6 +206,19 @@ the state of each part that
 hardens, which the card shows in green when it is on, in orange when it is
 off or changed and in grey when it is unknown or an exception;
 the documentation in the repository describes them.
+A report of format 2 also has
+.BR jobs ,
+a list with the state of every job the agent has scheduled and the end of
+every job in
+.B open
+of the last reply that has ended, each with
+.B sequence
+and
+.BR state ,
+and for an ended job
+.B started
+and
+.BR ended .
 .PP
 The first report of a host name registers its token.
 Later reports of that host name must have the same token, otherwise they are
@@ -175,6 +227,39 @@ Only a hash of the token is stored.
 A reinstalled system has a new token: forget the old one with
 .BR "hd-dashboard forget" ,
 and the next report registers the new one.
+.SH JOBS
+A job is one command for one system, to run once, not before
+.B not_before
+and not after
+.BR expires ,
+signed by a manager.
+The dashboard stores it as it was sent, with its state, its start and end
+time and when it was stored.
+.PP
+A manager POSTs a JSON array of signed jobs to
+.IR /jobs .
+The dashboard stores them all, as waiting, or none.
+It refuses them with 400 when one is malformed, 403 when the signature of one
+does not verify against any of
+.BR manager_keys ,
+422 when one is for a host it has no token for, and 409 when the sequence
+number of one is taken: not above the highest it has seen.
+It counts as seen the sequence numbers of the jobs it stores and those in the
+reports, and keeps the highest when the jobs are removed.
+.PP
+The reply to a report is a JSON object with
+.BR jobs ,
+the waiting jobs of the system in order of sequence, as they were signed, and
+.BR open ,
+the sequence numbers of its jobs that have not ended.
+A job is handed out with every reply until a report shows it as scheduled or
+ended.
+A waiting job whose expiry has passed is marked expired by the dashboard.
+A report only changes the jobs of its own system, and not one that ended ok,
+failed or cancelled.
+Ended jobs are removed
+.B history_days
+after their end.
 .SH ISSUES
 Errors: no report for longer than
 .BR offline_days ,
@@ -182,9 +267,11 @@ failed units, a pool that is not ONLINE or 90% full or more, errors found by
 the last completed scrub of a pool, a degraded mdadm
 array, a failed last run of the service of a timer, and Secure Boot that is
 not on or not reported, see
-.BR hd-secboot (8).
+.BR hd-secboot (8),
+and a failed job, until a newer job with the same command ends ok.
 .PP
-Warnings: a pool that is 80% full or more, bytes repaired by the last
+Warnings: an expired job, until a newer job with the same command ends ok,
+a pool that is 80% full or more, bytes repaired by the last
 completed scrub of a pool, a system that is starting or
 stopping, a part of
 .BR hd-harden (8)

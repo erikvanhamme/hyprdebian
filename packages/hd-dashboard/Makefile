@@ -1,5 +1,5 @@
 # Builds the package hd-dashboard, the dashboard that shows the status reports
-# of the hyprdebian systems, run by hd-dashboard.service.
+# of the hyprdebian systems and relays their jobs, run by hd-dashboard.service.
 #
 #   make deb    build build/hd-dashboard_$(DEB_VERSION)_all.deb, with the
 #               version from version.json. It installs:

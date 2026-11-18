@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: all
 Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
 Installed-Size: @INSTALLED_SIZE@
-Depends: python3, systemd, hd-base (>= 1.22)
+Depends: python3, systemd, hd-base (>= 1.91)
 Section: admin
 Priority: optional
 Description: HyprDebian dashboard
@@ -13,6 +13,11 @@ Description: HyprDebian dashboard
  pool, and judges each system on its last report: failed units, full or
  unhealthy pools, degraded arrays, failed timers, pending reboots and missing
  upgrades.
+ .
+ It also relays the jobs of the estate: it stores the jobs that a manager
+ signed with hd-manager and hands them out to the agents in the replies to
+ their reports, and refuses every job whose signature does not verify against
+ its manager_keys. Its pages show the jobs read-only.
  .
  hd-dashboard.service runs it on port 80, as a user that systemd makes up,
  with the database in /var/lib/hd-dashboard. The settings are the key

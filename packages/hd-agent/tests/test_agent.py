@@ -210,11 +210,13 @@ class TestCollect(unittest.TestCase):
 
         collected = agent.collect()
         db = dashboard.connect(":memory:")
-        host = dashboard.accept_report(db, json.dumps(collected).encode(), "Bearer " + "a" * 64,
-                                       "127.0.0.1", int(time.time()), 30)
+        reply = dashboard.accept_report(db, json.dumps(collected).encode(), "Bearer " + "a" * 64,
+                                        "127.0.0.1", int(time.time()), 30)
 
-        self.assertEqual(host, collected["host"])
-        self.assertEqual(agent.FORMAT, dashboard.FORMAT)
+        self.assertEqual(reply, {"jobs": [], "open": []})
+        self.assertEqual(db.execute("SELECT name FROM hosts").fetchone()[0], collected["host"])
+        # The dashboard is updated before the systems, so it may know a newer format.
+        self.assertLessEqual(agent.FORMAT, dashboard.FORMAT)
 
 
 class TestSend(unittest.TestCase):
