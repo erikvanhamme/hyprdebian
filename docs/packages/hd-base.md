@@ -43,6 +43,8 @@ packages/hd-base/templates/hyprdebian.sources.j2
 packages/hd-base/templates/hd-harden-sshd.conf.j2
 packages/hd-base/templates/hd-harden-sysctl.conf.j2
 packages/hd-base/templates/hd-harden-modprobe.conf.j2
+packages/hd-base/lib/hyprdebian/__init__.py
+packages/hd-base/lib/hyprdebian/job.py
 packages/hd-base/etc/skel/.bash_aliases
 packages/hd-base/etc/skel/.config/nano/nanorc
 packages/hd-base/etc/profile.d/local-bin-path.sh
@@ -80,11 +82,12 @@ packages/hd-base/tests/test_firmware.py
 packages/hd-base/tests/test_issue.py
 packages/hd-base/tests/test_reboot_check.py
 packages/hd-base/tests/test_up.py
+packages/hd-base/tests/test_job.py
 ```
 
 The files of the shared parts are listed on their pages: [hd-config](hd-config.md#building-the-package), [hd-network](hd-network.md#building-the-package) and [hd-secboot](hd-secboot.md#building-the-package).
 
-`make test` runs the tests in `packages/hd-base/tests`, see [Firmware](#firmware), [hd-up](#hd-up), [hd-reboot-check](#hd-reboot-check), [hd-issue](#hd-issue), [hd-harden](#hd-harden) and [hd-secboot](hd-secboot.md#tests).
+`make test` runs the tests in `packages/hd-base/tests`, see [Firmware](#firmware), [hd-up](#hd-up), [hd-reboot-check](#hd-reboot-check), [hd-issue](#hd-issue), [hd-harden](#hd-harden), [Jobs](#jobs) and [hd-secboot](hd-secboot.md#tests).
 
 ## Packages
 The installer starts from the minimal base of Debian, the `minbase` variant of debootstrap, so these are all the packages besides the required ones of Debian.
@@ -341,3 +344,19 @@ Services are enabled on their installation as on Debian: a package that comes wi
 | `/usr/sbin/hd-network-*`, `/usr/lib/hd-network`, `/usr/share/hd-network`, `/usr/lib/systemd/network/*.link` | The network configuration, see [hd-network](hd-network.md#files). |
 | `/usr/sbin/hd-secboot`, `/etc/hyprdebian/secboot` | The Secure Boot keys, see [hd-secboot](hd-secboot.md#files). |
 | `/usr/share/man/man7/hd-base.7.gz`, `/usr/share/man/man1/hd-up.1.gz`, `/usr/share/man/man1/hd-reboot-check.1.gz`, `/usr/share/man/man1/hd-reboot.1.gz`, `/usr/share/man/man1/hd-poweroff.1.gz`, `/usr/share/man/man1/hd-sync-skel.1.gz`, `/usr/share/man/man8/hd-issue.8.gz`, `/usr/share/man/man8/hd-link-repo.8.gz`, `/usr/share/man/man8/hd-firmware.8.gz`, `/usr/share/man/man8/hd-harden.8.gz` | The man pages. |
+
+## Jobs
+`hd-base` installs the Python package `hyprdebian` in `/usr/lib/python3/dist-packages/hyprdebian`, with the code that other hd-* packages share. Its module `hyprdebian.job` holds the format of the jobs of the estate and their signatures, see [ADR 0001](../adr/0001-jobs-signed-by-manager.md); `hd-agent`, `hd-dashboard` and `hd-manager` import it and depend on `hd-base` 1.91 or later. A job is one command for one host, to run once, not before `not_before` and not after `expires`:
+```json
+{
+    "job": {"sequence": 412, "host": "beast", "command": "upgrade", "not_before": 1795000000, "expires": 1795086400},
+    "signature": "-----BEGIN SSH SIGNATURE-----\n...\n-----END SSH SIGNATURE-----\n"
+}
+```
+
+- `check` checks the fields: exactly these five, `sequence` a positive integer, `host` a host name, `command` one of the known commands, only `upgrade` for now, and `not_before` and `expires` integers, `expires` after `not_before`.
+- `canonical` gives the canonical JSON of a job, which is what is signed: sorted keys, no spaces.
+- `sign` signs a job with `ssh-keygen -Y sign -n hd-job` and a private key, which asks for its passphrase on the terminal.
+- `verify` checks a signed job against a list of Ed25519 public keys, the `manager_keys`, with `ssh-keygen -Y verify` and an allowed-signers file in a temporary directory, which gives every key the principal `hd-manager` for the namespace `hd-job` only. It raises `SignatureError` when the signature does not verify against any of the keys, so for a job signed by another key, a changed field, another namespace or a malformed signature, and `JobError` when the job or a key is malformed.
+
+The tests in `packages/hd-base/tests/test_job.py` sign jobs with test keys that they make in a temporary directory.

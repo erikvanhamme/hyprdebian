@@ -57,6 +57,12 @@
 #                 /usr/lib/hd-network/hd_network.py
 #                                             lib/hd_network.py, the code
 #                                             the hd-network commands share
+#                 /usr/lib/python3/dist-packages/hyprdebian/*.py
+#                                             lib/hyprdebian/, the Python
+#                                             package hyprdebian that other
+#                                             hd-* packages import: job.py,
+#                                             the format of the jobs and
+#                                             their signatures
 #                 /etc/...                    the files in etc/, at the
 #                                             same path, 0755 when they are
 #                                             executable and 0644 when not,
@@ -105,7 +111,8 @@
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
-#   make test   run the unittest tests in tests/, which need Python only
+#   make test   run the unittest tests in tests/, which need Python and
+#               ssh-keygen only
 #   make clean  remove build/
 
 BUILD := build
@@ -132,6 +139,9 @@ TEMPLATES := $(wildcard templates/*.j2)
 NETWORK_TEMPLATE_DIR := /usr/share/hd-network/templates
 NETWORK_TEMPLATES := $(wildcard templates/hd-network/*.j2)
 NETWORK_LIB_DIR := /usr/lib/hd-network
+# The Python package hyprdebian, which other hd-* packages import.
+PYTHON_LIB_DIR := /usr/lib/python3/dist-packages/hyprdebian
+PYTHON_LIB := $(wildcard lib/hyprdebian/*.py)
 # The man pages, named <page>.<section>. hd-poweroff.1 includes hd-reboot.1.
 MANPAGES := man/hd-base.7 man/hd-up.1 man/hd-reboot-check.1 man/hd-reboot.1 man/hd-poweroff.1 man/hd-sync-skel.1 \
 	man/hd-issue.8 man/hd-link-repo.8 man/hd-firmware.8 man/hd-harden.8 \
@@ -152,16 +162,17 @@ $(BUILD):
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
 $(DEB): $(VERSION_FILE) $(COMMANDS) $(SBIN_COMMANDS) $(TEMPLATES) $(NETWORK_TEMPLATES) \
-		lib/hd_network.py $(ETC) $(USR) deb/control deb/postinst deb/prerm deb/postrm deb/triggers \
+		lib/hd_network.py $(PYTHON_LIB) $(ETC) $(USR) deb/control deb/postinst deb/prerm deb/postrm deb/triggers \
 		$(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)/usr/sbin $(STAGE)$(TEMPLATE_DIR) \
-		$(STAGE)$(NETWORK_TEMPLATE_DIR) $(STAGE)$(NETWORK_LIB_DIR)
+		$(STAGE)$(NETWORK_TEMPLATE_DIR) $(STAGE)$(NETWORK_LIB_DIR) $(STAGE)$(PYTHON_LIB_DIR)
 	install -m 0755 $(COMMANDS) $(STAGE)/usr/bin/
 	install -m 0755 $(SBIN_COMMANDS) $(STAGE)/usr/sbin/
 	install -m 0644 $(TEMPLATES) $(STAGE)$(TEMPLATE_DIR)/
 	install -m 0644 $(NETWORK_TEMPLATES) $(STAGE)$(NETWORK_TEMPLATE_DIR)/
 	install -m 0644 lib/hd_network.py $(STAGE)$(NETWORK_LIB_DIR)/
+	install -m 0644 $(PYTHON_LIB) $(STAGE)$(PYTHON_LIB_DIR)/
 	for file in $(ETC); do \
 		if [ -x $$file ]; then mode=0755; else mode=0644; fi; \
 		install -D -m $$mode $$file $(STAGE)/$$file; \
