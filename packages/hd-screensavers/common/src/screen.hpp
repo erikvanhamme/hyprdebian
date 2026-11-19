@@ -52,7 +52,9 @@ public:
      * @brief Records the drawing of a frame.
      *
      * The attachments are cleared to black and the far plane, and the
-     * viewport and scissor set to the whole surface, before.
+     * viewport and scissor set to the whole surface, before. The frames of
+     * the surface before the last one are done drawing, so what the last
+     * one does not use may be written.
      *
      * @param cmd    The command buffer, within the rendering.
      * @param extent The size of the surface, in pixels.
