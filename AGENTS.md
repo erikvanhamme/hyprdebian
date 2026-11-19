@@ -31,6 +31,10 @@ Every other `hd-*` package also has a `version.json` of its own, in its folder i
 
 `.claude/skills/hyprdebian-codebase-map` maps the package directories and parts. Update it in the same change that adds, removes, renames or restructures one.
 
+### Running the systems
+
+`.claude/skills/hyprdebian` tells which command does what on an installed system, which man page to read, and which commands only the owner may run. Update it in the same change that adds, removes or renames a command or a man page, or changes whether an option needs root, with the tier of each command.
+
 ### Issue tracker
 
 Issues are tracked as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
