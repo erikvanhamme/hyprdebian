@@ -100,7 +100,7 @@ struct Cell {
 enum class Joints : uint8_t {
     elbow, ///< Every system has elbows, the type 3 of pipes.c.
     ball,  ///< Every system has balls, the type 1 of pipes.c.
-    cycle, ///< The systems of a screenful take turns.
+    cycle, ///< The screenfuls take turns, balls first; a screenful has one joint.
 };
 
 /** @brief The options of the walk, in the ranges of the options of hd-pipes. */
@@ -208,4 +208,6 @@ private:
     std::mt19937 random_;
     /** @brief The cells, x first, then y, then z; true when taken. */
     std::vector<bool> cells_;
+    /** @brief The screenfuls walked so far. */
+    int screenfuls_ = 0;
 };

@@ -69,7 +69,7 @@ With `--window` it is one ordinary window instead, with the app id `hd-pipes`, w
 ## Options
 | Option | Default | |
 | --- | --- | --- |
-| `--joints elbow\|ball\|cycle` | `cycle` | The joints where the pipes turn; `cycle` takes elbows and balls by turns per screenful. |
+| `--joints elbow\|ball\|cycle` | `cycle` | The joints where the pipes turn; `cycle` takes balls and elbows by turns, one kind per screenful, balls first. |
 | `--cycles N` | 5 | The pipes per screenful, 1–10. |
 | `--size N` | 500 | The longest run of a pipe, 10–1000. |
 | `--delay µs` | 10000 | The time of one step, in microseconds, 1–1000000. |

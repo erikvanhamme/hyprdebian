@@ -125,19 +125,21 @@ Screenful Walk::next()
         }
     }
 
+    // One joint for the whole screenful. pipes.c takes turns per system; here the screenfuls take
+    // turns, balls first, so that a screen never mixes elbows and balls.
+    Piece::Kind joint = Piece::Kind::elbow;
+    if (options_.joints == Joints::ball) {
+        joint = Piece::Kind::ball;
+    } else if (options_.joints == Joints::cycle) {
+        if (screenfuls_ % 2 == 0) {
+            joint = Piece::Kind::ball;
+        }
+    }
+    screenfuls_++;
+
     Screenful screenful;
     std::array<int, COLOURS> used{};
     for (int number = 1; number <= options_.cycles; number++) {
-        Piece::Kind joint = Piece::Kind::elbow;
-        if (options_.joints == Joints::ball) {
-            joint = Piece::Kind::ball;
-        } else if (options_.joints == Joints::cycle) {
-            // pipes.c takes turns among its three types: balls, bolted elbows and elbows. The bolts
-            // are left out, so its second type has plain elbows.
-            if ((number - 1) % 3 == 0) {
-                joint = Piece::Kind::ball;
-            }
-        }
         int colour = pick_colour(used);
         screenful.systems.push_back(walk_system(colour, joint));
     }

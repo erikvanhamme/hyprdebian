@@ -249,20 +249,19 @@ void test_turns()
 
 void test_joints()
 {
+    // The joints of three screenfuls in a row; every system of a screenful has the same joint.
     for (auto [joints, expected] : {
-             std::pair{Joints::elbow, std::vector{Piece::Kind::elbow, Piece::Kind::elbow, Piece::Kind::elbow, Piece::Kind::elbow}},
-             std::pair{Joints::ball, std::vector{Piece::Kind::ball, Piece::Kind::ball, Piece::Kind::ball, Piece::Kind::ball}},
-             std::pair{Joints::cycle, std::vector{Piece::Kind::ball, Piece::Kind::elbow, Piece::Kind::elbow, Piece::Kind::ball}},
+             std::pair{Joints::elbow, std::vector{Piece::Kind::elbow, Piece::Kind::elbow, Piece::Kind::elbow}},
+             std::pair{Joints::ball, std::vector{Piece::Kind::ball, Piece::Kind::ball, Piece::Kind::ball}},
+             std::pair{Joints::cycle, std::vector{Piece::Kind::ball, Piece::Kind::elbow, Piece::Kind::ball}},
          }) {
         WalkOptions o{.joints = joints, .cycles = 4, .size = 10};
         Walk walk(1, o);
-        for (int i = 0; i < 2; i++) {
+        for (Piece::Kind joint : expected) {
             auto s = walk.next();
-            std::vector<Piece::Kind> got;
             for (const auto& sys : s.systems) {
-                got.push_back(sys.joint);
+                check(sys.joint == joint, "joints " + std::to_string(static_cast<int>(joints)) + ": the joint of the screenful");
             }
-            check(got == expected, "joints " + std::to_string(static_cast<int>(joints)) + ": the joints of the systems");
         }
     }
 }

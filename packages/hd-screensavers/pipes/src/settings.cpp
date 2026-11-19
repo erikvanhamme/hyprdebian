@@ -39,7 +39,7 @@ void add_pipes_options(Options& options, PipesOptions& values)
 {
     options.choice("joints", values.walk.joints,
                    {{"elbow", Joints::elbow}, {"ball", Joints::ball}, {"cycle", Joints::cycle}},
-                   "the joints where the pipes turn; cycle takes turns per screenful");
+                   "the joints where the pipes turn; cycle takes balls and elbows by turns, one kind per screenful");
     options.number("cycles", values.walk.cycles, 1, 10, "N", "pipes per screenful");
     options.number("size", values.walk.size, 10, 1000, "N", "the longest run of a pipe");
     options.number("delay", values.delay, 1, 1000000, "US", "the time of one step, in microseconds");
