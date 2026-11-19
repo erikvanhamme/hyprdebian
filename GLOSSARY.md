@@ -4,6 +4,20 @@ HyprDebian is a Debian-based distribution built from `hd-*` packages, for the sy
 
 ## Language
 
+### Packages
+
+**Package**:
+A Debian package that HyprDebian builds: an `hd-*` package of its own, or a program Debian lacks, named after it, such as `yazi`.
+_Avoid_: Deb, module
+
+**Package directory**:
+The source of one or more packages in the repository, usually named after its one package; `hd-bootloader` builds `hd-bootloader-gfx` and `hd-bootloader-txt`.
+_Avoid_: Package (for the source), project
+
+**Part**:
+A named piece of a package with a page of its own, once a package of its own and now provided by it, such as `hd-network` of `hd-base` or `hd-theme` of `hd-desktop`.
+_Avoid_: Component, subpackage, module
+
 ### The estate
 
 **Estate**:

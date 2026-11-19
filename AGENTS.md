@@ -27,6 +27,10 @@ Every other `hd-*` package also has a `version.json` of its own, in its folder i
 
 ## Agent skills
 
+### Codebase map
+
+`.claude/skills/hyprdebian-codebase-map` maps the package directories and parts. Update it in the same change that adds, removes, renames or restructures one.
+
 ### Issue tracker
 
 Issues are tracked as local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
