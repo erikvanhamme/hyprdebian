@@ -1,0 +1,184 @@
+.TH HD-PIPES 6 "November 2026" "hd-screensavers" "HyprDebian"
+.SH NAME
+hd-pipes \- the 3D pipes screensaver of HyprDebian
+.SH SYNOPSIS
+.B hd-pipes
+.RB [ \-\-joints
+.IR elbow | ball | cycle ]
+.RB [ \-\-cycles
+.IR N ]
+.RB [ \-\-size
+.IR N ]
+.RB [ \-\-delay
+.IR us ]
+.RB [ \-\-[no\-]fisheye ]
+.RB [ \-\-[no\-]tightturns ]
+.RB [ \-\-[no\-]rotatepipes ]
+.RB [ \-\-window ]
+.br
+.B hd-pipes \-\-help
+.SH DESCRIPTION
+.B hd-pipes
+draws the 3D pipes of Windows NT, a screensaver of the package
+.BR hd-screensavers .
+It is based on
+.I hacks/glx/pipes.c
+of xscreensaver, from xlockmore, by Marcelo F. Vianna, and has its grid
+walk, its lights, materials and colours, and its options.
+.PP
+Pipes grow from cell to cell through a grid of 33\(mu25\(mu33 cells, one
+step per
+.BR \-\-delay ,
+each pipe in one colour, turning at elbows or balls.
+A pipe ends, capped with a ball, when it is boxed in or reaches
+.BR \-\-size .
+After
+.B \-\-cycles
+pipes, a screenful, the scene shrinks, tilts by 90\(de and starts again on
+an empty grid.
+.PP
+It puts a surface on the overlay layer of every monitor, of
+wlr-layer-shell, with the keyboard to itself, and follows the monitors that
+come and go while it runs.
+Every monitor has a scene of its own.
+It ends on a key press, a move of the mouse, a click, a scroll or a touch,
+and on SIGTERM or SIGINT.
+The pointer that is on a monitor when it starts does not end it; the
+cursor is hidden.
+.PP
+It draws with Vulkan, on the first discrete GPU that can show on the
+compositor, else an integrated one, else a virtual one, else lavapipe of
+mesa-vulkan-drivers, which renders on the CPU.
+It needs Vulkan 1.3.
+The shading is per pixel, with up to 8 samples per pixel, and the frames
+come at the refresh rate of each monitor; the pipes grow at the same speed
+at any refresh rate.
+.PP
+.B hd-launch-screensaver
+of
+.B hd-desktop
+starts it, without arguments, when the key
+.B hd-screensaver
+of the configuration names it, see
+.BR hd-screensaver (7);
+the package sets that key in the configuration of the system when it is
+installed.
+.SH OPTIONS
+.TP
+.BR \-\-joints " \fIelbow\fR|\fIball\fR|\fIcycle"
+The joints where the pipes turn.
+.I cycle
+takes elbows or balls by turns per screenful.
+Default:
+.IR cycle .
+.TP
+.BI \-\-cycles " N"
+The pipes per screenful, 1 to 10.
+Default: 5.
+.TP
+.BI \-\-size " N"
+The longest run of a pipe, in steps, 10 to 1000.
+Default: 500.
+.TP
+.BI \-\-delay " us"
+The time of one step, in microseconds, 1 to 1000000.
+Default: 10000.
+.TP
+.BR \-\-fisheye ", " \-\-no\-fisheye
+The camera closer to the pipes, or further away.
+Default: on.
+.TP
+.BR \-\-tightturns ", " \-\-no\-tightturns
+With it, every step has the same chance of a turn; without it, the chance
+grows with every step since the last turn.
+Default: off.
+.TP
+.BR \-\-rotatepipes ", " \-\-no\-rotatepipes
+The scene turns slowly about its vertical axis, or stands still.
+Default: on.
+.TP
+.B \-\-window
+One ordinary window instead of every monitor, which input does not end;
+Escape or closing the window ends it.
+For trying the options on a desktop and for screenshots.
+It is not read from the configuration.
+.TP
+.B \-\-help
+Print the options with their ranges and defaults, and exit.
+.PP
+Each option is
+.BI \-\- name " value"
+or
+.BI \-\- name = value\fR.
+When an option is given more than once, the last wins.
+.SH CONFIGURATION
+The key
+.B hd-pipes
+of the configuration sets the options too, as an object with their names:
+.PP
+.RS
+.nf
+{"hd-pipes": {"joints": "ball", "cycles": 3, "fisheye": false}}
+.fi
+.RE
+.PP
+The flags are
+.B true
+or
+.BR false ,
+the numbers whole numbers and the joints a string.
+It is read in the configuration of the system,
+.IR /etc/hyprdebian/config.json ,
+and then in that of the user,
+.IR ~/.config/hyprdebian/config.json ,
+member by member: an option that the user leaves out keeps the value of
+the system.
+Run as root, it only reads the configuration of the system.
+The command line wins over both.
+See
+.BR hd-config (7).
+.PP
+To set it for a user:
+.PP
+.RS
+.nf
+hd-config-update hd-pipes '{"joints": "ball"}'
+.fi
+.RE
+.PP
+A value out of its range or of the wrong type, a member that is not an
+option, a key that is not an object and a file that is not valid JSON are
+reported on stderr and skipped, so the value below stays.
+On the command line a wrong value is an error.
+.SH EXIT STATUS
+.TP
+.B 0
+It ended, on input, on SIGTERM or SIGINT, or after
+.BR \-\-help .
+.TP
+.B 1
+It cannot start: no Vulkan device, no wlr-layer-shell, no monitors; or it
+lost the compositor.
+The reason is on stderr.
+.TP
+.B 2
+A wrong argument.
+.SH FILES
+.TP
+.I ~/.config/hyprdebian/config.json
+The configuration of the user, with the key
+.BR hd-pipes .
+.TP
+.I /etc/hyprdebian/config.json
+The configuration of the system, with the keys
+.B hd-pipes
+and
+.BR hd-screensaver .
+.TP
+.I /usr/share/doc/hd-screensavers/copyright
+The notice of
+.IR pipes.c .
+.SH SEE ALSO
+.BR hd-screensaver (7),
+.BR hd-config (7),
+.BR hypridle (1)

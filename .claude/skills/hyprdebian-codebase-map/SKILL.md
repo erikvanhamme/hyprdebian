@@ -116,7 +116,7 @@ release in a container by `build-<name>.sh`. `orcaslicer`: the AppImage unpacked
 | `hd-screensaver` | `hd-desktop` | `hd-launch-screensaver`, `hd-cmd-screensaver`, `hd-kill-screensaver`, `screensaver.txt`; `hd-launch-screensaver` and `hd-kill-screensaver` read the key `hd-screensaver`, which `deb/postinst` and `deb/postrm` of `hd-screensavers` set to `hd-pipes` and remove | `hd-screensaver.md` |
 | `hd-art` | `hd-desktop` | `wallpapers/` | `hd-art.md` |
 | `hd-fonts` | `hd-desktop` | downloaded by the `Makefile` | `hd-fonts.md` |
-| `hd-pipes` | `hd-screensavers` | `pipes/src/`, with the notice of `pipes.c` at the top of each file: `main.cpp`, `settings.cpp` (the options, their names, ranges and defaults, and the key `hd-pipes` of the configuration, tested by `tests/test_options.cpp`), `walk.cpp` (the grid walk, where each pipe goes, tested by `tests/test_walk.cpp`), `mesh.cpp` (the tube, elbow and ball, tested by `tests/test_mesh.cpp`), `pipes.cpp` (a scene per output: the steps on the clock, the restart, the instanced drawing) with the shaders `pipe.vert` and `pipe.frag` | `hd-pipes.md` |
+| `hd-pipes` | `hd-screensavers` | `pipes/src/`, with the notice of `pipes.c` at the top of each file: `main.cpp`, `settings.cpp` (the options, their names, ranges and defaults, and the key `hd-pipes` of the configuration, tested by `tests/test_options.cpp`), `walk.cpp` (the grid walk, where each pipe goes, tested by `tests/test_walk.cpp`), `mesh.cpp` (the tube, elbow and ball, tested by `tests/test_mesh.cpp`), `pipes.cpp` (a scene per output: the steps on the clock, the restart, the instanced drawing) with the shaders `pipe.vert` and `pipe.frag`; `man/hd-pipes.6` | `hd-pipes.md` |
 
 ## Where a change goes
 

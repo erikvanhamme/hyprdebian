@@ -46,13 +46,14 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 The downloads and the compiled releases are kept in `build/` of their package directory, so later builds reuse them until `make clean`.
 
 ## The tests: make test
-`make test` runs the unittest tests of `hd-dashboard`, `hd-agent`, `hd-backup` and `hd-base`. They need:
+`make test` runs the unittest tests of `hd-dashboard`, `hd-agent`, `hd-backup` and `hd-base`, and the C++ tests of `hd-screensavers`. They need:
 
 | Package | Needs |
 | --- | --- |
 | `hd-base` | `python3`, only the standard library. |
 | `hd-dashboard` | `python3`, only the standard library. |
 | `hd-agent` | `python3`, only the standard library. It also loads `packages/hd-dashboard/hd-dashboard`. |
+| `hd-screensavers` | `g++` (build-essential), with C++23; the tests need no Wayland or Vulkan, so not the -dev packages of the container. |
 | `hd-backup` | `python3` and the C compiler of `make deb`, as it builds `blockwrite` first. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
 
 ## The live ISO: make iso

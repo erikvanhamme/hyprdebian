@@ -19,6 +19,7 @@
 #                 /usr/share/doc/hd-screensavers/copyright
 #                                             deb/copyright, with the notice
 #                                             of pipes.c
+#                 /usr/share/man/man*/*.gz    the man pages in man/
 #               with the control file deb/control, whose Depends are
 #               hd-desktop, the Vulkan loader, the Vulkan drivers of mesa and
 #               the libraries of the screensavers that dpkg-shlibdeps finds in
@@ -49,6 +50,8 @@ STAGE := $(BUILD)/deb
 DOC := /usr/share/doc/$(DEB_NAME)
 # The binaries of the screensavers, installed in /usr/bin.
 BINARIES := hd-pipes
+# The man pages, named <page>.<section>.
+MANPAGES := man/hd-pipes.6
 
 # The screensavers, compiled in a container. They are for the desktop, which needs Hyprland, so
 # only for unstable; the binaries need the libraries of the release they are compiled on.
@@ -94,11 +97,17 @@ $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): version.json $(PROGRAMS) deb/control deb/copyright deb/postinst deb/postrm | $(BUILD)
+$(DEB): version.json $(PROGRAMS) deb/control deb/copyright deb/postinst deb/postrm $(MANPAGES) | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)$(DOC)
 	install -s -m 0755 $(addprefix $(PROGRAMS)/,$(BINARIES)) $(STAGE)/usr/bin/
 	install -m 0644 deb/copyright $(STAGE)$(DOC)/copyright
+	for page in $(MANPAGES); do \
+		dir=$(STAGE)/usr/share/man/man$${page##*.}; \
+		install -d $$dir; \
+		gzip -9n < $$page > $$dir/$$(basename $$page).gz; \
+		chmod 0644 $$dir/$$(basename $$page).gz; \
+	done
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e 's/@ARCH@/$(ARCH)/' \
 		-e "s/@PROGRAM_DEPENDS@/$$(cat $(PROGRAMS)/depends)/" \
