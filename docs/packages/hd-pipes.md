@@ -56,8 +56,8 @@ Every monitor has a scene of its own, with a seed of its own. Monitors that come
 At first glance it looks like 1997; a close look shows smooth shapes, good shading and no jaggies:
 - the light, the materials, the shininess and the colours of `pipes.c`, lit per pixel as OpenGL 1.x did, in gamma space, on an 8 bit UNORM image, not sRGB;
 - tubes of 64 segments, elbows of 64×24 and balls of 64×32, made once at the start and drawn instanced;
-- multisampling with the most samples the device has, up to 8, every sample shaded when the device can, against the shimmer of the highlights;
-- a frame at every refresh of each monitor (FIFO), with the turn and the shrink in between two steps, so the pipes grow at the same speed at 60 Hz and at 240 Hz.
+- multisampling with the most samples the device has, up to 8 or `msaa`, every sample shaded when the device can, against the shimmer of the highlights;
+- a frame at every refresh of each monitor (FIFO), or at most `framerate` a second, with the turn and the shrink in between two steps, so the pipes grow at the same speed at 60 Hz, at 240 Hz and at any frame rate.
 
 The device is the first discrete GPU that can show on the compositor, else an integrated one, else a virtual one, as in a vm, else lavapipe of `mesa-vulkan-drivers`, which renders on the CPU. All monitors share it. It needs Vulkan 1.3.
 
@@ -76,10 +76,14 @@ With `--window` it is one ordinary window instead, with the app id `hd-pipes`, w
 | `--fisheye`, `--no-fisheye` | on | The camera closer to the pipes. |
 | `--tightturns`, `--no-tightturns` | off | The same chance of a turn at every step. |
 | `--rotatepipes`, `--no-rotatepipes` | on | The scene turns slowly. |
+| `--framerate N` | 0 | The most frames per second on each monitor, 1–1000; 0 for a frame at every refresh. |
+| `--msaa N` | 8 | The most samples per pixel, 1–8; it takes 1, 2, 4 or 8, the most the GPU has up to `N`. |
 | `--window` | | One window instead of every monitor; see [Input](#input). Only on the command line. |
 | `--help` | | Prints the options, with their ranges and defaults. |
 
 Each option is `--name value` or `--name=value`; when an option is given more than once, the last wins.
+
+`framerate` and `msaa` are what the pipes cost the GPU. On a Radeon RX 9070 at 3840×2160 and 120 Hz, the defaults keep the GPU about 30% busy and add about 26 W to the 27 W of the idle desktop; `{"framerate": 30, "msaa": 4}` keeps it about 10% busy and adds about 16 W. The CPU is under 2% of one core either way.
 
 ## The configuration
 The key `hd-pipes` of the configuration sets the options too, as an object with their names, the flags `true` or `false`:

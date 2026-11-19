@@ -46,6 +46,7 @@ void add_pipes_options(Options& options, PipesOptions& values)
     options.flag("fisheye", values.fisheye, "the camera closer to the pipes");
     options.flag("tightturns", values.walk.tightturns, "the same chance of a turn at every step");
     options.flag("rotatepipes", values.rotatepipes, "the pipes turn slowly");
+    add_render_options(options, values.render);
     options.command_line_flag("window", values.window,
                               "one window instead of every monitor, which only Escape or closing it ends");
 }

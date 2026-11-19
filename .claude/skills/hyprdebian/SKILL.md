@@ -83,7 +83,7 @@ Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `
 | `hd-plymouth-render` | Renders the boot splash in the theme of the system. | O |
 | `hd-mount`, `hd-unmount` | Menus that mount and unmount drives, with sudo, in the desktop session. | O |
 | `hd-battery` | Shows the battery level in a notification. | R |
-| `hd-pipes` | The screensaver of the 3D pipes, on every monitor until a key, the mouse, a touch or SIGTERM ends it; `--window` shows it in one window, which Escape or closing it ends. The options of `pipes.c`: `--joints`, `--cycles`, `--size`, `--delay`, `--[no-]fisheye`, `--[no-]tightturns`, `--[no-]rotatepipes`; `hd-pipes --help` lists them. The key `hd-pipes` of the configuration, the user's over the system's, sets them too; the command line wins. `man 6 hd-pipes`. | `--window` U; without it O, as it covers the monitors of the owner |
+| `hd-pipes` | The screensaver of the 3D pipes, on every monitor until a key, the mouse, a touch or SIGTERM ends it; `--window` shows it in one window, which Escape or closing it ends. The options of `pipes.c`: `--joints`, `--cycles`, `--size`, `--delay`, `--[no-]fisheye`, `--[no-]tightturns`, `--[no-]rotatepipes`, and `--framerate` (0, the refresh rate) and `--msaa` (8), which set what it costs the GPU; `hd-pipes --help` lists them. The key `hd-pipes` of the configuration, the user's over the system's, sets them too; the command line wins. `man 6 hd-pipes`. | `--window` U; without it O, as it covers the monitors of the owner |
 
 `hd-menu`, `hd-message`, `hd-yazi`, `hd-volume-*`, `hd-ask-*`, `hd-mode-select` and the
 screensaver commands are what the key bindings run, for the owner at the keyboard. The key

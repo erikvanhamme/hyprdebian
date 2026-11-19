@@ -76,7 +76,7 @@ int64_t draw_and_present_family(VkPhysicalDevice device, wl_display* display)
 
 } // namespace
 
-Gpu::Gpu(wl_display* display)
+Gpu::Gpu(wl_display* display, int msaa)
 {
     const VkApplicationInfo app = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -93,7 +93,7 @@ Gpu::Gpu(wl_display* display)
     // Without a driver, the loader has no instance with the Wayland surfaces.
     check(vkCreateInstance(&instance_info, nullptr, &instance_), "create the Vulkan instance: no Vulkan driver");
 
-    pick_device(display);
+    pick_device(display, msaa);
 
     VkPhysicalDeviceFeatures supported = {};
     vkGetPhysicalDeviceFeatures(physical_device_, &supported);
@@ -142,7 +142,7 @@ Gpu::~Gpu()
     }
 }
 
-void Gpu::pick_device(wl_display* display)
+void Gpu::pick_device(wl_display* display, int msaa)
 {
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(instance_, &count, nullptr);
@@ -165,12 +165,12 @@ void Gpu::pick_device(wl_display* display)
         queue_family_ = static_cast<uint32_t>(family);
         name_ = properties.deviceName;
 
-        // The most samples that both colour and depth attachments have, up to 8.
+        // The most samples that both colour and depth attachments have, up to msaa.
         const VkSampleCountFlags counts =
             properties.limits.framebufferColorSampleCounts & properties.limits.framebufferDepthSampleCounts;
         samples_ = VK_SAMPLE_COUNT_1_BIT;
         for (VkSampleCountFlagBits c : {VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_2_BIT}) {
-            if ((counts & c) != 0) {
+            if ((counts & c) != 0 && static_cast<int>(c) <= msaa) {
                 samples_ = c;
                 break;
             }

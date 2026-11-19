@@ -39,10 +39,12 @@
 // it; with --window it is one window, which Escape or closing it ends.
 //
 //   hd-pipes [--joints elbow|ball|cycle] [--cycles N] [--size N] [--delay µs]
-//            [--[no-]fisheye] [--[no-]tightturns] [--[no-]rotatepipes] [--window]
+//            [--[no-]fisheye] [--[no-]tightturns] [--[no-]rotatepipes]
+//            [--framerate N] [--msaa N] [--window]
 //
 // The options are those of pipes.c, with its names and defaults, in
-// settings.cpp. The key hd-pipes of the configuration of the system and then
+// settings.cpp, and the frame rate and the samples per pixel of
+// ../../common/src/render.cpp. The key hd-pipes of the configuration of the system and then
 // that of the user set them first, as {"joints": "ball", "fisheye": false};
 // the command line wins over both.
 //
@@ -55,7 +57,7 @@
 // is in ../../common/src, shared with the other screensavers: screen.cpp
 // puts the surfaces on the outputs and handles the input, gpu.cpp picks the
 // Vulkan device, swapchain.cpp gets the frames on a surface and options.cpp
-// reads the options.
+// reads the options, render.cpp adds those of the rendering.
 
 #include "gpu.hpp"
 #include "options.hpp"
@@ -87,8 +89,8 @@ int main(int argc, char** argv)
     }
 
     try {
-        Screen screen(pipes_options.window);
-        Gpu gpu(screen.display());
+        Screen screen(pipes_options.window, pipes_options.render.framerate);
+        Gpu gpu(screen.display(), pipes_options.render.msaa);
         Pipes pipes(pipes_options);
         screen.run(gpu, pipes);
         return 0;

@@ -14,6 +14,10 @@ hd-pipes \- the 3D pipes screensaver of HyprDebian
 .RB [ \-\-[no\-]fisheye ]
 .RB [ \-\-[no\-]tightturns ]
 .RB [ \-\-[no\-]rotatepipes ]
+.RB [ \-\-framerate
+.IR N ]
+.RB [ \-\-msaa
+.IR N ]
 .RB [ \-\-window ]
 .br
 .B hd-pipes \-\-help
@@ -50,9 +54,11 @@ It draws with Vulkan, on the first discrete GPU that can show on the
 compositor, else an integrated one, else a virtual one, else lavapipe of
 mesa-vulkan-drivers, which renders on the CPU.
 It needs Vulkan 1.3.
-The shading is per pixel, with up to 8 samples per pixel, and the frames
-come at the refresh rate of each monitor; the pipes grow at the same speed
-at any refresh rate.
+The shading is per pixel, with up to 8 samples per pixel
+.RB ( \-\-msaa ),
+and the frames come at the refresh rate of each monitor, or at most
+.B \-\-framerate
+a second; the pipes grow at the same speed at any frame rate.
 .PP
 .B hd-launch-screensaver
 of
@@ -96,6 +102,20 @@ Default: off.
 .BR \-\-rotatepipes ", " \-\-no\-rotatepipes
 The scene turns slowly about its vertical axis, or stands still.
 Default: on.
+.TP
+.BI \-\-framerate " N"
+The most frames per second on each monitor, 1 to 1000, or 0 for a frame at
+every refresh.
+Fewer frames take less of the GPU; the pipes grow at the same speed.
+Default: 0.
+.TP
+.BI \-\-msaa " N"
+The most samples per pixel against jagged edges, 1 to 8.
+It takes 1, 2, 4 or 8, the most the GPU has up to
+.IR N ;
+1 is no multisampling.
+Fewer samples take less of the GPU.
+Default: 8.
 .TP
 .B \-\-window
 One ordinary window instead of every monitor, which input does not end;

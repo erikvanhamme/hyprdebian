@@ -64,7 +64,8 @@ PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(
 # sources they test, which have no Wayland or Vulkan in them: the grid walk, the meshes and the
 # options.
 TESTS := $(wildcard tests/test_*.cpp)
-TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp
+TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp \
+	common/src/render.cpp
 TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
 # The structs are filled with designated initializers, as in common/program.mk, which leave the
 # members they skip zero; -Wextra would warn about each.

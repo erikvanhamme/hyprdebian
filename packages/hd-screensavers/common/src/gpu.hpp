@@ -23,10 +23,11 @@ public:
     /**
      * @brief Creates the instance and the device.
      * @param display The connection to the compositor the device must present to.
+     * @param msaa    The most samples per pixel; 1, 2, 4 or 8 are taken, the most the device has up to it.
      * @throws std::runtime_error When there is no Vulkan, or no device that
      *         has Vulkan 1.3 and can present to the compositor.
      */
-    explicit Gpu(wl_display* display);
+    Gpu(wl_display* display, int msaa);
 
     /** @brief Waits until the device is idle and destroys it and the instance. */
     ~Gpu();
@@ -53,7 +54,7 @@ public:
      * @brief The samples per pixel of the colour and depth attachments.
      *
      * The most that both colour and depth attachments have on the device, up
-     * to 8; 1 on a device without multisampling.
+     * to the msaa of the constructor; 1 on a device without multisampling.
      */
     VkSampleCountFlagBits samples() const { return samples_; }
 
@@ -79,9 +80,10 @@ private:
     /**
      * @brief Picks the physical device, its queue family and its sample count.
      * @param display The connection to the compositor.
+     * @param msaa    The most samples per pixel.
      * @throws std::runtime_error When no device fits.
      */
-    void pick_device(wl_display* display);
+    void pick_device(wl_display* display, int msaa);
 
     /** @brief The instance. */
     VkInstance instance_ = VK_NULL_HANDLE;

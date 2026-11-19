@@ -35,7 +35,8 @@
 
 /**
  * @file settings.hpp
- * @brief The options of hd-pipes: their names, ranges and defaults, those of pipes.c.
+ * @brief The options of hd-pipes: their names, ranges and defaults, those of
+ *        pipes.c, and the options of the rendering of ../../common/src/render.hpp.
  *
  * Options of ../../common/src reads them from the key hd-pipes of the
  * configuration and from the command line.
@@ -43,6 +44,7 @@
 #pragma once
 
 #include "options.hpp"
+#include "render.hpp"
 #include "walk.hpp"
 
 /** @brief The options of hd-pipes, with their defaults. */
@@ -55,6 +57,8 @@ struct PipesOptions {
     bool fisheye = true;
     /** @brief Whether the scene turns about the Y axis. */
     bool rotatepipes = true;
+    /** @brief The frame rate and the samples per pixel. */
+    RenderOptions render;
     /** @brief Whether it is one window instead of every monitor; the command line only. */
     bool window = false;
 };

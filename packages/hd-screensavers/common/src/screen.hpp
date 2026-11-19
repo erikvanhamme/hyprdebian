@@ -16,10 +16,14 @@
  * A frame of a surface is drawn when the compositor wants one: the first
  * after the configure, and each next one after the frame callback of the
  * one before. So FIFO never waits on a surface that is not shown, and the
- * monitors of other refresh rates do not hold each other up.
+ * monitors of other refresh rates do not hold each other up. With a frame
+ * rate, a frame that the compositor wants also waits for its turn on the
+ * clock, one each 1/framerate s, so a monitor shows fewer frames than its
+ * refresh rate; without one it shows every refresh.
  */
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -85,12 +89,13 @@ public:
      * comes before the Vulkan device, whose threads take over the blocked
      * signals.
      *
-     * @param window Whether to show one window instead of covering the outputs.
+     * @param window    Whether to show one window instead of covering the outputs.
+     * @param framerate The most frames per second on each surface; 0 for the refresh rate.
      * @throws std::runtime_error When there is no Wayland compositor, it has
      *         no outputs, or it lacks wl_compositor 4 or, without window,
      *         zwlr_layer_shell_v1 4 or, with window, xdg_wm_base.
      */
-    explicit Screen(bool window);
+    Screen(bool window, int framerate);
 
     /** @brief Destroys the surfaces and disconnects. */
     ~Screen();
@@ -161,6 +166,8 @@ private:
 
     /** @brief Whether this is the window of --window. */
     bool window_mode_;
+    /** @brief The time between two frames of a surface; zero for the refresh rate. */
+    std::chrono::microseconds frame_period_;
     /** @brief Whether run() goes on. */
     bool running_ = true;
     /** @brief The device; null until run(). */

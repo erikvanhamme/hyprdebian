@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstring>
 #include <linux/input-event-codes.h>
@@ -31,6 +32,14 @@ constexpr uint32_t WINDOW_HEIGHT = 720;
 
 /** @brief How long run() waits before it tries again to draw a frame that was not presented, in ms. */
 constexpr int RETRY_MS = 16;
+
+/**
+ * @brief How long before its turn on the clock a frame is drawn, with a frame rate.
+ *
+ * FIFO shows it at the first refresh after it is presented; drawn a little
+ * early, it is ready for the refresh at its turn and not the one after.
+ */
+constexpr std::chrono::microseconds FRAME_LEAD{2000};
 
 void fail(const std::string& what)
 {
@@ -68,6 +77,8 @@ struct Screen::Surface {
     uint32_t height = 0;
     /** @brief Whether a frame may be drawn: after a configure, and when the frame callback of the last is done. */
     bool due = false;
+    /** @brief The turn of the next frame on the clock, with a frame rate; it is drawn FRAME_LEAD before. */
+    std::chrono::steady_clock::time_point turn;
     /** @brief Whether the compositor closed the layer surface; run() destroys it. */
     bool closed = false;
 
@@ -260,7 +271,9 @@ void Screen::Seat::set_capabilities(uint32_t capabilities)
     }
 }
 
-Screen::Screen(bool window) : window_mode_(window)
+Screen::Screen(bool window, int framerate)
+    : window_mode_(window),
+      frame_period_(framerate > 0 ? std::chrono::microseconds(1000000 / framerate) : std::chrono::microseconds(0))
 {
     // SIGTERM ends the screensaver, as hd-kill-screensaver sends it, and
     // SIGINT, from a terminal. Blocked, they wait in the signalfd for run().
@@ -499,6 +512,9 @@ void Screen::draw(Surface& s)
         return;
     }
     s.due = false;
+    // The turns stay one period apart, so the frames keep to the frame rate;
+    // a surface that fell behind starts again from now.
+    s.turn = std::max(s.turn + frame_period_, std::chrono::steady_clock::now());
 }
 
 void Screen::destroy_surfaces()
@@ -552,6 +568,9 @@ void Screen::run(Gpu& gpu, SceneMaker& maker)
         }
 
         bool retry = false;
+        // The time until the first frame that waits for its turn; -1 when none does.
+        int wait_ms = -1;
+        const auto now = std::chrono::steady_clock::now();
         std::vector<Surface*> surfaces;
         if (window_ != nullptr) {
             surfaces.push_back(window_.get());
@@ -562,10 +581,20 @@ void Screen::run(Gpu& gpu, SceneMaker& maker)
             }
         }
         for (Surface* s : surfaces) {
-            if (s->due) {
-                draw(*s);
-                retry = retry || s->due;
+            if (!s->due) {
+                continue;
             }
+            if (s->turn - FRAME_LEAD > now) {
+                const auto wait = std::chrono::ceil<std::chrono::milliseconds>(s->turn - FRAME_LEAD - now);
+                const int ms = static_cast<int>(wait.count());
+                wait_ms = wait_ms < 0 ? ms : std::min(wait_ms, ms);
+                continue;
+            }
+            draw(*s);
+            retry = retry || s->due;
+        }
+        if (retry) {
+            wait_ms = wait_ms < 0 ? RETRY_MS : std::min(wait_ms, RETRY_MS);
         }
 
         while (wl_display_prepare_read(display_) != 0) {
@@ -575,7 +604,7 @@ void Screen::run(Gpu& gpu, SceneMaker& maker)
         }
         wl_display_flush(display_);
         pollfd fds[2] = {{wl_display_get_fd(display_), POLLIN, 0}, {signal_fd_, POLLIN, 0}};
-        if (poll(fds, 2, retry ? RETRY_MS : -1) < 0) {
+        if (poll(fds, 2, wait_ms) < 0) {
             wl_display_cancel_read(display_);
             if (errno == EINTR) {
                 continue;

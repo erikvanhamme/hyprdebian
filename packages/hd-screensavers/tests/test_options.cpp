@@ -34,7 +34,7 @@
  */
 
 // The tests of the options of hd-pipes: Options of common/src/options.cpp
-// with the options of pipes/src/settings.cpp. They check the layers, the
+// with the options of pipes/src/settings.cpp and common/src/render.cpp. They check the layers, the
 // defaults, the configuration of the system, that of the user and the
 // command line, each over the one before, and that values out of range or
 // of the wrong type are skipped in a configuration and refused on the
@@ -120,6 +120,8 @@ void test_defaults()
     check(r.values.fisheye, "defaults: fisheye on");
     check(!r.values.walk.tightturns, "defaults: tightturns off");
     check(r.values.rotatepipes, "defaults: rotatepipes on");
+    check(r.values.render.framerate == 0, "defaults: framerate 0, the refresh rate");
+    check(r.values.render.msaa == 8, "defaults: msaa 8");
     check(!r.values.window, "defaults: no window");
 }
 
@@ -127,7 +129,8 @@ void test_system()
 {
     const auto system = config("system.json", R"({"hd-theme": {"font": "x"},
         "hd-pipes": {"joints": "ball", "cycles": 3, "size": 20, "delay": 500,
-                     "fisheye": false, "tightturns": true, "rotatepipes": false}})");
+                     "fisheye": false, "tightturns": true, "rotatepipes": false,
+                     "framerate": 30, "msaa": 4}})");
     const Result r = run({system});
     check(r.errors.empty(), "system: no messages");
     check(r.values.walk.joints == Joints::ball, "system: joints");
@@ -137,6 +140,8 @@ void test_system()
     check(!r.values.fisheye, "system: fisheye");
     check(r.values.walk.tightturns, "system: tightturns");
     check(!r.values.rotatepipes, "system: rotatepipes");
+    check(r.values.render.framerate == 30, "system: framerate");
+    check(r.values.render.msaa == 4, "system: msaa");
 
     const Result other = run({config("other.json", R"({"hd-theme": {"font": "x"}})")});
     check(other.errors.empty() && other.values.walk.cycles == 5, "system: a configuration without the key is skipped");
@@ -158,7 +163,8 @@ void test_command_line()
 {
     const auto system = config("system.json", R"({"hd-pipes": {"joints": "ball", "cycles": 3, "size": 20}})");
     const auto user = config("user.json", R"({"hd-pipes": {"cycles": 7, "fisheye": false}})");
-    const Result r = run({system, user}, {"--cycles", "9", "--size=40", "--fisheye", "--no-rotatepipes", "--window"});
+    const Result r = run({system, user}, {"--cycles", "9", "--size=40", "--fisheye", "--no-rotatepipes", "--window",
+                                          "--framerate", "60", "--msaa=2"});
     check(r.parsed == Options::Parsed::run, "command line: runs");
     check(r.errors.empty(), "command line: no messages");
     check(r.values.walk.cycles == 9, "command line: wins over the user");
@@ -166,6 +172,8 @@ void test_command_line()
     check(r.values.fisheye, "command line: a flag wins over the user");
     check(!r.values.rotatepipes, "command line: --no-");
     check(r.values.window, "command line: --window");
+    check(r.values.render.framerate == 60, "command line: --framerate");
+    check(r.values.render.msaa == 2, "command line: --msaa");
     check(r.values.walk.joints == Joints::ball, "command line: what it leaves out keeps the configuration");
 
     const Result last = run({}, {"--joints", "elbow", "--joints", "ball", "--no-fisheye", "--fisheye"});
@@ -177,7 +185,8 @@ void test_config_out_of_range()
     const auto system = config("system.json", R"({"hd-pipes": {"cycles": 3, "size": 20, "delay": 500,
         "joints": "ball", "fisheye": false}})");
     const auto user = config("user.json", R"({"hd-pipes": {"cycles": 11, "size": 9, "delay": 0.5,
-        "joints": "teapot", "fisheye": "no", "window": true, "bolts": true, "tightturns": true}})");
+        "joints": "teapot", "fisheye": "no", "window": true, "bolts": true, "tightturns": true,
+        "framerate": 1001, "msaa": "4"}})");
     const Result r = run({system, user});
     check(r.parsed == Options::Parsed::run, "config range: runs");
     check(r.values.walk.cycles == 3, "config range: cycles 11 keeps the value of the system");
@@ -187,10 +196,13 @@ void test_config_out_of_range()
     check(!r.values.fisheye, "config range: a string for a flag keeps the value of the system");
     check(!r.values.window, "config range: window is of the command line only");
     check(r.values.walk.tightturns, "config range: the valid values of the same key are set");
+    check(r.values.render.framerate == 0, "config range: framerate 1001 keeps the default");
+    check(r.values.render.msaa == 8, "config range: msaa as a string keeps the default");
     for (const char* what : {"cycles is a whole number from 1 to 10", "size is a whole number from 10 to 1000",
                              "delay is a whole number from 1 to 1000000", "joints is elbow, ball or cycle",
                              "fisheye is true or false", "window is not an option of hd-pipes",
-                             "bolts is not an option of hd-pipes"}) {
+                             "bolts is not an option of hd-pipes", "framerate is a whole number from 0 to 1000",
+                             "msaa is a whole number from 1 to 8"}) {
         check(contains(r.errors, user + ": " + what + ", skipped"), std::string("config range: reports ") + what);
     }
 
@@ -233,6 +245,10 @@ void test_command_line_wrong()
              {{"--delay", "0"}, "--delay is a whole number from 1 to 1000000"},
              {{"--delay", "5x"}, "--delay is a whole number from 1 to 1000000"},
              {{"--joints", "teapot"}, "--joints is elbow, ball or cycle"},
+             {{"--framerate", "-1"}, "--framerate is a whole number from 0 to 1000"},
+             {{"--framerate", "1001"}, "--framerate is a whole number from 0 to 1000"},
+             {{"--msaa", "0"}, "--msaa is a whole number from 1 to 8"},
+             {{"--msaa", "16"}, "--msaa is a whole number from 1 to 8"},
              {{"--cycles"}, "--cycles needs a value"},
              {{"--fisheye=yes"}, "--fisheye takes no value"},
              {{"--no-cycles"}, "unknown option --no-cycles"},
@@ -256,7 +272,8 @@ void test_help()
     check(r.errors.empty(), "help: no messages");
     for (const char* line : {"usage: hd-pipes [options]", "--joints elbow|ball|cycle", "(cycle)",
                              "--cycles N", "1-10 (5)", "--size N", "10-1000 (500)", "--delay US", "(10000)",
-                             "--fisheye, --no-fisheye", "--tightturns, --no-tightturns", "--window"}) {
+                             "--fisheye, --no-fisheye", "--tightturns, --no-tightturns", "--framerate N",
+                             "0-1000 (0)", "--msaa N", "1-8 (8)", "--window"}) {
         check(contains(r.out, line), std::string("help: shows ") + line);
     }
 }
