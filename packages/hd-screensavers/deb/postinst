@@ -1,0 +1,20 @@
+#!/bin/sh
+# postinst of hd-screensavers: makes hd-pipes the screensaver of the system, in the key
+# hd-screensaver of /etc/hyprdebian/config.json, when the system has none yet. A screensaver that
+# the admin chose stays, also over upgrades. hd-launch-screensaver of hd-desktop reads the key.
+set -e
+
+CONFIG_FILE=/etc/hyprdebian/config.json
+CONFIG_KEY=hd-screensaver
+SCREENSAVER=hd-pipes
+
+# configure is the only action that installs the package; the abort-* actions undo a failed
+# upgrade or removal.
+if [ "$1" != "configure" ]; then
+    exit 0
+fi
+
+if [ -f "$CONFIG_FILE" ] && jq -e --arg key "$CONFIG_KEY" 'has($key)' "$CONFIG_FILE" > /dev/null; then
+    exit 0
+fi
+hd-config-update "$CONFIG_KEY" "\"$SCREENSAVER\""

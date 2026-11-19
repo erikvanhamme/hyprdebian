@@ -22,8 +22,11 @@
 #               with the control file deb/control, whose Depends are
 #               hd-desktop, the Vulkan loader, the Vulkan drivers of mesa and
 #               the libraries of the screensavers that dpkg-shlibdeps finds in
-#               the container. Raise the version in version.json for every
-#               change to the package.
+#               the container, and the maintainer scripts deb/postinst and
+#               deb/postrm, which set the key hd-screensaver of the
+#               configuration of the system to hd-pipes when it is unset, and
+#               remove it when it still is hd-pipes. Raise the version in
+#               version.json for every change to the package.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -91,7 +94,7 @@ $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
-$(DEB): version.json $(PROGRAMS) deb/control deb/copyright | $(BUILD)
+$(DEB): version.json $(PROGRAMS) deb/control deb/copyright deb/postinst deb/postrm | $(BUILD)
 	rm -rf $(STAGE)
 	install -d $(STAGE)/DEBIAN $(STAGE)/usr/bin $(STAGE)$(DOC)
 	install -s -m 0755 $(addprefix $(PROGRAMS)/,$(BINARIES)) $(STAGE)/usr/bin/
@@ -101,6 +104,7 @@ $(DEB): version.json $(PROGRAMS) deb/control deb/copyright | $(BUILD)
 		-e "s/@PROGRAM_DEPENDS@/$$(cat $(PROGRAMS)/depends)/" \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
+	install -m 0755 deb/postinst deb/postrm $(STAGE)/DEBIAN/
 	dpkg-deb --root-owner-group --build $(STAGE) $@
 
 $(BUILD)/tests/%: tests/%.cpp $(TEST_SOURCES) | $(BUILD)/tests

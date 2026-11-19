@@ -1,19 +1,56 @@
 #!/bin/bash
 
-# Launch the screensaver in kitty
+# Launch the screensaver that the key hd-screensaver of the configuration names, or else the text
+# screensaver in kitty.
 
-# Exit early if we don't have the tte show
-if ! command -v tte &>/dev/null; then
-    exit 1
-fi
+# The key is read in the configuration of the user first, and then in that of the system.
+CONFIG_FILES=(~/.config/hyprdebian/config.json /etc/hyprdebian/config.json)
+CONFIG_KEY=hd-screensaver
+
+# How long a screensaver may take to fail at its start, in tenths of a second.
+START_TENTHS=20
 
 # Matches only the screensaver kitty windows, not other processes that mention the class.
 screensaver_pattern='^kitty --class=hyprdebian\.screensaver( |$)'
 
-# Exit early if screensaver is already running
-if pgrep -f "$screensaver_pattern" >/dev/null; then
-    exit 0
-fi
+# Print the name of the screensaver of the key, from the first configuration that has it as a
+# string. A name is a program in the PATH, started without arguments, so it is only letters,
+# digits, - and _; that also makes it a pattern that matches only itself for pgrep.
+screensaver_name() {
+    local file name
+    for file in "${CONFIG_FILES[@]}"; do
+        if [[ ! -f "$file" ]]; then
+            continue
+        fi
+        name=$(jq -r --arg key "$CONFIG_KEY" '.[$key] | strings' "$file" 2>/dev/null)
+        if [[ -n "$name" ]]; then
+            if [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                echo "$name"
+            fi
+            return
+        fi
+    done
+}
+
+# Start the screensaver of the given name, and wait whether it fails at its start. It fails when
+# it is not installed, or when it ends with an error within START_TENTHS; a screensaver that
+# ends without one within that time was ended by input.
+start_screensaver() {
+    local name=$1 pid
+    if ! command -v "$name" &>/dev/null; then
+        return 1
+    fi
+    "$name" </dev/null &
+    pid=$!
+    for _ in $(seq "$START_TENTHS"); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid"
+            return
+        fi
+        sleep 0.1
+    done
+    return 0
+}
 
 # Wait until a screensaver window is mapped on the given monitor. Windows open on the monitor
 # that has focus when they map, so focus must not move on before that.
@@ -29,12 +66,37 @@ wait_for_screensaver_on() {
     return 1
 }
 
-focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
+# Start the text screensaver, a kitty window on every monitor.
+start_text_screensaver() {
+    local focused id m
 
-hyprctl monitors -j | jq -r '.[] | "\(.id) \(.name)"' | while read -r id m; do
-    hyprctl dispatch "hl.dsp.focus({ monitor = \"$m\" })"
-    hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class=hyprdebian.screensaver --override font_size=18 --override window_padding_width=0 -e /usr/bin/hd-cmd-screensaver")'
-    wait_for_screensaver_on "$id"
-done
+    # Exit early if we don't have the tte show
+    if ! command -v tte &>/dev/null; then
+        exit 1
+    fi
 
-hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })"
+    focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
+
+    hyprctl monitors -j | jq -r '.[] | "\(.id) \(.name)"' | while read -r id m; do
+        hyprctl dispatch "hl.dsp.focus({ monitor = \"$m\" })"
+        hyprctl dispatch 'hl.dsp.exec_cmd("kitty --class=hyprdebian.screensaver --override font_size=18 --override window_padding_width=0 -e /usr/bin/hd-cmd-screensaver")'
+        wait_for_screensaver_on "$id"
+    done
+
+    hyprctl dispatch "hl.dsp.focus({ monitor = \"$focused\" })"
+}
+
+name=$(screensaver_name)
+
+# Exit early if a screensaver is already running
+if pgrep -f "$screensaver_pattern" >/dev/null; then
+    exit 0
+fi
+if [[ -n "$name" ]] && pgrep -fx "$name" >/dev/null; then
+    exit 0
+fi
+
+if [[ -n "$name" ]] && start_screensaver "$name"; then
+    exit 0
+fi
+start_text_screensaver

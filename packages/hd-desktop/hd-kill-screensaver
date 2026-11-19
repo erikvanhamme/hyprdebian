@@ -1,5 +1,33 @@
 #!/bin/bash
 
+# Stop the screensaver that the key hd-screensaver of the configuration names, as
+# hd-launch-screensaver reads it, and the text screensaver.
+
+CONFIG_FILES=(~/.config/hyprdebian/config.json /etc/hyprdebian/config.json)
+CONFIG_KEY=hd-screensaver
+
+# The name of the screensaver of the key, as in hd-launch-screensaver.
+screensaver_name() {
+    local file name
+    for file in "${CONFIG_FILES[@]}"; do
+        if [[ ! -f "$file" ]]; then
+            continue
+        fi
+        name=$(jq -r --arg key "$CONFIG_KEY" '.[$key] | strings' "$file" 2>/dev/null)
+        if [[ -n "$name" ]]; then
+            if [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]]; then
+                echo "$name"
+            fi
+            return
+        fi
+    done
+}
+
+name=$(screensaver_name)
+if [[ -n "$name" ]]; then
+    pkill -TERM -fx "$name" 2> /dev/null
+fi
+
 hyprctl eval 'hl.config({ cursor = { invisible = false } })' &> /dev/null
 pkill -x tte 2> /dev/null
 pkill -f '^kitty --class=hyprdebian\.screensaver( |$)' 2> /dev/null

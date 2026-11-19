@@ -14,6 +14,17 @@ It shows a text with random effects of terminal text effects
 .RB ( tte )
 in a full screen kitty window on every monitor.
 .PP
+The key
+.B hd-screensaver
+of the configuration can name another screensaver in its place, such as
+.B hd-pipes
+of the package
+.BR hd-screensavers ,
+see
+.BR hd-pipes (6)
+and
+.BR "THE KEY" .
+.PP
 hypridle starts it after 2 minutes without input, and stops it before it
 locks the screen with hyprlock, by
 .IR ~/.config/hypr/hypridle.conf .
@@ -21,7 +32,10 @@ It also stops on a key press, or when another window gets the focus.
 .SH COMMANDS
 .TP
 .B hd-launch-screensaver
-Start the screensaver on every monitor, unless it already runs.
+Start the screensaver that the key names, unless it already runs.
+Without the key, when that program is not installed, or when it fails at
+its start, by ending with an error within 2 seconds, it starts the text screensaver on every monitor, unless it
+already runs.
 It runs Hyprland's
 .B hyprctl
 and must run in the Hyprland session.
@@ -33,8 +47,58 @@ runs it in each kitty window of the class
 .BR hyprdebian.screensaver .
 .TP
 .B hd-kill-screensaver
-Stop the screensaver on every monitor.
+Stop the screensaver that the key names, with SIGTERM, and the text
+screensaver on every monitor.
+.SH THE KEY
+The key
+.B hd-screensaver
+is a string, the name of a screensaver: a program in the
+.B PATH
+of letters, digits,
+.B \-
+and
+.BR _ ,
+which is started without arguments, covers every monitor, ends on input
+and ends on SIGTERM.
+It is read in the configuration of the user,
+.IR ~/.config/hyprdebian/config.json ,
+first and, when that does not have it, in the configuration of the system,
+.IR /etc/hyprdebian/config.json ,
+see
+.BR hd-config (7).
+.PP
+The package
+.B hd-screensavers
+sets the key of the system to
+.B hd-pipes
+when it is installed and the system has no key yet, and removes it when it
+is removed and the key still is
+.BR hd-pipes .
+A user who wants the text screensaver while the system has another sets a
+name that is not installed:
+.PP
+.RS
+.nf
+hd-config-update hd-screensaver '"none"'
+.fi
+.RE
+.PP
+A user follows the screensaver of the system again with
+.PP
+.RS
+.nf
+hd-config-remove hd-screensaver
+.fi
+.RE
 .SH FILES
+.TP
+.I ~/.config/hyprdebian/config.json
+The configuration of the user, with the key
+.BR hd-screensaver .
+.TP
+.I /etc/hyprdebian/config.json
+The configuration of the system, with the key
+.BR hd-screensaver .
 .TP
 .I ~/.config/hyprdebian/screensaver.txt
 The text that the screensaver shows, when the user has one.
@@ -46,4 +110,6 @@ Copy it to
 to change it.
 .SH SEE ALSO
 .BR hd-desktop (7),
+.BR hd-config (7),
+.BR hd-pipes (6),
 .BR hypridle (1)

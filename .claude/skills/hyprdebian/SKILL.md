@@ -86,7 +86,10 @@ Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `
 | `hd-pipes` | The screensaver of the 3D pipes, on every monitor until a key, the mouse, a touch or SIGTERM ends it; `--window` shows it in one window, which Escape or closing it ends. The options of `pipes.c`: `--joints`, `--cycles`, `--size`, `--delay`, `--[no-]fisheye`, `--[no-]tightturns`, `--[no-]rotatepipes`; `hd-pipes --help` lists them. The key `hd-pipes` of the configuration, the user's over the system's, sets them too; the command line wins. | `--window` U; without it O, as it covers the monitors of the owner |
 
 `hd-menu`, `hd-message`, `hd-yazi`, `hd-volume-*`, `hd-ask-*`, `hd-mode-select` and the
-screensaver commands are what the key bindings run, for the owner at the keyboard.
+screensaver commands are what the key bindings run, for the owner at the keyboard. The key
+`hd-screensaver` of the configuration, the user's over the system's, names the screensaver that
+`hd-launch-screensaver` starts (`hd-pipes` once `hd-screensavers` is installed); without it, or
+when that one fails, the text screensaver; `man 7 hd-screensaver`.
 
 ### hd-backup
 

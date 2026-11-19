@@ -1,0 +1,24 @@
+#!/bin/sh
+# postrm of hd-screensavers: a removal removes the key hd-screensaver from
+# /etc/hyprdebian/config.json when it still names hd-pipes, which the postinst set, so that
+# hd-launch-screensaver of hd-desktop starts the text screensaver again. A screensaver that the
+# admin chose stays.
+set -e
+
+CONFIG_FILE=/etc/hyprdebian/config.json
+CONFIG_KEY=hd-screensaver
+SCREENSAVER=hd-pipes
+
+case "$1" in
+    remove | purge | abort-install) ;;
+    *) exit 0 ;;
+esac
+
+# hd-base, or jq with hd-desktop, may already be removed, see hd-config(7).
+if [ ! -x /usr/bin/hd-config-remove ] || [ ! -x /usr/bin/jq ] || [ ! -f "$CONFIG_FILE" ]; then
+    exit 0
+fi
+if jq -e --arg key "$CONFIG_KEY" --arg name "$SCREENSAVER" '.[$key] == $name' "$CONFIG_FILE" \
+    > /dev/null; then
+    hd-config-remove "$CONFIG_KEY"
+fi
