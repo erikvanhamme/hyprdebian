@@ -1,0 +1,19 @@
+Package: hd-screensavers
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: Erik Van Hamme <erik.vanhamme@gmail.com>
+Installed-Size: @INSTALLED_SIZE@
+Depends: hd-desktop, libvulkan1, mesa-vulkan-drivers, @PROGRAM_DEPENDS@
+Section: x11
+Priority: optional
+Description: HyprDebian screensavers
+ Optional screensavers of the HyprDebian desktop, drawn with Vulkan on
+ every monitor, against the burn-in of OLED monitors. Each covers every
+ monitor with a scene of its own, and ends on a key, a move of the mouse, a
+ click, a scroll or a touch.
+ .
+ hd-pipes draws the 3D pipes of Windows NT, after pipes.c of xscreensaver
+ by Marcelo F. Vianna.
+ .
+ mesa-vulkan-drivers makes sure there is a Vulkan device: RADV, ANV, or
+ lavapipe, which renders on the CPU.

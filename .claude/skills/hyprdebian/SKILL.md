@@ -19,8 +19,8 @@ skill only says which command fits a task, which page to read, and who may run i
    ```
 
    Offer only the commands of packages that are installed there. `hd-base` is on every system;
-   `hd-desktop`, `hd-laptop`, `hd-backup`, `hd-agent`, `hd-manager`, `hd-dashboard`, `hd-repo`
-   and `hd-buildserver` are optional.
+   `hd-desktop`, `hd-laptop`, `hd-screensavers`, `hd-backup`, `hd-agent`, `hd-manager`,
+   `hd-dashboard`, `hd-repo` and `hd-buildserver` are optional.
 2. **Read the man page** of every command before you run or hand out one: `man <command>`, on the
    system you work on (`ssh <host> man -P cat <command>`). When the command is not installed
    there, read the copy in the repository, `man -l packages/<dir>/man/<page>`, and keep in mind
@@ -72,7 +72,7 @@ R is read-only, U user-level, O owner-only.
 Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `zfs list`,
 `systemctl list-timers`, `journalctl -u <unit>`.
 
-### hd-desktop and hd-laptop
+### hd-desktop, hd-laptop and hd-screensavers
 
 | Command | What it does | Tier |
 | --- | --- | --- |
@@ -83,6 +83,7 @@ Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `
 | `hd-plymouth-render` | Renders the boot splash in the theme of the system. | O |
 | `hd-mount`, `hd-unmount` | Menus that mount and unmount drives, with sudo, in the desktop session. | O |
 | `hd-battery` | Shows the battery level in a notification. | R |
+| `hd-pipes` | The screensaver of the 3D pipes, on every monitor until a key, the mouse, a touch or SIGTERM ends it; `--window` shows it in one window, which Escape or closing it ends. | `--window` U; without it O, as it covers the monitors of the owner |
 
 `hd-menu`, `hd-message`, `hd-yazi`, `hd-volume-*`, `hd-ask-*`, `hd-mode-select` and the
 screensaver commands are what the key bindings run, for the owner at the keyboard.
