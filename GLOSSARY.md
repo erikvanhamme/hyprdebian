@@ -18,6 +18,12 @@ _Avoid_: Package (for the source), project
 A named piece of a package with a page of its own, once a package of its own and now provided by it, such as `hd-network` of `hd-base` or `hd-theme` of `hd-desktop`.
 _Avoid_: Component, subpackage, module
 
+### The desktop
+
+**Screensaver**:
+A saving mode for the screen: after a time without input, a moving image covers every monitor so that no pixel stays lit the same way long enough to burn in, until any input ends it. Every desktop has the text screensaver of `hd-desktop`; the optional package `hd-screensavers` adds others, such as `hd-pipes`, that can take its place.
+_Avoid_: Screen saver, idle screen, lock screen (hyprlock locks; a screensaver does not)
+
 ### The estate
 
 **Estate**:
