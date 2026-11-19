@@ -55,11 +55,14 @@ PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(
 	pipes/Makefile $(wildcard pipes/src/*)
 
 # The tests: each tests/test_<name>.cpp is a binary of its own, linked with TEST_SOURCES, the
-# sources they test, which have no Wayland or Vulkan in them.
+# sources they test, which have no Wayland or Vulkan in them: the grid walk, the meshes and the
+# options.
 TESTS := $(wildcard tests/test_*.cpp)
-TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp
+TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp
 TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
-TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Ipipes/src -Icommon/src
+# The structs are filled with designated initializers, as in common/program.mk, which leave the
+# members they skip zero; -Wextra would warn about each.
+TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Wno-missing-field-initializers -Ipipes/src -Icommon/src
 
 .PHONY: deb deb-path test clean
 

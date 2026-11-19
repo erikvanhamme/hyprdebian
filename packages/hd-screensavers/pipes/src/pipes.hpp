@@ -60,21 +60,9 @@
 #pragma once
 
 #include "screen.hpp"
-#include "walk.hpp"
+#include "settings.hpp"
 
 #include <memory>
-
-/** @brief The options of hd-pipes. */
-struct PipesOptions {
-    /** @brief The options of the walk. */
-    WalkOptions walk;
-    /** @brief The time of one step, in µs. */
-    int delay = 10000;
-    /** @brief Whether the camera is closer, 3.8 away instead of 4.8. */
-    bool fisheye = true;
-    /** @brief Whether the scene turns about the Y axis. */
-    bool rotatepipes = true;
-};
 
 class Renderer;
 
