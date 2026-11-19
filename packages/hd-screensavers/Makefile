@@ -57,7 +57,7 @@ PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(
 # The tests: each tests/test_<name>.cpp is a binary of its own, linked with TEST_SOURCES, the
 # sources they test, which have no Wayland or Vulkan in them.
 TESTS := $(wildcard tests/test_*.cpp)
-TEST_SOURCES :=
+TEST_SOURCES := pipes/src/walk.cpp
 TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
 TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Ipipes/src -Icommon/src
 

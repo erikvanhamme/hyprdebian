@@ -88,7 +88,7 @@ PACKAGES := hd-repo hd-bootloader hd-dashboard hd-agent hd-manager hd-backup yaz
 # make all. The installer installs one of them, from the live ISO.
 KERNEL_PACKAGES := hd-kernel hd-kernel-vm hd-kernel-server hd-kernel-desktop
 # The package directories with tests.
-TESTS := hd-dashboard hd-agent hd-manager hd-backup hd-base
+TESTS := hd-dashboard hd-agent hd-manager hd-backup hd-base hd-screensavers
 # The directory with the package directories.
 SRC := packages
 OUT := build
