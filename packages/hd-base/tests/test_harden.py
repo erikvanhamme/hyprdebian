@@ -7,6 +7,7 @@
 import argparse
 import importlib.machinery
 import importlib.util
+import ipaddress
 import os
 import pwd
 import tempfile
@@ -28,7 +29,8 @@ harden = load_hd_harden()
 
 
 def address(text, prefix, family=2, scope='global'):
-    return {'Family': family, 'AddressString': text, 'PrefixLength': prefix, 'ScopeString': scope}
+    return {'Family': family, 'Address': list(ipaddress.ip_address(text).packed),
+            'PrefixLength': prefix, 'ScopeString': scope}
 
 
 class TestAdminsWithKeys(unittest.TestCase):

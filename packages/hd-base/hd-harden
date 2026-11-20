@@ -260,8 +260,9 @@ def local_networks(links):
         for address in link.get("Addresses") or []:
             if address.get("Family") != 2 or address.get("ScopeString") != "global":
                 continue
+            # The address as bytes: systemd 257 of Debian 13 has no AddressString.
             interface = ipaddress.ip_interface(
-                f"{address['AddressString']}/{address['PrefixLength']}")
+                (bytes(address["Address"]), address["PrefixLength"]))
             networks.add(interface.network)
     return [str(network) for network in sorted(networks)]
 
