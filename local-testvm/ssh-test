@@ -1,7 +1,59 @@
-#!/bin/sh
-# ssh to the HyprDebian test system, which gets a new host key with every installation. Logs in
-# with the key of the user, or else with the password in test.json next to this script. A tool of
-# the test vm, see .claude/skills/hyprdebian-test-vm.
-here="$(dirname "$(readlink -f "$0")")"
-SSH_ASKPASS="${here}/askpass-test" SSH_ASKPASS_REQUIRE=force exec ssh \
-    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR test "$@"
+#!/usr/bin/python3
+"""ssh to the HyprDebian test system, which gets a new host key with every installation.
+
+A tool of the test vm, see .claude/skills/hyprdebian-test-vm. It logs in with the key of the user,
+or else with the password in test.json next to this script. The options come before the command.
+
+    ssh-test '<command>'               run a command; stdin goes to it
+    ssh-test --sudo '<command>'        the command can use sudo, a function that gives sudo the
+                                       password; stdin still goes to the command, after the
+                                       password, but not to what runs under sudo
+    ssh-test --session '<command>'     with XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS,
+                                       WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE of the
+                                       Hyprland session
+    ssh-test --hx '<command>'          start the command in the Hyprland session, with hyprctl
+    ssh-test                           log in
+"""
+
+import argparse
+import os
+import sys
+
+import testvm
+
+
+def main():
+    parser = argparse.ArgumentParser(description="ssh to the HyprDebian test system.")
+    parser.add_argument("--sudo", action="store_true",
+                        help="give the command a function sudo that knows the password")
+    parser.add_argument("--session", action="store_true",
+                        help="run the command with the environment of the Hyprland session")
+    parser.add_argument("--hx", action="store_true",
+                        help="start the command as a program in the Hyprland session")
+    parser.add_argument("command", nargs=argparse.REMAINDER, help="the command to run")
+    args = parser.parse_args()
+
+    command = " ".join(args.command)
+    if args.hx:
+        if not command:
+            parser.error("--hx needs a command")
+        command = testvm.hyprland_exec(command)
+        args.session = True
+
+    if not args.sudo:
+        ssh = ["ssh", *testvm.TEST_SSH_OPTIONS, testvm.HOSTS["test"]]
+        if command:
+            ssh.append(testvm.test_command(command, session=args.session))
+        os.execvpe("ssh", ssh, testvm.test_env())
+
+    if not command:
+        parser.error("--sudo needs a command")
+    stdin = b""
+    if not sys.stdin.isatty():
+        stdin = sys.stdin.buffer.read()
+    return testvm.run_test(command, sudo=True, session=args.session, stdin=stdin,
+                           capture=False).returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

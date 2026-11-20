@@ -1,9 +1,61 @@
-#!/bin/sh
-# Takes a screenshot of the Hyprland session of the test system with grim and copies it to the
-# file given: shot-test <file.png>. virsh screenshot does not work when the vm renders on the GPU.
-# A tool of the test vm, see .claude/skills/hyprdebian-test-vm.
-set -e
-here="$(dirname "$(readlink -f "$0")")"
-scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$here/hx" test:/tmp/hx
-"$here/ssh-test" 'export XDG_RUNTIME_DIR=/run/user/$(id -u) WAYLAND_DISPLAY=wayland-1; grim /tmp/shot.png'
-scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR test:/tmp/shot.png "$1"
+#!/usr/bin/python3
+"""Takes a screenshot of the Hyprland session of the test system with grim.
+
+A tool of the test vm, see .claude/skills/hyprdebian-test-vm. virsh screenshot does not work when
+the vm renders on the GPU. grim writes the PNG to stdout over ssh, so nothing stays on the test
+system. grim waits for a frame, which a screen that hypridle turned off (DPMS) never gives; a
+Shift on the console of the vm turns it on first.
+
+    shot-test <file.png>                 the whole screen at full size
+    shot-test --scale 0.5 <file.png>     at half the size, which is enough to see most things
+"""
+
+import argparse
+import json
+import sys
+import time
+
+import testvm
+
+
+def screens_on():
+    """Whether every monitor of the session is on."""
+    result = testvm.run_test("hyprctl -j monitors", session=True, timeout=30)
+    if result.returncode != 0:
+        sys.exit(f"Error: hyprctl failed: {testvm.tail(result.stdout + result.stderr)}")
+    return all(monitor["dpmsStatus"] for monitor in json.loads(result.stdout))
+
+
+def wake():
+    """Turns the screen on with a Shift on the console, when hypridle turned it off."""
+    if screens_on():
+        return
+    testvm.virsh("send-key", testvm.DOMAIN, "KEY_LEFTSHIFT")
+    for _ in range(10):
+        time.sleep(1)
+        if screens_on():
+            return
+    sys.exit("Error: the screen stays off.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Takes a screenshot of the test system.")
+    parser.add_argument("file", help="the PNG file to write")
+    parser.add_argument("--scale", type=float, default=1.0,
+                        help="the scale of the image, 1 by default")
+    args = parser.parse_args()
+
+    if not 0 < args.scale <= 4:
+        parser.error("give a scale above 0, at most 4")
+    wake()
+    result = testvm.run_test(f"timeout 30 grim -s {args.scale} -", session=True, timeout=60)
+    if result.returncode != 0 or not result.stdout.startswith(b"\x89PNG"):
+        sys.exit(f"Error: grim failed: {testvm.tail(result.stderr)}")
+    with open(args.file, "wb") as f:
+        f.write(result.stdout)
+    print(args.file)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

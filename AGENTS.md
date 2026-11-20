@@ -25,15 +25,26 @@ The version of HyprDebian is in `version.json` in the root of the repository (`{
 
 Every other `hd-*` package also has a `version.json` of its own, in its folder in `packages/`, with the version of that package. Bump its minor number when that package changes, once per set of working changes, in the same way. `hd-base` and `hd-desktop` have none: their version is the one in the root.
 
+## What else a change touches
+
+Finish a change with every one of these that applies:
+
+- The version bumps of `Versions` above: the root `version.json` and the `version.json` of the package directory.
+- The doc page in `docs/packages/` and the man page in `man/` of the package directory that describe what changed.
+- The `Depends` of `packages/hd-base/deb/control` when every system needs a new package.
+- `buildenv/Dockerfile` and `docs/HyprDebian/Build requirements.md` for a new build dependency.
+- `make test` in the package directory when it has `tests/`, and new tests there for new behaviour.
+
+A new package directory also needs:
+
+- An entry in `PACKAGES` (or `KERNEL_PACKAGES`) of the root `Makefile`, and in `TESTS` when it has a `test` target.
+- `deploy.json`, `version.json`, a `.gitignore` with `build`, a doc page and a man page.
+
 ## Agent skills
-
-### Codebase map
-
-`.claude/skills/hyprdebian-codebase-map` maps the package directories and parts. Update it in the same change that adds, removes, renames or restructures one.
 
 ### Running the systems
 
-`.claude/skills/hyprdebian` tells which command does what on an installed system, which man page to read, and which commands only the owner may run. Update it in the same change that adds, removes or renames a command or a man page, or changes whether an option needs root, with the tier of each command.
+`.claude/skills/hyprdebian` tells which command does what on an installed system, which man page to read, and which commands only the owner may run. Update it in the same change that adds, removes or renames a command, or changes its tier. Options and behaviour belong in the man page, not in the skill.
 
 ### Issue tracker
 

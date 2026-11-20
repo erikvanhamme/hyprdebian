@@ -1,6 +1,6 @@
 ---
 name: hyprdebian
-description: How to run and administer HyprDebian systems, this one and the others of the estate over ssh - which hd-* command does what, which man page to read, and which commands only the owner may run. Use for any admin task on a HyprDebian system - upgrades, reboots, network, themes, firmware, backups, Secure Boot, the jobs of the estate. For changes to the code of HyprDebian, use hyprdebian-codebase-map.
+description: How to run and administer HyprDebian systems, this one and the others of the estate over ssh - which hd-* command does what, which man page to read, and which commands only the owner may run. Use for any admin task on a HyprDebian system - upgrades, reboots, network, themes, firmware, backups, Secure Boot, the jobs of the estate.
 ---
 
 # Running HyprDebian systems
@@ -44,30 +44,26 @@ Every command falls in one of three tiers, on this system and over ssh alike.
      `! <command>`.
   3. After the owner ran it, check the result with read-only commands.
 
-A command that changes things as a user and needs root for the rest is user-level as a user and
-owner-only with sudo: `hd-config-update` and `hd-theme` work on the configuration and the theme of
-the user who runs them, and on those of the system with sudo.
-
 ## The commands
 
-R is read-only, U user-level, O owner-only.
+R is read-only, U user-level, O owner-only. The man page of each command has its options.
 
 ### hd-base, on every system
 
 | Command | What it does | Tier |
 | --- | --- | --- |
-| `hd-up` | Upgrades the system after a ZFS snapshot. `hd-up.timer` runs `hd-up --unattended` every Tuesday at 04:30. | O |
-| `hd-reboot-check` | Prints why a reboot is needed, nothing when none is. | R; `--write` O |
-| `hd-reboot`, `hd-poweroff` | Reboot or power off, closing the desktop applications first. | O |
-| `hd-config-update`, `hd-config-remove` | Set or remove a key of the HyprDebian configuration; `man hd-config` explains it. | U on `~/.config/hyprdebian/config.json`; O on `/etc/hyprdebian/config.json` |
-| `hd-network-iface`, `hd-network-bridge` | The interfaces and bridges in the key `hd-network`; `man hd-network` explains the settings. | `list`, `show` R; `set`, `remove` O |
-| `hd-network-render` | Renders the systemd-networkd files from the key `hd-network`. | `-n` R; without it O |
-| `hd-link-repo` | Shows or switches the HyprDebian repository and suite of apt. | no arguments R; with a URL or `--suite` O |
+| `hd-up` | Upgrades the system after a ZFS snapshot. | O |
+| `hd-reboot-check` | Prints why a reboot is needed. | R; `--write` O |
+| `hd-reboot`, `hd-poweroff` | Reboot or power off. | O |
+| `hd-config-update`, `hd-config-remove` | Set or remove a key of the configuration (`man hd-config`). | U for the user; O with sudo |
+| `hd-network-iface`, `hd-network-bridge` | The interfaces and bridges of the key `hd-network`. | `list`, `show` R; the rest O |
+| `hd-network-render` | Writes the systemd-networkd files. | `-n` R; the rest O |
+| `hd-link-repo` | Shows or switches the repository and suite of apt. | no arguments R; the rest O |
 | `hd-firmware` | Lists the firmware packages the hardware needs. | R; `--install` O |
-| `hd-harden` | Shows whether ssh, sysctl, modules, zfs and ufw are hardened, and hardens them. | no options or `--json` R (ufw shows unknown without root); every option that hardens O |
-| `hd-secboot` | The Secure Boot keys of the owner, in the firmware; `man 7 hd-secboot` explains them. | `--status` R; the rest O |
-| `hd-issue` | Writes the login banner, `/etc/issue`. | O |
-| `hd-sync-skel` | Brings the files of `/etc/skel` into the home directory, asking per file. | O |
+| `hd-harden` | Shows and hardens ssh, sysctl, modules, zfs and ufw. | no options, `--json` R; the rest O |
+| `hd-secboot` | The Secure Boot keys of the owner (`man 7 hd-secboot`). | `--status` R; the rest O |
+| `hd-issue` | Writes the login banner. | O |
+| `hd-sync-skel` | Brings the files of `/etc/skel` into the home directory. | O |
 
 Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `zfs list`,
 `systemctl list-timers`, `journalctl -u <unit>`.
@@ -76,96 +72,61 @@ Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `
 
 | Command | What it does | Tier |
 | --- | --- | --- |
-| `hd-theme` | Lists, selects and applies the themes; `man 7 hd-theme` explains them. | `--list` R; `--select <name>`, `--apply` U; `--add`, `--delete`, `--cards` and all as root O |
+| `hd-theme` | Lists, selects and applies themes (`man 7 hd-theme`). | `--list` R; `--select`, `--apply` U; the rest and all with sudo O |
 | `hd-theme-card` | Renders a theme file into a picture. | U |
-| `hd-launcher-cache` | Prints or writes the menu of the application launcher. | no options, `-n` R; `-u` U; `-a` O |
-| `hd-desktop-render` | Writes the greetd config that logs the user in to Hyprland. | `--print-user` R; the rest O |
-| `hd-plymouth-render` | Renders the boot splash in the theme of the system. | O |
-| `hd-mount`, `hd-unmount` | Menus that mount and unmount drives, with sudo, in the desktop session. | O |
-| `hd-battery` | Shows the battery level in a notification. | R |
-| `hd-pipes` | The screensaver of the 3D pipes, on every monitor until a key, the mouse, a touch or SIGTERM ends it; `--window` shows it in one window, which Escape or closing it ends. The options of `pipes.c`: `--joints`, `--cycles`, `--size`, `--delay`, `--[no-]fisheye`, `--[no-]tightturns`, `--[no-]rotatepipes`, and `--framerate` (0, the refresh rate) and `--msaa` (8), which set what it costs the GPU; `hd-pipes --help` lists them. The key `hd-pipes` of the configuration, the user's over the system's, sets them too; the command line wins. `man 6 hd-pipes`. | `--window` U; without it O, as it covers the monitors of the owner |
+| `hd-launcher-cache` | The menu of the application launcher. | no options, `-n` R; `-u` U; `-a` O |
+| `hd-desktop-render` | Writes the greetd config. | `--print-user` R; the rest O |
+| `hd-plymouth-render` | Renders the boot splash. | O |
+| `hd-mount`, `hd-unmount` | Mount and unmount drives in the desktop session. | O |
+| `hd-battery` | Shows the battery level. | R |
+| `hd-pipes` | The 3D pipes screensaver (`man 6 hd-pipes`). | `--window` U; the rest O |
 
-`hd-menu`, `hd-message`, `hd-yazi`, `hd-volume-*`, `hd-ask-*`, `hd-mode-select` and the
-screensaver commands are what the key bindings run, for the owner at the keyboard. The key
-`hd-screensaver` of the configuration, the user's over the system's, names the screensaver that
-`hd-launch-screensaver` starts (`hd-pipes` once `hd-screensavers` is installed); without it, or
-when that one fails, the text screensaver; `man 7 hd-screensaver`.
+The other `hd-*` commands of the desktop are what the key bindings run, for the owner at the
+keyboard. The screensaver is set by the key `hd-screensaver` (`man 7 hd-screensaver`).
 
 ### hd-backup
 
 | Command | What it does | Tier |
 | --- | --- | --- |
-| `hd-backup` | Backs up filesets to drives and tape, with a database per user. | `summary`, `list-*`, `manifest` R; the commands that add, rename, remove or write U |
+| `hd-backup` | Backs up filesets to drives and tape. | `summary`, `list-*`, `manifest` R; the rest U |
 | `hd-backup-prep` | Wipes a drive and makes it a backup carrier. | O |
 | `hd-backup-load`, `hd-backup-unload` | Connect and disconnect a backup drive. | O |
-| `hd-backup-vm`, `hd-backup-vms` | Back up virtual machines on ZFS volumes. | O |
+| `hd-backup-vm`, `hd-backup-vms` | Back up virtual machines. | O |
 | `hd-restore-vm` | Restores a virtual machine, overwriting its datasets. | O |
 
 ### The estate
 
 | Command | What it does | Tier |
 | --- | --- | --- |
-| `hd-agent` | Sends the report to the dashboard and runs the jobs; `hd-agent.timer` runs it every 15 minutes. | O (the token is root's) |
-| `hd-manager` | Makes, signs and lists the jobs, run as the user with the manager key. | `jobs` R; `schedule`, `key` O; its settings with `hd-config-update hd-manager` U |
-| `hd-dashboard` | Runs the dashboard, lists and forgets its hosts. | O |
+| `hd-agent` | Sends the report and runs the jobs. | O |
+| `hd-manager` | Makes, signs and lists the jobs. | `jobs` R; `schedule`, `key` O |
+| `hd-dashboard` | Runs the dashboard. | O |
 
 ### Other servers
 
 | Command | What it does | Tier |
 | --- | --- | --- |
-| `hd-repo-update` | Adds uploaded packages to the repository, as the user `repo`. | O |
-| `hd-buildserver` | Builds HyprDebian and updates a repository with it. | O |
+| `hd-repo-update` | Adds uploaded packages to the repository. | O |
+| `hd-buildserver` | Builds HyprDebian and updates a repository. | O |
 | `hd-installer` | Installs HyprDebian from a live system. | O |
-| `hd-bootloader-update` | Writes the bootloader and its UKIs to an ESP. | O |
+| `hd-bootloader-update` | Writes the bootloader to an ESP. | O |
 
 ## Workflows
 
-### Is anything wrong?
-
-Run on the system, or for each host over ssh: `hd-reboot-check`, `systemctl --failed`,
-`zpool status -x`, `hd-harden`, `hd-firmware`. Report what each found; "nothing" is a finding too.
-
-### Upgrade and reboot
-
-1. Check each host: `hd-reboot-check`, `zpool status -x`, `systemctl --failed`. A host whose
-   `rpool` is not ONLINE is not upgraded unattended; `man hd-up` lists the checks.
-2. Choose how to upgrade. When the host has `hd-agent` installed, and the system you run on has
-   `hd-manager` and the manager key (`~/.ssh/hd-manager`), suggest a job:
-
-   ```
-   hd-manager schedule upgrade <host>... --at <time>
-   ```
-
-   `all` instead of the hosts schedules every system that runs `hd-agent`. Otherwise give
-   `ssh -t <host> sudo hd-up`.
-3. Follow the jobs with `hd-manager jobs <host>`; the agents pick them up within 15 minutes of
-   their time.
-4. For the reboot, run `hd-reboot-check` on the host, and when it gives a reason, give
-   `ssh -t <host> sudo hd-reboot`. Jobs have no reboot command yet.
-
-### Change the network
-
-1. Read the settings: `hd-network-iface list`, `hd-network-iface show <name>`, and the same for
-   `hd-network-bridge`.
-2. Give the `sudo hd-network-iface set <name> ...` line, from `man hd-network-iface`, and
-   `sudo hd-network-render -n` to see the files it would write. Warn that a change of the
-   interface that carries the ssh connection can cut it.
-3. Give `sudo hd-network-render` to write them.
-
-### Change the theme
-
-For the user: `hd-theme --list`, then `hd-theme --select <name> --apply`. For the system theme,
-which the boot splash and the bootloader use, give `sudo hd-theme --select <name>`; a new theme
-file first needs `sudo hd-theme --add <file>`.
-
-### Missing firmware
-
-Run `hd-firmware`; when it lists packages that are not installed, give
-`sudo hd-firmware --install`, and after new hardware, run `hd-firmware` again.
-
-### Backups
-
-Read the state with `hd-backup summary` and the `list-*` commands. Run the user-level
-`hd-backup` commands that the task needs. For a drive, give `sudo hd-backup-load <pool>` before and
-`sudo hd-backup-unload <pool>` after; for virtual machines, `sudo hd-backup-vm` or
-`sudo hd-backup-vms`. `docs/HyprDebian/Backup tool.md` describes the whole tool.
+- **Is anything wrong?** On each host: `hd-reboot-check`, `systemctl --failed`, `zpool status -x`,
+  `hd-harden`, `hd-firmware`. Report what each found; "nothing" is a finding too.
+- **Upgrade and reboot.** Check each host as above; a host whose `rpool` is not ONLINE is not
+  upgraded unattended. When the host runs `hd-agent` and this system has `hd-manager` and the
+  manager key (`~/.ssh/hd-manager`), give `hd-manager schedule upgrade <host>... --at <time>`
+  (`all` for every agent) and follow it with `hd-manager jobs <host>`; otherwise give
+  `ssh -t <host> sudo hd-up`. For the reboot, when `hd-reboot-check` gives a reason, give
+  `ssh -t <host> sudo hd-reboot`.
+- **Change the network.** Read `hd-network-iface list` and `show <name>`, give the
+  `sudo hd-network-iface set ...` line, then `sudo hd-network-render -n` to preview and
+  `sudo hd-network-render` to write. Warn that changing the interface of the ssh connection can
+  cut it.
+- **Change the theme.** For the user `hd-theme --select <name> --apply`; for the system, which the
+  boot splash and the bootloader use, `sudo hd-theme --select <name>`.
+- **Backups.** Read `hd-backup summary` and the `list-*` commands, and run the user-level
+  `hd-backup` commands the task needs. Around a drive, give `sudo hd-backup-load <pool>` and
+  `sudo hd-backup-unload <pool>`. `docs/HyprDebian/Backup tool.md` describes the whole tool.

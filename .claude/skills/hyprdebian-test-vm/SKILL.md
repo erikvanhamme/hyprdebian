@@ -1,78 +1,97 @@
 ---
 name: hyprdebian-test-vm
-description: How to test HyprDebian changes on the test vm - install from scratch with hd-installer, save and roll back states, run commands and take screenshots in the Hyprland session, measure package sizes. Use when a change to a package, the installer or the desktop has to be tried on a real system.
+description: How to test HyprDebian changes on the test vm - start from a clean install in seconds, install from scratch with hd-installer, deploy packages, save and roll back states, run commands and take screenshots in the Hyprland session, measure package sizes. Use when a change to a package, the installer or the desktop has to be tried on a real system.
 ---
 
 # Testing on the HyprDebian test vm
 
-The test vm installs HyprDebian on a disk of its own from an installer system on its other disk,
-so a test needs no live ISO, and it can save and roll back states of the installed system in about
-a minute. The tools are in `local-testvm/`; run them from the root of the repository. Only start a
-test when the owner asks, and test a set of changes once at the end, not every step.
+The test vm installs HyprDebian on a disk of its own from an installer system on its other disk, so
+a test needs no live ISO. The test disk is a zvol on the host, and a snapshot of it brings back a
+whole system, clean install or later state, in about 20 seconds. The tools are in `local-testvm/`;
+run them from the root of the repository. Each tool prints only a short result, and the end of the
+output when a step fails; the full output of a step is in `local-testvm/log/`. `--help` shows the
+options. Only start a test when the owner asks, and test a set of changes once at the end, not every
+step.
 
 ## The setup
 
-- libvirt domain `debian13` on `qemu:///system`, with two zvols:
-  - `virtio-vmdk-installer` (vda): plain Debian trixie on ext4, host `test-installer`. ssh as the
-    user with passwordless sudo. It has what the live cd has for `hd-installer` (zfs-dkms,
-    debootstrap, gdisk, parted, mdadm, efibootmgr, apt-utils, python3-jinja2) and the local
+- libvirt domain `debian13` on `qemu:///system`, with two zvols of the host:
+  - `rpool/vmdk/installer` (vda): plain Debian trixie on ext4, host `test-installer`. ssh as the
+    user with passwordless sudo. It has what the live cd has for `hd-installer` and the local
     repository `/srv/hyprdebian/repo`.
-  - `virtio-vmdk-test` (vdb): HyprDebian, host `test`. The user has sudo with a password, the one
-    in `local-testvm/test.json`.
-- Firmware without Secure Boot (`OVMF_CODE_4M.fd`, `OVMF_VARS_4M.fd`), no serial port (with a
-  serial console plymouth falls back to text), 3D acceleration on the GPU of the host (virgl).
+  - `rpool/vmdk/test` (vdb): HyprDebian, host `test`, the answers of `local-testvm/test.json`
+    (in `.gitignore`; `test.json.example` shows it without the password). The user has sudo with
+    a password.
+- Firmware without Secure Boot, no serial port (with a serial console plymouth falls back to text),
+  3D acceleration on the GPU of the host (virgl).
 - Reach both by host name, never by IP. The owner allows shutting down and redefining the vm.
 
 ## The tools
 
 | Tool | What it does |
 | --- | --- |
-| `boot-vm.py installer\|test` | Shuts the vm down, gives the chosen disk boot order 1, starts it. |
-| `update-installer-vm.py` | `make all`, then the local repository on the installer system, and installs `hd-installer` from it. |
-| `test-snapshot.py save\|rollback\|list <name> [--boot-test]` | States of the test system: `rpool@<name>` and a tar of its ESP, done from the installer system. |
-| `ssh-test '<command>'` | ssh to `test`, with the key or the password; ignores the host key, which every installation changes. |
-| `askpass-test` | Prints the password; pipe it in for sudo: `askpass-test \| ssh-test 'read -r PW; printf "%s\n" "$PW" \| sudo -S -p "" <command>'`. |
-| `shot-test <file.png>` | Screenshot of the Hyprland session with grim; also copies `hx` to `/tmp/hx` on `test`. |
-| `hx` | On `test`: `sh /tmp/hx '<command>'` starts a program in the Hyprland session. |
-| `type-test-password.py` | Types the password and Enter on the console of the vm, as for hyprlock. |
-| `dep-weights.py [package] [--drop=a,b]` | On `test`: what each dependency of a package costs, alone or together. |
-| `missing-recommends.py` | On `test`: the recommends of installed packages that are not installed. |
+| `zvol-snapshot.py save\|rollback\|destroy\|list <name> [--boot-test] [--wait session]` | Snapshots of the whole test disk on the host; shuts the vm down first. |
+| `install-test.py [--no-update] [--no-desktop]` | Installs from scratch and saves the snapshots `clean` and, with hd-desktop, `clean-desktop`. |
+| `deploy-test.py <package dir\|.deb>... [--no-build]` | `make <package>`, copies the packages and those of `build/` they depend on to `test`, installs them; prints the versions. |
+| `ssh-test [--sudo] [--session] [--hx] '<command>'` | ssh to `test`, with the key or the password; see below. |
+| `shot-test [--scale 0.5] <file.png>` | Screenshot of the Hyprland session with grim; turns a screen that is off on first. |
+| `boot-vm.py installer\|test [--wait ssh\|session\|none]` | Boots the vm from that disk and waits for ssh. |
+| `wait-test.py installer\|test\|session` | Waits until the system answers ssh, or the session hyprctl. |
+| `update-installer-vm.py` | `make all`, the local repository on the installer system, and `hd-installer` from it. |
+| `test-snapshot.py save\|rollback\|list <name>` | Snapshots of the pool inside the test system, from the installer system; slower than `zvol-snapshot.py`. |
+| `type-test-password.py` | Types the password and Enter on the console, as for hyprlock. |
+| `dep-weights.py`, `missing-recommends.py` | On `test`: what each dependency costs; the recommends that are not installed. |
 
-`test.json` holds the answers of the installation (host name `test`, no encryption, so the system
-boots without help); it is in `.gitignore`, `test.json.example` shows it without the password.
+`ssh-test` options, before the command:
+- `--sudo`: the command gets a function `sudo` that gives sudo the password:
+  `ssh-test --sudo 'sudo systemctl restart x && sudo journalctl -u x -n 20'`. It is a function of
+  the shell that runs the command, so put `sh -c '...'` after `sudo`, not around it. stdin still
+  reaches the command, but not a program run with `sudo`.
+- `--session`: `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `WAYLAND_DISPLAY` and
+  `HYPRLAND_INSTANCE_SIGNATURE` of the Hyprland session are set: `hyprctl clients -j`,
+  `systemctl --user --failed`, `journalctl --user`.
+- `--hx`: starts the command as a program in the session: `ssh-test --hx 'uwsm app -- kitty'`.
 
-## Install from scratch
+## A test run
 
-1. `python3 local-testvm/boot-vm.py installer`, wait until `ssh test-installer true` works.
-2. `python3 local-testvm/update-installer-vm.py` builds every package and installs them there.
-3. Copy the answers once: `scp local-testvm/test.json test-installer:/tmp/` and
-   `ssh test-installer 'sudo install -m 600 /tmp/test.json /root/test.json; rm /tmp/test.json'`.
-4. Run the installer as a unit, so it survives a lost ssh connection, with stdin closed so a
-   question it was not given fails instead of hanging:
-   `ssh test-installer 'sudo rm -rf /tmp/hd-installer; sudo systemd-run --unit=hd-test-install --property=StandardInput=null --setenv=TERM=dumb bash -c "hd-installer --answers /root/test.json > /root/install.log 2>&1; echo EXIT=\$? >> /root/install.log"'`
-   (`sudo systemctl reset-failed hd-test-install` first when the unit ran before). Wait in the
-   background until `/root/install.log` has `EXIT=`; it takes about 4 minutes.
-5. `python3 local-testvm/boot-vm.py test`, then put the key of the user on `test`; `ssh-test` logs
-   in with the password this time:
-   `local-testvm/ssh-test 'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys' < ~/.ssh/id_rsa.pub`.
-6. Save the state: `python3 local-testvm/test-snapshot.py save base --boot-test`.
+1. Start clean: `python3 local-testvm/zvol-snapshot.py rollback clean-desktop --boot-test --wait session`
+   (`clean` is the system as `hd-installer` leaves it, without hd-desktop). When the change is in
+   `hd-installer` or in what it installs, install from scratch instead:
+   `python3 local-testvm/install-test.py` (about 10 minutes; run it in the background). It saves
+   new snapshots `clean` and `clean-desktop`.
+2. Put the change on it: `python3 local-testvm/deploy-test.py hd-desktop hd-base`.
+3. Check it with `ssh-test` and `shot-test`.
+4. Before a step that is hard to undo, `zvol-snapshot.py save <name>`; roll back to it instead of
+   starting again.
 
-## Try, roll back, try again
+Snapshots of the zvol go back in a line: a rollback to a snapshot with newer ones refuses unless
+`--destroy-newer`, which destroys them, so a rollback to `clean` loses `clean-desktop`.
+Destroying a snapshot, rolling back past newer ones and replacing `clean` need the zfs permissions
+destroy and mount on `rpool/vmdk/test`; the owner gives them, see the head of `zvol-snapshot.py`.
 
-Save a state before every change that is hard to undo, and roll back instead of installing again.
-`test-snapshot.py` works from the installer system and boots it when needed; a rollback with
-`--boot-test` is back on `test` in about a minute. Packages that are not in a repository go over
-with `scp` and `apt-get install /tmp/debs/*.deb`.
+## Running a test in a subagent
+
+A run with long output or long waits, such as an installation, a deploy with many checks, or a
+size measurement, goes to the agent `hyprdebian-test-runner` on a cheaper model. A run the owner
+asked for may go there without asking again; a check of two or three commands is quicker inline.
+The brief gives:
+
+- the start state: the snapshot to roll back to, or an installation from scratch;
+- each step as the exact command, with the quoting of `ssh-test` worked out, and what it should
+  give;
+- what to collect: the output, lines or values, and the screenshots to take, with file names;
+- the steps that destroy snapshots that it may run, when there are any.
+
+It reports each step, the first failure and the data word for word. Read the screenshots it names
+yourself, and decide yourself what the results mean and what comes next.
 
 ## Check a desktop
 
-- Programs: `ssh-test "sh /tmp/hx 'uwsm app -- kitty'"`, after one `shot-test`, which copies `hx`.
-- Screenshots: `shot-test`; `virsh screenshot` does not work while the vm renders on the GPU, but
-  it does for the boot and the console when the vm runs without one.
 - Keys: `virsh -c qemu:///system send-key debian13 KEY_ESC`; the lock screen with
   `type-test-password.py`.
-- State of the session: `XDG_RUNTIME_DIR=/run/user/$(id -u)`, `systemctl --user --failed`,
-  `hyprctl clients -j` with `HYPRLAND_INSTANCE_SIGNATURE=$(ls $XDG_RUNTIME_DIR/hypr)`.
+- `virsh screenshot` does not work while the vm renders on the GPU, but it does for the boot and
+  the console when the vm runs without one.
+- Look at screenshots at `--scale 0.5` unless a detail needs the full size.
 
 ## Measure size
 
@@ -82,18 +101,15 @@ why. Compare with and without recommends with `apt-get -s install [-o APT::Insta
 
 ## Pitfalls
 
-- A new installation makes the pool again: all snapshots are gone, and a rollback to an older
-  name is refused. Save a new base after each installation.
-- Never `apt-get install --assume-no` to measure: apt does not ask, and so installs, when a
-  package needs nothing else. Use `apt-get -s`.
-- `pkill -f '<pattern>'` over ssh also matches the shell that runs it; use a PID, or a pattern
-  like `'titl[e] x'` that does not match itself.
+- Measure with `apt-get -s`: `apt-get install --assume-no` does not ask, and so installs, when a
+  package needs nothing else.
+- `pkill -f '<pattern>'` over ssh also matches the shell that runs it; use `pkill -x <name>`, a
+  PID, or a pattern like `'titl[e] x'` that does not match itself.
+- `test-snapshot.py` keeps the ESP of a state as a tar on the installer disk, which a zvol rollback
+  of the test disk does not bring back; its states can only be trusted until the next zvol rollback.
+  A new installation makes the pool again, and its snapshots are gone.
 - Mounting the test pool under `/mnt` on the installer system: timesyncd, udevd and logind keep a
   copy of the mounts and the export fails; make `/mnt` private first, or restart them.
-- `<boot dev='hd'/>` in the domain makes OVMF delete the boot entry of the second disk; keep the
-  boot order per disk, as `boot-vm.py` sets it.
-- `/tmp` on `test` is emptied at every boot: copy `hx` again (`shot-test` does).
-- Hyprland 0.56 takes Lua: `hyprctl dispatch 'hl.dsp.exec_cmd("...")'`, which `hx` wraps.
 - plymouthd started by hand keeps the ssh session open; run it detached, and stop it with
   `plymouth quit`.
-- Only `hd-installer` goes on the installer system; install every other package on `test`.
+- Only `hd-installer` goes on the installer system; every other package goes on `test`.

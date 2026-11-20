@@ -11,48 +11,25 @@ is always exported again, so the test system imports it at its next boot as its 
     test-snapshot.py save <name>       save the current state of the test system as <name>
     test-snapshot.py rollback <name>   bring the test system back to the state <name>
     test-snapshot.py list              list the saved states
-    test-snapshot.py ... --boot-test   boot the test system afterwards
+    test-snapshot.py ... --boot-test   boot the test system afterwards, and wait for ssh
+    test-snapshot.py ... --boot-test --wait session
+                                       and wait for the Hyprland session
 
-The vm is booted into the installer system first when it runs the test system.
+The vm is booted into the installer system first when it runs the test system. The snapshots of the
+zvol of the test disk on the host, zvol-snapshot.py, are quicker and also hold the ESP.
 """
 
 import argparse
-import os
-import re
 import shlex
 import subprocess
 import sys
-import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-INSTALLER = "test-installer"
+import testvm
+
+INSTALLER = testvm.HOSTS["installer"]
 POOL = "rpool"
 ESP = "/dev/disk/by-id/virtio-vmdk-test-part1"
 STATE_DIR = "/var/lib/hd-test"
-NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-
-
-def reachable(host):
-    return subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", host, "true"],
-                          capture_output=True).returncode == 0
-
-
-def boot(system):
-    """Boots the vm into the system with boot-vm.py and waits until ssh answers."""
-    subprocess.run([sys.executable, os.path.join(HERE, "boot-vm.py"), system], check=True)
-    host = INSTALLER if system == "installer" else "test"
-    for _ in range(90):
-        time.sleep(2)
-        if system == "installer" and reachable(host):
-            return
-        if system == "test":
-            result = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3",
-                                     "-o", "StrictHostKeyChecking=no",
-                                     "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
-                                     host, "true"], capture_output=True, text=True)
-            if result.returncode == 0 or "Permission denied" in result.stderr:
-                return
-    sys.exit(f"Error: {host} does not answer.")
 
 
 def on_installer(script):
@@ -110,13 +87,16 @@ def main():
     parser.add_argument("name", nargs="?", help="the name of the state")
     parser.add_argument("--boot-test", action="store_true",
                         help="boot the test system afterwards")
+    parser.add_argument("--wait", choices=["ssh", "session"], default="ssh",
+                        help="with --boot-test, wait for ssh (the default) or the Hyprland "
+                             "session")
     args = parser.parse_args()
 
-    if args.action != "list" and (args.name is None or not NAME_PATTERN.match(args.name)):
+    if args.action != "list" and (args.name is None or not testvm.NAME_PATTERN.match(args.name)):
         parser.error("give a name of lower case letters, digits, - and _")
 
-    if not reachable(INSTALLER):
-        boot("installer")
+    if not testvm.ready("installer"):
+        testvm.boot("installer", "installer")
 
     if args.action == "save":
         save(args.name)
@@ -126,7 +106,7 @@ def main():
         list_states()
 
     if args.boot_test:
-        boot("test")
+        testvm.boot("test", "test" if args.wait == "ssh" else "session")
     return 0
 
 

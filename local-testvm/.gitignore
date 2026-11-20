@@ -1,3 +1,5 @@
 # The answers of the test installation, with the password of the test user.
 test.json
+# The output of the steps of the tools.
+log/
 __pycache__/
