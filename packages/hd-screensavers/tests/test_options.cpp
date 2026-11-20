@@ -119,6 +119,7 @@ void test_defaults()
     check(r.values.delay == 10000, "defaults: delay 10000");
     check(r.values.fisheye, "defaults: fisheye on");
     check(!r.values.walk.tightturns, "defaults: tightturns off");
+    check(r.values.walk.factory == 2, "defaults: factory 2");
     check(r.values.rotatepipes, "defaults: rotatepipes on");
     check(r.values.render.framerate == 0, "defaults: framerate 0, the refresh rate");
     check(r.values.render.msaa == 8, "defaults: msaa 8");
@@ -130,7 +131,7 @@ void test_system()
     const auto system = config("system.json", R"({"hd-theme": {"font": "x"},
         "hd-pipes": {"joints": "ball", "cycles": 3, "size": 20, "delay": 500,
                      "fisheye": false, "tightturns": true, "rotatepipes": false,
-                     "framerate": 30, "msaa": 4}})");
+                     "framerate": 30, "msaa": 4, "factory": 0}})");
     const Result r = run({system});
     check(r.errors.empty(), "system: no messages");
     check(r.values.walk.joints == Joints::ball, "system: joints");
@@ -142,6 +143,7 @@ void test_system()
     check(!r.values.rotatepipes, "system: rotatepipes");
     check(r.values.render.framerate == 30, "system: framerate");
     check(r.values.render.msaa == 4, "system: msaa");
+    check(r.values.walk.factory == 0, "system: factory");
 
     const Result other = run({config("other.json", R"({"hd-theme": {"font": "x"}})")});
     check(other.errors.empty() && other.values.walk.cycles == 5, "system: a configuration without the key is skipped");
@@ -164,7 +166,7 @@ void test_command_line()
     const auto system = config("system.json", R"({"hd-pipes": {"joints": "ball", "cycles": 3, "size": 20}})");
     const auto user = config("user.json", R"({"hd-pipes": {"cycles": 7, "fisheye": false}})");
     const Result r = run({system, user}, {"--cycles", "9", "--size=40", "--fisheye", "--no-rotatepipes", "--window",
-                                          "--framerate", "60", "--msaa=2"});
+                                          "--framerate", "60", "--msaa=2", "--factory", "100"});
     check(r.parsed == Options::Parsed::run, "command line: runs");
     check(r.errors.empty(), "command line: no messages");
     check(r.values.walk.cycles == 9, "command line: wins over the user");
@@ -174,10 +176,17 @@ void test_command_line()
     check(r.values.window, "command line: --window");
     check(r.values.render.framerate == 60, "command line: --framerate");
     check(r.values.render.msaa == 2, "command line: --msaa");
+    check(r.values.walk.factory == 100, "command line: --factory");
     check(r.values.walk.joints == Joints::ball, "command line: what it leaves out keeps the configuration");
 
     const Result last = run({}, {"--joints", "elbow", "--joints", "ball", "--no-fisheye", "--fisheye"});
     check(last.values.walk.joints == Joints::ball && last.values.fisheye, "command line: the last one wins");
+
+    const Result bolted = run({config("bolted.json", R"({"hd-pipes": {"joints": "elbow"}})")}, {"--joints", "bolted"});
+    check(bolted.errors.empty() && bolted.values.walk.joints == Joints::bolted, "command line: --joints bolted");
+    const Result config_bolted = run({config("bolted.json", R"({"hd-pipes": {"joints": "bolted"}})")});
+    check(config_bolted.errors.empty() && config_bolted.values.walk.joints == Joints::bolted,
+          "config: joints bolted");
 }
 
 void test_config_out_of_range()
@@ -186,7 +195,7 @@ void test_config_out_of_range()
         "joints": "ball", "fisheye": false}})");
     const auto user = config("user.json", R"({"hd-pipes": {"cycles": 11, "size": 9, "delay": 0.5,
         "joints": "teapot", "fisheye": "no", "window": true, "bolts": true, "tightturns": true,
-        "framerate": 1001, "msaa": "4"}})");
+        "framerate": 1001, "msaa": "4", "factory": 101}})");
     const Result r = run({system, user});
     check(r.parsed == Options::Parsed::run, "config range: runs");
     check(r.values.walk.cycles == 3, "config range: cycles 11 keeps the value of the system");
@@ -198,21 +207,24 @@ void test_config_out_of_range()
     check(r.values.walk.tightturns, "config range: the valid values of the same key are set");
     check(r.values.render.framerate == 0, "config range: framerate 1001 keeps the default");
     check(r.values.render.msaa == 8, "config range: msaa as a string keeps the default");
+    check(r.values.walk.factory == 2, "config range: factory 101 keeps the default");
     for (const char* what : {"cycles is a whole number from 1 to 10", "size is a whole number from 10 to 1000",
-                             "delay is a whole number from 1 to 1000000", "joints is elbow, ball or cycle",
+                             "delay is a whole number from 1 to 1000000", "joints is elbow, ball, bolted or cycle",
                              "fisheye is true or false", "window is not an option of hd-pipes",
                              "bolts is not an option of hd-pipes", "framerate is a whole number from 0 to 1000",
-                             "msaa is a whole number from 1 to 8"}) {
+                             "msaa is a whole number from 1 to 8", "factory is a whole number from 0 to 100"}) {
         check(contains(r.errors, user + ": " + what + ", skipped"), std::string("config range: reports ") + what);
     }
 
-    const Result upper = run({config("upper.json", R"({"hd-pipes": {"cycles": 10, "size": 1000, "delay": 1000000}})")});
+    const Result upper = run({config("upper.json",
+                                     R"({"hd-pipes": {"cycles": 10, "size": 1000, "delay": 1000000, "factory": 100}})")});
     check(upper.errors.empty() && upper.values.walk.cycles == 10 && upper.values.walk.size == 1000
-              && upper.values.delay == 1000000,
+              && upper.values.delay == 1000000 && upper.values.walk.factory == 100,
           "config range: the highest values are in range");
-    const Result lower = run({config("lower.json", R"({"hd-pipes": {"cycles": 1, "size": 10, "delay": 1}})")});
+    const Result lower = run({config("lower.json",
+                                     R"({"hd-pipes": {"cycles": 1, "size": 10, "delay": 1, "factory": 0}})")});
     check(lower.errors.empty() && lower.values.walk.cycles == 1 && lower.values.walk.size == 10
-              && lower.values.delay == 1,
+              && lower.values.delay == 1 && lower.values.walk.factory == 0,
           "config range: the lowest values are in range");
 }
 
@@ -244,7 +256,9 @@ void test_command_line_wrong()
              {{"--size", "1001"}, "--size is a whole number from 10 to 1000"},
              {{"--delay", "0"}, "--delay is a whole number from 1 to 1000000"},
              {{"--delay", "5x"}, "--delay is a whole number from 1 to 1000000"},
-             {{"--joints", "teapot"}, "--joints is elbow, ball or cycle"},
+             {{"--joints", "teapot"}, "--joints is elbow, ball, bolted or cycle"},
+             {{"--factory", "-1"}, "--factory is a whole number from 0 to 100"},
+             {{"--factory", "101"}, "--factory is a whole number from 0 to 100"},
              {{"--framerate", "-1"}, "--framerate is a whole number from 0 to 1000"},
              {{"--framerate", "1001"}, "--framerate is a whole number from 0 to 1000"},
              {{"--msaa", "0"}, "--msaa is a whole number from 1 to 8"},
@@ -270,10 +284,10 @@ void test_help()
     const Result r = run({system}, {"--help"});
     check(r.parsed == Options::Parsed::help, "help: --help");
     check(r.errors.empty(), "help: no messages");
-    for (const char* line : {"usage: hd-pipes [options]", "--joints elbow|ball|cycle", "(cycle)",
+    for (const char* line : {"usage: hd-pipes [options]", "--joints elbow|ball|bolted|cycle", "(cycle)",
                              "--cycles N", "1-10 (5)", "--size N", "10-1000 (500)", "--delay US", "(10000)",
                              "--fisheye, --no-fisheye", "--tightturns, --no-tightturns", "--framerate N",
-                             "0-1000 (0)", "--msaa N", "1-8 (8)", "--window"}) {
+                             "0-1000 (0)", "--msaa N", "1-8 (8)", "--factory N", "0-100 (2)", "--window"}) {
         check(contains(r.out, line), std::string("help: shows ") + line);
     }
 }

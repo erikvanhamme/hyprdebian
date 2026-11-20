@@ -35,7 +35,9 @@
 
 /**
  * @file mesh.hpp
- * @brief The shapes of the pipes, after MakeTube, myElbow and mySphere of pipes.c.
+ * @brief The shapes of the pipes, after MakeTube, myElbow and mySphere of pipes.c,
+ *        and the bolts of the elbows, after LWO_ElbowCoins and LWO_ElbowBolts of
+ *        pipeobjs.c.
  *
  * The units are those of pipes.c: the cells of the grid are 4/3 apart, a
  * pipe has a radius of 1/3. A tube is the straight piece in the middle of a
@@ -44,6 +46,15 @@
  * quarter of a torus whose ring has the radius of the pipe, about a point
  * 1/3 back and 1/3 aside of the middle of the cell. The ball is a sphere of
  * radius 1, scaled to that of a start, an end or a joint.
+ *
+ * A bolted elbow, the type 2 of pipes.c, is an elbow with a flange on each
+ * of the two links next to it, a coin of pipeobjs.c, which bolts it onto the
+ * pipe: a disc across the pipe, with six bolts through it, which show as a
+ * hexagonal head on each of its faces. The sizes and places are measured
+ * from pipeobjs.c and the transformations of myElbow; the shapes are made
+ * here, smoother: the rim of a flange with 64 segments and smooth normals,
+ * its faces flat, and the heads as hexagonal prisms with flat
+ * normals.
  *
  * pipes.c draws them with 24 or 25 facets; these are smoother and made once,
  * to be drawn instanced: the tube with 64 segments, the elbow with 64 × 24,
@@ -69,7 +80,21 @@ constexpr float END_RADIUS = 0.6f;
 /** @brief The radius of the balls where a pipe of balls turns, elbowradius of pipes.c. */
 constexpr float JOINT_RADIUS = 0.5f;
 
-/** @brief The segments around a tube, an elbow and a ball. */
+/** @brief How far a flange is from the middle of the cell, along the link it is on: its two faces. */
+constexpr float FLANGE_NEAR = 0.52f;
+constexpr float FLANGE_FAR = 0.6f;
+/** @brief The radius of a flange. */
+constexpr float FLANGE_RADIUS = 0.5f;
+/** @brief The bolts through a flange, 60° apart, the first in the line of y, across the bend. */
+constexpr int BOLTS = 6;
+/** @brief How far the bolts are from the axis of the pipe. */
+constexpr float BOLT_CIRCLE = 0.425f;
+/** @brief From the middle of a head or a nut to its corners; a flat faces the axis of the pipe. */
+constexpr float BOLT_RADIUS = 0.07f;
+/** @brief The height of a head or a nut above the face of the flange. */
+constexpr float BOLT_HEIGHT = 0.06f;
+
+/** @brief The segments around a tube, an elbow, a ball and a flange. */
 constexpr int SEGMENTS = 64;
 /** @brief The rings along the bend of an elbow. */
 constexpr int ELBOW_RINGS = 24;
@@ -106,3 +131,22 @@ Mesh make_elbow();
 
 /** @brief The ball, a sphere of radius 1 about the origin. */
 Mesh make_ball();
+
+/**
+ * @brief The flanges of a bolted elbow, LWO_ElbowCoins of pipeobjs.c.
+ *
+ * In the place of make_elbow(): one about the z axis, from z = -FLANGE_FAR
+ * to -FLANGE_NEAR, on the link the pipe comes in from, and one about the x
+ * axis, from x = FLANGE_NEAR to FLANGE_FAR, on the link it goes out on.
+ * Closed: a rim and two faces. Drawn in the colour of the system.
+ */
+Mesh make_flanges();
+
+/**
+ * @brief The bolts of a bolted elbow, LWO_ElbowBolts of pipeobjs.c.
+ *
+ * In the place of make_flanges(): BOLTS through each flange, at BOLT_CIRCLE
+ * from the axis of the pipe; each is a head on either face of the flange,
+ * a closed hexagonal prism of BOLT_HEIGHT. Drawn in grey, MaterialGray of pipes.c.
+ */
+Mesh make_bolts();

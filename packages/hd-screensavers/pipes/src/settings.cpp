@@ -38,13 +38,17 @@
 void add_pipes_options(Options& options, PipesOptions& values)
 {
     options.choice("joints", values.walk.joints,
-                   {{"elbow", Joints::elbow}, {"ball", Joints::ball}, {"cycle", Joints::cycle}},
-                   "the joints where the pipes turn; cycle takes balls and elbows by turns, one kind per screenful");
+                   {{"elbow", Joints::elbow}, {"ball", Joints::ball}, {"bolted", Joints::bolted},
+                    {"cycle", Joints::cycle}},
+                   "the joints where the pipes turn; cycle takes balls, bolted elbows and elbows by turns, one "
+                   "kind per screenful");
     options.number("cycles", values.walk.cycles, 1, 10, "N", "pipes per screenful");
     options.number("size", values.walk.size, 10, 1000, "N", "the longest run of a pipe");
     options.number("delay", values.delay, 1, 1000000, "US", "the time of one step, in microseconds");
     options.flag("fisheye", values.fisheye, "the camera closer to the pipes");
     options.flag("tightturns", values.walk.tightturns, "the same chance of a turn at every step");
+    options.number("factory", values.walk.factory, 0, 100, "N",
+                   "the factory of pipes.c; above 0 the bolted elbows have their bolts");
     options.flag("rotatepipes", values.rotatepipes, "the pipes turn slowly");
     add_render_options(options, values.render);
     options.command_line_flag("window", values.window,

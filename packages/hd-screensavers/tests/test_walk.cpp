@@ -249,19 +249,33 @@ void test_turns()
 
 void test_joints()
 {
-    // The joints of three screenfuls in a row; every system of a screenful has the same joint.
-    for (auto [joints, expected] : {
-             std::pair{Joints::elbow, std::vector{Piece::Kind::elbow, Piece::Kind::elbow, Piece::Kind::elbow}},
-             std::pair{Joints::ball, std::vector{Piece::Kind::ball, Piece::Kind::ball, Piece::Kind::ball}},
-             std::pair{Joints::cycle, std::vector{Piece::Kind::ball, Piece::Kind::elbow, Piece::Kind::ball}},
+    // The joints of four screenfuls in a row; every system of a screenful has the same joint. Without
+    // factory there are no bolts, as in pipes.c.
+    using K = Piece::Kind;
+    struct Case {
+        Joints joints;
+        int factory;
+        std::vector<K> expected;
+    };
+    for (const Case& c : std::vector<Case>{
+             {Joints::elbow, 2, {K::elbow, K::elbow, K::elbow, K::elbow}},
+             {Joints::ball, 2, {K::ball, K::ball, K::ball, K::ball}},
+             {Joints::bolted, 2, {K::bolted, K::bolted, K::bolted, K::bolted}},
+             {Joints::bolted, 0, {K::elbow, K::elbow, K::elbow, K::elbow}},
+             {Joints::cycle, 2, {K::ball, K::bolted, K::elbow, K::ball}},
+             {Joints::cycle, 100, {K::ball, K::bolted, K::elbow, K::ball}},
+             {Joints::cycle, 0, {K::ball, K::elbow, K::ball, K::elbow}},
          }) {
-        WalkOptions o{.joints = joints, .cycles = 4, .size = 10};
+        WalkOptions o{.joints = c.joints, .cycles = 4, .size = 10, .factory = c.factory};
         Walk walk(1, o);
-        for (Piece::Kind joint : expected) {
+        const std::string name = "joints " + std::to_string(static_cast<int>(c.joints)) + ", factory " +
+                                 std::to_string(c.factory);
+        for (K joint : c.expected) {
             auto s = walk.next();
             for (const auto& sys : s.systems) {
-                check(sys.joint == joint, "joints " + std::to_string(static_cast<int>(joints)) + ": the joint of the screenful");
+                check(sys.joint == joint, name + ": the joint of the screenful");
             }
+            replay(s, o, name);
         }
     }
 }
@@ -304,6 +318,7 @@ int main()
     test_shape({}, "defaults");
     test_shape({.joints = Joints::ball, .cycles = 10, .size = 1000}, "10 systems of 1000");
     test_shape({.joints = Joints::elbow, .cycles = 1, .size = 10, .tightturns = true}, "1 system of 10, tightturns");
+    test_shape({.joints = Joints::bolted, .cycles = 10, .size = 1000}, "10 bolted systems of 1000");
     test_shape({.cycles = 10, .size = 1000, .tightturns = true}, "10 systems of 1000, tightturns");
     test_ends();
     test_turns();

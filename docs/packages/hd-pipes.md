@@ -39,14 +39,14 @@ packages/hd-screensavers/deb/copyright
 | `main.cpp` | Reads the options and runs the screen. |
 | `settings.cpp` | The options: their names, ranges and defaults. |
 | `walk.cpp` | The grid walk: where each pipe goes. No Wayland or Vulkan, tested by `test_walk.cpp`. |
-| `mesh.cpp` | The shapes: the tube, the elbow and the ball. Tested by `test_mesh.cpp`. |
+| `mesh.cpp` | The shapes: the tube, the elbow, the ball, and the flanges and bolts of a bolted elbow. Tested by `test_mesh.cpp`. |
 | `pipes.cpp` | A scene per monitor: the steps on the clock, the restart and the drawing. |
 | `pipe.vert`, `pipe.frag` | The shaders, with the lighting of OpenGL 1.x per pixel. |
 
-Each of them, and the tests, starts with the notice of `pipes.c`.
+Each of them, and the tests, starts with the notice of `pipes.c`. The flanges and bolts are measured from `pipeobjs.c` of xscreensaver; `deb/copyright` names it, under the notice of xscreensaver.
 
 ## The pipes
-The pipes run through a grid of 33×25×33 cells. A screenful is `cycles` pipes on the same grid, each of one of the 7 colours of `pipes.c`. A pipe starts with a ball in a free cell and goes on from cell to cell, one step per `delay`. Where it turns, by 90°, it gets a joint: an elbow or a ball. It ends, capped with a ball, when it is boxed in or reaches `size`. Without `tightturns` the chance of a turn grows with every step since the last turn; with it, every step has a chance of 20%.
+The pipes run through a grid of 33×25×33 cells. A screenful is `cycles` pipes on the same grid, each of one of the 7 colours of `pipes.c`. A pipe starts with a ball in a free cell and goes on from cell to cell, one step per `delay`. Where it turns, by 90°, it gets a joint: an elbow, a bolted elbow or a ball. A bolted elbow is bolted onto the pipe with a flange on either side, each with six grey bolts; it has its bolts only when `factory` is above 0, as in `pipes.c`. It ends, capped with a ball, when it is boxed in or reaches `size`. Without `tightturns` the chance of a turn grows with every step since the last turn; with it, every step has a chance of 20%.
 
 When the last pipe of a screenful is done, the scene shrinks and tilts by 90° and starts again with the next screenful on an empty grid. With `rotatepipes` the scene turns slowly about its vertical axis, from a random angle.
 
@@ -55,7 +55,7 @@ Every monitor has a scene of its own, with a seed of its own. Monitors that come
 ## The look
 At first glance it looks like 1997; a close look shows smooth shapes, good shading and no jaggies:
 - the light, the materials, the shininess and the colours of `pipes.c`, lit per pixel as OpenGL 1.x did, in gamma space, on an 8 bit UNORM image, not sRGB;
-- tubes of 64 segments, elbows of 64×24 and balls of 64×32, made once at the start and drawn instanced;
+- tubes of 64 segments, elbows of 64×24 and balls of 64×32, flanges of 64 segments and bolts with hexagonal heads, made once at the start and drawn instanced;
 - multisampling with the most samples the device has, up to 8 or `msaa`, every sample shaded when the device can, against the shimmer of the highlights;
 - a frame at every refresh of each monitor (FIFO), or at most `framerate` a second, with the turn and the shrink in between two steps, so the pipes grow at the same speed at 60 Hz, at 240 Hz and at any frame rate.
 
@@ -69,12 +69,13 @@ With `--window` it is one ordinary window instead, with the app id `hd-pipes`, w
 ## Options
 | Option | Default | |
 | --- | --- | --- |
-| `--joints elbow\|ball\|cycle` | `cycle` | The joints where the pipes turn; `cycle` takes balls and elbows by turns, one kind per screenful, balls first. |
+| `--joints elbow\|ball\|bolted\|cycle` | `cycle` | The joints where the pipes turn; `cycle` takes balls, bolted elbows and elbows by turns, one kind per screenful, in that order; with `--factory 0` balls and elbows. `bolted` with `--factory 0` is elbows. |
 | `--cycles N` | 5 | The pipes per screenful, 1–10. |
 | `--size N` | 500 | The longest run of a pipe, 10–1000. |
 | `--delay µs` | 10000 | The time of one step, in microseconds, 1–1000000. |
 | `--fisheye`, `--no-fisheye` | on | The camera closer to the pipes. |
 | `--tightturns`, `--no-tightturns` | off | The same chance of a turn at every step. |
+| `--factory N` | 2 | The factory of `pipes.c`, 0–100: above 0 the bolted elbows have their bolts, at 0 they are plain elbows. |
 | `--rotatepipes`, `--no-rotatepipes` | on | The scene turns slowly. |
 | `--framerate N` | 0 | The most frames per second on each monitor, 1–1000; 0 for a frame at every refresh. |
 | `--msaa N` | 8 | The most samples per pixel, 1–8; it takes 1, 2, 4 or 8, the most the GPU has up to `N`. |
@@ -113,4 +114,4 @@ In a configuration, a value out of its range or of the wrong type, a member that
 | `/usr/bin/hd-pipes` | The screensaver. |
 | `~/.config/hyprdebian/config.json` | The configuration of the user, with the key `hd-pipes`. |
 | `/etc/hyprdebian/config.json` | The configuration of the system, with the keys `hd-pipes` and `hd-screensaver`. |
-| `/usr/share/doc/hd-screensavers/copyright` | The notice of `pipes.c`. |
+| `/usr/share/doc/hd-screensavers/copyright` | The notices of `pipes.c` and of xscreensaver, for `pipeobjs.c`. |

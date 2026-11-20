@@ -82,7 +82,10 @@ constexpr int FADE_STEP = 4;
 constexpr int64_t MAX_STEPS_PER_FRAME = 25;
 
 /** @brief The meshes, in the order of the regions of the instance buffers. */
-enum MeshKind : std::size_t { TUBE, ELBOW, BALL, MESHES };
+enum MeshKind : std::size_t { TUBE, ELBOW, BALL, FLANGE, BOLT, MESHES };
+
+/** @brief The colour of the bolts, MaterialGray of pipes.c, after the colours of the systems in pipe.frag. */
+constexpr int GREY = COLOURS;
 
 /** @brief A piece of a pipe as the vertex shader takes it: a mesh, turned, scaled and moved. */
 struct Instance {
@@ -164,34 +167,45 @@ Instance ball(float radius, const Vec3& position, int colour)
     return place({1, 0, 0}, {0, 1, 0}, {0, 0, 1}, radius, position, colour);
 }
 
-/**
- * @brief The instance of a piece.
- * @return The mesh and the instance.
- */
-std::pair<MeshKind, Instance> instance(const Piece& p, int colour)
+/** @brief The instances of a screenful, per mesh. */
+using Instances = std::array<std::vector<Instance>, MESHES>;
+
+/** @brief Adds the instances of a piece: one, or three for a bolted elbow. */
+void add_instances(const Piece& p, int colour, Instances& instances)
 {
     const Vec3 middle = centre(p.cell);
     switch (p.kind) {
     case Piece::Kind::start:
     case Piece::Kind::cap:
-        return {BALL, ball(END_RADIUS, middle, colour)};
+        instances[BALL].push_back(ball(END_RADIUS, middle, colour));
+        return;
     case Piece::Kind::ball:
-        return {BALL, ball(JOINT_RADIUS, middle, colour)};
+        instances[BALL].push_back(ball(JOINT_RADIUS, middle, colour));
+        return;
     case Piece::Kind::straight:
-        return {TUBE, tube(p.out, middle, colour)};
+        instances[TUBE].push_back(tube(p.out, middle, colour));
+        return;
     case Piece::Kind::link: {
         const Vec3 next = centre(p.cell.next(p.out));
-        return {TUBE, tube(p.out, {(middle[0] + next[0]) / 2, (middle[1] + next[1]) / 2, (middle[2] + next[2]) / 2},
-                           colour)};
+        instances[TUBE].push_back(
+            tube(p.out, {(middle[0] + next[0]) / 2, (middle[1] + next[1]) / 2, (middle[2] + next[2]) / 2}, colour));
+        return;
     }
-    case Piece::Kind::elbow: {
-        // The elbow of mesh.hpp comes in along its z and goes out along its x.
+    case Piece::Kind::elbow:
+    case Piece::Kind::bolted: {
+        // The elbow of mesh.hpp comes in along its z and goes out along its x;
+        // the flanges and the bolts are in the same place.
         const Vec3 z = vector(p.in);
         const Vec3 x = vector(p.out);
-        return {ELBOW, place(x, cross(z, x), z, 1.0f, middle, colour)};
+        const Vec3 y = cross(z, x);
+        instances[ELBOW].push_back(place(x, y, z, 1.0f, middle, colour));
+        if (p.kind == Piece::Kind::bolted) {
+            instances[FLANGE].push_back(place(x, y, z, 1.0f, middle, colour));
+            instances[BOLT].push_back(place(x, y, z, 1.0f, middle, GREY));
+        }
+        return;
     }
     }
-    return {BALL, ball(0.0f, middle, colour)};
 }
 
 /**
@@ -229,7 +243,7 @@ public:
      */
     explicit Renderer(Gpu& gpu) : gpu_(gpu)
     {
-        const std::array<Mesh, MESHES> meshes = {make_tube(), make_elbow(), make_ball()};
+        const std::array<Mesh, MESHES> meshes = {make_tube(), make_elbow(), make_ball(), make_flanges(), make_bolts()};
         std::size_t vertex_count = 0;
         std::size_t index_count = 0;
         for (std::size_t m = 0; m < MESHES; m++) {
@@ -447,9 +461,10 @@ public:
     {
         // The most pieces of a screenful: per system, a straight piece or a
         // joint and a link in each of size + 1 steps, and the start and the
-        // cap; at most one joint per step.
+        // cap; at most one joint per step, with its flanges and bolts.
         const VkDeviceSize steps = static_cast<VkDeviceSize>(options.walk.size + 1) * options.walk.cycles;
-        const std::array<VkDeviceSize, MESHES> capacity = {2 * steps, steps, steps + 2 * options.walk.cycles};
+        const std::array<VkDeviceSize, MESHES> capacity = {2 * steps, steps, steps + 2 * options.walk.cycles, steps,
+                                                           steps};
         VkDeviceSize size = 0;
         for (std::size_t m = 0; m < MESHES; m++) {
             offsets_[m] = size;
@@ -491,7 +506,7 @@ public:
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
         vkCmdPushConstants(cmd, renderer_.layout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof transform, &transform);
         vkCmdBindIndexBuffer(cmd, renderer_.indices(), 0, VK_INDEX_TYPE_UINT32);
-        for (MeshKind m : {TUBE, ELBOW, BALL}) {
+        for (MeshKind m : {TUBE, ELBOW, BALL, FLANGE, BOLT}) {
             const uint32_t count = counts_[m][shown_];
             if (count == 0) {
                 continue;
@@ -557,8 +572,7 @@ private:
         for (const System& system : screenful.systems) {
             for (const Step& step : system.steps) {
                 for (const Piece& piece : step.pieces) {
-                    const auto [m, i] = instance(piece, system.colour);
-                    instances_[m].push_back(i);
+                    add_instances(piece, system.colour, instances_);
                 }
                 for (std::size_t m = 0; m < MESHES; m++) {
                     counts_[m].push_back(static_cast<uint32_t>(instances_[m].size()));
@@ -600,7 +614,7 @@ private:
     /** @brief The steps of the screenful shown, all systems one after the other. */
     std::size_t shown_ = 0;
     /** @brief The instances of the screenful, per mesh, in the order of the steps. */
-    std::array<std::vector<Instance>, MESHES> instances_;
+    Instances instances_;
     /** @brief Per mesh, the instances of the first n steps at n, from 0 to all steps. */
     std::array<std::vector<uint32_t>, MESHES> counts_;
     /** @brief Whether the instances are not in a buffer yet. */

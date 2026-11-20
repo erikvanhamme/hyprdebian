@@ -4,7 +4,7 @@ hd-pipes \- the 3D pipes screensaver of HyprDebian
 .SH SYNOPSIS
 .B hd-pipes
 .RB [ \-\-joints
-.IR elbow | ball | cycle ]
+.IR elbow | ball | bolted | cycle ]
 .RB [ \-\-cycles
 .IR N ]
 .RB [ \-\-size
@@ -13,6 +13,8 @@ hd-pipes \- the 3D pipes screensaver of HyprDebian
 .IR us ]
 .RB [ \-\-[no\-]fisheye ]
 .RB [ \-\-[no\-]tightturns ]
+.RB [ \-\-factory
+.IR N ]
 .RB [ \-\-[no\-]rotatepipes ]
 .RB [ \-\-framerate
 .IR N ]
@@ -33,7 +35,7 @@ walk, its lights, materials and colours, and its options.
 Pipes grow from cell to cell through a grid of 33\(mu25\(mu33 cells, one
 step per
 .BR \-\-delay ,
-each pipe in one colour, turning at elbows or balls.
+each pipe in one colour, turning at elbows, bolted elbows or balls.
 A pipe ends, capped with a ball, when it is boxed in or reaches
 .BR \-\-size .
 After
@@ -71,10 +73,18 @@ the package sets that key in the configuration of the system when it is
 installed.
 .SH OPTIONS
 .TP
-.BR \-\-joints " \fIelbow\fR|\fIball\fR|\fIcycle"
+.BR \-\-joints " \fIelbow\fR|\fIball\fR|\fIbolted\fR|\fIcycle"
 The joints where the pipes turn.
+.I bolted
+elbows are bolted onto the pipe with a flange on either side, each with six
+grey bolts; with
+.B \-\-factory 0
+they are plain elbows.
 .I cycle
-takes balls and elbows by turns, one kind per screenful, balls first.
+takes balls, bolted elbows and elbows by turns, one kind per screenful, in
+that order; with
+.B \-\-factory 0
+balls and elbows.
 Default:
 .IR cycle .
 .TP
@@ -98,6 +108,13 @@ Default: on.
 With it, every step has the same chance of a turn; without it, the chance
 grows with every step since the last turn.
 Default: off.
+.TP
+.BI \-\-factory " N"
+The factory of
+.IR pipes.c ,
+0 to 100: above 0 the bolted elbows have their bolts, at 0 they are plain
+elbows.
+Default: 2.
 .TP
 .BR \-\-rotatepipes ", " \-\-no\-rotatepipes
 The scene turns slowly about its vertical axis, or stands still.
@@ -196,8 +213,11 @@ and
 .BR hd-screensaver .
 .TP
 .I /usr/share/doc/hd-screensavers/copyright
-The notice of
-.IR pipes.c .
+The notices of
+.I pipes.c
+and of xscreensaver, for
+.IR pipeobjs.c ,
+which the flanges and bolts are measured from.
 .SH SEE ALSO
 .BR hd-screensaver (7),
 .BR hd-config (7),

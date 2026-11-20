@@ -47,15 +47,17 @@ layout(location = 0) out vec4 colour;
 
 // The diffuse colours of the systems: MaterialRed, MaterialGreen,
 // MaterialBlue, MaterialCyan, MaterialYellow, MaterialMagenta and
-// MaterialWhite, in the order of the colours of the walk.
-const vec3 DIFFUSE[7] = vec3[](
+// MaterialWhite, in the order of the colours of the walk; then that of the
+// bolts, MaterialGray.
+const vec3 DIFFUSE[8] = vec3[](
     vec3(0.7, 0.0, 0.0),
     vec3(0.1, 0.5, 0.2),
     vec3(0.0, 0.0, 0.7),
     vec3(0.2, 0.5, 0.7),
     vec3(0.7, 0.7, 0.0),
     vec3(0.6, 0.2, 0.5),
-    vec3(0.7, 0.7, 0.7));
+    vec3(0.7, 0.7, 0.7),
+    vec3(0.2, 0.2, 0.2));
 
 // Only GL_LIGHT0 is on, a directional light from position0 (1, 1, 1), set
 // with the modelview at the identity, so in eye space. The viewer is far,

@@ -42,7 +42,7 @@
  * pipe of one colour. A pipe starts with a ball in a free cell that has a
  * free neighbour and goes on from cell to cell, a straight piece in every
  * cell it goes through and a link between each two. Where it turns the cell
- * gets a joint instead, an elbow or a ball. It ends, capped with a ball, when
+ * gets a joint instead, an elbow, a bolted elbow or a ball. It ends, capped with a ball, when
  * it is boxed in or after `size` + 1 steps, as `counter > system_length` of
  * pipes.c has it.
  *
@@ -98,9 +98,15 @@ struct Cell {
 
 /** @brief The joints of the systems, the option joints. */
 enum class Joints : uint8_t {
-    elbow, ///< Every system has elbows, the type 3 of pipes.c.
-    ball,  ///< Every system has balls, the type 1 of pipes.c.
-    cycle, ///< The screenfuls take turns, balls first; a screenful has one joint.
+    elbow,  ///< Every system has elbows, the type 3 of pipes.c.
+    ball,   ///< Every system has balls, the type 1 of pipes.c.
+    bolted, ///< Every system has bolted elbows, the type 2 of pipes.c; plain elbows with factory 0.
+    /**
+     * @brief The screenfuls take turns, balls first; a screenful has one joint.
+     *
+     * Ball, bolted, elbow, the order of the types of pipes.c; ball, elbow with factory 0.
+     */
+    cycle,
 };
 
 /** @brief The options of the walk, in the ranges of the options of hd-pipes. */
@@ -112,6 +118,8 @@ struct WalkOptions {
     int size = 500;
     /** @brief Whether every step has the same chance of a turn. */
     bool tightturns = false;
+    /** @brief The factory of pipes.c, 0–100; above 0 the bolted elbows have their bolts, as in DrawElbow. */
+    int factory = 2;
 };
 
 /** @brief A piece of a pipe. */
@@ -121,15 +129,16 @@ struct Piece {
         straight, ///< A straight piece through the middle of cell, along out.
         link,     ///< A straight piece from cell to its neighbour in out, over the face between them.
         elbow,    ///< An elbow in cell, coming in along in and going on along out.
+        bolted,   ///< An elbow with bolts, as elbow.
         ball,     ///< A ball in cell where the pipe turns, from in to out.
         cap,      ///< The ball at the end, in cell.
     };
 
     Kind kind;
     Cell cell;
-    /** @brief The direction the pipe goes in when it comes into the cell; for elbow and ball. */
+    /** @brief The direction the pipe goes in when it comes into the cell; for elbow, bolted and ball. */
     Direction in = Direction::up;
-    /** @brief The direction the pipe goes in when it leaves the cell; for straight, link, elbow and ball. */
+    /** @brief The direction the pipe goes in when it leaves the cell; for straight, link, elbow, bolted and ball. */
     Direction out = Direction::up;
 
     bool operator==(const Piece&) const = default;
@@ -152,7 +161,7 @@ struct Step {
 struct System {
     /** @brief The colour, 0 to COLOURS - 1: red, green, blue, cyan, yellow, magenta, white. */
     int colour = 0;
-    /** @brief The joint of its turns, elbow or ball. */
+    /** @brief The joint of its turns, elbow, bolted or ball. */
     Piece::Kind joint = Piece::Kind::elbow;
     std::vector<Step> steps;
 

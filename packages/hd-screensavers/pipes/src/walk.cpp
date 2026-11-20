@@ -126,12 +126,20 @@ Screenful Walk::next()
     }
 
     // One joint for the whole screenful. pipes.c takes turns per system; here the screenfuls take
-    // turns, balls first, so that a screen never mixes elbows and balls.
+    // turns, balls first, so that a screen never mixes joints. Without factory the elbows of
+    // pipes.c have no bolts, so bolted is elbow.
     Piece::Kind joint = Piece::Kind::elbow;
     if (options_.joints == Joints::ball) {
         joint = Piece::Kind::ball;
+    } else if (options_.joints == Joints::bolted) {
+        if (options_.factory > 0) {
+            joint = Piece::Kind::bolted;
+        }
     } else if (options_.joints == Joints::cycle) {
-        if (screenfuls_ % 2 == 0) {
+        if (options_.factory > 0) {
+            constexpr Piece::Kind order[] = {Piece::Kind::ball, Piece::Kind::bolted, Piece::Kind::elbow};
+            joint = order[screenfuls_ % 3];
+        } else if (screenfuls_ % 2 == 0) {
             joint = Piece::Kind::ball;
         }
     }

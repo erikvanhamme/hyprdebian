@@ -37,8 +37,10 @@
 
 #include "mesh.hpp"
 
+#include <array>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 namespace {
 
@@ -103,6 +105,83 @@ void connect_rings(Mesh& mesh, uint32_t first, int rings, int size)
     }
 }
 
+using Vec3 = std::array<float, 3>;
+
+/** @brief Where the point @p a, @p b, @p h of a frame of @p u, @p v and @p w about @p origin is. */
+Vec3 in_frame(const Vec3& origin, const Vec3& u, const Vec3& v, const Vec3& w, float a, float b, float h)
+{
+    return {origin[0] + a * u[0] + b * v[0] + h * w[0], origin[1] + a * u[1] + b * v[1] + h * w[1],
+            origin[2] + a * u[2] + b * v[2] + h * w[2]};
+}
+
+/**
+ * @brief Adds a closed prism, a polygon swept along an axis.
+ *
+ * The axis goes through @p origin along @p w, with @p u and @p v across it.
+ * The corners of the polygon are @p radius from the axis, the first at the
+ * angle @p phase from u towards v; the prism goes from @p from to @p to
+ * along w. Its two ends are flat; its sides are smooth, a cylinder of
+ * @p sides segments, or flat, a polygon of @p sides sides.
+ */
+void add_prism(Mesh& mesh, const Vec3& origin, const Vec3& u, const Vec3& v, const Vec3& w, int sides, float radius,
+               float phase, float from, float to, bool smooth)
+{
+    const auto corner = [&](int j, float h) {
+        const float a = phase + 2.0f * PI * j / sides;
+        return in_frame(origin, u, v, w, radius * std::cos(a), radius * std::sin(a), h);
+    };
+    const auto across = [&](float a) { return in_frame({0, 0, 0}, u, v, w, std::cos(a), std::sin(a), 0.0f); };
+    const auto add = [&](const Vec3& p, const Vec3& n) { return add_vertex(mesh, p[0], p[1], p[2], n[0], n[1], n[2]); };
+
+    if (smooth) {
+        const uint32_t first = static_cast<uint32_t>(mesh.vertices.size());
+        for (float h : {from, to}) {
+            for (int j = 0; j <= sides; j++) {
+                add(corner(j, h), across(phase + 2.0f * PI * j / sides));
+            }
+        }
+        connect_rings(mesh, first, 2, sides + 1);
+    } else {
+        for (int j = 0; j < sides; j++) {
+            // The normal of a flat side is halfway between its corners.
+            const Vec3 n = across(phase + 2.0f * PI * (j + 0.5f) / sides);
+            const uint32_t a = add(corner(j, from), n);
+            const uint32_t b = add(corner(j + 1, from), n);
+            const uint32_t c = add(corner(j, to), n);
+            const uint32_t d = add(corner(j + 1, to), n);
+            add_triangle(mesh, a, b, d);
+            add_triangle(mesh, a, d, c);
+        }
+    }
+    for (auto [h, sign] : {std::pair{from, -1.0f}, std::pair{to, 1.0f}}) {
+        const Vec3 n = {sign * w[0], sign * w[1], sign * w[2]};
+        const uint32_t middle = add(in_frame(origin, u, v, w, 0.0f, 0.0f, h), n);
+        const uint32_t first = static_cast<uint32_t>(mesh.vertices.size());
+        for (int j = 0; j < sides; j++) {
+            add(corner(j, h), n);
+        }
+        for (int j = 0; j < sides; j++) {
+            add_triangle(mesh, middle, first + j, first + (j + 1) % sides);
+        }
+    }
+}
+
+/**
+ * @brief The axes of the two flanges of a bolted elbow, as make_flanges() places them.
+ *
+ * For each the axis w, from the middle of the cell out along the link, and
+ * u, the line of y in which the first bolt is, and v across both.
+ */
+struct FlangeAxes {
+    Vec3 u;
+    Vec3 v;
+    Vec3 w;
+};
+constexpr std::array<FlangeAxes, 2> FLANGES = {{
+    {{0, 1, 0}, {1, 0, 0}, {0, 0, -1}}, // on the link the pipe comes in from, along -z
+    {{0, 1, 0}, {0, 0, 1}, {1, 0, 0}},  // on the link it goes out on, along +x
+}};
+
 } // namespace
 
 Mesh make_tube()
@@ -162,5 +241,33 @@ Mesh make_ball()
         }
     }
     connect_rings(mesh, 0, BALL_RINGS + 1, SEGMENTS + 1);
+    return mesh;
+}
+
+Mesh make_flanges()
+{
+    Mesh mesh;
+    for (const FlangeAxes& f : FLANGES) {
+        add_prism(mesh, {0, 0, 0}, f.u, f.v, f.w, SEGMENTS, FLANGE_RADIUS, 0.0f, FLANGE_NEAR, FLANGE_FAR, true);
+    }
+    return mesh;
+}
+
+Mesh make_bolts()
+{
+    Mesh mesh;
+    for (const FlangeAxes& f : FLANGES) {
+        for (int k = 0; k < BOLTS; k++) {
+            // A bolt in a frame of its own: u out from the axis of the pipe, v
+            // around it. The corners are 30° off u, so a flat faces the axis.
+            const float a = 2.0f * PI * k / BOLTS;
+            const Vec3 out = in_frame({0, 0, 0}, f.u, f.v, f.w, std::cos(a), std::sin(a), 0.0f);
+            const Vec3 around = in_frame({0, 0, 0}, f.u, f.v, f.w, -std::sin(a), std::cos(a), 0.0f);
+            const Vec3 middle = in_frame({0, 0, 0}, out, around, f.w, BOLT_CIRCLE, 0.0f, 0.0f);
+            for (float face : {FLANGE_NEAR - BOLT_HEIGHT, FLANGE_FAR}) {
+                add_prism(mesh, middle, out, around, f.w, 6, BOLT_RADIUS, PI / 6, face, face + BOLT_HEIGHT, false);
+            }
+        }
+    }
     return mesh;
 }
