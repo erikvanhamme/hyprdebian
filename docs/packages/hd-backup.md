@@ -26,9 +26,9 @@ cd packages/hd-backup
 make deb
 ```
 
-This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags`; building it needs `gcc` and `dpkg-dev`. It depends on `libc6`, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-base`, `zfsutils-linux`, `zstd`, `libvirt-clients` and `udev`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
+This builds `build/hd-backup_<version>_amd64.deb`, with the version from `version.json`. Raise the version there for every package that is handed out. The package is for amd64, as it holds `blockwrite`, compiled from `blockwrite.c` with `gcc` and the hardening flags of `dpkg-buildflags` in a container of `hd-build:trixie`, the build image of trixie from `buildenv/Dockerfile`, which `make deb` builds first; building it needs `docker` and a user that may run it. It is compiled on trixie as the package goes to trixie and unstable, and a binary compiled on unstable can need a newer glibc than trixie has. It depends on the `libc6` that `dpkg-shlibdeps` finds for `blockwrite` in the container, `python3`, `python3-colorama`, `python3-tabulate`, `systemd`, `hd-base`, `zfsutils-linux`, `zstd`, `libvirt-clients` and `udev`, and recommends `mbuffer` and `mt-st`, which `hd-backup` needs for tape. Install it with:
 ```
-sudo apt install ./build/hd-backup_<version>_all.deb
+sudo apt install ./build/hd-backup_<version>_amd64.deb
 ```
 
 The files involved are:
@@ -159,7 +159,7 @@ It then defines the VM in libvirt with the XML of the backup, with the disks poi
 Removing the package stops the timer and keeps the list of VMs and the backups. Purging it also removes the key `hd-backup` of `/etc/hyprdebian/config.json`. The backups and the snapshot of the last backup of each disk stay.
 
 ## Tests
-The tests are in `packages/hd-backup/tests`. The tests of `hd-backup` cover the scan, the write, the estimate of the tarball sizes when a carrier runs full and every command, on a database in memory or a temporary one, and write and restore backups end to end with `tar`, with stubs in place of the tape drive. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first and write to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
+The tests are in `packages/hd-backup/tests`. The tests of `hd-backup` cover the scan, the write, the estimate of the tarball sizes when a carrier runs full and every command, on a database in memory or a temporary one, and write and restore backups end to end with `tar`, with stubs in place of the tape drive. In the tests of the drive tools, the commands they run are replaced by mocks; in the tests of the VM tools, `virsh`, `zfs` and `zstd` are replaced by `tests/fake-command`, which logs its calls and keeps the snapshots in a temporary folder, so they run as a normal user, without libvirt or ZFS. The tests of `blockwrite` build it first, in the container of `make deb`, and run it on this computer, writing to a file in `/var/tmp`, as `O_DIRECT` does not work on tmpfs:
 ```
 cd packages/hd-backup
 make test

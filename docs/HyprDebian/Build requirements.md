@@ -6,7 +6,7 @@ The builds are made for amd64. `hd-backup`, `hd-desktop`, `orcaslicer` and the p
 ## In short
 On a Debian trixie or unstable amd64 computer, this installs everything the package builds and the tests need:
 ```
-sudo apt install build-essential python3 clang lld gnu-efi wget unzip ca-certificates docker.io tar util-linux
+sudo apt install build-essential python3 wget unzip ca-certificates docker.io tar util-linux
 ```
 
 Then let the user run docker, and log in again:
@@ -34,8 +34,8 @@ Each package is staged in its `build/deb` and built with `dpkg-deb`. Each Makefi
 | Package | Needs | Why |
 | --- | --- | --- |
 | `hd-agent`, `hd-base`, `hd-buildserver`, `hd-cups`, `hd-dashboard`, `hd-docker`, `hd-installer`, `hd-laptop`, `hd-qemu-kvm`, `hd-repo` | Only the tools above. | They only stage scripts, configs and man pages. |
-| `hd-backup` | `gcc`, `libc6-dev`, `dpkg-buildflags` (dpkg-dev), `strip` (binutils); all in build-essential | Compiles `blockwrite` from `blockwrite.c` with the hardening flags of Debian, and strips it. |
-| `hd-bootloader` | `clang++` (clang), `lld-link` (lld), the headers in `/usr/include/efi` (gnu-efi) | Compiles the EFI bootloader for the target `x86_64-unknown-windows` and links it as a PE32+ image. Only the headers of gnu-efi are used. Works with gnu-efi 3.0 (trixie) and 4.0. |
+| `hd-backup` | `docker` (docker.io), a user that may run docker, `strip` (binutils), internet access | Compiles `blockwrite` from `blockwrite.c` with the hardening flags of Debian in a container of `hd-build:trixie`, the build image of trixie from `buildenv/Dockerfile`, which it builds first, pulling `debian:trixie`, and strips it. It is compiled on trixie, as the package goes to trixie and unstable; its `libc6` in the Depends comes from `dpkg-shlibdeps` in the container. |
+| `hd-bootloader` | `docker` (docker.io), a user that may run docker, internet access | Compiles the EFI bootloader for the target `x86_64-unknown-windows` with `clang++` and links it as a PE32+ image with `lld-link`, in a container of `hd-build:trixie`, which it builds first, pulling `debian:trixie`. The image has clang, lld and gnu-efi, of which only the headers are used. Works with gnu-efi 3.0 (trixie) and 4.0. |
 | `orcaslicer` | `wget`, ca-certificates, internet access, an amd64 computer | Downloads the OrcaSlicer 2.4.2 AppImage from GitHub once, checks its sha256 and unpacks it by running it with `--appimage-extract`, which needs no FUSE. |
 | `hd-desktop` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, `wget`, `unzip`, ca-certificates, internet access | Compiles hd-menu and hd-message in a container of `hd-build:unstable`, the build image of unstable from `buildenv/Dockerfile`, which it builds first, pulling `debian:unstable`. The image has the build tools and the -dev packages of wayland, xkbcommon, cairo and librsvg. The package gets the architecture of the build computer. `make all` in `menu/` or `message/`, which builds hd-menu or hd-message without a package to try it, compiles in that container too; the binary runs on the computer itself, which needs unstable and `libwayland-client0`, `libxkbcommon0`, `libcairo2` and `librsvg2-2`, as a HyprDebian desktop has. Downloads the JetBrains Mono and Source Code Pro zips of Nerd Fonts 3.4.0 from GitHub once, checks their sha256 and unpacks the fonts. |
 | `hd-screensavers` | `docker` (docker.io), a user that may run docker, `strip` (binutils), `dpkg` for `--print-architecture`, internet access | Compiles the screensavers in a container of `hd-build:unstable`, which it builds first, pulling `debian:unstable`. The image has the build tools, the -dev packages of Wayland and Vulkan, and glslang-tools for the shaders. The package gets the architecture of the build computer. `make all` in `pipes/`, which builds hd-pipes without a package to try it, compiles in that container too; the binary runs on the computer itself, which needs unstable, `libwayland-client0`, `libvulkan1` and a Vulkan driver, as `mesa-vulkan-drivers`. |
@@ -54,7 +54,7 @@ The downloads and the compiled releases are kept in `build/` of their package di
 | `hd-dashboard` | `python3`, only the standard library. |
 | `hd-agent` | `python3`, only the standard library. It also loads `packages/hd-dashboard/hd-dashboard`. |
 | `hd-screensavers` | `docker` (docker.io) and a user that may run docker: the tests are compiled in a container of `hd-build:unstable`, which `make test` builds first, and run on the computer itself, which needs the libstdc++ of unstable. They need no Wayland or Vulkan. |
-| `hd-backup` | `python3` and the C compiler of `make deb`, as it builds `blockwrite` first. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
+| `hd-backup` | `python3`, and `docker` and a user that may run docker: `make test` builds `blockwrite` first in a container of `hd-build:trixie`, as `make deb` does, and runs it on the computer itself. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
 
 ## The live ISO: make iso
 `make iso` builds every package and the kernels, then the ISO in a container, see [Live cd](../Livecd/Overview.md). The computer needs everything `make all` and `make kernel` need, and:

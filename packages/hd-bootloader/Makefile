@@ -59,6 +59,12 @@
 #               a package with REPOS_<package> as <repos>:<path>, as it only
 #               goes to those repos, not to the repos of deploy.json
 #   make clean  remove build/
+#
+# make all compiles in one container of hd-build:trixie, the build image of trixie from
+# buildenv/Dockerfile, which it builds first, as the user who runs make, so that the bootloader of
+# a package that goes to trixie and unstable is built with the tools of trixie. make all
+# IN_BUILD=1 compiles without a container, as the container does, with clang, lld and gnu-efi,
+# which hd-build:trixie has.
 
 BUILD := build
 PYTHON := python3
@@ -114,9 +120,36 @@ DEB_HOOKS := /etc/kernel/postinst.d/zz-hd-bootloader \
 # The man pages, named <page>.<section>.
 MANPAGES := man/hd-bootloader.7 man/hd-bootloader-update.8
 
+MKFS_FAT := /usr/sbin/mkfs.fat
+# The sources of the bootloaders and the stub, which make all compiles.
+SOURCES := bootloader.cpp bootloader.hpp assets.cpp $(FRONTENDS:%=%.cpp)
+SUITE := trixie
+
+.PHONY: all esp image deb deb-path clean
+
+all: $(TARGETS) $(ASSETS_STUB)
+
+$(BUILD):
+	mkdir -p $@
+
+ifeq ($(IN_BUILD),)
+
+include ../../buildenv/buildenv.mk
+
+# The container has this directory at the same path, so the bootloaders and the stub in build/
+# are of the user who runs make.
+$(TARGETS) $(ASSETS_STUB) &: $(SOURCES) | $(BUILD)
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
+		--user $$(id -u):$$(id -g) \
+		-v $(CURDIR):$(CURDIR) \
+		-w $(CURDIR), \
+		make -j$$(nproc) all IN_BUILD=1)
+
+else
+
 CXX := clang++
 LD := lld-link
-MKFS_FAT := /usr/sbin/mkfs.fat
 GNU_EFI_INC := /usr/include/efi
 
 # UEFI binaries are PE32+ images with the Microsoft x64 calling convention,
@@ -155,13 +188,6 @@ LDFLAGS := \
 	-entry:efi_main \
 	-nodefaultlib
 
-.PHONY: all esp image deb deb-path clean
-
-all: $(TARGETS) $(ASSETS_STUB)
-
-$(BUILD):
-	mkdir -p $@
-
 $(BUILD)/%.obj: %.cpp bootloader.hpp | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -178,6 +204,8 @@ $(BUILD)/bootx64-%.efi: $(BUILD)/bootloader.obj $(BUILD)/%.obj
 # dozens.
 $(ASSETS_STUB): $(BUILD)/assets.obj
 	$(LD) $(LDFLAGS) -filealign:4096 -out:$@ $^
+
+endif
 
 esp: $(ESP_STAMP)
 

@@ -27,9 +27,10 @@
 #                                             every night at 3:30
 #                 /usr/share/man/man1/*.1.gz and
 #                 /usr/share/man/man8/*.8.gz  the man pages in man/
-#               with the control file deb/control and the maintainer scripts
-#               deb/postinst, deb/prerm and deb/postrm. The postinst stores
-#               an empty list of VMs in the key hd-backup of
+#               with the control file deb/control, whose Depends start with
+#               those of blockwrite from dpkg-shlibdeps, and the maintainer
+#               scripts deb/postinst, deb/prerm and deb/postrm. The
+#               postinst stores an empty list of VMs in the key hd-backup of
 #               /etc/hyprdebian/config.json when there is none; it does not
 #               enable the timer. The prerm stops the timer on a removal;
 #               the postrm masks it on a removal, and on a purge removes
@@ -38,9 +39,16 @@
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
-#   make test   build blockwrite and run the unittest tests in tests/; the
-#               system commands of the VM tools are replaced by fakes
+#   make test   build blockwrite and run the unittest tests in tests/ on
+#               this computer; the system commands of the VM tools are
+#               replaced by fakes
 #   make clean  remove build/
+#
+# blockwrite is compiled in a container of hd-build:trixie, the build image of trixie from
+# buildenv/Dockerfile, which make builds first, as the user who runs make: the package goes to
+# trixie and unstable, and a binary compiled on unstable can need a newer glibc than trixie has.
+# make build/blockwrite IN_BUILD=1 compiles it without a container, as the container does, with
+# gcc and dpkg-dev, which hd-build:trixie has.
 
 BUILD := build
 PYTHON := python3
@@ -57,6 +65,9 @@ ADMIN_COMMANDS := hd-backup-prep hd-backup-load hd-backup-unload hd-backup-vm hd
 	hd-restore-vm
 UNITS := hd-backup-vms.service hd-backup-vms.timer
 BLOCKWRITE := $(BUILD)/blockwrite
+# The Depends of blockwrite, from dpkg-shlibdeps in the container.
+BLOCKWRITE_DEPENDS := $(BUILD)/blockwrite.depends
+SUITE := trixie
 # The maintainer scripts in deb/.
 SCRIPTS := deb/postinst deb/prerm deb/postrm
 # The man pages, named <page>.<section>.
@@ -74,14 +85,45 @@ deb-path:
 $(BUILD):
 	mkdir -p $@
 
+ifeq ($(IN_BUILD),)
+
+include ../../buildenv/buildenv.mk
+
+# The container has this directory at the same path, so blockwrite and its Depends in build/ are
+# of the user who runs make.
+$(BLOCKWRITE): blockwrite.c | $(BUILD)
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
+		--user $$(id -u):$$(id -g) \
+		-v $(CURDIR):$(CURDIR) \
+		-w $(CURDIR), \
+		make $(BLOCKWRITE) IN_BUILD=1)
+
+else
+
 # Compiled with the hardening flags Debian packages use.
 CC := gcc
 CFLAGS := $(shell dpkg-buildflags --get CFLAGS) -Wall -Werror
 CPPFLAGS := $(shell dpkg-buildflags --get CPPFLAGS) -D_GNU_SOURCE
 LDFLAGS := $(shell dpkg-buildflags --get LDFLAGS)
 
+# dpkg-shlibdeps finds the packages of the libraries blockwrite links to. It wants a
+# debian/control to run in, and the binary in the root of a package, with a DEBIAN directory, in
+# debian/<package>. blockwrite is moved to build/ last, so a build that fails leaves no blockwrite
+# without its Depends behind.
+SHLIBDEPS := $(BUILD)/shlibdeps
+
 $(BLOCKWRITE): blockwrite.c | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $<
+	rm -rf $(SHLIBDEPS)
+	mkdir -p $(SHLIBDEPS)/debian/$(DEB_NAME)/DEBIAN
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $(SHLIBDEPS)/debian/$(DEB_NAME)/blockwrite $<
+	printf 'Source: $(DEB_NAME)\n\nPackage: $(DEB_NAME)\nArchitecture: any\n' \
+		> $(SHLIBDEPS)/debian/control
+	cd $(SHLIBDEPS) && dpkg-shlibdeps -O debian/$(DEB_NAME)/blockwrite > substvars
+	sed -n 's/^shlibs:Depends=//p' $(SHLIBDEPS)/substvars > $(BLOCKWRITE_DEPENDS)
+	mv $(SHLIBDEPS)/debian/$(DEB_NAME)/blockwrite $@
+
+endif
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
 # files owned by root.
@@ -99,6 +141,7 @@ $(DEB): version.json $(USER_COMMANDS) $(BLOCKWRITE) $(ADMIN_COMMANDS) $(UNITS) d
 		chmod 0644 $$dir/$$(basename $$page).gz; \
 	done
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
+		-e "s/@BLOCKWRITE_DEPENDS@/$$(cat $(BLOCKWRITE_DEPENDS))/" \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
 	install -m 0755 $(SCRIPTS) $(STAGE)/DEBIAN/
