@@ -48,7 +48,8 @@ void add_pipes_options(Options& options, PipesOptions& values)
     options.flag("fisheye", values.fisheye, "the camera closer to the pipes");
     options.flag("tightturns", values.walk.tightturns, "the same chance of a turn at every step");
     options.number("factory", values.walk.factory, 0, 100, "N",
-                   "the factory of pipes.c; above 0 the bolted elbows have their bolts");
+                   "the chance in percent of a gauge, a valve or the teapot on a straight piece; above 0 "
+                   "the bolted elbows have their bolts");
     options.flag("rotatepipes", values.rotatepipes, "the pipes turn slowly");
     add_render_options(options, values.render);
     options.command_line_flag("window", values.window,

@@ -82,10 +82,32 @@ constexpr int FADE_STEP = 4;
 constexpr int64_t MAX_STEPS_PER_FRAME = 25;
 
 /** @brief The meshes, in the order of the regions of the instance buffers. */
-enum MeshKind : std::size_t { TUBE, ELBOW, BALL, FLANGE, BOLT, MESHES };
+enum MeshKind : std::size_t {
+    TUBE,
+    ELBOW,
+    BALL,
+    FLANGE,
+    BOLT,
+    BODY,
+    END_PLATES,
+    WHEEL,
+    CONNECTOR,
+    HEAD,
+    FACE,
+    DIAL,
+    TEAPOT,
+    MESHES
+};
 
 /** @brief The colour of the bolts, MaterialGray of pipes.c, after the colours of the systems in pipe.frag. */
 constexpr int GREY = COLOURS;
+
+/**
+ * @brief The most instances of a step that moves on: a gauge, of six meshes, and the link.
+ *
+ * A bolted elbow and its link are four; the start and the cap come once per pipe.
+ */
+constexpr VkDeviceSize MOST_INSTANCES_PER_STEP = 7;
 
 /** @brief A piece of a pipe as the vertex shader takes it: a mesh, turned, scaled and moved. */
 struct Instance {
@@ -152,6 +174,42 @@ Instance place(const Vec3& x, const Vec3& y, const Vec3& z, float scale, const V
     return i;
 }
 
+/** @brief An instance with the axes and the origin of the mesh where @p m takes them. */
+Instance place(const Mat4& m, int colour)
+{
+    Instance i;
+    for (int k = 0; k < 3; k++) {
+        for (int c = 0; c < 3; c++) {
+            i.axes[c][k] = m.m[c * 4 + k];
+        }
+        i.position[k] = m.m[12 + k];
+    }
+    i.colour = static_cast<uint32_t>(colour);
+    return i;
+}
+
+/**
+ * @brief The turn of a valve or the teapot onto its pipe, MakeValve and MakeTeapot of pipes.c.
+ *
+ * Their z axis goes along the pipe; @p turn, of the walk, turns them about
+ * it by quarter turns.
+ */
+Mat4 turn_onto(Direction d, int turn)
+{
+    switch (d) {
+    case Direction::up:
+    case Direction::down:
+        return rotate(90.0f, 1.0f, 0.0f, 0.0f) * rotate(turn * 90.0f, 0.0f, 0.0f, 1.0f);
+    case Direction::left:
+    case Direction::right:
+        return rotate(90.0f, 0.0f, -1.0f, 0.0f) * rotate(turn * 90.0f - 90.0f, 0.0f, 0.0f, 1.0f);
+    case Direction::near:
+    case Direction::far:
+        break;
+    }
+    return rotate(turn * 90.0f, 0.0f, 0.0f, 1.0f);
+}
+
 /** @brief A tube along @p d about @p position; its own z axis goes along d. */
 Instance tube(Direction d, const Vec3& position, int colour)
 {
@@ -170,7 +228,7 @@ Instance ball(float radius, const Vec3& position, int colour)
 /** @brief The instances of a screenful, per mesh. */
 using Instances = std::array<std::vector<Instance>, MESHES>;
 
-/** @brief Adds the instances of a piece: one, or three for a bolted elbow. */
+/** @brief Adds the instances of a piece: one, three for a bolted elbow and a valve, six for a gauge. */
 void add_instances(const Piece& p, int colour, Instances& instances)
 {
     const Vec3 middle = centre(p.cell);
@@ -205,6 +263,36 @@ void add_instances(const Piece& p, int colour, Instances& instances)
         }
         return;
     }
+    case Piece::Kind::valve: {
+        // MakeValve: the body in the colour of the system, the plates grey, the wheel turned
+        // about its stem.
+        const Mat4 valve = translate(middle[0], middle[1], middle[2]) * turn_onto(p.out, p.turn);
+        instances[BODY].push_back(place(valve, colour));
+        instances[END_PLATES].push_back(place(valve, GREY));
+        instances[WHEEL].push_back(place(valve * rotate(static_cast<float>(p.angle), 1.0f, 0.0f, 0.0f), p.colour));
+        return;
+    }
+    case Piece::Kind::gauge: {
+        // MakeGuage: only the body turns onto a pipe along x; the gauge always stands up and
+        // faces +z. The needle turns clockwise from straight down.
+        const Mat4 cell = translate(middle[0], middle[1], middle[2]);
+        Mat4 body = cell;
+        if (p.out == Direction::left || p.out == Direction::right) {
+            body = cell * rotate(90.0f, 0.0f, 1.0f, 0.0f);
+        }
+        instances[BODY].push_back(place(body, colour));
+        instances[END_PLATES].push_back(place(body, GREY));
+        instances[CONNECTOR].push_back(place(cell, GREY));
+        instances[HEAD].push_back(place(cell, colour));
+        instances[FACE].push_back(place(cell, WHITE));
+        instances[DIAL].push_back(place(cell * translate(0.0f, GAUGE_HEIGHT, 0.0f) *
+                                            rotate(static_cast<float>(p.angle), 0.0f, 0.0f, -1.0f),
+                                        GREY));
+        return;
+    }
+    case Piece::Kind::teapot:
+        instances[TEAPOT].push_back(place(translate(middle[0], middle[1], middle[2]) * turn_onto(p.out, p.turn), colour));
+        return;
     }
 }
 
@@ -243,7 +331,10 @@ public:
      */
     explicit Renderer(Gpu& gpu) : gpu_(gpu)
     {
-        const std::array<Mesh, MESHES> meshes = {make_tube(), make_elbow(), make_ball(), make_flanges(), make_bolts()};
+        const std::array<Mesh, MESHES> meshes = {
+            make_tube(),  make_elbow(),      make_ball(),  make_flanges(), make_bolts(), make_body(),  make_end_plates(),
+            make_wheel(), make_connector(), make_head(), make_face(),    make_dial(),  make_teapot(),
+        };
         std::size_t vertex_count = 0;
         std::size_t index_count = 0;
         for (std::size_t m = 0; m < MESHES; m++) {
@@ -459,17 +550,11 @@ public:
         , walk_(seed, options.walk)
         , rotation_(rotation)
     {
-        // The most pieces of a screenful: per system, a straight piece or a
-        // joint and a link in each of size + 1 steps, and the start and the
-        // cap; at most one joint per step, with its flanges and bolts.
+        // The most instances of a screenful: per system, those of size + 1
+        // steps and the start and the cap. The regions of the meshes are
+        // laid out per screenful, in upload().
         const VkDeviceSize steps = static_cast<VkDeviceSize>(options.walk.size + 1) * options.walk.cycles;
-        const std::array<VkDeviceSize, MESHES> capacity = {2 * steps, steps, steps + 2 * options.walk.cycles, steps,
-                                                           steps};
-        VkDeviceSize size = 0;
-        for (std::size_t m = 0; m < MESHES; m++) {
-            offsets_[m] = size;
-            size += capacity[m] * sizeof(Instance);
-        }
+        const VkDeviceSize size = (MOST_INSTANCES_PER_STEP * steps + 2 * options.walk.cycles) * sizeof(Instance);
         for (auto& buffer : buffers_) {
             buffer = std::make_unique<Buffer>(gpu, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
         }
@@ -506,15 +591,15 @@ public:
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
         vkCmdPushConstants(cmd, renderer_.layout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof transform, &transform);
         vkCmdBindIndexBuffer(cmd, renderer_.indices(), 0, VK_INDEX_TYPE_UINT32);
-        for (MeshKind m : {TUBE, ELBOW, BALL, FLANGE, BOLT}) {
+        for (std::size_t m = 0; m < MESHES; m++) {
             const uint32_t count = counts_[m][shown_];
             if (count == 0) {
                 continue;
             }
             const VkBuffer buffers[] = {renderer_.vertices(), buffers_[current_]->buffer()};
-            const VkDeviceSize offsets[] = {0, offsets_[m]};
+            const VkDeviceSize offsets[] = {0, offsets_[current_][m]};
             vkCmdBindVertexBuffers(cmd, 0, 2, buffers, offsets);
-            const Renderer::Part& part = renderer_.part(m);
+            const Renderer::Part& part = renderer_.part(static_cast<MeshKind>(m));
             vkCmdDrawIndexed(cmd, part.index_count, count, part.first_index, part.vertex_offset, 0);
         }
     }
@@ -584,7 +669,8 @@ private:
     }
 
     /**
-     * @brief Writes the instances of the screenful into the buffer that the last frame did not use.
+     * @brief Writes the instances of the screenful into the buffer that the last frame did not use,
+     *        the meshes one after the other.
      *
      * The frames before the last are done when draw() is called, so that
      * buffer is free.
@@ -593,8 +679,11 @@ private:
     {
         current_ = 1 - current_;
         auto* data = static_cast<unsigned char*>(buffers_[current_]->data());
+        VkDeviceSize offset = 0;
         for (std::size_t m = 0; m < MESHES; m++) {
-            std::memcpy(data + offsets_[m], instances_[m].data(), instances_[m].size() * sizeof(Instance));
+            offsets_[current_][m] = offset;
+            std::memcpy(data + offset, instances_[m].data(), instances_[m].size() * sizeof(Instance));
+            offset += instances_[m].size() * sizeof(Instance);
         }
         fresh_ = false;
     }
@@ -621,8 +710,8 @@ private:
     bool fresh_ = false;
     /** @brief Two buffers of instances, each with a region per mesh at offsets_; one written while the other is drawn. */
     std::array<std::unique_ptr<Buffer>, 2> buffers_;
-    /** @brief Where the region of each mesh starts in the buffers. */
-    std::array<VkDeviceSize, MESHES> offsets_;
+    /** @brief Where the region of each mesh starts in each buffer. */
+    std::array<std::array<VkDeviceSize, MESHES>, 2> offsets_{};
     /** @brief The buffer of the screenful shown. */
     std::size_t current_ = 0;
     /** @brief When the last frame was drawn; the epoch before the first. */

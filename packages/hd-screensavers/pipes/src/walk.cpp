@@ -161,7 +161,9 @@ System Walk::walk_system(int colour, Piece::Kind joint)
     system.joint = joint;
 
     // A free cell with a free neighbour. One always exists: a screenful takes at most 10 × 1002
-    // cells of the 31 × 23 × 31 inside the wall, too few to leave every free cell boxed in.
+    // cells of the 31 × 23 × 31 inside the wall for its pipes, and one more for each gauge, which
+    // even at factory 100 is on only a part of the straight pieces; too few to leave every free
+    // cell boxed in.
     Cell cell;
     do {
         cell = {random(GRID_WIDTH - 1) + 1, random(GRID_HEIGHT - 1) + 1, random(GRID_DEPTH - 1) + 1};
@@ -203,7 +205,8 @@ System Walk::walk_system(int colour, Piece::Kind joint)
         }
 
         if (dir == now) {
-            step.pieces.push_back({.kind = Piece::Kind::straight, .cell = cell, .out = dir});
+            const bool room = std::find(free.begin(), free.end(), Direction::up) != free.end();
+            step.pieces.push_back(straight_piece(cell, dir, counter, system.colour, room));
         } else {
             step.pieces.push_back({.kind = joint, .cell = cell, .in = now, .out = dir});
         }
@@ -214,4 +217,48 @@ System Walk::walk_system(int colour, Piece::Kind joint)
         cell = cell.next(dir);
         take(cell);
     }
+}
+
+Piece Walk::straight_piece(Cell cell, Direction d, int counter, int colour, bool room)
+{
+    Piece piece{.kind = Piece::Kind::straight, .cell = cell, .out = d};
+    if (counter <= 1 || random(100) >= options_.factory) {
+        return piece;
+    }
+    // The turn about the pipe of MakeValve and MakeTeapot: three ways on a pipe along x or y, four
+    // along z.
+    const bool along_z = d == Direction::near || d == Direction::far;
+    const int shape = random(100);
+    if (shape < 50) {
+        // A gauge stands on top of a horizontal pipe, in the cell above.
+        if (d != Direction::up && d != Direction::down && room) {
+            take(cell.next(Direction::up));
+            piece.kind = Piece::Kind::gauge;
+            piece.angle = random(270) + 45;
+        }
+    } else if (shape < 98) {
+        piece.kind = Piece::Kind::valve;
+        piece.turn = random(along_z ? 4 : 3);
+        piece.colour = wheel_colour(colour);
+        piece.angle = random(90);
+    } else {
+        piece.kind = Piece::Kind::teapot;
+        piece.turn = random(along_z ? 4 : 3);
+    }
+    return piece;
+}
+
+int Walk::wheel_colour(int colour)
+{
+    if (colour == RED) {
+        return random(2) != 0 ? YELLOW : BLUE;
+    }
+    if (colour == BLUE) {
+        return random(2) != 0 ? RED : YELLOW;
+    }
+    if (colour == YELLOW) {
+        return random(2) != 0 ? BLUE : RED;
+    }
+    constexpr int wheels[] = {RED, BLUE, YELLOW};
+    return wheels[random(3)];
 }

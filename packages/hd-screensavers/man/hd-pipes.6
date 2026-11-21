@@ -38,6 +38,10 @@ step per
 each pipe in one colour, turning at elbows, bolted elbows or balls.
 A pipe ends, capped with a ball, when it is boxed in or reaches
 .BR \-\-size .
+With
+.B \-\-factory
+some straight pieces carry equipment: a gauge on top of a horizontal pipe,
+a valve with a wheel in another colour, and now and then a teapot.
 After
 .B \-\-cycles
 pipes, a screenful, the scene shrinks, tilts by 90\(de and starts again on
@@ -112,9 +116,14 @@ Default: off.
 .BI \-\-factory " N"
 The factory of
 .IR pipes.c ,
-0 to 100: above 0 the bolted elbows have their bolts, at 0 they are plain
-elbows.
-Default: 2.
+0 to 100: the chance in percent that a straight piece of a pipe, from its
+second step on, carries equipment: a gauge at half of them, a valve at
+nearly all others, the teapot at 2%.
+A gauge needs a horizontal pipe with room above it, where later pipes do
+not go; without room the piece stays plain.
+Above 0 the bolted elbows also have their bolts; at 0 there is no
+equipment and they are plain elbows.
+Default: 2, a little equipment.
 .TP
 .BR \-\-rotatepipes ", " \-\-no\-rotatepipes
 The scene turns slowly about its vertical axis, or stands still.
@@ -217,7 +226,9 @@ The notices of
 .I pipes.c
 and of xscreensaver, for
 .IR pipeobjs.c ,
-which the flanges and bolts are measured from.
+which the flanges, bolts, gauges and valves are measured from, and of
+.IR teapot.c ,
+whose teapot it has.
 .SH SEE ALSO
 .BR hd-screensaver (7),
 .BR hd-config (7),

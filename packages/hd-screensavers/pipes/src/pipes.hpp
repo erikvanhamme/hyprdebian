@@ -50,9 +50,11 @@
  * refresh rate.
  *
  * The meshes of mesh.hpp are made once and shared by all scenes. Each piece
- * of a pipe is an instance of one of them; a scene writes the instances of
- * a screenful into a buffer when it starts one, and draws each mesh once
- * per frame, with the instances of the steps shown so far.
+ * of a pipe is an instance of one of them, or of a few, as the bolted
+ * elbows and the equipment of the factory, placed and turned as pipes.c
+ * does; a scene writes the instances of a screenful into a buffer when it
+ * starts one, and draws each mesh once per frame, with the instances of the
+ * steps shown so far.
  *
  * The lighting is that of pipes.c in OpenGL 1.x, per pixel in the shaders
  * pipe.vert and pipe.frag.

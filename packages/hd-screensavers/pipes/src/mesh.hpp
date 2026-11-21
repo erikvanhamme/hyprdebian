@@ -36,8 +36,8 @@
 /**
  * @file mesh.hpp
  * @brief The shapes of the pipes, after MakeTube, myElbow and mySphere of pipes.c,
- *        and the bolts of the elbows, after LWO_ElbowCoins and LWO_ElbowBolts of
- *        pipeobjs.c.
+ *        the bolts of the elbows and the equipment of the factory, after the
+ *        objects of pipeobjs.c, and the teapot of teapot.c.
  *
  * The units are those of pipes.c: the cells of the grid are 4/3 apart, a
  * pipe has a radius of 1/3. A tube is the straight piece in the middle of a
@@ -55,6 +55,16 @@
  * here, smoother: the rim of a flange with 64 segments and smooth normals,
  * its faces flat, and the heads as hexagonal prisms with flat
  * normals.
+ *
+ * The equipment of the factory takes the place of a straight piece, in a
+ * cell with its middle at the origin and the pipe along z, as pipeobjs.c has
+ * it. A valve and a gauge sit on a body, a wider piece of pipe with an
+ * octagonal plate at each end, the bolts of pipeobjs.c. The valve has a
+ * wheel on a stem out along +x; the gauge stands on a connector up along +y
+ * and has a round head with a white face and a needle towards +z. The
+ * teapot is the Newell teapot, upright, as unit_teapot of teapot.c places
+ * it. The sizes and places are measured from pipeobjs.c; the shapes are
+ * made here, smoother, as the flanges.
  *
  * pipes.c draws them with 24 or 25 facets; these are smoother and made once,
  * to be drawn instanced: the tube with 64 segments, the elbow with 64 × 24,
@@ -94,12 +104,61 @@ constexpr float BOLT_RADIUS = 0.07f;
 /** @brief The height of a head or a nut above the face of the flange. */
 constexpr float BOLT_HEIGHT = 0.06f;
 
-/** @brief The segments around a tube, an elbow, a ball and a flange. */
+/** @brief The body of a valve and a gauge, LWO_PipeBetweenBolts: its radius, and its half length along z. */
+constexpr float BODY_RADIUS = 0.5f;
+constexpr float BODY_HALF_LENGTH = 0.5f;
+/** @brief The plates at the ends of the body, LWO_Bolts3D: octagons with a flat on each axis, from the body to END_PLATE_FAR. */
+constexpr float END_PLATE_APOTHEM = 0.4f;
+constexpr float END_PLATE_FAR = 0.6f;
+
+/** @brief The wheel of a valve, LWO_BigValve, about the x axis: the stem from the body out to the spindle. */
+constexpr float STEM_RADIUS = 0.2f;
+constexpr float STEM_FROM = 0.42f;
+constexpr float STEM_TO = 0.54f;
+/** @brief The spindle, from the stem to the end of the valve. */
+constexpr float SPINDLE_RADIUS = 0.1f;
+constexpr float SPINDLE_TO = 0.8f;
+/** @brief The plane of the rim and the spokes. */
+constexpr float WHEEL_X = 0.73f;
+/** @brief The rim: a torus about the x axis, the radius to the middle of its ring, and that of the ring. */
+constexpr float RIM_RADIUS = 0.55f;
+constexpr float RIM_THICKNESS = 0.07f;
+/** @brief The four spokes, along ±y and ±z, from inside the spindle to the middle of the rim. */
+constexpr float SPOKE_RADIUS = 0.06f;
+constexpr float SPOKE_FROM = 0.06f;
+
+/** @brief The connector of a gauge, LWO_GuageConnector, up along y: a collar on the body, a neck and a collar under the head. */
+constexpr float COLLAR_RADIUS = 0.2f;
+constexpr float NECK_RADIUS = 0.15f;
+constexpr float CONNECTOR_FROM = 0.4f;
+constexpr float NECK_FROM = 0.55f;
+constexpr float NECK_TO = 0.8f;
+/** @brief The top of the upper collar, in the head. */
+constexpr float CONNECTOR_TO = 0.876f;
+/** @brief The middle of the head of a gauge above the middle of the cell; pipes.c: "the object really is centered on 1.3333300000". */
+constexpr float GAUGE_HEIGHT = 1.33333f;
+/** @brief The head, LWO_GuageHead: a short cylinder along z, from -1/3 to 1/3, with a bore at the front for the face. */
+constexpr float HEAD_RADIUS = 0.5f;
+constexpr float HEAD_HALF_LENGTH = 1.0f / 3.0f;
+/** @brief The face, LWO_GuageFace: a disc at the bottom of the bore. */
+constexpr float FACE_RADIUS = 0.45f;
+constexpr float FACE_Z = 0.2f;
+/** @brief The dial, LWO_GuageDial: a hub in the middle of the face, and the needle, which points down. */
+constexpr float HUB_RADIUS = 0.05f;
+constexpr float HUB_TO = 0.3f;
+constexpr float NEEDLE_Z = 0.275f;
+constexpr float NEEDLE_LENGTH = 0.3733f;
+
+/** @brief The segments around a tube, an elbow, a ball, a flange and the round parts of the equipment. */
 constexpr int SEGMENTS = 64;
 /** @brief The rings along the bend of an elbow. */
 constexpr int ELBOW_RINGS = 24;
 /** @brief The rings of a ball, from pole to pole. */
 constexpr int BALL_RINGS = 32;
+/** @brief The segments around the ring of the rim of a wheel. */
+constexpr int RIM_RINGS = 24;
+/** @brief The rows and the columns of triangles of each patch of the teapot; unit_teapot of pipes.c has 12. */
+constexpr int TEAPOT_GRID = 32;
 
 /** @brief A vertex: where it is and the normal of the shape there. */
 struct Vertex {
@@ -150,3 +209,81 @@ Mesh make_flanges();
  * a closed hexagonal prism of BOLT_HEIGHT. Drawn in grey, MaterialGray of pipes.c.
  */
 Mesh make_bolts();
+
+/**
+ * @brief The body of a valve or a gauge, LWO_PipeBetweenBolts of pipeobjs.c.
+ *
+ * About the z axis, from -BODY_HALF_LENGTH to BODY_HALF_LENGTH, with a
+ * radius of BODY_RADIUS; closed. Drawn in the colour of the system.
+ */
+Mesh make_body();
+
+/**
+ * @brief The plates at the ends of the body, LWO_Bolts3D of pipeobjs.c.
+ *
+ * Two closed octagonal prisms about the z axis, from BODY_HALF_LENGTH to
+ * END_PLATE_FAR and from -END_PLATE_FAR to -BODY_HALF_LENGTH, with a flat
+ * END_PLATE_APOTHEM from the axis towards ±x and ±y. Drawn in grey.
+ */
+Mesh make_end_plates();
+
+/**
+ * @brief The wheel of a valve, LWO_BigValve of pipeobjs.c.
+ *
+ * About the x axis, on a body along z: the stem and the spindle, closed
+ * cylinders, the four spokes in the plane x = WHEEL_X, closed cylinders
+ * along ±y and ±z, and the rim, a torus in that plane. Drawn in the colour
+ * of the wheel.
+ */
+Mesh make_wheel();
+
+/**
+ * @brief The connector of a gauge, LWO_GuageConnector of pipeobjs.c.
+ *
+ * Three closed cylinders about the y axis: the lower collar from
+ * CONNECTOR_FROM to NECK_FROM, the neck to NECK_TO, the upper collar to
+ * CONNECTOR_TO. Drawn in grey.
+ */
+Mesh make_connector();
+
+/**
+ * @brief The head of a gauge, LWO_GuageHead of pipeobjs.c.
+ *
+ * About an axis along z through (0, GAUGE_HEIGHT, 0): a cylinder of
+ * HEAD_RADIUS from -HEAD_HALF_LENGTH to HEAD_HALF_LENGTH, closed at the
+ * back, and at the front a ring down to FACE_RADIUS and a bore of that
+ * radius back to FACE_Z, whose normals point to its axis. Drawn in the
+ * colour of the system.
+ */
+Mesh make_head();
+
+/**
+ * @brief The face of a gauge, LWO_GuageFace of pipeobjs.c.
+ *
+ * A disc of FACE_RADIUS about (0, GAUGE_HEIGHT, FACE_Z), facing +z, at the
+ * bottom of the bore of the head. Drawn in white, MaterialWhite of pipes.c.
+ */
+Mesh make_face();
+
+/**
+ * @brief The dial of a gauge, LWO_GuageDial of pipeobjs.c.
+ *
+ * About the origin, to be moved to the middle of the face: the hub, a
+ * cylinder about the z axis from FACE_Z to HUB_TO, closed, and the needle, a
+ * flat triangle at NEEDLE_Z facing +z, from the hub down to NEEDLE_LENGTH
+ * below the axis. Drawn in grey.
+ */
+Mesh make_dial();
+
+/**
+ * @brief The teapot, unit_teapot of teapot.c.
+ *
+ * The patches of teapot.hpp, each tessellated into TEAPOT_GRID × TEAPOT_GRID
+ * squares of two triangles, with the normals of the patches, put where
+ * unit_teapot puts them: glRotatef(270, 1, 0, 0), glScalef(0.5, 0.5, 0.5)
+ * and glTranslatef(0, 0, -1.5) take (x, y, z) of teapot.c to
+ * (x / 2, (z - 1.5) / 2, -y / 2). Upright along +y, the spout towards +x;
+ * open where the Newell teapot is, between the lid and the rim and at the
+ * ends of the spout and the handle. Drawn in the colour of the system.
+ */
+Mesh make_teapot();

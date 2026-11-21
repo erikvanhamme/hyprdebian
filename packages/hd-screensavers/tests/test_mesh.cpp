@@ -37,20 +37,27 @@
 // that the tube, the elbow and the ball have the size and place of those of
 // pipes.c, that their normals are of unit length and point out, that every
 // triangle faces out, and that the ends of the elbow meet a tube without a
-// seam; and that the flanges and bolts of a bolted elbow are where those of
-// pipeobjs.c are, with their normals and triangles facing out.
+// seam; that the flanges and bolts of a bolted elbow and the valves and
+// gauges of the factory are where those of pipeobjs.c are, with their
+// normals and triangles facing out; and that the teapot is where
+// unit_teapot of teapot.c puts it, faces out and is closed where its
+// patches meet.
 //
 // make test in the package directory compiles and runs it; it prints a line
 // for every check that fails and exits with 1 when one did.
 
 #include "mesh.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <map>
 #include <numbers>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -375,6 +382,355 @@ void test_bolts()
     check(place, "bolts: heads 0.06 high, 0.07 to the corners, a flat towards the axis");
 }
 
+/**
+ * @brief A part of a shape: where its surface is, and which way is out.
+ *
+ * For a convex part out is away from its middle; for the others it is
+ * worked out from their shape.
+ */
+struct Part {
+    std::string name;
+    /** @brief Whether a point is on the surface of the part. */
+    std::function<bool(const Vec3&)> on;
+    /** @brief The direction out of the part at a point on it. */
+    std::function<Vec3(const Vec3&)> outward;
+};
+
+/**
+ * @brief Checks the normals and the triangles of a mesh of parts.
+ *
+ * Each triangle belongs to the first part that all three of its vertices
+ * are on; where two parts meet in a plane, as the end of a spindle on a
+ * stem, the narrower comes first. Every normal points out of its part, and
+ * every triangle is counter-clockwise seen from outside.
+ *
+ * @return The triangles of each part.
+ */
+std::vector<int> check_parts(const Mesh& m, const std::string& name, const std::vector<Part>& parts)
+{
+    check(!m.vertices.empty() && !m.indices.empty() && m.indices.size() % 3 == 0, name + ": triangles");
+    std::vector<int> triangles(parts.size());
+    bool placed = true;
+    bool unit = true;
+    bool out = true;
+    bool ccw = true;
+    for (std::size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+        const Vec3 a = position(m, m.indices[t]);
+        const Vec3 b = position(m, m.indices[t + 1]);
+        const Vec3 c = position(m, m.indices[t + 2]);
+        std::size_t part = 0;
+        while (part < parts.size() && !(parts[part].on(a) && parts[part].on(b) && parts[part].on(c))) {
+            part++;
+        }
+        if (part == parts.size()) {
+            placed = false;
+            continue;
+        }
+        triangles[part]++;
+        const Part& p = parts[part];
+        for (int k = 0; k < 3; k++) {
+            const Vertex& v = m.vertices[m.indices[t + k]];
+            const Vec3 n = {v.normal[0], v.normal[1], v.normal[2]};
+            unit = unit && near(length(n), 1.0f);
+            out = out && dot(n, p.outward(position(m, m.indices[t + k]))) > 0.0f;
+        }
+        const Vec3 u = sub(b, a);
+        const Vec3 v = sub(c, a);
+        const Vec3 face = {u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]};
+        const Vec3 centroid = {(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3};
+        ccw = ccw && length(face) > 0.0f && dot(face, p.outward(centroid)) > 0.0f;
+    }
+    check(placed, name + ": every triangle on one of its parts, as in pipeobjs.c");
+    check(unit, name + ": normals of unit length");
+    check(out, name + ": the normals point out");
+    check(ccw, name + ": every triangle counter-clockwise seen from outside");
+    for (std::size_t i = 0; i < parts.size(); i++) {
+        check(triangles[i] > 0, name + ": the " + parts[i].name);
+    }
+    return triangles;
+}
+
+/** @brief Whether @p x is from @p from to @p to, give or take a little. */
+bool within(float x, float from, float to)
+{
+    return x > from - 1e-5f && x < to + 1e-5f;
+}
+
+/** @brief The point @p p in the frame of an axis along the unit vector @p w through @p origin: how far along, and how far off. */
+std::pair<float, float> axial(const Vec3& p, const Vec3& origin, const Vec3& w)
+{
+    const Vec3 d = sub(p, origin);
+    const float along = dot(d, w);
+    return {along, length({d[0] - along * w[0], d[1] - along * w[1], d[2] - along * w[2]})};
+}
+
+/** @brief A closed cylinder about the axis along @p w through @p origin, of @p radius, from @p from to @p to along it. */
+Part cylinder(const std::string& name, const Vec3& origin, const Vec3& w, float radius, float from, float to)
+{
+    const float middle = (from + to) / 2;
+    return {name,
+            [=](const Vec3& p) {
+                const auto [along, off] = axial(p, origin, w);
+                return (near(off, radius) && within(along, from, to)) ||
+                       ((near(along, from) || near(along, to)) && off < radius + 1e-5f);
+            },
+            [=](const Vec3& p) {
+                return sub(p, {origin[0] + middle * w[0], origin[1] + middle * w[1], origin[2] + middle * w[2]});
+            }};
+}
+
+/**
+ * @brief A closed octagonal prism about the z axis, from @p from to @p to,
+ *        with a flat @p apothem from the axis towards ±x, ±y and the
+ *        diagonals.
+ */
+Part octagon(const std::string& name, float apothem, float from, float to)
+{
+    return {name,
+            [=](const Vec3& p) {
+                const float d = std::max({std::fabs(p[0]), std::fabs(p[1]),
+                                          (std::fabs(p[0]) + std::fabs(p[1])) / std::sqrt(2.0f)});
+                return (near(d, apothem) && within(p[2], from, to)) ||
+                       ((near(p[2], from) || near(p[2], to)) && d < apothem + 1e-5f);
+            },
+            [=](const Vec3& p) { return Vec3{p[0], p[1], p[2] - (from + to) / 2}; }};
+}
+
+void test_body()
+{
+    // LWO_PipeBetweenBolts: a cylinder along z of radius 0.5 from -0.5 to 0.5, closed.
+    const auto triangles = check_parts(make_body(), "body", {cylinder("cylinder", {0, 0, 0}, {0, 0, 1}, 0.5f, -0.5f, 0.5f)});
+    check(triangles[0] == 4 * SEGMENTS, "body: a side and two ends of 64 segments");
+}
+
+void test_end_plates()
+{
+    // LWO_Bolts3D: octagons with flats 0.4 from the axis towards x and y, from 0.5 to 0.6 and from
+    // -0.6 to -0.5; flat sides.
+    const Mesh plates = make_end_plates();
+    const auto triangles = check_parts(plates, "end plates",
+                                       {octagon("plate at +z", 0.4f, 0.5f, 0.6f), octagon("plate at -z", 0.4f, -0.6f, -0.5f)});
+    check(triangles[0] == 32 && triangles[1] == 32, "end plates: 8 flat sides and two ends each");
+    bool flat = true;
+    for (const Vertex& v : plates.vertices) {
+        const float n = std::max(std::fabs(v.normal[0]), std::fabs(v.normal[1]));
+        flat = flat && (near(std::fabs(v.normal[2]), 1.0f) || near(n, 1.0f) || near(n, std::sqrt(0.5f)));
+    }
+    check(flat, "end plates: the normals of flat sides, towards the axes and the diagonals");
+}
+
+void test_wheel()
+{
+    // LWO_BigValve, about the x axis: a stem of radius 0.2 from 0.42 to 0.54, a spindle of 0.1 to
+    // 0.8, four spokes of 0.06 along ±y and ±z from 0.06 to 0.55 in the plane x = 0.73, and the rim,
+    // a torus of 0.55 and 0.07 in that plane.
+    const Vec3 hub = {0.73f, 0, 0};
+    const Part rim = {"rim",
+                      [=](const Vec3& p) {
+                          const auto [along, off] = axial(p, hub, {1, 0, 0});
+                          return near(std::hypot(along, off - 0.55f), 0.07f);
+                      },
+                      [=](const Vec3& p) {
+                          const auto [along, off] = axial(p, hub, {1, 0, 0});
+                          const float s = 0.55f / off;
+                          return Vec3{p[0] - 0.73f, p[1] - p[1] * s, p[2] - p[2] * s};
+                      }};
+    const auto triangles = check_parts(make_wheel(), "wheel",
+                                       {cylinder("spindle", {0, 0, 0}, {1, 0, 0}, 0.1f, 0.54f, 0.8f),
+                                        cylinder("stem", {0, 0, 0}, {1, 0, 0}, 0.2f, 0.42f, 0.54f),
+                                        cylinder("spoke along +y", hub, {0, 1, 0}, 0.06f, 0.06f, 0.55f),
+                                        cylinder("spoke along -y", hub, {0, -1, 0}, 0.06f, 0.06f, 0.55f),
+                                        cylinder("spoke along +z", hub, {0, 0, 1}, 0.06f, 0.06f, 0.55f),
+                                        cylinder("spoke along -z", hub, {0, 0, -1}, 0.06f, 0.06f, 0.55f), rim});
+    check(triangles[6] == 2 * SEGMENTS * RIM_RINGS, "wheel: a rim of 64 × 24");
+}
+
+void test_connector()
+{
+    // LWO_GuageConnector, up along y: collars of radius 0.2 from 0.4 to 0.55 and from 0.8 into the
+    // head, at 0.876, and a neck of 0.15 between them.
+    check_parts(make_connector(), "connector",
+                {cylinder("neck", {0, 0, 0}, {0, 1, 0}, 0.15f, 0.55f, 0.8f),
+                 cylinder("lower collar", {0, 0, 0}, {0, 1, 0}, 0.2f, 0.4f, 0.55f),
+                 cylinder("upper collar", {0, 0, 0}, {0, 1, 0}, 0.2f, 0.8f, 0.876f)});
+    // The top of the upper collar is inside the head, a cylinder of 0.5 along z about y = 1.33333.
+    check(std::hypot(0.2f, 0.876f - 1.33333f) < 0.5f, "connector: the upper collar ends inside the head");
+}
+
+void test_head()
+{
+    // LWO_GuageHead, about an axis along z through y = 1.33333: a cylinder of radius 0.5 from -1/3
+    // to 1/3, closed at the back; at the front a ring to 0.45, and a bore of 0.45 back to 0.2, whose
+    // inside faces its axis.
+    const Vec3 middle = {0, 1.33333f, 0};
+    const Vec3 z = {0, 0, 1};
+    const float third = 1.0f / 3.0f;
+    const auto off = [=](const Vec3& p) { return axial(p, middle, z); };
+    const auto radial = [=](const Vec3& p) { return Vec3{p[0], p[1] - middle[1], 0.0f}; };
+    const auto triangles = check_parts(
+        make_head(), "head",
+        {{"side", [=](const Vec3& p) { return near(off(p).second, 0.5f) && within(p[2], -third, third); }, radial},
+         {"back", [=](const Vec3& p) { return near(p[2], -third) && off(p).second < 0.5f + 1e-5f; },
+          [](const Vec3&) { return Vec3{0, 0, -1}; }},
+         {"front ring", [=](const Vec3& p) { return near(p[2], third) && within(off(p).second, 0.45f, 0.5f); },
+          [](const Vec3&) { return Vec3{0, 0, 1}; }},
+         {"bore", [=](const Vec3& p) { return near(off(p).second, 0.45f) && within(p[2], 0.2f, third); },
+          [=](const Vec3& p) {
+              const Vec3 r = radial(p);
+              return Vec3{-r[0], -r[1], 0.0f};
+          }}});
+    check(triangles[0] == 2 * SEGMENTS && triangles[1] == SEGMENTS && triangles[2] == 2 * SEGMENTS &&
+              triangles[3] == 2 * SEGMENTS,
+          "head: of 64 segments");
+}
+
+void test_face()
+{
+    // LWO_GuageFace: a disc of radius 0.45 at z = 0.2 about y = 1.33333, facing +z.
+    const auto triangles = check_parts(
+        make_face(), "face",
+        {{"disc", [](const Vec3& p) { return near(p[2], 0.2f) && std::hypot(p[0], p[1] - 1.33333f) < 0.45f + 1e-5f; },
+          [](const Vec3&) { return Vec3{0, 0, 1}; }}});
+    check(triangles[0] == SEGMENTS, "face: of 64 segments");
+}
+
+void test_dial()
+{
+    // LWO_GuageDial: a hub of radius 0.05 along z from 0.2 to 0.3, and the needle, a triangle at
+    // 0.275 facing +z, from (-0.035355, -0.0354) and (0.035355, -0.0354) on the hub to (0, -0.3733).
+    const Mesh dial = make_dial();
+    const auto triangles = check_parts(
+        dial, "dial",
+        {cylinder("hub", {0, 0, 0}, {0, 0, 1}, 0.05f, 0.2f, 0.3f),
+         {"needle", [](const Vec3& p) { return near(p[2], 0.275f); }, [](const Vec3&) { return Vec3{0, 0, 1}; }}});
+    check(triangles[1] == 1, "dial: the needle is one triangle");
+    std::vector<Vec3> needle;
+    for (const Vertex& v : dial.vertices) {
+        if (near(v.position[2], 0.275f)) {
+            needle.push_back({v.position[0], v.position[1], v.position[2]});
+        }
+    }
+    bool tip = false;
+    bool base = needle.size() == 3;
+    for (const Vec3& p : needle) {
+        tip = tip || (near(p[0], 0.0f) && std::fabs(p[1] + 0.3733f) < 1e-4f);
+        base = base && ((std::fabs(std::fabs(p[0]) - 0.035355f) < 1e-4f && std::fabs(p[1] + 0.0354f) < 1e-4f) ||
+                        near(p[0], 0.0f));
+    }
+    check(tip && base, "dial: the needle points down, from the hub to 0.3733");
+}
+
+void test_teapot()
+{
+    // unit_teapot takes (x, y, z) of teapot.c to (x / 2, (z - 1.5) / 2, -y / 2): the middle of the
+    // bottom, (0, 0, 0), comes to y = -0.75, the knob, (0, 0, 3.15), to y = 0.825, and the body,
+    // whose widest ring is of radius 2 at z = 0.9, is 1 wide about the y axis at y = -0.3.
+    const Mesh teapot = make_teapot();
+    check(teapot.vertices.size() == 32 * (TEAPOT_GRID + 1) * (TEAPOT_GRID + 1), "teapot: 32 patches");
+    float low = 1e9f, high = -1e9f, wide = 0.0f, spout = -1e9f, handle = 1e9f;
+    bool ring = false;
+    for (const Vertex& v : teapot.vertices) {
+        const Vec3 p = {v.position[0], v.position[1], v.position[2]};
+        low = std::min(low, p[1]);
+        high = std::max(high, p[1]);
+        wide = std::max(wide, std::fabs(p[2]));
+        spout = std::max(spout, p[0]);
+        handle = std::min(handle, p[0]);
+        ring = ring || (near(p[0], 1.0f) && near(p[1], -0.3f) && near(p[2], 0.0f));
+    }
+    check(near(low, -0.75f) && near(high, 0.825f), "teapot: from the bottom at -0.75 to the knob at 0.825");
+    check(near(wide, 1.0f) && ring, "teapot: the body 1 wide, at y = -0.3");
+    check(spout > 1.6f && spout < 1.7625f && handle < -1.4f && handle >= -1.5f,
+          "teapot: the spout towards +x, the handle towards -x");
+
+    // The normals: of unit length, every triangle counter-clockwise seen from where they point, and
+    // on the body away from its axis.
+    bool unit = true;
+    bool ccw = true;
+    bool body = true;
+    double volume = 0.0;
+    for (const Vertex& v : teapot.vertices) {
+        const Vec3 n = {v.normal[0], v.normal[1], v.normal[2]};
+        unit = unit && near(length(n), 1.0f);
+        // The body is from z = 0.15 to 2.4 of teapot.c; away from the handle and the spout, which
+        // are within 0.66 of the plane y = 0.
+        if (v.position[1] > -0.67f && v.position[1] < 0.43f && std::fabs(v.position[2]) > 0.4f) {
+            body = body && n[0] * v.position[0] + n[2] * v.position[2] > 0.0f;
+        }
+    }
+    for (std::size_t t = 0; t + 2 < teapot.indices.size(); t += 3) {
+        const Vec3 a = position(teapot, teapot.indices[t]);
+        const Vec3 b = position(teapot, teapot.indices[t + 1]);
+        const Vec3 c = position(teapot, teapot.indices[t + 2]);
+        const Vec3 u = sub(b, a);
+        const Vec3 w = sub(c, a);
+        const Vec3 face = {u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]};
+        for (int k = 0; k < 3; k++) {
+            const float* n = teapot.vertices[teapot.indices[t + k]].normal;
+            ccw = ccw && length(face) > 0.0f && dot(face, {n[0], n[1], n[2]}) > 0.0f;
+        }
+        volume += dot(a, {b[1] * c[2] - b[2] * c[1], b[2] * c[0] - b[0] * c[2], b[0] * c[1] - b[1] * c[0]}) / 6.0;
+    }
+    check(unit, "teapot: normals of unit length");
+    check(ccw, "teapot: every triangle counter-clockwise seen from where its normals point");
+    check(body, "teapot: the normals of the body point away from its axis");
+    check(volume > 0.0, "teapot: the triangles face out, the volume they enclose is positive");
+
+    // Closed where the patches meet: with the vertices at the same place taken as one, every edge
+    // is between two triangles, but those of the openings of the Newell teapot: the edge of the lid
+    // and the inside of the rim, 4 patches each, and the two ends of the spout and of the handle,
+    // 2 patches each. And where the patches meet they have the same normal.
+    std::map<std::tuple<long, long, long>, uint32_t> welded;
+    std::vector<uint32_t> id(teapot.vertices.size());
+    for (std::size_t i = 0; i < teapot.vertices.size(); i++) {
+        const Vertex& v = teapot.vertices[i];
+        const auto key = std::make_tuple(std::lround(v.position[0] * 1e5), std::lround(v.position[1] * 1e5),
+                                         std::lround(v.position[2] * 1e5));
+        id[i] = welded.emplace(key, static_cast<uint32_t>(i)).first->second;
+    }
+    std::map<std::pair<uint32_t, uint32_t>, int> edges;
+    for (std::size_t t = 0; t + 2 < teapot.indices.size(); t += 3) {
+        for (int k = 0; k < 3; k++) {
+            const uint32_t a = id[teapot.indices[t + k]];
+            const uint32_t b = id[teapot.indices[t + (k + 1) % 3]];
+            edges[{std::min(a, b), std::max(a, b)}]++;
+        }
+    }
+    int open = 0;
+    bool twice = true;
+    bool openings = true;
+    std::vector<bool> on_opening(teapot.vertices.size());
+    for (const auto& [edge, n] : edges) {
+        twice = twice && n <= 2 && edge.first != edge.second;
+        if (n == 1) {
+            open++;
+            for (uint32_t i : {edge.first, edge.second}) {
+                on_opening[i] = true;
+                // Back in the frame of teapot.c.
+                const float* p = teapot.vertices[i].position;
+                const float x = 2 * p[0];
+                const float z = 2 * p[1] + 1.5f;
+                const bool lid_or_rim_or_tip = near(z, 2.4f);
+                const bool spout_base = near(x, 1.7f);
+                const bool handle_end = x >= -2.0f && x <= -1.5f && (within(z, 0.6f, 0.9f) || within(z, 2.025f, 2.25f));
+                openings = openings && (lid_or_rim_or_tip || spout_base || handle_end);
+            }
+        }
+    }
+    // The ends of the handle touch the body, but do not meet it along an edge.
+    bool smooth = true;
+    for (std::size_t i = 0; i < teapot.vertices.size(); i++) {
+        if (!on_opening[id[i]]) {
+            const float* a = teapot.vertices[i].normal;
+            const float* b = teapot.vertices[id[i]].normal;
+            smooth = smooth && dot({a[0], a[1], a[2]}, {b[0], b[1], b[2]}) > 0.99f;
+        }
+    }
+    check(twice, "teapot: no edge of more than two triangles");
+    check(open == 16 * TEAPOT_GRID && openings, "teapot: closed where the patches meet, open where the Newell teapot is");
+    check(smooth, "teapot: where the patches meet, the same normal");
+}
+
 } // namespace
 
 int main()
@@ -384,6 +740,14 @@ int main()
     test_ball();
     test_flanges();
     test_bolts();
+    test_body();
+    test_end_plates();
+    test_wheel();
+    test_connector();
+    test_head();
+    test_face();
+    test_dial();
+    test_teapot();
 
     if (failures > 0) {
         std::printf("%d checks failed\n", failures);

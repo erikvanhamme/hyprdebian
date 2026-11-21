@@ -37,15 +37,18 @@
 // Each test walks screenfuls of many seeds and replays them on a grid of its
 // own, to check where the pipes go: that they never overlap and stay in the
 // grid, that they end after size + 1 steps or when boxed in, that their
-// turns follow the rules with and without tightturns, and that the same seed
-// gives the same screenfuls.
+// turns follow the rules with and without tightturns, that the equipment of
+// the factory is only where pipes.c puts it, and that the same seed gives the
+// same screenfuls.
 //
 // make test in the package directory compiles and runs it; it prints a line
 // for every check that fails and exits with 1 when one did.
 
 #include "walk.hpp"
 
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <set>
 #include <string>
@@ -99,6 +102,17 @@ private:
     std::set<std::tuple<int, int, int>> cells_;
 };
 
+bool horizontal(Direction d)
+{
+    return d != Direction::up && d != Direction::down;
+}
+
+/** @brief Whether a piece is where the pipe goes straight on: a straight piece or equipment. */
+bool straight_on(Piece::Kind k)
+{
+    return k == Piece::Kind::straight || k == Piece::Kind::gauge || k == Piece::Kind::valve || k == Piece::Kind::teapot;
+}
+
 /** @brief What the replay of a step sees: the cell, and whether straight on was free. */
 struct Seen {
     const Piece& piece;
@@ -106,6 +120,10 @@ struct Seen {
     bool straight_free;
     /** @brief The steps of the pipe so far, this one included. */
     int counter;
+    /** @brief Whether the cell above was free, before a gauge took it. */
+    bool room;
+    /** @brief The colour of the system. */
+    int colour;
 };
 
 /**
@@ -152,15 +170,37 @@ std::vector<int> replay(const Screenful& s, const WalkOptions& o, const std::str
             check(link.kind == Piece::Kind::link && link.out == piece.out, name + ": the link goes on where the piece goes");
             if (i == 0) {
                 check(piece.kind == Piece::Kind::straight, name + ": the first step goes straight");
-            } else if (piece.kind == Piece::Kind::straight) {
+            } else if (straight_on(piece.kind)) {
                 check(piece.out == now, name + ": a straight piece goes on in the same direction");
             } else {
                 check(piece.kind == sys.joint, name + ": a turn has the joint of the system");
                 check(piece.in == now, name + ": a joint comes in along the direction of the pipe");
                 check(piece.out != now && !opposite(piece.out, now), name + ": a turn is of 90 degrees");
             }
+            const Cell above = cell.next(Direction::up);
+            const bool room = !grid.taken(above);
+            if (piece.kind != Piece::Kind::straight && straight_on(piece.kind)) {
+                check(o.factory > 0, name + ": equipment only with factory");
+                check(counter > 1, name + ": equipment only from the second step of a pipe on");
+            }
+            if (piece.kind == Piece::Kind::gauge) {
+                check(horizontal(piece.out), name + ": a gauge only on a horizontal pipe");
+                check(room, name + ": a gauge only with a free cell above");
+                check(piece.angle >= 45 && piece.angle < 315, name + ": the needle of a gauge from 45 to 314 degrees");
+                grid.take(above);
+            }
+            if (piece.kind == Piece::Kind::valve || piece.kind == Piece::Kind::teapot) {
+                const int turns = piece.out == Direction::near || piece.out == Direction::far ? 4 : 3;
+                check(piece.turn >= 0 && piece.turn < turns, name + ": the turn of a valve or teapot of MakeValve");
+            }
+            if (piece.kind == Piece::Kind::valve) {
+                check(piece.angle >= 0 && piece.angle < 90, name + ": the wheel of a valve from 0 to 89 degrees");
+                check(piece.colour == RED || piece.colour == BLUE || piece.colour == YELLOW,
+                      name + ": the wheel of a valve red, blue or yellow");
+                check(piece.colour != sys.colour, name + ": the wheel of a valve in another colour than the pipe");
+            }
             if (each && i > 0) {
-                each({piece, now, !grid.taken(cell.next(now)), counter});
+                each({piece, now, !grid.taken(cell.next(now)), counter, room, sys.colour});
             }
             now = piece.out;
             cell = cell.next(now);
@@ -219,7 +259,7 @@ std::pair<double, double> turn_rates(bool tightturns)
         Walk walk(seed, o);
         bool turned = false;
         replay(walk.next(), o, "turns", [&](const Seen& s) {
-            bool turns = s.piece.kind != Piece::Kind::straight;
+            bool turns = !straight_on(s.piece.kind);
             if (s.straight_free && s.counter > 2) {
                 (turned ? after_turn : after_straight)++;
                 if (turns) {
@@ -280,6 +320,77 @@ void test_joints()
     }
 }
 
+/** @brief How often each kind of piece where a pipe goes straight on comes, from the second step of a pipe on. */
+struct Factory {
+    int straight = 0;
+    int gauges = 0;
+    int valves = 0;
+    int teapots = 0;
+    /** @brief The straight pieces of factory 100: a gauge without room, on a vertical pipe or under a taken cell. */
+    int straight_without_room = 0;
+};
+
+Factory count_factory(const WalkOptions& o, const std::string& name)
+{
+    Factory f;
+    for (uint32_t seed = 0; seed < SEEDS; seed++) {
+        Walk walk(seed, o);
+        for (int i = 0; i < 2; i++) {
+            replay(walk.next(), o, name, [&](const Seen& s) {
+                if (s.counter <= 1) {
+                    return;
+                }
+                switch (s.piece.kind) {
+                case Piece::Kind::straight:
+                    f.straight++;
+                    if (!horizontal(s.piece.out) || !s.room) {
+                        f.straight_without_room++;
+                    }
+                    break;
+                case Piece::Kind::gauge:
+                    f.gauges++;
+                    break;
+                case Piece::Kind::valve:
+                    f.valves++;
+                    break;
+                case Piece::Kind::teapot:
+                    f.teapots++;
+                    break;
+                default:
+                    break;
+                }
+            });
+        }
+    }
+    return f;
+}
+
+void test_factory()
+{
+    // Without factory every straight piece is plain; replay checks that equipment only comes with it.
+    const Factory none = count_factory({.factory = 0}, "factory 0");
+    check(none.straight > 0 && none.gauges + none.valves + none.teapots == 0, "factory 0: no equipment");
+
+    // At 100 every straight piece from the second step on is equipment, but a gauge that has no
+    // room, which stays a straight piece: half the shapes are gauges, 48 % valves, 2 % teapots.
+    const Factory all = count_factory({.cycles = 10, .size = 1000, .factory = 100}, "factory 100");
+    const int shapes = all.gauges + all.valves + all.teapots + all.straight;
+    std::printf("factory 100: %d gauges, %d valves, %d teapots, %d straight pieces\n", all.gauges, all.valves,
+                all.teapots, all.straight);
+    check(all.straight == all.straight_without_room, "factory 100: a straight piece only where a gauge has no room");
+    check(all.gauges > 0 && all.teapots > 0, "factory 100: gauges, valves and teapots");
+    check(std::abs(double(all.valves) / shapes - 0.48) < 0.02, "factory 100: 48 % valves");
+    check(std::abs(double(all.teapots) / shapes - 0.02) < 0.01, "factory 100: 2 % teapots");
+    check(std::abs(double(all.gauges + all.straight) / shapes - 0.5) < 0.02, "factory 100: 50 % gauges or no room");
+
+    // The default, 2: a little equipment.
+    const Factory some = count_factory({}, "factory 2");
+    const double share = double(some.gauges + some.valves + some.teapots) / (some.gauges + some.valves + some.teapots +
+                                                                             some.straight);
+    std::printf("factory 2: %.4f of the straight pieces are equipment\n", share);
+    check(share > 0.01 && share < 0.025, "factory 2: about 2 % of the straight pieces are equipment");
+}
+
 void test_colours()
 {
     // The colours do not repeat on a screenful until all seven are used.
@@ -300,14 +411,16 @@ void test_colours()
 
 void test_seed()
 {
-    WalkOptions o{};
-    Walk a(42, o);
-    Walk b(42, o);
-    Walk c(43, o);
-    for (int i = 0; i < 3; i++) {
-        auto sa = a.next();
-        check(sa == b.next(), "seed: the same seed gives the same screenfuls");
-        check(!(sa == c.next()), "seed: another seed gives other screenfuls");
+    // Also with every straight piece equipment: the same seed gives the same factory.
+    for (const WalkOptions& o : {WalkOptions{}, WalkOptions{.factory = 100}}) {
+        Walk a(42, o);
+        Walk b(42, o);
+        Walk c(43, o);
+        for (int i = 0; i < 3; i++) {
+            auto sa = a.next();
+            check(sa == b.next(), "seed: the same seed gives the same screenfuls");
+            check(!(sa == c.next()), "seed: another seed gives other screenfuls");
+        }
     }
 }
 
@@ -320,9 +433,12 @@ int main()
     test_shape({.joints = Joints::elbow, .cycles = 1, .size = 10, .tightturns = true}, "1 system of 10, tightturns");
     test_shape({.joints = Joints::bolted, .cycles = 10, .size = 1000}, "10 bolted systems of 1000");
     test_shape({.cycles = 10, .size = 1000, .tightturns = true}, "10 systems of 1000, tightturns");
+    test_shape({.cycles = 10, .size = 1000, .factory = 100}, "10 systems of 1000, factory 100");
+    test_shape({.cycles = 10, .size = 1000, .tightturns = true, .factory = 100}, "10 systems of 1000, tightturns, factory 100");
     test_ends();
     test_turns();
     test_joints();
+    test_factory();
     test_colours();
     test_seed();
 

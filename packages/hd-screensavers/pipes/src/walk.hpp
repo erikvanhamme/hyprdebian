@@ -51,6 +51,15 @@
  * on straight always turns. A turn is always to a free neighbour, never back,
  * so every turn is of 90°.
  *
+ * The factory of pipes.c, MakeShape: from the second step of a pipe on, a
+ * straight piece has a chance of factory % to be equipment instead: a gauge
+ * at 50 %, a valve at 48 % and the teapot at 2 %. A gauge needs a horizontal
+ * pipe with a free cell above it, which it then takes, so that later pipes
+ * go round it; without that room the piece stays a plain straight piece.
+ * How each is turned, the angle of the wheel or the needle and the colour of
+ * the wheel are chosen here too, so that the same seed gives the same
+ * factory.
+ *
  * There is no Wayland or Vulkan in here: the renderer reveals the steps one
  * by one, one per `delay`, and starts the restart of the scene when the last
  * step of a screenful is shown.
@@ -70,6 +79,11 @@ constexpr int GRID_HEIGHT = 25;
 constexpr int GRID_DEPTH = 33;
 /** @brief The colours a system can have; Colour in the renderer. */
 constexpr int COLOURS = 7;
+/** @brief The colours that pipes.c names: those of the wheels of the valves, and white, of the face of a gauge. */
+constexpr int RED = 0;
+constexpr int BLUE = 2;
+constexpr int YELLOW = 4;
+constexpr int WHITE = 6;
 
 /**
  * @brief A direction of the grid, in the order of pipes.c, which the choice
@@ -118,7 +132,11 @@ struct WalkOptions {
     int size = 500;
     /** @brief Whether every step has the same chance of a turn. */
     bool tightturns = false;
-    /** @brief The factory of pipes.c, 0–100; above 0 the bolted elbows have their bolts, as in DrawElbow. */
+    /**
+     * @brief The factory of pipes.c, 0–100: the chance in % of equipment on a straight piece.
+     *
+     * Above 0 the bolted elbows also have their bolts, as in myElbow.
+     */
     int factory = 2;
 };
 
@@ -132,14 +150,31 @@ struct Piece {
         bolted,   ///< An elbow with bolts, as elbow.
         ball,     ///< A ball in cell where the pipe turns, from in to out.
         cap,      ///< The ball at the end, in cell.
+        gauge,    ///< A straight piece with a gauge on top, in the cell above cell too, along out.
+        valve,    ///< A straight piece with a valve, along out.
+        teapot,   ///< The teapot, in the place of a straight piece along out.
     };
 
     Kind kind;
     Cell cell;
     /** @brief The direction the pipe goes in when it comes into the cell; for elbow, bolted and ball. */
     Direction in = Direction::up;
-    /** @brief The direction the pipe goes in when it leaves the cell; for straight, link, elbow, bolted and ball. */
+    /** @brief The direction the pipe goes in when it leaves the cell; for every kind but start and cap. */
     Direction out = Direction::up;
+    /**
+     * @brief For valve and teapot, the turn about the pipe, NRAND(3) or NRAND(4) of MakeValve and MakeTeapot.
+     *
+     * 0 to 2 on a pipe along x or y, 0 to 3 on one along z; the renderer turns them as pipes.c does.
+     */
+    int turn = 0;
+    /**
+     * @brief For valve, the turn of the wheel about its axis, 0 to 89°; for gauge, that of the needle.
+     *
+     * The needle is turned from straight down, clockwise seen from the front, 45 to 314°.
+     */
+    int angle = 0;
+    /** @brief For valve, the colour of the wheel: red, blue or yellow, another than that of the system. */
+    int colour = 0;
 
     bool operator==(const Piece&) const = default;
 };
@@ -148,7 +183,7 @@ struct Piece {
  * @brief The pieces of one step of a pipe, shown at once, a display list of
  *        pipes.c.
  *
- * A step is a straight piece or a joint, and the link to the next cell; the
+ * A step is a straight piece, equipment or a joint, and the link to the next cell; the
  * first also has the start, the last only the cap.
  */
 struct Step {
@@ -212,6 +247,19 @@ private:
 
     /** @brief Walks one pipe from a random start, pinit and generate_system of pipes.c. */
     System walk_system(int colour, Piece::Kind joint);
+
+    /**
+     * @brief The piece where a pipe goes straight on: a straight piece, or equipment, MakeShape of pipes.c.
+     * @param cell    The cell.
+     * @param d       The direction of the pipe.
+     * @param counter The steps of the pipe so far, this one included.
+     * @param colour  The colour of the system.
+     * @param room    Whether the cell above is free, for a gauge; the gauge takes it.
+     */
+    Piece straight_piece(Cell cell, Direction d, int counter, int colour, bool room);
+
+    /** @brief The colour of the wheel of a valve on a pipe of @p colour, as MakeValve picks it. */
+    int wheel_colour(int colour);
 
     WalkOptions options_;
     std::mt19937 random_;

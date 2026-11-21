@@ -17,8 +17,8 @@
 #                                             changes or make clean removes
 #                                             them
 #                 /usr/share/doc/hd-screensavers/copyright
-#                                             deb/copyright, with the notice
-#                                             of pipes.c
+#                                             deb/copyright, with the notices
+#                                             of pipes.c and teapot.c
 #                 /usr/share/man/man*/*.gz    the man pages in man/
 #               with the control file deb/control, whose Depends are
 #               hd-desktop, the Vulkan loader, the Vulkan drivers of mesa and
@@ -64,7 +64,7 @@ PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(
 # sources they test, which have no Wayland or Vulkan in them: the grid walk, the meshes and the
 # options.
 TESTS := $(wildcard tests/test_*.cpp)
-TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp \
+TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/teapot.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp \
 	common/src/render.cpp
 TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
 # The structs are filled with designated initializers, as in common/program.mk, which leave the
