@@ -7,7 +7,9 @@
 # The first layer is shared: the build tools of the kernel, and the deb-src entries that apt
 # source needs, also in contrib for zfs-linux and in the stanzas of the security updates. After it
 # comes only the layer of the suite itself, so a change to the packages of one suite does not
-# install the kernel tools again, nor touch the image of the other suite.
+# install the kernel tools again, nor touch the image of the other suite. The release of the
+# kernels has the shared layer in its sha256, without comments, so a change to it builds new
+# kernels, and a change to the layer of a suite does not.
 #
 # hd-buildserver builds this without arguments, so of trixie, as its build environment: it runs
 # make iso in a container of it, with the checkout at the same path as on the host and the docker

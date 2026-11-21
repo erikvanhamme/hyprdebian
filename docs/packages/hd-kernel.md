@@ -67,9 +67,9 @@ In the root of the repository, `make kernel` does the same and puts them in `bui
 
 Raise the version in `version.json` for every change of the packages.
 
-A suite is only built when it has to be. `make deb` starts a container of each suite, which looks up the versions of `linux` and `zfs-linux` and works out the release; when `build/<suite>` already has the four packages of that release, it stops there, which takes a few seconds. So a second `make deb` or `make kernel` builds no kernel, until Debian has a new `linux` or `zfs-linux`, `build-kernel.sh`, `deb/`, `man/` or the version changes, or `make clean` removes the packages. The packages only get to `build/<suite>` at the end of a build that went through, so a build that stops halfway is done again.
+A suite is only built when it has to be. `make deb` starts a container of each suite, which looks up the versions of `linux` and `zfs-linux` and works out the release; when `build/<suite>` already has the four packages of that release, it stops there, which takes a few seconds. So a second `make deb` or `make kernel` builds no kernel, until Debian has a new `linux` or `zfs-linux`, `build-kernel.sh`, the shared layer of `buildenv/Dockerfile`, `deb/`, `man/` or the version changes, or `make clean` removes the packages. The packages only get to `build/<suite>` at the end of a build that went through, so a build that stops halfway is done again.
 
-`build-kernel.sh` does the work, in a container of the build environment of the suite, `hd-kernel-buildenv:trixie` or `hd-kernel-buildenv:unstable`: an image of `debian:trixie` or `debian:sid` with the build dependencies, of `buildenv/Dockerfile`. `make deb` builds it before every build, pulling the image of the suite first; docker only installs the build dependencies again when that image has changed, and removes the build environments that a new one replaced.
+`build-kernel.sh` does the work, in a container of the build image of the suite, `hd-build:trixie` or `hd-build:unstable`: an image of `debian:trixie` or `debian:unstable` from `buildenv/Dockerfile` in the root of the repository, whose shared first layer has the build dependencies of the kernel, see [ADR 0002](../adr/0002-one-build-image-per-suite.md). `make deb` builds it before every build, pulling the image of the suite first, with `buildenv/buildenv.mk`; docker only installs the build dependencies again when that image or the Dockerfile has changed, and removes the build images that a new one replaced. The release has the shared layer of the Dockerfile in its sha256, without its comments, so a change to it builds new kernels; a change to the layer of a suite, with the packages of the other builds, does not.
 1. It takes the most recent versions of the source packages `linux` and `zfs-linux` of the suite, also of `trixie-security`, and gets them with `apt source`, with the patches of Debian, and the config of Debian for amd64 from `linux-config-<x.y>` of the same version. When that `linux` is newer than the `Linux-Maximum` in the `META` of that `zfs-linux` supports, it stops there, see [A kernel newer than ZFS](#a-kernel-newer-than-zfs).
 2. It changes the config only where it has to: the kernel trusts no keys of Debian (`SYSTEM_TRUSTED_KEYS`), signs every module with a key that the build makes in `certs/signing_key.pem` (`MODULE_SIG_ALL`), and has the release above (`LOCALVERSION`). It stops when an option that Debian has on is off in the config of the build, as `olddefconfig` silently turns off what the tools in the container cannot build, such as Rust.
 3. It builds the kernel and its headers with `make bindeb-pkg`, but not the package of the debug info, `linux-image-<release>-dbg` (the build profile `pkg.linux-upstream.nokerneldbg`), with the ccache of the compiler, and prints the statistics of the ccache of the build at the end.
@@ -98,7 +98,8 @@ packages/hd-kernel/Makefile
 packages/hd-kernel/version.json
 packages/hd-kernel/deploy.json
 packages/hd-kernel/build-kernel.sh
-packages/hd-kernel/buildenv/Dockerfile
+buildenv/Dockerfile
+buildenv/buildenv.mk
 packages/hd-kernel/deb/hd-kernel/control
 packages/hd-kernel/deb/zfs-modules/control
 packages/hd-kernel/deb/zfs-modules/postinst

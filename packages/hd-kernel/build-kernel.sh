@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds a HyprDebian kernel of one suite in a container of the build environment of that suite,
-# hd-kernel-buildenv:<suite> of buildenv/Dockerfile, with its build dependencies; kernel.mk runs it
-# with docker, for hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop. MODE says what
-# it does:
+# Builds a HyprDebian kernel of one suite in a container of the build image of that suite,
+# hd-build:<suite> of buildenv/Dockerfile in the root of the repository, whose shared layer has its
+# build dependencies; kernel.mk runs it with docker, for hd-kernel, hd-kernel-vm, hd-kernel-server
+# and hd-kernel-desktop. MODE says what it does:
 #
 #   sources  print the versions of the source packages linux and zfs-linux that a build would use,
 #            the most recent ones in the suite, as "<suite> linux <version> zfs-linux <version>"
@@ -24,10 +24,11 @@
 # hd-kernel, hdvm for hd-kernel-vm, hdserver for hd-kernel-server and hddesktop for
 # hd-kernel-desktop, and <id> six hex digits of a sha256 of
 # everything the packages are made of: the versions of linux, zfs-linux and PACKAGE, this script,
-# the Dockerfile of the build environment, the templates of zfs-modules, the control file, the man
-# page and the keep list of PACKAGE, and in the mode test the modules in /lsmod. Every build signs
-# the modules with a key of its own, so a build of anything else also gets another release: it
-# installs next to the kernel that runs, whose modules stay signed with the key it trusts.
+# the shared layer of the Dockerfile of the build image, in /Dockerfile, the templates of
+# zfs-modules, the control file, the man page and the keep list of PACKAGE, and in the mode test
+# the modules in /lsmod. Every build signs the modules with a key of its own, so a build of
+# anything else also gets another release: it installs next to the kernel that runs, whose
+# modules stay signed with the key it trusts.
 #
 # A build only builds when it has to. When /out already has the four packages of the release, it
 # stops there: they only get there at the end of a build that went through. A make clean removes
@@ -202,8 +203,13 @@ if [[ -z "${DEBIAN_RELEASE}" ]]; then
   exit 1
 fi
 DEBNN="$(grep -oE '\+deb[0-9]+(\.[0-9]+)?' <<< "${DEBIAN_RELEASE}")"
-# The sums of the files the packages are made of, by their path in /src and /package.
-inputs="$(cd /src && find build-kernel.sh buildenv deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
+# The sums of the files the packages are made of, by their path in /src and /package, and of the
+# shared layer of the Dockerfile without its comments and empty lines: everything before the
+# layers of the suites, which have the packages of the other builds, so that a change to those
+# does not make a new kernel.
+inputs="$(cd /src && find build-kernel.sh deb/zfs-modules -type f | LC_ALL=C sort | xargs sha256sum)"
+inputs="${inputs}"$'\n'"$(sed -e '/^FROM shared /,$d' -e '/^#/d' -e '/^$/d' /Dockerfile | sha256sum \
+  | sed 's|-$|Dockerfile|')"
 package_files=("deb/${PACKAGE}" "man/${PACKAGE}.7")
 if [[ -n "${KEEP}" ]]; then
   package_files+=("${KEEP}")

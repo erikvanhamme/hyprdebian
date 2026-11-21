@@ -19,11 +19,6 @@ BUILD := build
 PYTHON := python3
 
 SUITES := trixie unstable
-# The docker image of each suite, which the build environment of the suite,
-# hd-kernel-buildenv:<suite> of buildenv/Dockerfile, is built on.
-IMAGE_trixie := debian:trixie
-IMAGE_unstable := debian:sid
-BUILDENV := hd-kernel-buildenv
 HD_VERSION := $(shell $(PYTHON) -c 'import json; v = json.load(open("version.json")); print("%d.%d" % (v["major"], v["minor"]))')
 # The modules of the test build, as lsmod prints them.
 LSMOD := ../../local-testvm/lsmod-test.txt
@@ -39,6 +34,8 @@ HD_KERNEL_WORK ?= $(KERNEL_SRC)/$(BUILD)/work
 # which the kernels of every package and suite share.
 CCACHE_SIZE := 64G
 
+include $(KERNEL_SRC)/../../buildenv/buildenv.mk
+
 .PHONY: deb deb-path sources test-build clean $(addprefix deb-,$(SUITES)) $(addprefix sources-,$(SUITES))
 # One suite at a time, also under make -j of the Makefile in the root: each
 # build already runs JOBS jobs and takes up to MEMORY.
@@ -48,17 +45,15 @@ deb: $(addprefix deb-,$(SUITES))
 
 # Runs build-kernel.sh in the mode $(1) for the suite $(2), with the work of
 # the suite in HD_KERNEL_WORK, the tree of the build in its directory $(4) and
-# the packages into $(BUILD)/$(3), in a container of the build environment of
-# the suite. It builds that first, with the latest image of the suite: docker
-# only installs the build dependencies again when that image has changed. Then
-# it removes the build environments that the new one replaced. Neither prints
-# anything but errors, as make sources prints only the versions.
+# the packages into $(BUILD)/$(3), in a container of the build image of the
+# suite, hd-build:<suite> of buildenv/Dockerfile, which it builds first. The
+# Dockerfile is mounted too, as the release has the shared layer of it in its
+# sha256. Neither the image build nor the prune prints anything but errors, as
+# make sources prints only the versions.
 define run
 	mkdir -p $(HD_KERNEL_WORK)/$(2) $(HD_KERNEL_WORK)/ccache $(BUILD)/$(3)
-	docker build --pull --quiet --build-arg IMAGE=$(IMAGE_$(2)) -t $(BUILDENV):$(2) \
-		$(KERNEL_SRC)/buildenv > /dev/null
-	docker image prune --force --filter label=org.hyprdebian.image=$(BUILDENV) > /dev/null
-	docker run --rm \
+	$(call build-image,$(2))
+	$(call in-build,$(2), \
 		--memory $(MEMORY) --memory-swap $(MEMORY) \
 		-e MODE=$(1) \
 		-e SUITE=$(2) \
@@ -72,13 +67,14 @@ define run
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(KERNEL_SRC):/src:ro \
+		-v $(BUILDENV_SRC)/Dockerfile:/Dockerfile:ro \
 		-v $(CURDIR):/package:ro \
 		-v $(abspath $(LSMOD)):/lsmod:ro \
 		-v $(abspath $(HD_KERNEL_WORK))/$(2):/work \
 		-v $(abspath $(HD_KERNEL_WORK))/ccache:/ccache \
 		-v $(CURDIR)/$(BUILD)/$(3):/out \
-		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache) \
-		$(BUILDENV):$(2) bash /src/build-kernel.sh
+		$(if $(HD_KERNEL_CACHE),-v $(abspath $(HD_KERNEL_CACHE)):/cache), \
+		bash /src/build-kernel.sh)
 endef
 
 $(addprefix deb-,$(SUITES)): deb-%:

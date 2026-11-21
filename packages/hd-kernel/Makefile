@@ -2,8 +2,9 @@
 # config, and the ZFS module of the zfs-linux of Debian built against it and
 # signed with its key, so a system needs no compiler and no DKMS for ZFS.
 # Each suite in SUITES gets a kernel of its own, built from the most recent
-# linux and zfs-linux of that suite in a container of it, so the build needs
-# docker and a user that may run it. build-kernel.sh does the work, see there,
+# linux and zfs-linux of that suite in a container of the build image of the
+# suite, hd-build:<suite> of buildenv/Dockerfile, so the build needs docker
+# and a user that may run it. build-kernel.sh does the work, see there,
 # and kernel.mk runs it, also for hd-kernel-vm, hd-kernel-server and
 # hd-kernel-desktop, whose Makefiles have the same targets.
 #
