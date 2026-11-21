@@ -32,12 +32,12 @@ make deb
 
 This builds `build/yazi_<release>-<revision>_<arch>.deb`. Install it with:
 ```
-sudo apt install ./build/yazi_26.9.1-2_amd64.deb
+sudo apt install ./build/yazi_26.9.1-3_amd64.deb
 ```
 
-The binaries are compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-yazi.sh` runs in a `debian:trixie` container: it installs the build tools and the latest stable Rust toolchain with rustup, as the `rustc` in Debian is too old for Yazi, clones the release tag and runs `cargo build --release --locked`. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
+The binaries are compiled in a container of the build image of unstable, `hd-build:unstable` of `buildenv/Dockerfile`, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `make deb` builds the image first, with the latest `debian:unstable`; docker only installs its packages again when that image or the Dockerfile has changed, and removes the build images that a new one replaced. The image has the build tools and rustup, so `build-yazi.sh` installs nothing: it runs `rustup update stable`, so Yazi is compiled with the latest stable Rust toolchain, as the `rustc` in Debian is too old for it, clones the release tag and runs `cargo build --release --locked`. `dpkg-shlibdeps` then finds the packages of the libraries the binaries link to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
 
-The container is trixie because the binaries need the libc of the release they are compiled on: built on trixie, they also run on unstable.
+The package goes to the repo of unstable only: [hd-desktop](hd-desktop.md), which depends on it, is for unstable only. It is built on unstable, so it gets the libraries of unstable as hd-desktop does.
 
 To move to a new release of Yazi, change `YAZI_VERSION` in the Makefile, set `DEB_REVISION` back to 1, and update the release on this page. For a new package of the same release, raise `DEB_REVISION`.
 
@@ -51,6 +51,8 @@ packages/yazi/etc/skel/.config/yazi/yazi.toml
 packages/yazi/etc/skel/.config/yazi/plugins/hd-ouch.yazi/main.lua
 packages/yazi/deb/control
 packages/yazi/deb/copyright
+buildenv/Dockerfile
+buildenv/buildenv.mk
 ```
 
 ## Copyright

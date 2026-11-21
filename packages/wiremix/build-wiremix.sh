@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds wiremix in a Debian container; the Makefile runs it with docker. It
-# installs the build tools and the latest stable Rust toolchain, compiles the
-# release WIREMIX_VERSION of wiremix and copies what the package needs to
-# /out:
+# Builds wiremix in a container of hd-build:unstable, which has the build
+# tools, libpipewire-0.3-dev and rustup; the Makefile runs it with docker. It
+# updates to the latest stable Rust toolchain, compiles the release
+# WIREMIX_VERSION of wiremix and copies what the package needs to /out:
 #
 #   /out/wiremix             the binary
 #   /out/depends             the Depends of the package, from dpkg-shlibdeps
@@ -18,24 +18,11 @@ set -euo pipefail
 
 REPO_URL="https://github.com/tsowell/wiremix.git"
 
-echo "--> Installing build dependencies..."
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  git \
-  build-essential \
-  pkg-config \
-  curl \
-  ca-certificates \
-  clang \
-  libpipewire-0.3-dev \
-  dpkg-dev
-
-# The rustc in Debian can be too old for the crates wiremix uses, so install the latest stable
-# toolchain with rustup, as for yazi.
-echo "--> Installing the latest stable Rust toolchain with rustup..."
-curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --profile minimal --default-toolchain stable
-. "${HOME}/.cargo/env"
+# The rustc in Debian can be too old for the crates wiremix uses, so it is compiled with the latest
+# stable toolchain of rustup, as ouch and yazi are.
+echo "--> Updating to the latest stable Rust toolchain..."
+. "${CARGO_HOME}/env"
+rustup update stable
 echo "--> Using $(rustc --version)"
 
 # The build puts the git description of the tag in the output of wiremix --version.

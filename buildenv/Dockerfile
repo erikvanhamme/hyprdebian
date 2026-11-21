@@ -40,11 +40,12 @@ FROM shared AS unstable
 # rustup of Debian conflicts with the rustc that the kernel is built with, so the toolchain comes
 # from the installer of rustup, in /opt/rust and not in the PATH: the Rust builds source
 # $CARGO_HOME/env and run rustup update stable, so they use the latest stable toolchain.
+# wiremix needs libpipewire-0.3-dev, and libclang-dev for the bindings that bindgen makes of it.
 ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        git curl pkg-config \
+        git curl pkg-config libpipewire-0.3-dev libclang-dev \
     && rm -rf /var/lib/apt/lists/* \
     && curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable

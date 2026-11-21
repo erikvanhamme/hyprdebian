@@ -1,12 +1,15 @@
 # Builds the package yazi, the terminal file manager, from a release of yazi,
 # with hd-yazi, which starts yazi where it was left the last time.
-# The binaries are compiled in a Docker container, so the build needs docker
-# and a user that may run it.
+# The binaries are compiled in a container of the build image of unstable,
+# hd-build:unstable of buildenv/Dockerfile, so the build needs docker and a
+# user that may run it.
 #
 #   make deb    build build/yazi_$(DEB_VERSION)_$(ARCH).deb. build-yazi.sh
-#               compiles the release YAZI_VERSION in a $(IMAGE) container,
-#               into build/dist-$(YAZI_VERSION); later builds reuse it, until
-#               make clean removes it. It installs:
+#               compiles the release YAZI_VERSION in a container of the build
+#               image, which make deb builds first, with the latest stable
+#               Rust toolchain from rustup, into build/dist-$(YAZI_VERSION);
+#               later builds reuse it, until make clean removes it. It
+#               installs:
 #                 /usr/bin/yazi               the file manager
 #                 /usr/bin/ya                 the command line tool of yazi,
 #                                             for packages and messages
@@ -32,10 +35,11 @@
 #                                             the previewer of archives
 #                                             with ouch, of that
 #                                             configuration, a conffile
-#               with the control file deb/control. The version of the
-#               package is the release with DEB_REVISION; raise DEB_REVISION
-#               for a package of the same release that is handed out, and
-#               set it back to 1 for a new release.
+#               with the control file deb/control. Its Depends are the ones
+#               dpkg-shlibdeps finds for the binaries in the container. The
+#               version of the package is the release with DEB_REVISION;
+#               raise DEB_REVISION for a package of the same release that is
+#               handed out, and set it back to 1 for a new release.
 #   make deb-path
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
@@ -46,7 +50,7 @@ BUILD := build
 # The release of yazi, without the v of its tag, and the revision of the
 # package of it.
 YAZI_VERSION := 26.9.1
-DEB_REVISION := 2
+DEB_REVISION := 3
 
 DEB_NAME := yazi
 DEB_VERSION := $(YAZI_VERSION)-$(DEB_REVISION)
@@ -56,14 +60,16 @@ DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
 STAGE := $(BUILD)/deb
 DIST := $(BUILD)/dist-$(YAZI_VERSION)
 DOC := /usr/share/doc/$(DEB_NAME)
-# The oldest Debian release the package is for, as the binaries need the libc
-# of the release they are compiled on.
-IMAGE := debian:trixie
+# The suite of the build image. yazi is for unstable only, as hd-desktop that
+# depends on it, and gets the libraries of unstable.
+SUITE := unstable
 # The commands of HyprDebian in the package, and their man pages, named <page>.<section>.
 COMMANDS := hd-yazi
 MANPAGES := man/hd-yazi.1
 # The files in etc/, installed at the same path as conffiles.
 CONFFILES := etc/skel/.config/yazi/yazi.toml etc/skel/.config/yazi/plugins/hd-ouch.yazi/main.lua
+
+include ../../buildenv/buildenv.mk
 
 .PHONY: deb deb-path clean
 
@@ -76,17 +82,18 @@ $(BUILD):
 	mkdir -p $@
 
 # The container compiles into a temporary directory, so a build that fails
-# leaves no DIST behind. It pulls the latest $(IMAGE) every time.
+# leaves no DIST behind.
 $(DIST): build-yazi.sh | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
-	docker run --rm --pull always \
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
 		-e YAZI_VERSION=$(YAZI_VERSION) \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/build-yazi.sh:/build-yazi.sh:ro \
-		-v $(CURDIR)/$@.tmp:/out \
-		$(IMAGE) bash /build-yazi.sh
+		-v $(CURDIR)/$@.tmp:/out, \
+		bash /build-yazi.sh)
 	mv $@.tmp $@
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
@@ -120,6 +127,7 @@ $(DEB): $(DIST) $(COMMANDS) $(MANPAGES) $(CONFFILES) deb/control deb/copyright |
 	sed -e 's/@VERSION@/$(DEB_VERSION)/' \
 		-e 's/@YAZI_VERSION@/$(YAZI_VERSION)/' \
 		-e 's/@ARCH@/$(ARCH)/' \
+		-e "s/@DEPENDS@/$$(cat $(DIST)/depends)/" \
 		-e "s/@INSTALLED_SIZE@/$$(du -sk --apparent-size --exclude=DEBIAN $(STAGE) | cut -f1)/" \
 		deb/control > $(STAGE)/DEBIAN/control
 	dpkg-deb --root-owner-group --build $(STAGE) $@
