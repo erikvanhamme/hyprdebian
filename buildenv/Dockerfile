@@ -1,8 +1,10 @@
 # The build images of HyprDebian, one per suite: hd-build:trixie and hd-build:unstable, built with
 # --build-arg SUITE=trixie or unstable from debian:<suite>. buildenv.mk next to this file builds
 # them and runs the builds in containers of them; see docs/adr/0002-one-build-image-per-suite.md.
-# Add the build dependencies of a new package here, in the layer of the suite it is built on, see
-# docs/HyprDebian/Build requirements.md.
+# Every build dependency of HyprDebian is here, those of the containers of make iso and
+# hd-buildserver too: add one of a new or changed package here, in the layer of the suite it is
+# built on, and not on the computer that runs make. What the binaries compiled here need to run on
+# that computer, for make test and the tryouts, is listed in docs/HyprDebian/Build requirements.md.
 #
 # The first layer is shared: the build tools of the kernel, and the deb-src entries that apt
 # source needs, also in contrib for zfs-linux and in the stanzas of the security updates. After it

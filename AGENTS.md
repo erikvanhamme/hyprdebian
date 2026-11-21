@@ -32,7 +32,8 @@ Finish a change with every one of these that applies:
 - The version bumps of `Versions` above: the root `version.json` and the `version.json` of the package directory.
 - The doc page in `docs/packages/` and the man page in `man/` of the package directory that describe what changed.
 - The `Depends` of `packages/hd-base/deb/control` when every system needs a new package.
-- `buildenv/Dockerfile` and `docs/HyprDebian/Build requirements.md` for a new build dependency.
+- A new build dependency in `buildenv/Dockerfile`, in the layer of the suite the package is built on; it also holds those of the containers of `make iso` and hd-buildserver. Nothing compiles on the host, so the host gets no new compiler or -dev package.
+- A new runtime dependency of a binary that `make test` or a tryout compiles in a build image and runs on the host in the list of what the host needs to run them in `docs/HyprDebian/Build requirements.md`.
 - `make test` in the package directory when it has `tests/`, and new tests there for new behaviour.
 
 A new package directory also needs:
