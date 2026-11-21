@@ -12,11 +12,13 @@ it every night as the user hd-buildserver. A run:
   3. stops when the commit and those versions are those of the last build, in
      /var/lib/hd-buildserver/last-built, so a night on which only Debian has a new kernel or ZFS
      also builds;
-  4. otherwise builds the image of buildenv/Dockerfile of the checkout and runs make iso kernel
-     in a container of it, which builds every package and the live ISO, and the kernels of
-     hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop, which come from the cache in
-     /var/lib/hd-buildserver/hd-kernel when they were built of the same versions before, and are
-     built in /var/lib/hd-buildserver/kernel-work otherwise;
+  4. otherwise builds the build image hd-build:trixie of buildenv/Dockerfile of the checkout,
+     removes the build images it replaced, and runs make iso kernel in a container of it. The
+     builds start their own containers of hd-build:trixie and hd-build:unstable with the docker of
+     the host, as on a computer you develop on. That builds every package and the live ISO, and the
+     kernels of hd-kernel, hd-kernel-vm, hd-kernel-server and hd-kernel-desktop, which come from
+     the cache in /var/lib/hd-buildserver/hd-kernel when they were built of the same versions
+     before, and are built in /var/lib/hd-buildserver/kernel-work otherwise;
   5. uploads the packages that are not in the repository yet and the ISO with update-repo.py of
      the checkout, see hd-repo(7), and stores the commit and the versions as the last build.
 
@@ -55,10 +57,14 @@ KERNEL_WORK = f"{STATE_DIR}/kernel-work"
 KERNEL_PACKAGE = "packages/hd-kernel"
 LOCK_FILE = f"{STATE_DIR}/build.lock"
 DOCKER_SOCKET = "/var/run/docker.sock"
-# The build environment, from buildenv/Dockerfile of the checkout.
-IMAGE = "hd-buildserver-env"
-CONTAINER = "hd-buildserver-build"
+# The build environment: the build image of trixie, from buildenv/Dockerfile of the checkout, as
+# buildenv/buildenv.mk builds it. Its images carry the label, so the images that a new build
+# replaced can be pruned.
 BUILDENV = "buildenv"
+SUITE = "trixie"
+IMAGE = f"hd-build:{SUITE}"
+IMAGE_LABEL = "org.hyprdebian.image=hd-build"
+CONTAINER = "hd-buildserver-build"
 ISO = "livecd/out/hyprdebian-live-amd64.iso"
 UPDATE_REPO = "update-repo/update-repo.py"
 # A host name, a fully qualified domain name or an IPv4 address, as update-repo.py takes it.
@@ -181,13 +187,15 @@ def build():
     os.makedirs(KERNEL_CACHE, exist_ok=True)
     os.makedirs(KERNEL_WORK, exist_ok=True)
 
-    print(f"==> Building the build environment {IMAGE}...", flush=True)
-    run(["docker", "build", "--pull", "-t", IMAGE, f"{CHECKOUT}/{BUILDENV}"])
+    print(f"==> Building the build image {IMAGE}...", flush=True)
+    run(["docker", "build", "--pull", "--build-arg", f"SUITE={SUITE}", "-t", IMAGE,
+         f"{CHECKOUT}/{BUILDENV}"])
+    run(["docker", "image", "prune", "--force", "--filter", f"label={IMAGE_LABEL}"], capture=True)
 
     print("==> Building the packages, the live ISO and the kernels...", flush=True)
     # The checkout, the kernel cache and the kernel work have the same paths in the container as on
-    # the host, so the containers that the builds start with the docker of the host get the right
-    # paths.
+    # the host, so the containers that the builds start with the docker of the host, through
+    # buildenv/buildenv.mk, get the right paths.
     run(["docker", "run", "--rm", "--name", CONTAINER,
          "--user", f"{os.getuid()}:{os.getgid()}",
          "--group-add", str(os.stat(DOCKER_SOCKET).st_gid),

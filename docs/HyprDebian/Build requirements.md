@@ -90,7 +90,7 @@ The ISO is built in a container of `hd-build:trixie`, the build image of trixie 
 `make switch-vm-gpu` runs `vm/switch-vm-gpu.py`, which switches a vm between running with and without a GPU. It needs `python3` and `virsh` with a running libvirtd.
 
 ## On a build server
-`hd-buildserver` builds everything every night in a container of `buildenv/Dockerfile`, which installs what this page lists, see [hd-buildserver](../packages/hd-buildserver.md). Add the build dependencies of a new package to that Dockerfile as well.
+`hd-buildserver` builds everything every night in a container of `hd-build:trixie`, the build image of `buildenv/Dockerfile`, which starts the builds in the build images with the docker of the host, as on a computer you develop on, see [hd-buildserver](../packages/hd-buildserver.md). Add the build dependencies of a new package to that Dockerfile as well.
 
 ## Uploading to the repository: make update-repo
 `make update-repo` builds every package, then runs `update-repo/update-repo.py` with them and the kernels that `make kernel` built, which needs:

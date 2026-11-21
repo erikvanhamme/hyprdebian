@@ -1,4 +1,4 @@
-.TH HD-BUILDSERVER 8 "October 2026" "hd-buildserver" "HyprDebian"
+.TH HD-BUILDSERVER 8 "November 2026" "hd-buildserver" "HyprDebian"
 .SH NAME
 hd-buildserver \- build HyprDebian and update a package repository with it
 .SH SYNOPSIS
@@ -37,13 +37,20 @@ stops when the commit and those versions are those of the last build, in
 .IR /var/lib/hd-buildserver/last-built ,
 so a night on which only Debian has a new kernel or ZFS also builds;
 .IP 4. 4
-otherwise builds the image of
+otherwise builds the build image
+.B hd-build:trixie
+of
 .I buildenv/Dockerfile
-of the checkout, a clean
-.B debian:trixie
-build environment, and runs
+of the checkout, with the latest
+.BR debian:trixie ,
+removes the build images that it replaced, and runs
 .B make iso kernel
-in a container of it, which builds every package and the live ISO, and the
+in a container of it; the builds start their containers of
+.B hd-build:trixie
+and
+.B hd-build:unstable
+with the docker of the host, as on a computer you develop on.
+This builds every package and the live ISO, and the
 kernels of
 .BR hd-kernel ,
 .BR hd-kernel-vm ,

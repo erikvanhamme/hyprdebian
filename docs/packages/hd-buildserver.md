@@ -35,6 +35,7 @@ packages/hd-buildserver/deb/prerm
 packages/hd-buildserver/deb/postrm
 packages/hd-buildserver/man/hd-buildserver.8
 buildenv/Dockerfile
+buildenv/buildenv.mk
 ```
 
 ## Setting up
@@ -57,7 +58,7 @@ The first build takes long: it pulls the images and compiles every package from 
 1. It updates the checkout in `/var/lib/hd-buildserver/checkout` from the git repository with `git fetch`, and clones it the first time. It checks out the head of the branch and removes everything git does not track with `git clean -fdx`, also the downloads and the compiled releases that earlier builds left in `build/`, so every build starts from the sources alone.
 2. It asks `make sources` of `packages/hd-kernel` for the versions of the source packages `linux` and `zfs-linux` in each suite, which the kernels of [hd-kernel](hd-kernel.md) are built of. This starts a container of each suite, which looks them up in its apt sources.
 3. When the commit and those versions are those of the last build, in `/var/lib/hd-buildserver/last-built`, it stops there. A night on which only Debian has a new kernel or ZFS builds too, so their security updates reach the repository the next morning.
-4. Otherwise it builds the image `hd-buildserver-env` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, and runs `make iso kernel` in a container of it, which builds every package, the kernels of hd-kernel, which `make all` leaves out, and the live ISO, with the kernels in it. The kernels come from the cache in `/var/lib/hd-buildserver/hd-kernel` when they were built of the same versions before, and are built in `/var/lib/hd-buildserver/kernel-work` otherwise, see [The kernel cache](#the-kernel-cache).
+4. Otherwise it builds the build image `hd-build:trixie` of `buildenv/Dockerfile` of the checkout, pulling `debian:trixie` first, removes the build images that the new one replaced, and runs `make iso kernel` in a container of it, which builds every package, the kernels of hd-kernel, which `make all` leaves out, and the live ISO, with the kernels in it. The kernels come from the cache in `/var/lib/hd-buildserver/hd-kernel` when they were built of the same versions before, and are built in `/var/lib/hd-buildserver/kernel-work` otherwise, see [The kernel cache](#the-kernel-cache).
 5. It runs `update-repo/update-repo.py` of the checkout with `--host <repo> --yes --only-new --iso livecd/out/hyprdebian-live-amd64.iso`, which uploads the packages that are not in the repository yet and the ISO, see [hd-repo](hd-repo.md#the-hyprdebian-packages). Then it stores the commit and the versions as the last build.
 
 A build that fails leaves the last build as it was, so the next night tries the same commit again. Only one build runs at a time.
@@ -72,9 +73,11 @@ Building the kernels of [hd-kernel](hd-kernel.md) takes long, about half an hour
 A build passes `HD_KERNEL_WORK=/var/lib/hd-buildserver/kernel-work` too, outside the checkout, so `git clean` leaves the sources, the kernel trees and the ccache, and the next build only compiles what changed. That takes about 30 GB of disk per suite, plus the ccache. The compilers need memory: the container of each suite gets 5/8 GB per core.
 
 ### The build environment
-`buildenv/Dockerfile` is in the git repository, not in the package, so a new package brings its build dependencies along: add them to the Dockerfile in the same change. It installs what [Build requirements](../HyprDebian/Build%20requirements.md) lists, on trixie, so what is compiled outside a container of its own, such as `blockwrite` of `hd-backup`, also runs on trixie.
+The build server builds as a computer you develop on does, with the build images of `buildenv/Dockerfile`, one per suite: `hd-build:trixie` and `hd-build:unstable`, see [One build image per suite](../adr/0002-one-build-image-per-suite.md). The Dockerfile is in the git repository, not in the package, so a new package brings its build dependencies along: add them to the Dockerfile in the same change, see [Build requirements](../HyprDebian/Build%20requirements.md).
 
-The Rust packages, `hd-desktop`, `hd-audacious` and the live cd build in containers of their own. The build container gets the docker socket of the host for them, and the checkout is at the same path in the container as on the host, so the paths those builds hand to docker are right. With the docker socket, the build can do anything on the build server that root can: only build branches you trust.
+`make iso kernel` runs in a container of `hd-build:trixie`, which has the docker client. Every build that compiles starts a container of the build image of its suite through `buildenv/buildenv.mk`, with the docker socket of the host, so those containers run next to the build container, not in it. The checkout, the kernel cache and the kernel work are at the same paths in the build container as on the host, so the paths those builds hand to docker are right. With the docker socket, the build can do anything on the build server that root can: only build branches you trust.
+
+Every image build pulls the image of its suite and then removes the build images that the new one replaced, by the label `org.hyprdebian.image=hd-build`. docker keeps the layers, so a build only installs packages again when the image of the suite or the Dockerfile has changed.
 
 ## The timer
 `hd-buildserver.timer` runs `hd-buildserver.service` every night at 5:00, after the backups of the virtual machines of `hd-backup-vms.timer` at 3:30 and the upgrade of `hd-up.timer` on Tuesday at 4:30, and catches up on a night the system was off. The service runs `hd-buildserver` as the user `hd-buildserver`, and stops a build after 12 hours. The timer is enabled on the first installation, by its preset, see [hd-base](hd-base.md#services); after that, it stays as the admin left it. To stop the nightly builds:
