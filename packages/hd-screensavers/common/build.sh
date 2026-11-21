@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds the screensavers in a Debian container; ../Makefile runs it with
+# Builds the screensavers in a container of hd-build:unstable, which has the
+# build tools, their -dev packages and glslang-tools; ../Makefile runs it with
 # docker, with the directories common/ and that of each screensaver in /src,
-# read only. It installs the build dependencies, compiles each screensaver on
-# every core, with the hardening flags of Debian, and copies what the package
-# needs to /out:
+# read only. It compiles each screensaver on every core, with the hardening
+# flags of Debian, and copies what the package needs to /out:
 #
 #   /out/hd-pipes            the binary of hd-pipes
 #   /out/depends             the Depends of the package for all of them, from dpkg-shlibdeps
@@ -16,19 +16,10 @@ set -euo pipefail
 # directory in the docker run of ../Makefile.
 PROGRAMS=(pipes:hd-pipes)
 
-echo "--> Installing build dependencies..."
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  build-essential \
-  pkgconf \
-  dpkg-dev \
-  libwayland-dev \
-  wayland-protocols \
-  libvulkan-dev \
-  glslang-tools
-
 # A copy of the sources, so that the build does not write into /src. The
 # screensavers find the shared code in ../common, as in the repository.
+# IN_BUILD=1 has program.mk compile in this container; without it, make all
+# starts a container of hd-build:unstable to compile in.
 mkdir -p /usr/src/hd-screensavers
 cp -r /src/common /usr/src/hd-screensavers/
 binaries=()
@@ -38,7 +29,7 @@ for program in "${PROGRAMS[@]}"; do
   echo "--> Compiling ${name}..."
   mkdir -p "/usr/src/hd-screensavers/${dir}"
   cp -r "/src/${dir}/Makefile" "/src/${dir}/src" "/usr/src/hd-screensavers/${dir}/"
-  make -C "/usr/src/hd-screensavers/${dir}" -j"$(nproc)" all \
+  make -C "/usr/src/hd-screensavers/${dir}" -j"$(nproc)" all IN_BUILD=1 \
     CPPFLAGS="$(dpkg-buildflags --get CPPFLAGS)" \
     CXXFLAGS="$(dpkg-buildflags --get CXXFLAGS)" \
     CFLAGS="$(dpkg-buildflags --get CFLAGS)" \

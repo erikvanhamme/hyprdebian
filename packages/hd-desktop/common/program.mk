@@ -3,13 +3,17 @@
 # Each program has its own sources in src/; both link the sources in
 # ../common/src, the shared code, into the binary build/$(PROGRAM).
 #
-#   make all    build build/$(PROGRAM)
+#   make all    build build/$(PROGRAM) in a container of hd-build:unstable,
+#               the build image of unstable from buildenv/Dockerfile, which
+#               it builds first, as the user who runs make. The binary runs
+#               on a computer with unstable and the libraries it links to:
+#               libwayland-client0, libxkbcommon0, libcairo2 and librsvg2-2
 #   make clean  remove build/
 #
-# It needs g++, make, pkgconf, libwayland-dev, wayland-protocols,
-# libxkbcommon-dev, libcairo2-dev, librsvg2-dev and libdav1d-dev. libdav1d-dev
-# is for pkg-config: librsvg-2.0.pc requires dav1d, but librsvg2-dev does not
-# depend on libdav1d-dev.
+# make all IN_BUILD=1 compiles without a container, as ../common/build.sh and
+# the container of make all do. It needs g++, make, pkgconf, libwayland-dev,
+# wayland-protocols, libxkbcommon-dev, libcairo2-dev, librsvg2-dev and
+# libdav1d-dev, which hd-build:unstable has.
 #
 # wayland-scanner, of libwayland-bin, turns the XML of each Wayland protocol
 # into a C header and the C tables of its interfaces. wlr-layer-shell is not
@@ -19,6 +23,30 @@
 
 BUILD := build
 COMMON := ../common
+
+ifeq ($(IN_BUILD),)
+
+# Here, make all runs make all IN_BUILD=1 in the container, with the package directory, which has
+# the program and ../common, at the same path.
+SUITE := unstable
+PACKAGE_DIR := $(abspath ..)
+
+include ../../../buildenv/buildenv.mk
+
+.PHONY: all clean
+
+all:
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
+		--user $$(id -u):$$(id -g) \
+		-v $(PACKAGE_DIR):$(PACKAGE_DIR) \
+		-w $(CURDIR), \
+		make -j$$(nproc) all IN_BUILD=1)
+
+clean:
+	rm -rf $(BUILD)
+
+else
 
 PKGS := wayland-client xkbcommon cairo librsvg-2.0
 # Only make clean goes without the -dev packages. Anything else stops here with the message of
@@ -84,3 +112,5 @@ clean:
 	rm -rf $(BUILD)
 
 -include $(OBJS:.o=.d)
+
+endif

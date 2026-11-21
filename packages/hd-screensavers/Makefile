@@ -11,7 +11,10 @@
 #                                             with the code they share in
 #                                             common/, with make all of
 #                                             their Makefiles in one
-#                                             $(IMAGE) container, into
+#                                             container of the build image
+#                                             of unstable, hd-build:unstable
+#                                             of buildenv/Dockerfile, which
+#                                             make deb builds first, into
 #                                             build/programs; later builds
 #                                             reuse them until a source
 #                                             changes or make clean removes
@@ -32,8 +35,13 @@
 #               print the path of the package that make deb builds,
 #               relative to this directory, for the Makefile in the root
 #   make test   compile each tests/test_*.cpp with TEST_SOURCES into
-#               build/tests/ and run it; with g++ on this computer, as the
-#               tests need no Wayland or Vulkan
+#               build/tests/, with make test-binaries in a container of
+#               hd-build:unstable, which it builds first, and run them on
+#               this computer; the tests need no Wayland or Vulkan, only the
+#               libstdc++ of unstable
+#   make test-binaries
+#               compile the tests without running them, without a
+#               container; make test runs it in the container
 #   make clean  remove build/, also the compiled screensavers, and
 #               pipes/build/ of make all in pipes/
 
@@ -53,9 +61,10 @@ BINARIES := hd-pipes
 # The man pages, named <page>.<section>.
 MANPAGES := man/hd-pipes.6
 
-# The screensavers, compiled in a container. They are for the desktop, which needs Hyprland, so
-# only for unstable; the binaries need the libraries of the release they are compiled on.
-IMAGE := debian:unstable
+# The screensavers and the tests, compiled in a container of the build image of the suite. They
+# are for the desktop, which needs Hyprland, so only for unstable; the binaries need the libraries
+# of the release they are compiled on.
+SUITE := unstable
 PROGRAMS := $(BUILD)/programs
 PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(wildcard common/protocols/*) \
 	pipes/Makefile $(wildcard pipes/src/*)
@@ -71,7 +80,9 @@ TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
 # members they skip zero; -Wextra would warn about each.
 TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Wno-missing-field-initializers -Ipipes/src -Icommon/src
 
-.PHONY: deb deb-path test clean
+include ../../buildenv/buildenv.mk
+
+.PHONY: deb deb-path test test-binaries clean
 
 deb: $(DEB)
 
@@ -82,18 +93,18 @@ $(BUILD) $(BUILD)/tests:
 	mkdir -p $@
 
 # make all of the Makefile of every screensaver, in the container. It compiles into a temporary
-# directory, so a build that fails leaves no $(PROGRAMS) behind. It pulls the latest $(IMAGE)
-# every time.
+# directory, so a build that fails leaves no $(PROGRAMS) behind.
 $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
-	docker run --rm --pull always \
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/common:/src/common:ro \
 		-v $(CURDIR)/pipes:/src/pipes:ro \
-		-v $(CURDIR)/$@.tmp:/out \
-		$(IMAGE) bash /src/common/build.sh
+		-v $(CURDIR)/$@.tmp:/out, \
+		bash /src/common/build.sh)
 	mv $@.tmp $@
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all
@@ -120,7 +131,18 @@ $(DEB): version.json $(PROGRAMS) deb/control deb/copyright deb/postinst deb/post
 $(BUILD)/tests/%: tests/%.cpp $(TEST_SOURCES) | $(BUILD)/tests
 	$(CXX) $(TEST_CXXFLAGS) -o $@ $< $(TEST_SOURCES)
 
-test: $(TEST_BINARIES)
+test-binaries: $(TEST_BINARIES)
+
+# The container has this directory at the same path, and buildenv/ for the include above, and
+# compiles as the user who runs make, so the binaries in build/tests/ are theirs.
+test:
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
+		--user $$(id -u):$$(id -g) \
+		-v $(CURDIR):$(CURDIR) \
+		-v $(BUILDENV_SRC):$(BUILDENV_SRC):ro \
+		-w $(CURDIR), \
+		make -j$$(nproc) test-binaries)
 	for test in $(TEST_BINARIES); do \
 		$$test || exit 1; \
 	done

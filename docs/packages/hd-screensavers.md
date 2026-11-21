@@ -24,7 +24,7 @@ This builds `build/hd-screensavers_<version>_<arch>.deb`, with the version from 
 sudo apt install ./build/hd-screensavers_<version>_<arch>.deb
 ```
 
-The screensavers are C++23 programs. `make deb` compiles them in a `debian:unstable` container, pulled every time, with `common/build.sh`: it installs the build tools, the -dev packages of Wayland and Vulkan and `glslang-tools`, and runs `make all` in the directory of each screensaver with the hardening flags of Debian. The GLSL shaders are compiled to SPIR-V and built into the binaries; no shader files are installed. The libraries the binaries link to, as `dpkg-shlibdeps` finds them in the container, go into the Depends. The compiled screensavers are kept in `build/programs` until a source changes or `make clean`. See [Build requirements](../HyprDebian/Build%20requirements.md).
+The screensavers are C++23 programs. `make deb` compiles them in a container of `hd-build:unstable`, the build image of unstable from `buildenv/Dockerfile`, which it builds first, with `common/build.sh`. The image has the build tools, the -dev packages of Wayland and Vulkan and `glslang-tools`; the script runs `make all IN_BUILD=1` in the directory of each screensaver with the hardening flags of Debian. The GLSL shaders are compiled to SPIR-V and built into the binaries; no shader files are installed. The libraries the binaries link to, as `dpkg-shlibdeps` finds them in the container, go into the Depends. The compiled screensavers are kept in `build/programs` until a source changes or `make clean`. See [Build requirements](../HyprDebian/Build%20requirements.md).
 
 The directories are:
 
@@ -39,18 +39,17 @@ The directories are:
 | `man/` | The man pages. |
 | `deb/` | The control file, the copyright file and the maintainer scripts `postinst` and `postrm`. |
 
-A new screensaver adds a directory `<name>/` with a `Makefile` that sets `PROGRAM` and includes `../common/program.mk`, and its sources in `<name>/src/`; it is listed in `PROGRAMS` of `common/build.sh`, in the docker run and `PROGRAM_SOURCES` of the `Makefile`, and in `BINARIES`.
+A new screensaver adds a directory `<name>/` with a `Makefile` that sets `PROGRAM` and includes `../common/program.mk`, and its sources in `<name>/src/`; it is listed in `PROGRAMS` of `common/build.sh`, in the docker run and `PROGRAM_SOURCES` of the `Makefile`, and in `BINARIES`. The -dev packages it needs go in the layer of unstable of `buildenv/Dockerfile`.
 
-To try a screensaver without a package, `make all` in its directory builds it there, on the computer itself, which then needs the build tools and -dev packages:
+To try a screensaver without a package, `make all` in its directory builds it there. It compiles in a container of `hd-build:unstable` too, as the user who runs it, so it needs docker and none of the -dev packages; the binary runs on the computer itself, a HyprDebian system on unstable, with `libvulkan1` and a Vulkan driver:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libvulkan-dev glslang-tools
 cd packages/hd-screensavers/pipes
 make all
 build/hd-pipes --window
 ```
 
 ## Tests
-`make test` compiles each `tests/test_*.cpp` with the sources it tests into `build/tests/` and runs it, with `g++` on the computer itself, as the tests need no Wayland or Vulkan. `make test` in the root of the repository runs them too.
+`make test` compiles each `tests/test_*.cpp` with the sources it tests into `build/tests/`, with `make test-binaries` in a container of `hd-build:unstable`, and runs them on the computer itself. The tests need no Wayland or Vulkan, only the libstdc++ of unstable. `make test` in the root of the repository runs them too.
 
 | Test | |
 | --- | --- |

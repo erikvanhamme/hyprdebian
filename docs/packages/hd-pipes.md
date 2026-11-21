@@ -8,9 +8,8 @@ When `hd-screensavers` is installed, the key `hd-screensaver` of the configurati
 ## Building the package
 hd-pipes is part of the package `hd-screensavers`, built from `packages/hd-screensavers`; see [hd-screensavers](hd-screensavers.md#building-the-package). Its sources are in `packages/hd-screensavers/pipes/src`, the code it shares with the other screensavers in `packages/hd-screensavers/common`.
 
-To try a change without a package, `make all` in `pipes/` builds `build/hd-pipes` there, on the computer itself, which then needs the -dev packages:
+To try a change without a package, `make all` in `pipes/` builds `build/hd-pipes` there. It compiles in a container of `hd-build:unstable`, the build image of unstable, as the user who runs it, so it needs docker and none of the -dev packages; the binary runs on the computer itself, a HyprDebian system on unstable, with `libvulkan1` and a Vulkan driver:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libvulkan-dev glslang-tools
 cd packages/hd-screensavers/pipes
 make all
 build/hd-pipes --window --joints ball

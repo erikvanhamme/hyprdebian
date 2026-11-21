@@ -10,11 +10,10 @@ Only one `hd-menu` is open at a time: a lock in `/run/user/<uid>/hd-menu.lock` m
 `hd-desktop` comes with the man page `man 1 hd-menu`.
 
 ## Building the package
-hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). Its source is in `packages/hd-desktop/menu`, the code it shares with [hd-message](hd-message.md), the Wayland surface, the theme, the JSON reader, the icons and the drawing of the box, in `packages/hd-desktop/common`. `make deb` of hd-desktop compiles both programs in one `debian:unstable` container, with `make all` of `menu/Makefile` and `message/Makefile`, and puts the libraries the binaries link to, as `dpkg-shlibdeps` finds them, in the Depends of `hd-desktop`, which is therefore built for the architecture of the build computer.
+hd-menu is part of the package `hd-desktop`, built from `packages/hd-desktop`; see [hd-desktop](hd-desktop.md). Its source is in `packages/hd-desktop/menu`, the code it shares with [hd-message](hd-message.md), the Wayland surface, the theme, the JSON reader, the icons and the drawing of the box, in `packages/hd-desktop/common`. `make deb` of hd-desktop compiles both programs in one container of `hd-build:unstable`, the build image of unstable from `buildenv/Dockerfile`, which it builds first, with `make all` of `menu/Makefile` and `message/Makefile`, and puts the libraries the binaries link to, as `dpkg-shlibdeps` finds them, in the Depends of `hd-desktop`, which is therefore built for the architecture of the build computer.
 
-To try a change without a package, `make all` in `menu/` builds `build/hd-menu` there, on the computer itself, which then needs the -dev packages:
+To try a change without a package, `make all` in `menu/` builds `build/hd-menu` there. It compiles in a container of `hd-build:unstable` too, as the user who runs it, so it needs docker and none of the -dev packages; the binary runs on the computer itself, a HyprDebian system on unstable, which has the libraries it links to:
 ```
-sudo apt install build-essential pkgconf libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev libdav1d-dev
 cd packages/hd-desktop/menu
 make all
 echo '{"banner": "Reboot system?", "options": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-menu

@@ -11,9 +11,10 @@
 #
 #                 build/hd-pipes --window
 #
-#               It needs g++, make, pkgconf, libwayland-dev,
-#               wayland-protocols, libvulkan-dev and glslang-tools on this
-#               computer; make deb of ../Makefile only needs docker.
+#               It compiles in a container of hd-build:unstable, the build
+#               image of unstable, so it needs docker, as make deb of
+#               ../Makefile; the binary runs here, with libwayland-client0,
+#               libvulkan1 and a Vulkan driver on this computer.
 #   make clean  remove build/
 
 PROGRAM := hd-pipes

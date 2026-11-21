@@ -19,7 +19,10 @@
 #                                             they share in common/, with
 #                                             make all of menu/Makefile and
 #                                             message/Makefile in one
-#                                             $(IMAGE) container, into
+#                                             container of the build image
+#                                             of unstable, hd-build:unstable
+#                                             of buildenv/Dockerfile, which
+#                                             make deb builds first, into
 #                                             build/programs; later builds
 #                                             reuse them until a source
 #                                             changes or make clean removes
@@ -254,13 +257,16 @@ HOOK_DIR := /usr/share/initramfs-tools/hooks
 PLYMOUTH_THEME := $(wildcard plymouth/theme/*)
 PLYMOUTH_TEMPLATES := $(wildcard templates/hd-plymouth/*.j2)
 
-# The menu and the message box, compiled in a container. The desktop needs Hyprland, so they are
-# only for unstable; the binaries need the libraries of the release they are compiled on.
-IMAGE := debian:unstable
+# The menu and the message box, compiled in a container of the build image of the suite. The
+# desktop needs Hyprland, so they are only for unstable; the binaries need the libraries of the
+# release they are compiled on.
+SUITE := unstable
 PROGRAMS := $(BUILD)/programs
 PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) \
 	$(wildcard common/protocols/*) menu/Makefile $(wildcard menu/src/*) message/Makefile \
 	$(wildcard message/src/*)
+
+include ../../buildenv/buildenv.mk
 
 .PHONY: deb deb-path clean
 
@@ -273,19 +279,19 @@ $(BUILD):
 	mkdir -p $@
 
 # make all of menu/Makefile and message/Makefile, in the container. It compiles into a temporary
-# directory, so a build that fails leaves no $(PROGRAMS) behind. It pulls the latest $(IMAGE)
-# every time.
+# directory, so a build that fails leaves no $(PROGRAMS) behind.
 $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
-	docker run --rm --pull always \
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/common:/src/common:ro \
 		-v $(CURDIR)/menu:/src/menu:ro \
 		-v $(CURDIR)/message:/src/message:ro \
-		-v $(CURDIR)/$@.tmp:/out \
-		$(IMAGE) bash /src/common/build.sh
+		-v $(CURDIR)/$@.tmp:/out, \
+		bash /src/common/build.sh)
 	mv $@.tmp $@
 
 # A download that does not match the checksum is removed, so the next make

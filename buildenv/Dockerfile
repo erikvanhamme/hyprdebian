@@ -52,4 +52,14 @@ RUN apt-get update \
     && curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable
 
+# The -dev packages of the programs of hd-desktop, hd-menu and hd-message, and of the screensavers
+# of hd-screensavers, in a layer after rustup, so a change to them does not install rustup again.
+# libdav1d-dev is for pkg-config only: librsvg-2.0.pc requires dav1d, but librsvg2-dev does not
+# depend on libdav1d-dev. glslang-tools compiles the shaders of the screensavers.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev libdav1d-dev \
+        libvulkan-dev glslang-tools \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM ${SUITE}

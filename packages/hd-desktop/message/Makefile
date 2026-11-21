@@ -14,10 +14,10 @@
 #
 #                 echo '{"title": "Reboot system?", "text": "Unsaved work is lost.", "buttons": [{"label": "No"}, {"label": "Yes"}]}' | build/hd-message
 #
-#               It needs g++, make, pkgconf, libwayland-dev,
-#               wayland-protocols, libxkbcommon-dev, libcairo2-dev,
-#               librsvg2-dev and libdav1d-dev on this computer; make deb of
-#               ../Makefile only needs docker.
+#               It compiles in a container of hd-build:unstable, the build
+#               image of unstable, so it needs docker, as make deb of
+#               ../Makefile; the binary runs here, with libwayland-client0,
+#               libxkbcommon0, libcairo2 and librsvg2-2 on this computer.
 #   make clean  remove build/
 
 PROGRAM := hd-message
