@@ -14,7 +14,7 @@ The live cd contains:
 Recommended packages are left out to keep the ISO small, so the package lists name everything the live system needs.
 
 ## Building
-The ISO is built with live-build, in a debian:trixie docker container, so live-build and its dependencies stay off the desktop system. From the root of the repository:
+The ISO is built with live-build, in a container of `hd-build:trixie`, the build image of trixie from `buildenv/Dockerfile`, so live-build and its dependencies stay off the desktop system, see [ADR 0002](../adr/0002-one-build-image-per-suite.md). From the root of the repository:
 ```
 make iso
 ```
@@ -26,7 +26,7 @@ The finished ISO is written to:
 livecd/out/hyprdebian-live-amd64.iso
 ```
 
-`make -C livecd image` only builds the docker image, and `make -C livecd clean` removes `livecd/out`.
+`make -C livecd clean` removes `livecd/out`.
 
 ### Downloading
 The build server builds the ISO of `main` every night it has moved and puts it on the package repository, see [hd-buildserver](../packages/hd-buildserver.md). Download it from there with its checksum, and check it:
@@ -38,7 +38,6 @@ sha256sum -c SHA256SUMS
 The files involved are:
 ```
 livecd/Makefile
-livecd/Dockerfile
 livecd/build.sh
 livecd/config/package-lists/*.list.chroot
 livecd/config/hooks/live/*.hook.chroot
@@ -47,8 +46,7 @@ livecd/config/includes.chroot/
 
 | File | Purpose |
 | --- | --- |
-| `Makefile` | Builds the docker image, then runs it with the repository read-only at `/src`, `livecd/out` at `/out` and the packages of `DEBS` in its environment. |
-| `Dockerfile` | The debian:trixie image with live-build, and apt-utils for `apt-ftparchive`. Its entrypoint is `build.sh` in `/src`, so the image only has to be rebuilt when the Dockerfile changes. |
+| `Makefile` | Builds `hd-build:trixie` with `buildenv/buildenv.mk`, pulling `debian:trixie` first, then runs `build.sh` in a container of it with the repository read-only at `/src`, `livecd/out` at `/out` and the packages of `DEBS` in its environment. docker only installs the packages of the image again when `debian:trixie` or `buildenv/Dockerfile` has changed. The image has live-build, debootstrap, the boot loaders and apt-utils for `apt-ftparchive`, in the layer of trixie. |
 | `build.sh` | Runs `lb config`, puts `config/` on top, makes the boot menus start the live system after 5 seconds, puts `hd-installer` from `build/` in `packages.chroot` and every package of `DEBS` in the local repository, runs `lb build` and copies the ISO to `/out`. |
 | `config/package-lists/` | The packages of the live system: `hyprdebian.list.chroot` for the installer and its tools, `zfs.list.chroot` for ZFS and `console.list.chroot` for the console, the network and ssh. |
 | `config/hooks/live/0100-zfs-dkms.hook.chroot` | Builds the ZFS module for the kernel of the image. |

@@ -11,6 +11,9 @@
 # kernels has the shared layer in its sha256, without comments, so a change to it builds new
 # kernels, and a change to the layer of a suite does not.
 #
+# make iso builds the live ISO in a --privileged container of hd-build:trixie, with livecd/build.sh
+# as the command.
+#
 # hd-buildserver builds this without arguments, so of trixie, as its build environment: it runs
 # make iso in a container of it, with the checkout at the same path as on the host and the docker
 # socket of the host, and the builds start their own containers with the docker of the host.
@@ -35,6 +38,14 @@ FROM shared AS trixie
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         clang lld gnu-efi wget unzip tar util-linux docker-cli docker-buildx \
+    && rm -rf /var/lib/apt/lists/*
+
+# The live ISO of livecd/build.sh: live-build and what it runs, the boot loaders of the ISO, and
+# apt-utils for apt-ftparchive, which indexes the local repository of the hd-* packages.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        live-build debootstrap apt-utils dosfstools mtools squashfs-tools xorriso \
+        grub-efi-amd64-bin grub-pc-bin isolinux syslinux syslinux-efi syslinux-utils \
     && rm -rf /var/lib/apt/lists/*
 
 FROM shared AS unstable

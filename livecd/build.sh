@@ -1,6 +1,7 @@
 #!/bin/bash
-# Builds the HyprDebian live ISO. This is the entrypoint of the docker image
-# of the Dockerfile next to it; run it with make iso (see the Makefile).
+# Builds the HyprDebian live ISO. It is the command of a container of
+# hd-build:trixie, the build image of trixie from buildenv/Dockerfile, which
+# has live-build; run it with make iso (see the Makefile).
 #
 # It expects the repository read-only at /src, with the packages built in
 # /src/build, a folder for the ISO at /out, and in DEBS the packages for the

@@ -60,9 +60,9 @@ The downloads and the compiled releases are kept in `build/` of their package di
 `make iso` builds every package and the kernels, then the ISO in a container, see [Live cd](../Livecd/Overview.md). The computer needs everything `make all` and `make kernel` need, and:
 - `docker` (docker.io) and a user that may run it.
 - Privileged containers: the container runs with `--privileged`, because live-build mounts filesystems and makes device nodes in its chroot.
-- Internet access, for the `debian:trixie` image, the packages of `livecd/Dockerfile` and the packages of the live system.
+- Internet access, for the `debian:trixie` image, the packages of `hd-build:trixie` and the packages of the live system.
 
-live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), which indexes the local repository of the hd-* packages, are all installed in the image.
+The ISO is built in a container of `hd-build:trixie`, the build image of trixie from `buildenv/Dockerfile`, which `make iso` builds first. live-build, debootstrap, the boot loaders and `apt-ftparchive` (apt-utils), which indexes the local repository of the hd-* packages, are all installed in the image.
 
 ## The bootloader for development: make esp and make image
 `make esp` and `make image` in `packages/hd-bootloader` are not part of `make all`. They build an ESP from the kernels of the build computer, to try the bootloader in QEMU, and also need:

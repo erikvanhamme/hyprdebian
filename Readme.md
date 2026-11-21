@@ -47,7 +47,7 @@ Please note: the installer will not do any handholding. If it asks questions, yo
 
 The HyprDebian live ISO is a small Debian trixie live system with a text console, ZFS support, an ssh server that allows logging in with a password, the package `hd-installer` installed, and every hd-* package in a local repository, which the installer installs them from. The Debian packages still come from the Debian mirrors, so the installation needs internet access, but no HyprDebian repository.
 
-Build every package, then the ISO in a debian:trixie docker container, with:
+Build every package, then the ISO in a container of `hd-build:trixie`, the build image of trixie, with:
 
 ```
 make iso
