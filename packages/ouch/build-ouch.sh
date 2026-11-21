@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Builds ouch in a Debian container; the Makefile runs it with docker. It
-# installs the build tools and the latest stable Rust toolchain, compiles the
-# release OUCH_VERSION of ouch and copies what the package needs to /out:
+# Builds ouch in a container of hd-build:unstable, which has the build tools
+# and rustup; the Makefile runs it with docker. It updates to the latest stable
+# Rust toolchain, compiles the release OUCH_VERSION of ouch and copies what the
+# package needs to /out:
 #
 #   /out/ouch                the binary
 #   /out/depends             the Depends of the package, from dpkg-shlibdeps
@@ -17,23 +18,11 @@ set -euo pipefail
 
 REPO_URL="https://github.com/ouch-org/ouch.git"
 
-echo "--> Installing build dependencies..."
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  git \
-  build-essential \
-  pkg-config \
-  curl \
-  ca-certificates \
-  clang \
-  dpkg-dev
-
-# The rustc in trixie is too old for ouch, so install the latest stable toolchain with rustup, as
-# for yazi and wiremix. Built on trixie, the binary also runs on unstable.
-echo "--> Installing the latest stable Rust toolchain with rustup..."
-curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | \
-  sh -s -- -y --profile minimal --default-toolchain stable
-. "${HOME}/.cargo/env"
+# ouch is compiled with the latest stable toolchain of rustup, not the rustc of Debian, as yazi
+# and wiremix are.
+echo "--> Updating to the latest stable Rust toolchain..."
+. "${CARGO_HOME}/env"
+rustup update stable
 echo "--> Using $(rustc --version)"
 
 # The tags of ouch have no v.

@@ -1,10 +1,12 @@
 # Builds the package ouch, the compression and decompression tool, from a
-# release of ouch. The binary is compiled in a Docker container, so the build
-# needs docker and a user that may run it.
+# release of ouch. The binary is compiled in a container of the build image
+# of unstable, hd-build:unstable of buildenv/Dockerfile, so the build needs
+# docker and a user that may run it.
 #
 #   make deb    build build/ouch_$(DEB_VERSION)_$(ARCH).deb. build-ouch.sh
-#               compiles the release OUCH_VERSION in a $(IMAGE) container,
-#               with the latest stable Rust toolchain from rustup, into
+#               compiles the release OUCH_VERSION in a container of the build
+#               image, which make deb builds first, with the latest stable
+#               Rust toolchain from rustup, into
 #               build/dist-$(OUCH_VERSION); later builds reuse it, until
 #               make clean removes it. It installs:
 #                 /usr/bin/ouch               the tool
@@ -33,7 +35,7 @@ BUILD := build
 
 # The release of ouch, as its tag, and the revision of the package of it.
 OUCH_VERSION := 0.8.3
-DEB_REVISION := 2
+DEB_REVISION := 3
 
 DEB_NAME := ouch
 DEB_VERSION := $(OUCH_VERSION)-$(DEB_REVISION)
@@ -43,9 +45,11 @@ DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
 STAGE := $(BUILD)/deb
 DIST := $(BUILD)/dist-$(OUCH_VERSION)
 DOC := /usr/share/doc/$(DEB_NAME)
-# The binary needs the libc of the release it is compiled on: built on trixie,
-# it also runs on unstable.
-IMAGE := debian:trixie
+# The suite of the build image. ouch is for unstable only, as hd-desktop that
+# depends on it, and gets the libraries of unstable.
+SUITE := unstable
+
+include ../../buildenv/buildenv.mk
 
 .PHONY: deb deb-path clean
 
@@ -58,17 +62,18 @@ $(BUILD):
 	mkdir -p $@
 
 # The container compiles into a temporary directory, so a build that fails
-# leaves no DIST behind. It pulls the latest $(IMAGE) every time.
+# leaves no DIST behind.
 $(DIST): build-ouch.sh | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
-	docker run --rm --pull always \
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
 		-e OUCH_VERSION=$(OUCH_VERSION) \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/build-ouch.sh:/build-ouch.sh:ro \
-		-v $(CURDIR)/$@.tmp:/out \
-		$(IMAGE) bash /build-ouch.sh
+		-v $(CURDIR)/$@.tmp:/out, \
+		bash /build-ouch.sh)
 	mv $@.tmp $@
 
 # The package is built from a staged root in build/deb. dpkg-deb makes all

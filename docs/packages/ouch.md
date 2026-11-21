@@ -23,12 +23,12 @@ make deb
 
 This builds `build/ouch_<release>-<revision>_<arch>.deb`. Install it with:
 ```
-sudo apt install ./build/ouch_0.8.3-2_amd64.deb
+sudo apt install ./build/ouch_0.8.3-3_amd64.deb
 ```
 
-The binary is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-ouch.sh` runs in a `debian:trixie` container: it installs the build tools and the latest stable Rust toolchain with rustup, as the `rustc` in Debian is too old for ouch, clones the release tag and runs `cargo build --release --locked`, which also writes the man pages and completions. `dpkg-shlibdeps` then finds the packages of the libraries the binary links to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
+The binary is compiled in a container of the build image of unstable, `hd-build:unstable` of `buildenv/Dockerfile`, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `make deb` builds the image first, with the latest `debian:unstable`; docker only installs its packages again when that image or the Dockerfile has changed, and removes the build images that a new one replaced. The image has the build tools and rustup, so `build-ouch.sh` installs nothing: it runs `rustup update stable`, so ouch is compiled with the latest stable Rust toolchain and not the `rustc` of Debian, clones the release tag and runs `cargo build --release --locked`, which also writes the man pages and completions. `dpkg-shlibdeps` then finds the packages of the libraries the binary links to, which become the Depends of the package. The results land in `build/dist-<release>`; later builds reuse them, until `make clean` removes them.
 
-The container is trixie because the binary needs the libc of the release it is compiled on: built on trixie, it also runs on unstable.
+The package goes to the repo of unstable only: [hd-desktop](hd-desktop.md), which depends on it, is for unstable only. It is built on unstable, so it gets the libraries of unstable as hd-desktop does.
 
 To move to a new release of ouch, change `OUCH_VERSION` in the Makefile, set `DEB_REVISION` back to 1, and update the release on this page. For a new package of the same release, raise `DEB_REVISION`.
 
@@ -38,6 +38,8 @@ packages/ouch/Makefile
 packages/ouch/build-ouch.sh
 packages/ouch/deb/control
 packages/ouch/deb/copyright
+buildenv/Dockerfile
+buildenv/buildenv.mk
 ```
 
 ## Copyright

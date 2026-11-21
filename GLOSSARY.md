@@ -14,6 +14,14 @@ _Avoid_: Deb, module
 The source of one or more packages in the repository, usually named after its one package; `hd-bootloader` builds `hd-bootloader-gfx` and `hd-bootloader-txt`.
 _Avoid_: Package (for the source), project
 
+**Suite**:
+A Debian release that HyprDebian builds packages for, trixie or unstable, each with a repo of its own.
+_Avoid_: Sid, distribution, release
+
+**Build image**:
+The image of one suite that every package of that suite is built in.
+_Avoid_: Buildenv, build environment
+
 **Part**:
 A named piece of a package with a page of its own, once a package of its own and now provided by it, such as `hd-network` of `hd-base` or `hd-theme` of `hd-desktop`.
 _Avoid_: Component, subpackage, module
