@@ -68,9 +68,9 @@ This builds `build/hd-audacious_<version>_<arch>.deb`, with the version from `ve
 sudo apt install ./build/hd-audacious_<version>_<arch>.deb
 ```
 
-The player is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-hd-audacious.sh` runs in a `debian:unstable` container: it installs the build tools and the -dev packages of the plugins, clones the commits of the forks named in the Makefile, and builds both with meson. It turns off every boolean option of audacious-plugins but those of the plugins above, so no other plugin gets in, also not one that a later release adds. It fails when the plugins differ from those above, as meson leaves out a plugin whose library it does not find. `dpkg-shlibdeps` then finds the packages of the libraries the binaries and plugins link to, which become the Depends of the package. The results land in `build/dist-<commits>`; later builds reuse them, until `make clean` removes them.
+The player is compiled in a Docker container, so the build needs `docker` and a user that may run it, besides `dpkg-deb`. `build-hd-audacious.sh` runs in a container of `hd-build:unstable`, the build image of unstable from `buildenv/Dockerfile`, which `make deb` builds first and which has the build tools and the -dev packages of the plugins; it installs nothing, clones the commits of the forks named in the Makefile, and builds both with meson. It turns off every boolean option of audacious-plugins but those of the plugins above, so no other plugin gets in, also not one that a later release adds. It fails when the plugins differ from those above, as meson leaves out a plugin whose library it does not find. `dpkg-shlibdeps` then finds the packages of the libraries the binaries and plugins link to, which become the Depends of the package. The results land in `build/dist-<commits>`; later builds reuse them, until `make clean` removes them.
 
-The container is unstable because the package is for unstable only, as hd-desktop.
+The image is that of unstable because the package is for unstable only, as hd-desktop; notcurses, of the terminal interface, does not exist in trixie.
 
 The libraries `libaudcore` and `libaudtag` are private, in `/usr/lib/hd-audacious`, which the binaries and plugins have as RUNPATH, so they never clash with the libraries of the audacious of Debian.
 

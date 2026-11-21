@@ -62,4 +62,13 @@ RUN apt-get update \
         libvulkan-dev glslang-tools \
     && rm -rf /var/lib/apt/lists/*
 
+# The build dependencies of the forks of audacious and audacious-plugins of hd-audacious: meson,
+# and the -dev packages of the core and of its plugins for the terminal interface, FLAC, MP3 and
+# WAV; PipeWire is in the layer of rustup already. libnotcurses-core-dev does not exist in trixie.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        meson ninja-build gettext libglib2.0-dev zlib1g-dev libnotcurses-core-dev libflac-dev \
+        libmpg123-dev libsndfile1-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM ${SUITE}

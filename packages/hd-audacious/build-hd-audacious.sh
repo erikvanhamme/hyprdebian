@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Builds audacious and audacious-plugins with the terminal interface in a Debian container; the
-# Makefile runs it with docker. It installs the build tools and the libraries of the plugins,
-# compiles the commits AUDACIOUS_COMMIT and PLUGINS_COMMIT of the HyprDebian forks, or the local
-# checkouts mounted on /src/audacious and /src/audacious-plugins, with only the terminal interface
+# Builds audacious and audacious-plugins with the terminal interface in a container of
+# hd-build:unstable, the build image of unstable from buildenv/Dockerfile, which has the build
+# tools and the -dev packages of the plugins; the Makefile runs it with docker. It installs
+# nothing, compiles the commits AUDACIOUS_COMMIT and PLUGINS_COMMIT of the HyprDebian forks, or
+# the local checkouts mounted on /src/audacious and /src/audacious-plugins, with only the terminal interface
 # and the plugins for FLAC, MP3 and WAV over PipeWire, and copies what the package needs to /out:
 #
 #   /out/root                 the installed files, from / of the package on: the libraries,
@@ -39,25 +40,6 @@ declare -A PLUGINS=(
   [m3u]=Container/m3u.so
   [pls]=Container/pls.so
 )
-
-echo "--> Installing build dependencies..."
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  git \
-  ca-certificates \
-  build-essential \
-  meson \
-  ninja-build \
-  pkgconf \
-  gettext \
-  dpkg-dev \
-  libglib2.0-dev \
-  zlib1g-dev \
-  libnotcurses-core-dev \
-  libflac-dev \
-  libmpg123-dev \
-  libsndfile1-dev \
-  libpipewire-0.3-dev
 
 # clone <url> <commit> <dir>: fetches only the commit, which needs no branch or tag.
 clone() {

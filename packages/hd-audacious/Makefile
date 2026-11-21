@@ -4,8 +4,9 @@
 #
 #   make deb    build build/hd-audacious_$(DEB_VERSION)_$(ARCH).deb, with the version from
 #               version.json. build-hd-audacious.sh compiles the commits AUDACIOUS_COMMIT and
-#               PLUGINS_COMMIT in a $(IMAGE) container, into build/dist-<commits>; later builds
-#               reuse it, until make clean removes it. It installs:
+#               PLUGINS_COMMIT in a container of hd-build:unstable, the build image of unstable
+#               of buildenv/Dockerfile, which make deb builds first, into build/dist-<commits>;
+#               later builds reuse it, until make clean removes it. It installs:
 #                 /usr/bin/audacious          starts audacious with its terminal interface, in
 #                                             a kitty window when there is no terminal and
 #                                             kitty is installed
@@ -73,11 +74,13 @@ SOURCE_MOUNTS := -v $(abspath $(LOCAL_SRC))/audacious:/src/audacious:ro \
 DIST_FORCE := FORCE
 endif
 DOC := /usr/share/doc/$(DEB_NAME)
-# The player is compiled on the release it is for, as the desktop: unstable.
-IMAGE := debian:unstable
+# The player is compiled in the build image of the release it is for, as the desktop: unstable.
+SUITE := unstable
 # The command in front of the binary, and the man pages, named <page>.<section>.
 COMMANDS := audacious
 MANPAGES := man/hd-audacious.7
+
+include ../../buildenv/buildenv.mk
 
 .PHONY: deb deb-path clean FORCE
 
@@ -90,19 +93,19 @@ $(BUILD):
 	mkdir -p $@
 
 # The container compiles into a temporary directory, so a build that fails leaves no DIST behind.
-# It pulls the latest $(IMAGE) every time.
 $(DIST): build-hd-audacious.sh $(DIST_FORCE) | $(BUILD)
 	rm -rf $@ $@.tmp
 	mkdir -p $@.tmp
-	docker run --rm --pull always \
+	$(call build-image,$(SUITE))
+	$(call in-build,$(SUITE), \
 		-e AUDACIOUS_COMMIT=$(AUDACIOUS_COMMIT) \
 		-e PLUGINS_COMMIT=$(PLUGINS_COMMIT) \
 		-e HOST_UID=$$(id -u) \
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/build-hd-audacious.sh:/build-hd-audacious.sh:ro \
 		-v $(CURDIR)/$@.tmp:/out \
-		$(SOURCE_MOUNTS) \
-		$(IMAGE) bash /build-hd-audacious.sh
+		$(SOURCE_MOUNTS), \
+		bash /build-hd-audacious.sh)
 	mv $@.tmp $@
 
 # The package is built from a staged root in build/deb, from the files the container installed.
