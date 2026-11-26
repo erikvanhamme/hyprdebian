@@ -17,9 +17,15 @@ Comment: hd-pipes is based on hacks/glx/pipes.c of xscreensaver, which comes
  control points and patches, copied from teapot.c, and starts with that
  notice, as does pipes/src/teapot.hpp.
  .
+ The logo of hd-logo, logo/hd-logo.svg, is "HyprDebian" over the Debian
+ swirl: the paths of openlogo-nd.svg of https://www.debian.org/logos/, the
+ Debian Open Use Logo without the label, under its notice, the license
+ debian-open-use-logo below. hd-logo holds the mask that the build renders
+ from it.
+ .
  The binaries also hold the interface tables that wayland-scanner generates
- from two Wayland protocols: wlr-layer-shell, of wlr-protocols, and
- xdg-shell, of wayland-protocols. Their notices follow.
+ from three Wayland protocols: wlr-layer-shell, of wlr-protocols, and
+ xdg-shell and linux-dmabuf, of wayland-protocols. Their notices follow.
 
 Files: *
 Copyright: 2026, Erik Van Hamme <erik.vanhamme@gmail.com>
@@ -41,8 +47,42 @@ Copyright: 1994, Mark J. Kilgard
            1993, Silicon Graphics, Inc.
 License: teapot-c
 
+Files: logo/hd-logo.svg
+Copyright: 1999, Software in the Public Interest, Inc.
+           2026, Erik Van Hamme <erik.vanhamme@gmail.com>
+License: debian-open-use-logo
+
 Files: common/protocols/wlr-layer-shell-unstable-v1.xml
 Copyright: 2017, Drew DeVault
+License: wlr-layer-shell
+
+Files: wayland-protocols/stable/xdg-shell/xdg-shell.xml
+Copyright: 2008-2013, Kristian Høgsberg
+           2013, Rafael Antognolli
+           2013, Jasper St. Pierre
+           2010-2013, Intel Corporation
+           2015-2017, Samsung Electronics Co., Ltd
+           2015-2017, Red Hat Inc.
+License: Expat
+
+Files: wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml
+Copyright: 2014, 2015, Collabora, Ltd.
+License: Expat
+
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation; either version 2 of the License, or (at your option)
+ any later version.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT
+ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ more details.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.
+
 License: teapot-c
  Copyright (c) Mark J. Kilgard, 1994.
  .
@@ -86,31 +126,6 @@ License: teapot-c
  94039-7311.
  .
  OpenGL(TM) is a trademark of Silicon Graphics, Inc.
-
-License: wlr-layer-shell
-
-Files: wayland-protocols/stable/xdg-shell/xdg-shell.xml
-Copyright: 2008-2013, Kristian Høgsberg
-           2013, Rafael Antognolli
-           2013, Jasper St. Pierre
-           2010-2013, Intel Corporation
-           2015-2017, Samsung Electronics Co., Ltd
-           2015-2017, Red Hat Inc.
-License: Expat
-
-License: GPL-2+
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the Free
- Software Foundation; either version 2 of the License, or (at your option)
- any later version.
- .
- This program is distributed in the hope that it will be useful, but WITHOUT
- ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- more details.
- .
- On Debian systems, the complete text of the GNU General Public License
- version 2 can be found in /usr/share/common-licenses/GPL-2.
 
 License: pipes-c
  Permission to use, copy, modify, and distribute this software and its
@@ -193,3 +208,14 @@ License: Expat
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  DEALINGS IN THE SOFTWARE.
+
+License: debian-open-use-logo
+ The Debian Open Use Logo(s) are Copyright (c) 1999 Software in the Public
+ Interest, Inc., and are released under the terms of the GNU Lesser General
+ Public License, version 3 or any later version, or, at your option, of the
+ Creative Commons Attribution-ShareAlike 3.0 Unported License.
+ .
+ On Debian systems, the complete text of the GNU Lesser General Public
+ License version 3 can be found in /usr/share/common-licenses/LGPL-3, and
+ that of the Creative Commons Attribution-ShareAlike 3.0 Unported License in
+ /usr/share/common-licenses/CC-BY-SA-3.0.

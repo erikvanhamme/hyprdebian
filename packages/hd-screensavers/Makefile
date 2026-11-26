@@ -19,9 +19,15 @@
 #                                             reuse them until a source
 #                                             changes or make clean removes
 #                                             them
+#                 /usr/bin/hd-logo            the bouncing logo, compiled
+#                                             from logo/ in the same
+#                                             container, with the mask that
+#                                             rsvg-convert and logo/mask.py
+#                                             make of logo/hd-logo.svg
 #                 /usr/share/doc/hd-screensavers/copyright
 #                                             deb/copyright, with the notices
-#                                             of pipes.c and teapot.c
+#                                             of pipes.c and teapot.c and of
+#                                             the Debian Open Use Logo
 #                 /usr/share/man/man*/*.gz    the man pages in man/
 #               with the control file deb/control, whose Depends are
 #               hd-desktop, the Vulkan loader, the Vulkan drivers of mesa and
@@ -43,7 +49,7 @@
 #               compile the tests without running them, without a
 #               container; make test runs it in the container
 #   make clean  remove build/, also the compiled screensavers, and
-#               pipes/build/ of make all in pipes/
+#               pipes/build/ and logo/build/ of make all in pipes/ and logo/
 
 BUILD := build
 PYTHON := python3
@@ -57,9 +63,9 @@ DEB := $(BUILD)/$(DEB_NAME)_$(DEB_VERSION)_$(ARCH).deb
 STAGE := $(BUILD)/deb
 DOC := /usr/share/doc/$(DEB_NAME)
 # The binaries of the screensavers, installed in /usr/bin.
-BINARIES := hd-pipes
+BINARIES := hd-pipes hd-logo
 # The man pages, named <page>.<section>.
-MANPAGES := man/hd-pipes.6
+MANPAGES := man/hd-pipes.6 man/hd-logo.6
 
 # The screensavers and the tests, compiled in a container of the build image of the suite. They
 # are for the desktop, which needs Hyprland, so only for unstable; the binaries need the libraries
@@ -67,18 +73,18 @@ MANPAGES := man/hd-pipes.6
 SUITE := unstable
 PROGRAMS := $(BUILD)/programs
 PROGRAM_SOURCES := common/build.sh common/program.mk $(wildcard common/src/*) $(wildcard common/protocols/*) \
-	pipes/Makefile $(wildcard pipes/src/*)
+	pipes/Makefile $(wildcard pipes/src/*) logo/Makefile logo/hd-logo.svg logo/mask.py $(wildcard logo/src/*)
 
 # The tests: each tests/test_<name>.cpp is a binary of its own, linked with TEST_SOURCES, the
-# sources they test, which have no Wayland or Vulkan in them: the grid walk, the meshes and the
-# options.
+# sources they test, which have no Wayland or Vulkan in them: the grid walk, the meshes, the
+# options, the choice of the Vulkan device, and the motion and the colours of hd-logo.
 TESTS := $(wildcard tests/test_*.cpp)
 TEST_SOURCES := pipes/src/walk.cpp pipes/src/mesh.cpp pipes/src/teapot.cpp pipes/src/settings.cpp common/src/options.cpp common/src/json.cpp \
-	common/src/render.cpp
+	common/src/render.cpp common/src/gpu_pick.cpp logo/src/bounce.cpp logo/src/logo_options.cpp logo/src/theme_colours.cpp
 TEST_BINARIES := $(TESTS:tests/%.cpp=$(BUILD)/tests/%)
 # The structs are filled with designated initializers, as in common/program.mk, which leave the
 # members they skip zero; -Wextra would warn about each.
-TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Wno-missing-field-initializers -Ipipes/src -Icommon/src
+TEST_CXXFLAGS := -std=c++23 -O2 -g -Wall -Wextra -Wno-missing-field-initializers -Ipipes/src -Ilogo/src -Icommon/src
 
 include ../../buildenv/buildenv.mk
 
@@ -103,6 +109,7 @@ $(PROGRAMS): $(PROGRAM_SOURCES) | $(BUILD)
 		-e HOST_GID=$$(id -g) \
 		-v $(CURDIR)/common:/src/common:ro \
 		-v $(CURDIR)/pipes:/src/pipes:ro \
+		-v $(CURDIR)/logo:/src/logo:ro \
 		-v $(CURDIR)/$@.tmp:/out, \
 		bash /src/common/build.sh)
 	mv $@.tmp $@
@@ -150,3 +157,4 @@ test:
 clean:
 	rm -rf $(BUILD)
 	$(MAKE) -C pipes clean
+	$(MAKE) -C logo clean

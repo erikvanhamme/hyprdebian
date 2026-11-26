@@ -56,10 +56,14 @@ and on SIGTERM or SIGINT.
 The pointer that is on a monitor when it starts does not end it; the
 cursor is hidden.
 .PP
-It draws with Vulkan, on the first discrete GPU that can show on the
-compositor, else an integrated one, else a virtual one, else lavapipe of
-mesa-vulkan-drivers, which renders on the CPU.
-It needs Vulkan 1.3.
+It draws with Vulkan, on the GPU that drives the compositor, the main
+device of its dmabuf feedback.
+When the compositor names none, or that GPU will not do, it is the first
+discrete GPU that can show on the compositor, else an integrated one, else
+a virtual one, else lavapipe of mesa-vulkan-drivers, which renders on the
+CPU.
+It needs Vulkan 1.3, or Vulkan 1.2 with VK_KHR_dynamic_rendering and
+VK_KHR_synchronization2.
 The shading is per pixel, with up to 8 samples per pixel
 .RB ( \-\-msaa ),
 and the frames come at the refresh rate of each monitor, or at most

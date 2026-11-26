@@ -15,5 +15,9 @@ Description: HyprDebian screensavers
  hd-pipes draws the 3D pipes of Windows NT, after pipes.c of xscreensaver
  by Marcelo F. Vianna.
  .
+ hd-logo is the moving logo of the old DVD players: the Debian swirl with
+ HyprDebian over it, bouncing on black in the colours of the theme, light
+ on the GPU and the battery.
+ .
  mesa-vulkan-drivers makes sure there is a Vulkan device: RADV, ANV, or
  lavapipe, which renders on the CPU.

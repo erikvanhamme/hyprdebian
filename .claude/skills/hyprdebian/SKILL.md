@@ -80,6 +80,7 @@ Also read-only, and part of every check: `systemctl --failed`, `zpool status`, `
 | `hd-mount`, `hd-unmount` | Mount and unmount drives in the desktop session. | O |
 | `hd-battery` | Shows the battery level. | R |
 | `hd-pipes` | The 3D pipes screensaver (`man 6 hd-pipes`). | `--window` U; the rest O |
+| `hd-logo` | The bouncing logo screensaver (`man 6 hd-logo`). | `--window` U; the rest O |
 
 The other `hd-*` commands of the desktop are what the key bindings run, for the owner at the
 keyboard. The screensaver is set by the key `hd-screensaver` (`man 7 hd-screensaver`).

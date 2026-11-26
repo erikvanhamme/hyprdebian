@@ -62,7 +62,7 @@ At first glance it looks like 1997; a close look shows smooth shapes, good shadi
 - multisampling with the most samples the device has, up to 8 or `msaa`, every sample shaded when the device can, against the shimmer of the highlights;
 - a frame at every refresh of each monitor (FIFO), or at most `framerate` a second, with the turn and the shrink in between two steps, so the pipes grow at the same speed at 60 Hz, at 240 Hz and at any frame rate.
 
-The device is the first discrete GPU that can show on the compositor, else an integrated one, else a virtual one, as in a vm, else lavapipe of `mesa-vulkan-drivers`, which renders on the CPU. All monitors share it. It needs Vulkan 1.3.
+The device is the GPU that drives the compositor, the main device of its dmabuf feedback, so that on a laptop with two GPUs it is the one of the panel. When the compositor names none, or that GPU will not do, it is the first discrete GPU that can show on the compositor, else an integrated one, else a virtual one, as in a vm, else lavapipe of `mesa-vulkan-drivers`, which renders on the CPU. All monitors share it. It needs Vulkan 1.3, or Vulkan 1.2 with `VK_KHR_dynamic_rendering` and `VK_KHR_synchronization2`, as the HD Graphics 4000 of Ivy Bridge has.
 
 ## Input
 On the monitors, hd-pipes has the keyboard to itself and ends on a key press, a move of the mouse, a click, a scroll or a touch. The pointer that is on a monitor when it starts does not end it, as the surface appears under a mouse that stands still; the cursor is hidden on its surfaces. It also ends on SIGTERM, which `hd-kill-screensaver` sends, and on SIGINT.

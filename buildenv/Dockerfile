@@ -68,11 +68,12 @@ RUN apt-get update \
 # The -dev packages of the programs of hd-desktop, hd-menu and hd-message, and of the screensavers
 # of hd-screensavers, in a layer after rustup, so a change to them does not install rustup again.
 # libdav1d-dev is for pkg-config only: librsvg-2.0.pc requires dav1d, but librsvg2-dev does not
-# depend on libdav1d-dev. glslang-tools compiles the shaders of the screensavers.
+# depend on libdav1d-dev. glslang-tools compiles the shaders of the screensavers, and rsvg-convert
+# of librsvg2-bin renders the logo of hd-logo to its mask.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libwayland-dev wayland-protocols libxkbcommon-dev libcairo2-dev librsvg2-dev libdav1d-dev \
-        libvulkan-dev glslang-tools \
+        libvulkan-dev glslang-tools librsvg2-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # The build dependencies of the forks of audacious and audacious-plugins of hd-audacious: meson,

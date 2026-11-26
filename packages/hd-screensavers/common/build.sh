@@ -6,6 +6,7 @@
 # flags of Debian, and copies what the package needs to /out:
 #
 #   /out/hd-pipes            the binary of hd-pipes
+#   /out/hd-logo             the binary of hd-logo
 #   /out/depends             the Depends of the package for all of them, from dpkg-shlibdeps
 #
 # Everything in /out ends up owned by HOST_UID:HOST_GID, the user who runs
@@ -14,7 +15,7 @@ set -euo pipefail
 
 # <directory>:<binary> of each screensaver. A new one also needs its
 # directory in the docker run of ../Makefile.
-PROGRAMS=(pipes:hd-pipes)
+PROGRAMS=(pipes:hd-pipes logo:hd-logo)
 
 # A copy of the sources, so that the build does not write into /src. The
 # screensavers find the shared code in ../common, as in the repository.
@@ -27,8 +28,10 @@ for program in "${PROGRAMS[@]}"; do
   dir=${program%%:*}
   name=${program#*:}
   echo "--> Compiling ${name}..."
+  # Everything of the directory but a build/ of make all there, as the logo
+  # of hd-logo next to its Makefile.
   mkdir -p "/usr/src/hd-screensavers/${dir}"
-  cp -r "/src/${dir}/Makefile" "/src/${dir}/src" "/usr/src/hd-screensavers/${dir}/"
+  find "/src/${dir}" -mindepth 1 -maxdepth 1 ! -name build -exec cp -r {} "/usr/src/hd-screensavers/${dir}/" \;
   make -C "/usr/src/hd-screensavers/${dir}" -j"$(nproc)" all IN_BUILD=1 \
     CPPFLAGS="$(dpkg-buildflags --get CPPFLAGS)" \
     CXXFLAGS="$(dpkg-buildflags --get CXXFLAGS)" \

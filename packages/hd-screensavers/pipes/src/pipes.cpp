@@ -561,7 +561,7 @@ public:
         load(walk_.next());
     }
 
-    void draw(VkCommandBuffer cmd, VkExtent2D extent) override
+    void draw(VkCommandBuffer cmd, VkExtent2D extent, int) override
     {
         const float between = advance();
         if (fresh_) {

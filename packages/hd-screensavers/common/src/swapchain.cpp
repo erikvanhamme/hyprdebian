@@ -12,6 +12,7 @@ constexpr std::size_t FRAMES = 2;
 
 /**
  * @brief Records a layout transition of an image.
+ * @param gpu         The device, which has the command of the barrier.
  * @param cmd         The command buffer.
  * @param image       The image.
  * @param aspect      The aspect of the image.
@@ -22,7 +23,7 @@ constexpr std::size_t FRAMES = 2;
  * @param dst_stage   The stages that wait for the transition.
  * @param dst_access  What those stages do with it.
  */
-void transition(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspect, VkImageLayout from, VkImageLayout to,
+void transition(const Gpu& gpu, VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspect, VkImageLayout from, VkImageLayout to,
                 VkPipelineStageFlags2 src_stage, VkAccessFlags2 src_access, VkPipelineStageFlags2 dst_stage,
                 VkAccessFlags2 dst_access)
 {
@@ -44,7 +45,7 @@ void transition(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags aspect, V
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &barrier,
     };
-    vkCmdPipelineBarrier2(cmd, &dependency);
+    gpu.cmd_pipeline_barrier2(cmd, &dependency);
 }
 
 /**
@@ -213,7 +214,7 @@ bool Swapchain::draw(const Draw& draw)
         .signalSemaphoreInfoCount = 1,
         .pSignalSemaphoreInfos = &signal,
     };
-    check(vkQueueSubmit2(gpu_.queue(), 1, &submit, f.done), "submit a frame");
+    check(gpu_.queue_submit2(1, &submit, f.done), "submit a frame");
     frame_ = (frame_ + 1) % frames_.size();
 
     const VkPresentInfoKHR present = {
@@ -387,16 +388,19 @@ void Swapchain::record(uint32_t image, const Draw& draw)
     constexpr VkPipelineStageFlags2 color_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     constexpr VkPipelineStageFlags2 depth_stage =
         VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-    transition(cmd, images_[image], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+    transition(gpu_, cmd, images_[image], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, color_stage, 0, color_stage,
                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
     if (multisampled) {
-        transition(cmd, color_.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+        transition(gpu_, cmd, color_.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, color_stage, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                    color_stage, VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
     }
-    transition(cmd, depth_.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-               VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depth_stage, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    // The depth goes in DEPTH_STENCIL_ATTACHMENT_OPTIMAL of Vulkan 1.0, which
+    // depth formats without stencil have too; DEPTH_ATTACHMENT_OPTIMAL would
+    // need the feature separateDepthStencilLayouts turned on.
+    transition(gpu_, cmd, depth_.image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depth_stage, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
                depth_stage,
                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
@@ -414,7 +418,7 @@ void Swapchain::record(uint32_t image, const Draw& draw)
     const VkRenderingAttachmentInfo depth = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = depth_.view,
-        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
         .clearValue = {.depthStencil = {.depth = 1.0f, .stencil = 0}},
@@ -427,7 +431,7 @@ void Swapchain::record(uint32_t image, const Draw& draw)
         .pColorAttachments = &color,
         .pDepthAttachment = &depth,
     };
-    vkCmdBeginRendering(cmd, &rendering);
+    gpu_.cmd_begin_rendering(cmd, &rendering);
     // The pipelines of the scene take the viewport and scissor as dynamic state.
     const VkViewport viewport = {0.0f, 0.0f, static_cast<float>(extent_.width), static_cast<float>(extent_.height),
                                  0.0f, 1.0f};
@@ -435,9 +439,9 @@ void Swapchain::record(uint32_t image, const Draw& draw)
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     draw(cmd, extent_);
-    vkCmdEndRendering(cmd);
+    gpu_.cmd_end_rendering(cmd);
 
-    transition(cmd, images_[image], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    transition(gpu_, cmd, images_[image], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, color_stage, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                VK_PIPELINE_STAGE_2_NONE, 0);
     check(vkEndCommandBuffer(cmd), "end a command buffer");

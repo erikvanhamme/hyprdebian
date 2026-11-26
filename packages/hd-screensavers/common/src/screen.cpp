@@ -14,9 +14,12 @@
 #include <stdexcept>
 #include <string>
 #include <sys/signalfd.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
+#include "linux-dmabuf-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 // The header is C, with an argument named namespace, a keyword in C++. It
 // comes after the other headers, so that the define touches only it.
@@ -63,6 +66,8 @@ struct Screen::Surface {
     xdg_surface* xdg = nullptr;
     /** @brief The toplevel of the window; null on an output. */
     xdg_toplevel* toplevel = nullptr;
+    /** @brief The output the surface is on: that of the layer surface, or the last one the window entered. */
+    wl_output* output = nullptr;
     /** @brief The frame callback of the last frame; null when it is done. */
     wl_callback* frame = nullptr;
     /** @brief The swapchain; null until the first configure. */
@@ -120,6 +125,8 @@ struct Screen::Output {
     wl_output* output = nullptr;
     /** @brief The version of the output, for its release. */
     uint32_t version = 0;
+    /** @brief The refresh rate of its current mode, in mHz; 0 until the output sends it. */
+    int refresh = 0;
     /** @brief The surface on the output; null before run(). */
     std::unique_ptr<Surface> surface;
 
@@ -320,6 +327,39 @@ Screen::Screen(bool window, int framerate)
     if (outputs_.empty()) {
         fail("the compositor has no outputs");
     }
+    read_main_device();
+}
+
+void Screen::read_main_device()
+{
+    if (dmabuf_ == nullptr) {
+        return;
+    }
+    // The default feedback names the main device, a dev_t, the GPU that
+    // drives the compositor, and sends the table of the formats as a file,
+    // which is not needed and is closed. The roundtrip waits for all of it;
+    // after it the feedback and the dmabuf are not needed any more.
+    static const zwp_linux_dmabuf_feedback_v1_listener feedback_listener = {
+        .done = [](void*, zwp_linux_dmabuf_feedback_v1*) {},
+        .format_table = [](void*, zwp_linux_dmabuf_feedback_v1*, int32_t fd, uint32_t) { close(fd); },
+        .main_device = [](void* data, zwp_linux_dmabuf_feedback_v1*, wl_array* device) {
+            if (device->size == sizeof(dev_t)) {
+                dev_t dev;
+                std::memcpy(&dev, device->data, sizeof(dev));
+                static_cast<Screen*>(data)->main_device_ = DrmNode{major(dev), minor(dev)};
+            }
+        },
+        .tranche_done = [](void*, zwp_linux_dmabuf_feedback_v1*) {},
+        .tranche_target_device = [](void*, zwp_linux_dmabuf_feedback_v1*, wl_array*) {},
+        .tranche_formats = [](void*, zwp_linux_dmabuf_feedback_v1*, wl_array*) {},
+        .tranche_flags = [](void*, zwp_linux_dmabuf_feedback_v1*, uint32_t) {},
+    };
+    zwp_linux_dmabuf_feedback_v1* feedback = zwp_linux_dmabuf_v1_get_default_feedback(dmabuf_);
+    zwp_linux_dmabuf_feedback_v1_add_listener(feedback, &feedback_listener, this);
+    wl_display_roundtrip(display_);
+    zwp_linux_dmabuf_feedback_v1_destroy(feedback);
+    zwp_linux_dmabuf_v1_destroy(dmabuf_);
+    dmabuf_ = nullptr;
 }
 
 Screen::~Screen()
@@ -329,6 +369,9 @@ Screen::~Screen()
     outputs_.clear();
     if (layer_shell_ != nullptr) {
         zwlr_layer_shell_v1_destroy(layer_shell_);
+    }
+    if (dmabuf_ != nullptr) {
+        zwp_linux_dmabuf_v1_destroy(dmabuf_);
     }
     if (wm_base_ != nullptr) {
         xdg_wm_base_destroy(wm_base_);
@@ -356,6 +399,12 @@ void Screen::bind_global(uint32_t name, const char* interface, uint32_t version)
     } else if (iface == zwlr_layer_shell_v1_interface.name && version >= 4 && !window_mode_) {
         layer_shell_ = static_cast<zwlr_layer_shell_v1*>(
             wl_registry_bind(registry_, name, &zwlr_layer_shell_v1_interface, 4));
+    } else if (iface == zwp_linux_dmabuf_v1_interface.name && version >= 4 && dmabuf_ == nullptr &&
+               gpu_ == nullptr) {
+        // Only for the feedback at the start. Version 4 sends no events of
+        // the dmabuf itself, which needs no listener.
+        dmabuf_ = static_cast<zwp_linux_dmabuf_v1*>(
+            wl_registry_bind(registry_, name, &zwp_linux_dmabuf_v1_interface, 4));
     } else if (iface == xdg_wm_base_interface.name && window_mode_) {
         static const xdg_wm_base_listener wm_base_listener = {
             .ping = [](void*, xdg_wm_base* wm_base, uint32_t serial) { xdg_wm_base_pong(wm_base, serial); },
@@ -363,14 +412,28 @@ void Screen::bind_global(uint32_t name, const char* interface, uint32_t version)
         wm_base_ = static_cast<xdg_wm_base*>(wl_registry_bind(registry_, name, &xdg_wm_base_interface, 1));
         xdg_wm_base_add_listener(wm_base_, &wm_base_listener, this);
     } else if (iface == wl_output_interface.name) {
-        // The events of the output are not needed: the layer surface gets the
-        // size of the output in its configure. Without a listener libwayland
-        // drops them.
+        // Of the events of the output only the current mode is needed, for
+        // its refresh rate: the layer surface gets the size of the output in
+        // its configure.
+        static const wl_output_listener output_listener = {
+            .geometry = [](void*, wl_output*, int32_t, int32_t, int32_t, int32_t, int32_t, const char*, const char*,
+                           int32_t) {},
+            .mode = [](void* data, wl_output*, uint32_t flags, int32_t, int32_t, int32_t refresh) {
+                if ((flags & WL_OUTPUT_MODE_CURRENT) != 0) {
+                    static_cast<Output*>(data)->refresh = refresh;
+                }
+            },
+            .done = [](void*, wl_output*) {},
+            .scale = [](void*, wl_output*, int32_t) {},
+            .name = [](void*, wl_output*, const char*) {},
+            .description = [](void*, wl_output*, const char*) {},
+        };
         auto output = std::make_unique<Output>();
         output->name = name;
         output->version = std::min(version, 4u);
         output->output = static_cast<wl_output*>(wl_registry_bind(registry_, name, &wl_output_interface,
                                                                   output->version));
+        wl_output_add_listener(output->output, &output_listener, output.get());
         // An output that comes while run() goes on gets its surface at once.
         if (gpu_ != nullptr && !window_mode_) {
             output->surface = make_surface(output->output);
@@ -402,6 +465,7 @@ std::unique_ptr<Screen::Surface> Screen::make_surface(wl_output* output)
 {
     auto s = std::make_unique<Surface>();
     s->surface = wl_compositor_create_surface(compositor_);
+    s->output = output;
 
     if (output != nullptr) {
         // The layer-shell role: on the overlay layer of the output, above
@@ -448,6 +512,14 @@ std::unique_ptr<Screen::Surface> Screen::make_surface(wl_output* output)
             .configure_bounds = [](void*, xdg_toplevel*, int32_t, int32_t) {},
             .wm_capabilities = [](void*, xdg_toplevel*, wl_array*) {},
         };
+        // The output the window is on, for the refresh rate: the last one it entered.
+        static const wl_surface_listener surface_listener = {
+            .enter = [](void* data, wl_surface*, wl_output* output) { static_cast<Surface*>(data)->output = output; },
+            .leave = [](void*, wl_surface*, wl_output*) {},
+            .preferred_buffer_scale = [](void*, wl_surface*, int32_t) {},
+            .preferred_buffer_transform = [](void*, wl_surface*, uint32_t) {},
+        };
+        wl_surface_add_listener(s->surface, &surface_listener, s.get());
         s->xdg = xdg_wm_base_get_xdg_surface(wm_base_, s->surface);
         xdg_surface_add_listener(s->xdg, &xdg_listener, s.get());
         s->toplevel = xdg_surface_get_toplevel(s->xdg);
@@ -501,8 +573,9 @@ void Screen::draw(Surface& s)
     }
     s.frame = wl_surface_frame(s.surface);
     wl_callback_add_listener(s.frame, &frame_listener, &s);
-    const bool presented = s.swapchain->draw([&s](VkCommandBuffer cmd, VkExtent2D extent) {
-        s.scene->draw(cmd, extent);
+    const int rate = refresh(s.output);
+    const bool presented = s.swapchain->draw([&s, rate](VkCommandBuffer cmd, VkExtent2D extent) {
+        s.scene->draw(cmd, extent, rate);
     });
     if (!presented) {
         // The request stays pending until the next commit; its callback would
@@ -515,6 +588,16 @@ void Screen::draw(Surface& s)
     // The turns stay one period apart, so the frames keep to the frame rate;
     // a surface that fell behind starts again from now.
     s.turn = std::max(s.turn + frame_period_, std::chrono::steady_clock::now());
+}
+
+int Screen::refresh(wl_output* output) const
+{
+    for (const auto& o : outputs_) {
+        if (o->output == output) {
+            return o->refresh;
+        }
+    }
+    return 0;
 }
 
 void Screen::destroy_surfaces()

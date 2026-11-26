@@ -1,7 +1,7 @@
 ## Introduction
 The package `hd-desktop` holds the screensaver of the HyprDebian desktop. It shows a text with random effects of terminal text effects (`tte`) in a full screen kitty window on every monitor. See [hd-desktop](hd-desktop.md).
 
-The key `hd-screensaver` of the configuration can name another screensaver in its place, such as `hd-pipes` of the package [hd-screensavers](hd-screensavers.md); see [The key](#the-key).
+The key `hd-screensaver` of the configuration can name another screensaver in its place, such as `hd-pipes` or `hd-logo` of the package [hd-screensavers](hd-screensavers.md); see [The key](#the-key).
 
 hypridle starts it after 2 minutes without input, and stops it before it locks the screen with hyprlock, by `~/.config/hypr/hypridle.conf` of `hd-desktop`. It also stops on a key press, or when another window gets the focus.
 

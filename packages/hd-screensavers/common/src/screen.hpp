@@ -10,6 +10,13 @@
  * not count, as the surface appears under a mouse that stands still; the
  * cursor is hidden on it. It also ends on SIGTERM and SIGINT.
  *
+ * It follows the current mode of every output, for the refresh rate that
+ * the scenes are told, and on which output the window is.
+ *
+ * At the start it asks the compositor for the default dmabuf feedback of
+ * zwp_linux_dmabuf_v1 4, whose main device is the GPU that drives it, for
+ * the choice of the Vulkan device.
+ *
  * With --window it is one ordinary window instead, an xdg-toplevel that
  * input does not end; Escape or closing the window does.
  *
@@ -26,8 +33,11 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 #include <vulkan/vulkan.h>
+
+#include "gpu_pick.hpp"
 
 class Gpu;
 class Swapchain;
@@ -45,6 +55,7 @@ struct xdg_surface;
 struct xdg_toplevel;
 struct xdg_wm_base;
 struct zwlr_layer_shell_v1;
+struct zwp_linux_dmabuf_v1;
 struct zwlr_layer_surface_v1;
 
 /** @brief What a screensaver draws on one surface. */
@@ -60,10 +71,13 @@ public:
      * the surface before the last one are done drawing, so what the last
      * one does not use may be written.
      *
-     * @param cmd    The command buffer, within the rendering.
-     * @param extent The size of the surface, in pixels.
+     * @param cmd     The command buffer, within the rendering.
+     * @param extent  The size of the surface, in pixels.
+     * @param refresh The refresh rate of the current mode of the output the
+     *                surface is on, in mHz; 0 while it is not known, as for
+     *                a window before the compositor says on which output it is.
      */
-    virtual void draw(VkCommandBuffer cmd, VkExtent2D extent) = 0;
+    virtual void draw(VkCommandBuffer cmd, VkExtent2D extent, int refresh) = 0;
 };
 
 /** @brief Makes the scenes of a screensaver. */
@@ -107,6 +121,13 @@ public:
     wl_display* display() const { return display_; }
 
     /**
+     * @brief The GPU that drives the compositor, for the Vulkan device.
+     * @return The main device of the default dmabuf feedback; none when the
+     *         compositor lacks zwp_linux_dmabuf_v1 4 or names no device.
+     */
+    std::optional<DrmNode> main_device() const { return main_device_; }
+
+    /**
      * @brief Makes the surfaces and handles the events until the screensaver ends.
      * @param gpu   The device; it must outlive the screen.
      * @param maker Makes the scenes; it must outlive the screen.
@@ -127,6 +148,9 @@ private:
      * @param version   The highest version the compositor has.
      */
     void bind_global(uint32_t name, const char* interface, uint32_t version);
+
+    /** @brief Reads main_device_ from the default dmabuf feedback, and lets the dmabuf go. */
+    void read_main_device();
 
     /**
      * @brief Handles a global going away: an output loses its surface, a seat its devices.
@@ -154,6 +178,13 @@ private:
      * @param s The surface.
      */
     void draw(Surface& s);
+
+    /**
+     * @brief The refresh rate of an output, from its current mode.
+     * @param output The output; null for none.
+     * @return The refresh rate in mHz; 0 when the output is not known or has sent no current mode.
+     */
+    int refresh(wl_output* output) const;
 
     /** @brief Destroys every surface, with its swapchain and scene, before the device goes. */
     void destroy_surfaces();
@@ -185,6 +216,10 @@ private:
     zwlr_layer_shell_v1* layer_shell_ = nullptr;
     /** @brief Gives the window its role; null without --window. */
     xdg_wm_base* wm_base_ = nullptr;
+    /** @brief For the dmabuf feedback; null when the compositor lacks it, and after the constructor. */
+    zwp_linux_dmabuf_v1* dmabuf_ = nullptr;
+    /** @brief The main device of the dmabuf feedback; none without it. */
+    std::optional<DrmNode> main_device_;
     /** @brief The outputs, each with its surface while run() goes on. */
     std::vector<std::unique_ptr<Output>> outputs_;
     /** @brief The seats, with their keyboard, pointer and touch. */

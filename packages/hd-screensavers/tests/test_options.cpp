@@ -38,13 +38,18 @@
 // defaults, the configuration of the system, that of the user and the
 // command line, each over the one before, and that values out of range or
 // of the wrong type are skipped in a configuration and refused on the
-// command line. The configurations are files in a temporary directory.
+// command line. The same for the option framerate of hd-logo, of
+// logo/src/logo_options.cpp, and its colours from the key hd-theme, of
+// logo/src/theme_colours.cpp. The configurations are files in a temporary
+// directory.
 //
 // make test in the package directory compiles and runs it; it prints a line
 // for every check that fails and exits with 1 when one did.
 
+#include "logo_options.hpp"
 #include "options.hpp"
 #include "settings.hpp"
+#include "theme_colours.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -292,6 +297,116 @@ void test_help()
     }
 }
 
+/** @brief What a run of the options of hd-logo gives. */
+struct LogoResult {
+    LogoOptions values;
+    Options::Parsed parsed = Options::Parsed::run;
+    std::string errors;
+    std::string out;
+};
+
+/** @brief Reads the configurations files of hd-logo, the one below first, and then the command line args. */
+LogoResult run_logo(const std::vector<std::string>& files, const std::vector<std::string>& args = {})
+{
+    LogoResult result;
+    Options options("hd-logo");
+    add_logo_options(options, result.values);
+    std::ostringstream out;
+    std::ostringstream errors;
+    options.read_config(files, errors);
+    result.parsed = options.parse(args, out, errors);
+    result.errors = errors.str();
+    result.out = out.str();
+    return result;
+}
+
+void test_logo_framerate()
+{
+    const LogoResult defaults = run_logo({(directory / "absent.json").string()});
+    check(defaults.errors.empty() && defaults.values.framerate == 30 && !defaults.values.window,
+          "logo: framerate 30 by default, no window");
+
+    const auto system = config("system.json", R"({"hd-logo": {"framerate": 60}, "hd-pipes": {"framerate": 10}})");
+    const LogoResult s = run_logo({system});
+    check(s.errors.empty() && s.values.framerate == 60, "logo: framerate of the system, not that of hd-pipes");
+
+    const auto user = config("user.json", R"({"hd-logo": {"framerate": 0}})");
+    const LogoResult u = run_logo({system, user});
+    check(u.errors.empty() && u.values.framerate == 0, "logo: framerate 0 of the user wins over the system");
+
+    const LogoResult c = run_logo({system, user}, {"--framerate", "144", "--window"});
+    check(c.parsed == Options::Parsed::run && c.values.framerate == 144 && c.values.window,
+          "logo: --framerate on the command line wins, --window");
+    const LogoResult last = run_logo({}, {"--framerate=1", "--framerate", "1000"});
+    check(last.values.framerate == 1000, "logo: the last --framerate wins, 1 and 1000 in range");
+
+    const auto wrong = config("wrong.json", R"({"hd-logo": {"framerate": 1001, "msaa": 4, "window": true}})");
+    const LogoResult w = run_logo({system, wrong});
+    check(w.parsed == Options::Parsed::run && w.values.framerate == 60 && !w.values.window,
+          "logo: a wrong framerate in a configuration keeps the value below");
+    for (const char* what : {"framerate is a whole number from 0 to 1000", "msaa is not an option of hd-logo",
+                             "window is not an option of hd-logo"}) {
+        check(contains(w.errors, wrong + ": " + what + ", skipped"), std::string("logo: reports ") + what);
+    }
+
+    for (const std::vector<std::string>& args : std::vector<std::vector<std::string>>{
+             {"--framerate", "-1"}, {"--framerate", "1001"}, {"--framerate", "fast"}}) {
+        const LogoResult r = run_logo({}, args);
+        check(r.parsed == Options::Parsed::error &&
+                  contains(r.errors, "hd-logo: --framerate is a whole number from 0 to 1000\n"),
+              "logo: refuses --framerate " + args[1]);
+    }
+    const LogoResult msaa = run_logo({}, {"--msaa", "4"});
+    check(msaa.parsed == Options::Parsed::error && contains(msaa.errors, "unknown option --msaa"),
+          "logo: has no --msaa");
+
+    const LogoResult help = run_logo({}, {"--help"});
+    check(help.parsed == Options::Parsed::help, "logo: --help");
+    for (const char* line : {"usage: hd-logo [options]", "--framerate N", "0-1000 (30)", "--window"}) {
+        check(contains(help.out, line), std::string("logo: help shows ") + line);
+    }
+}
+
+void test_logo_palette()
+{
+    const LogoPalette fallback = default_palette();
+    const Rgb normal = {0x00 / 255.0f, 0x66 / 255.0f, 0xcc / 255.0f};
+    check(fallback[0] == normal, "palette: normal of the theme default first");
+    check(fallback[2] == Rgb{0xe6 / 255.0f, 0xed / 255.0f, 0xf5 / 255.0f}, "palette: light of the theme default last");
+
+    std::ostringstream quiet;
+    check(read_palette({(directory / "none.json").string()}, quiet) == fallback && quiet.str().empty(),
+          "palette: without configurations the theme default, quietly");
+
+    const auto user = config("theme-user.json", R"({"hd-theme": {"normal": "#112233", "light": "#ffffff"}})");
+    const auto system = config("theme-system.json",
+                               R"({"hd-theme": {"normal": "#000000", "highlight": "#00ff00", "light": "#000000"}})");
+    std::ostringstream errors;
+    const LogoPalette p = read_palette({user, system}, errors);
+    check(errors.str().empty(), "palette: no messages");
+    check(p[0] == Rgb{0x11 / 255.0f, 0x22 / 255.0f, 0x33 / 255.0f}, "palette: normal of the user");
+    check(p[1] == fallback[1], "palette: a colour the user lacks has its default, not that of the system");
+    check(p[2] == Rgb{1.0f, 1.0f, 1.0f}, "palette: light of the user");
+
+    const auto other = config("theme-other.json", R"({"hd-pipes": {"cycles": 3}})");
+    const LogoPalette s = read_palette({other, system}, errors);
+    check(s[1] == Rgb{0.0f, 1.0f, 0.0f}, "palette: a configuration without hd-theme is skipped for the next");
+
+    const auto wrong = config("theme-wrong.json", R"({"hd-theme": {"normal": "blue", "highlight": "#12345g"}})");
+    std::ostringstream wrong_errors;
+    const LogoPalette w = read_palette({wrong, system}, wrong_errors);
+    check(w == fallback, "palette: wrong colours have their defaults");
+    check(contains(wrong_errors.str(), wrong + ": hd-theme: normal is not a #rrggbb colour"),
+          "palette: a wrong colour is reported");
+    check(contains(wrong_errors.str(), "highlight is not a #rrggbb colour"), "palette: a wrong hex digit is reported");
+
+    const auto broken = config("theme-broken.json", R"({"hd-theme": {"normal": "#112233")");
+    std::ostringstream broken_errors;
+    const LogoPalette b = read_palette({broken, system}, broken_errors);
+    check(b[1] == Rgb{0.0f, 1.0f, 0.0f}, "palette: a file that is not valid JSON is skipped for the next");
+    check(contains(broken_errors.str(), "hd-logo: " + broken + ": "), "palette: a file that is not valid JSON is reported");
+}
+
 } // namespace
 
 int main()
@@ -311,6 +426,8 @@ int main()
     test_config_broken();
     test_command_line_wrong();
     test_help();
+    test_logo_framerate();
+    test_logo_palette();
 
     std::filesystem::remove_all(directory);
     if (failures > 0) {

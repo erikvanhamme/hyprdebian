@@ -53,7 +53,7 @@ Each package Makefile that compiles builds the image of its suite first, so `mak
 The packages compiled in a build image get their Depends from `dpkg-shlibdeps` in the container, from the libraries of the suite they are for.
 
 ## The tests and the tryouts: make test
-`make test` runs the unittest tests of `hd-dashboard`, `hd-agent`, `hd-manager`, `hd-backup` and `hd-base`, and the C++ tests of `hd-screensavers`. The tryouts are `make all` in `menu/` and `message/` of `hd-desktop` and in `pipes/` of `hd-screensavers`: they build hd-menu, hd-message or hd-pipes without a package, to try it.
+`make test` runs the unittest tests of `hd-dashboard`, `hd-agent`, `hd-manager`, `hd-backup` and `hd-base`, and the C++ tests of `hd-screensavers`. The tryouts are `make all` in `menu/` and `message/` of `hd-desktop` and in `pipes/` and `logo/` of `hd-screensavers`: they build hd-menu, hd-message, hd-pipes or hd-logo without a package, to try it.
 
 The test binaries and the tryouts are compiled in the build image of the suite of their package, as `make deb` does, and run on the computer itself. That computer needs their runtime libraries:
 
@@ -63,7 +63,7 @@ The test binaries and the tryouts are compiled in the build image of the suite o
 | `make test` of `hd-backup` | `python3`, and `blockwrite`, compiled on trixie, runs with the libc6 of trixie or unstable. Some tests are skipped without `tar`, without `unshare` (util-linux) and working unprivileged user namespaces, or when they run as root. |
 | `make test` of `hd-screensavers` | Unstable, for the libstdc++ of unstable (`libstdc++6`). The tests need no Wayland or Vulkan. |
 | `make all` in `menu/` and `message/` of `hd-desktop` | Unstable, with `libwayland-client0`, `libxkbcommon0`, `libcairo2` and `librsvg2-2`, and a Wayland session to show them in. |
-| `make all` in `pipes/` of `hd-screensavers` | Unstable, with `libwayland-client0`, `libvulkan1` and a Vulkan driver, as `mesa-vulkan-drivers`, and a Wayland session. |
+| `make all` in `pipes/` and `logo/` of `hd-screensavers` | Unstable, with `libwayland-client0`, `libvulkan1` and a Vulkan driver, as `mesa-vulkan-drivers`, and a Wayland session. |
 
 A HyprDebian desktop on unstable has all of these.
 

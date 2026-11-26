@@ -55,9 +55,10 @@
 // walk.cpp walks the grid, mesh.cpp makes the shapes of the pipes and
 // pipes.cpp draws them, with the shaders pipe.vert and pipe.frag. The rest
 // is in ../../common/src, shared with the other screensavers: screen.cpp
-// puts the surfaces on the outputs and handles the input, gpu.cpp picks the
-// Vulkan device, swapchain.cpp gets the frames on a surface and options.cpp
-// reads the options, render.cpp adds those of the rendering.
+// puts the surfaces on the outputs, handles the input and asks for the GPU of
+// the compositor, gpu.cpp makes the Vulkan device that gpu_pick.cpp picks,
+// swapchain.cpp gets the frames on a surface and options.cpp reads the
+// options, render.cpp adds those of the rendering.
 
 #include "gpu.hpp"
 #include "options.hpp"
@@ -90,7 +91,7 @@ int main(int argc, char** argv)
 
     try {
         Screen screen(pipes_options.window, pipes_options.render.framerate);
-        Gpu gpu(screen.display(), pipes_options.render.msaa);
+        Gpu gpu(screen.display(), screen.main_device(), pipes_options.render.msaa);
         Pipes pipes(pipes_options);
         screen.run(gpu, pipes);
         return 0;
