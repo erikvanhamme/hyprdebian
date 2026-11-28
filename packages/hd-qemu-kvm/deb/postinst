@@ -9,11 +9,13 @@ ones of /usr/share/hd-qemu-kvm are written in their place when the diversion is 
 libvirtd is restarted when one of its configs was written. libvirt-guests reads its config each
 time it runs, so it needs no restart. A config that the administrator had changed is moved to
 <name>.libvirt with the diversion, which the postinst says. Later installations leave them alone,
-so changes made to them stay. The postrm of a removal removes them and puts the ones of libvirt
-back.
+so changes made to them stay, except a config that is still one that an earlier version of
+hd-qemu-kvm wrote: that one is replaced by the new one. The postrm of a removal removes them and
+puts the ones of libvirt back.
 
-The config of libvirt-guests starts the guests that were running before a shutdown of the host
-again at the next boot, so a reboot of the host also reboots its guests.
+The config of libvirt-guests shuts the running guests down with the host and starts none at the
+boot: libvirtd starts the guests that have autostart, so a reboot of the host also reboots them.
+Starting them from libvirt-guests too would only tell that they are already active.
 
 It adds nobody to the groups libvirt and kvm; that is up to the administrator.
 
@@ -42,6 +44,11 @@ SHARE_DIR = "/usr/share/hd-qemu-kvm"
 # The configs of libvirt that hd-qemu-kvm replaces; libvirtd is restarted for the first two.
 LIBVIRTD_CONFIGS = ["/etc/libvirt/libvirtd.conf", "/etc/libvirt/secret.conf"]
 LIBVIRT_CONFIGS = LIBVIRTD_CONFIGS + ["/etc/default/libvirt-guests"]
+# The md5 sums of the configs that earlier versions of hd-qemu-kvm wrote, which an upgrade replaces.
+EARLIER_CONFIGS = {
+    # 0.4 and before: ON_BOOT=start, which started the guests with autostart a second time.
+    "/etc/default/libvirt-guests": ["25dd8bc158e86ff683b23470eecbb48b"],
+}
 SYSCTL_CONF = "/usr/lib/sysctl.d/50-bridge-netfilter.conf"
 NET_CLASS_DIR = "/sys/class/net"
 BRIDGE = "br0"
@@ -89,15 +96,33 @@ def changed_conffile(path):
     return False
 
 
+def md5_of(path):
+    """The md5 sum of the file, empty when it cannot be read."""
+    try:
+        with open(path, "rb") as f:
+            return hashlib.md5(f.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+def write_config(path):
+    shutil.copyfile(os.path.join(SHARE_DIR, os.path.basename(path)), path)
+    os.chmod(path, 0o644)
+
+
 def replace_libvirt_configs():
-    """Diverts the configs of libvirt and writes those of hd-qemu-kvm. Returns the ones written."""
+    """Diverts the configs of libvirt and writes those of hd-qemu-kvm, and replaces those that an
+    earlier version wrote. Returns the ones written."""
     written = []
     for path in LIBVIRT_CONFIGS:
         changed = changed_conffile(path)
         if not divert(path):
+            if md5_of(path) in EARLIER_CONFIGS.get(path, []):
+                write_config(path)
+                print(f"Replaced {path}, which an earlier version of {PACKAGE} wrote.")
+                written.append(path)
             continue
-        shutil.copyfile(os.path.join(SHARE_DIR, os.path.basename(path)), path)
-        os.chmod(path, 0o644)
+        write_config(path)
         print(f"Wrote {path}; the one of libvirt is {path}.libvirt.")
         if changed:
             print(f"{path} had changes, which are in {path}.libvirt now; copy them to {path} "

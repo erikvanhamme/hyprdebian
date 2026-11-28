@@ -2,9 +2,9 @@
 # which explains every setting, is /etc/default/libvirt-guests.libvirt.
 #
 # A shutdown or reboot of the host shuts the running guests down, one after the other, and waits up
-# to SHUTDOWN_TIMEOUT seconds for each. The next boot starts the guests that were running again,
-# so a reboot of the host also reboots them, into a new kernel after an upgrade. Guests that were
-# not running stay off, unless they have autostart.
-ON_BOOT=start
+# to SHUTDOWN_TIMEOUT seconds for each. libvirt-guests starts no guests at the boot: libvirtd starts
+# the guests that have autostart, also after a power loss, so a reboot of the host also reboots
+# them, into a new kernel after an upgrade. Guests without autostart stay off.
+ON_BOOT=ignore
 ON_SHUTDOWN=shutdown
 SHUTDOWN_TIMEOUT=300

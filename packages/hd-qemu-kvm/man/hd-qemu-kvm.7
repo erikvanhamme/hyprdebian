@@ -123,13 +123,19 @@ stores secrets without encryption, and
 has
 .B libvirt-guests.service
 shut the running guests down when the host shuts down, waiting up to 300
-seconds for each, and start them again at the next boot. A reboot of the
-host thus also reboots its guests, into a new kernel after an upgrade.
-Guests that were not running stay off, unless they have autostart.
+seconds for each, and start none at the next boot. libvirtd starts the guests
+that have autostart
+.RB ( "virsh autostart"
+.IR <name> ),
+also after a power loss, so a reboot of the host also reboots them, into a
+new kernel after an upgrade. Guests without autostart stay off.
 A config that had been changed moves to
 .I <name>.libvirt
 with the diversion, which the installation says.
-Later installations leave them alone, so changes made to them stay.
+Later installations leave them alone, so changes made to them stay, except a
+config that is still one that an earlier version of
+.B hd-qemu-kvm
+wrote, which is replaced.
 Removing the package puts the ones of libvirt back.
 .PP
 The package also masks the sockets

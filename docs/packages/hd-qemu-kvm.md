@@ -4,7 +4,7 @@ The package `hd-qemu-kvm` installs Qemu with KVM, from `qemu-system-x86`, with i
 Installing the package:
 - makes the chosen wired interfaces ports of the bridge `br0` on the first installation, with the commands of [hd-network](hd-network.md); see below;
 - installs `/etc/skel/.config/libvirt/libvirt.conf`, so `virsh` and `virt-manager` of new users connect to `qemu:///system`;
-- diverts `/etc/libvirt/libvirtd.conf`, `/etc/libvirt/secret.conf` and `/etc/default/libvirt-guests` of libvirt and writes its own in their place: libvirtd does not listen on TCP or TLS, secrets are stored without encryption, and a reboot of the host shuts the running guests down and starts them again, so it reboots them too;
+- diverts `/etc/libvirt/libvirtd.conf`, `/etc/libvirt/secret.conf` and `/etc/default/libvirt-guests` of libvirt and writes its own in their place: libvirtd does not listen on TCP or TLS, secrets are stored without encryption, and a reboot of the host shuts the running guests down, after which libvirtd starts the ones with autostart again, so it reboots them too;
 - masks `libvirtd-tcp.socket`, `libvirtd-tls.socket` and the drop-in `libvirtd.service.d/10-secret.conf` of libvirt, which hands libvirtd an encryption key for the secrets;
 - loads `br_netfilter` and keeps the traffic over bridges out of iptables, so ufw does not filter the traffic of the virtual machines.
 
@@ -70,16 +70,16 @@ sudo hd-network-render
 ```
 
 ## The configs of libvirt
-libvirt ships `/etc/libvirt/libvirtd.conf`, `/etc/libvirt/secret.conf` and `/etc/default/libvirt-guests` as conffiles. `hd-qemu-kvm` diverts them to `<name>.libvirt`, where dpkg keeps the ones of libvirt, and writes its own from `/usr/share/hd-qemu-kvm` in their place when it makes the diversion, after which libvirtd is restarted for its configs; libvirt-guests reads its config each time it runs. A config that had been changed moves to `<name>.libvirt` with the diversion, which the installation says; copy the changes back when they are still needed. Later installations leave them alone, so changes made to them stay. Removing the package removes them and puts the ones of libvirt back.
+libvirt ships `/etc/libvirt/libvirtd.conf`, `/etc/libvirt/secret.conf` and `/etc/default/libvirt-guests` as conffiles. `hd-qemu-kvm` diverts them to `<name>.libvirt`, where dpkg keeps the ones of libvirt, and writes its own from `/usr/share/hd-qemu-kvm` in their place when it makes the diversion, after which libvirtd is restarted for its configs; libvirt-guests reads its config each time it runs. A config that had been changed moves to `<name>.libvirt` with the diversion, which the installation says; copy the changes back when they are still needed. Later installations leave them alone, so changes made to them stay, except a config that is still one that an earlier version of `hd-qemu-kvm` wrote, which is replaced. Removing the package removes them and puts the ones of libvirt back.
 
-`/etc/default/libvirt-guests` has `libvirt-guests.service` shut the running guests down when the host shuts down or reboots, one after the other, waiting up to 300 seconds for each (`ON_SHUTDOWN=shutdown`, `SHUTDOWN_TIMEOUT=300`), and start the guests that were running again at the next boot (`ON_BOOT=start`). A reboot of the host thus also reboots its guests, into a new kernel after an upgrade with `hd-up`. Guests that were not running stay off, unless they have autostart (`virsh autostart <name>`).
+`/etc/default/libvirt-guests` has `libvirt-guests.service` shut the running guests down when the host shuts down or reboots, one after the other, waiting up to 300 seconds for each (`ON_SHUTDOWN=shutdown`, `SHUTDOWN_TIMEOUT=300`), and start none at the next boot (`ON_BOOT=ignore`). libvirtd starts the guests that have autostart (`virsh autostart <name>`), also after a power loss, so a reboot of the host also reboots them, into a new kernel after an upgrade with `hd-up`. Guests without autostart stay off. libvirt-guests does not start them as well, as it would only tell on the console that each of them is already active.
 
 ## Files
 | Path | Purpose |
 | --- | --- |
 | `/etc/libvirt/libvirtd.conf` | The config of libvirtd that `hd-qemu-kvm` wrote: no TCP or TLS. |
 | `/etc/libvirt/secret.conf` | The config of the secrets driver that `hd-qemu-kvm` wrote: no encryption. |
-| `/etc/default/libvirt-guests` | The config of libvirt-guests that `hd-qemu-kvm` wrote: shut the guests down with the host, and start them again at the boot. |
+| `/etc/default/libvirt-guests` | The config of libvirt-guests that `hd-qemu-kvm` wrote: shut the guests down with the host, and start none at the boot. |
 | `/etc/libvirt/*.conf.libvirt`, `/etc/default/libvirt-guests.libvirt` | The configs of libvirt. |
 | `/etc/skel/.config/libvirt/libvirt.conf` | Connects `virsh` and `virt-manager` to `qemu:///system`, a conffile. |
 | `/etc/systemd/system/libvirtd-tcp.socket`, `libvirtd-tls.socket` | Links to `/dev/null`, which mask the sockets. |
