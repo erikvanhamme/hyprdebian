@@ -71,17 +71,12 @@ sudo systemctl restart hd-dashboard.service
 The service does not start when a setting has the wrong type; the journal says which one.
 
 ## Firewall
-The package leaves the firewall alone: the systems can only reach the dashboard once the admin allows its port. With ufw, on the default port:
+The package leaves the firewall alone: the systems can only reach the dashboard once the admin allows its port. `hd-harden --ufw` of hd-base lets the port of the settings in from the local IPv4 networks, as it does for ssh, and deletes the rules that let it in from anywhere, see [hd-harden](hd-base.md#hd-harden):
 ```
-sudo ufw allow 80/tcp
-```
-
-To let only the local network in:
-```
-sudo ufw allow from 192.168.1.0/24 to any port 80 proto tcp
+sudo hd-harden --ufw
 ```
 
-After changing the port in the settings, change the rule as well.
+Its state of `ufw` is `off`, a warning on the dashboard, as long as a rule such as `ufw allow 80/tcp` lets the dashboard in from anywhere. After changing the port in the settings, run it again; the rules of the old port stay until the admin deletes them.
 
 ## The pages
 | Path | |

@@ -50,12 +50,26 @@ which is enabled and started, and makes the database on its first start.
 The dashboard listens on port 80 by default.
 The installation does not open that port in the firewall; that is up to the
 admin.
-With
-.BR ufw (8):
+.B hd-harden \-\-ufw
+lets the port of the settings in from the local IPv4 networks, as it does for
+ssh, and deletes the rules of
+.BR ufw (8)
+that let it in from anywhere, see
+.BR hd-harden (8):
 .PP
 .RS
-sudo ufw allow 80/tcp
+sudo hd-harden \-\-ufw
 .RE
+.PP
+Its state of
+.B ufw
+is
+.B off
+as long as a rule such as
+.B ufw allow 80/tcp
+lets the dashboard in from anywhere.
+After changing the port, run it again; the rules of the old port stay until
+the admin deletes them.
 .PP
 Then the dashboard answers on
 .IR http://<host>/ .

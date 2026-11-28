@@ -1,8 +1,8 @@
 # Tests for hd-harden, on the parts that decide what it changes and what it shows: the users of
 # sudo who can log in with a key, the state of a file it writes, the modules that are loaded
 # already, the ZFS dataset of /home and its mounts without nosuid or nodev, the local IPv4
-# networks from networkctl, the rules of ufw that let ssh in from anywhere, and the networks of
-# --network.
+# networks from networkctl, the services that --ufw limits, among them the port of hd-dashboard,
+# the rules of ufw that let them in from anywhere, and the networks of --network.
 
 import argparse
 import importlib.machinery
@@ -26,6 +26,8 @@ def load_hd_harden():
 
 
 harden = load_hd_harden()
+SSH_NAMES = harden.SSH[2]
+DEFAULTS = {'listen': '0.0.0.0', 'port': 80, 'stale_minutes': 45}
 
 
 def address(text, prefix, family=2, scope='global'):
@@ -184,7 +186,7 @@ class TestOpenSshRules(unittest.TestCase):
                  "ufw limit 22/tcp\n"
                  "ufw allow in OpenSSH\n"
                  "ufw allow 22\n")
-        self.assertEqual(harden.open_ssh_rules(added),
+        self.assertEqual(harden.open_rules(added, SSH_NAMES),
                          [['allow', 'SSH'], ['limit', '22/tcp'], ['allow', 'in', 'OpenSSH'],
                           ['allow', '22']])
 
@@ -193,7 +195,7 @@ class TestOpenSshRules(unittest.TestCase):
                  "ufw allow from 172.16.0.0/16 to any port 22 proto tcp\n"
                  "ufw allow 80/tcp\n"
                  "ufw deny SSH\n")
-        self.assertEqual(harden.open_ssh_rules(added), [])
+        self.assertEqual(harden.open_rules(added, SSH_NAMES), [])
 
     def test_docker_rules(self):
         # The route rules of the containers of hd-docker, and the rules for the networks of
@@ -203,11 +205,57 @@ class TestOpenSshRules(unittest.TestCase):
                  "ufw route allow 22/tcp\n"
                  "ufw allow in on docker0 to any port 22 proto tcp\n"
                  "ufw allow from 192.168.240.0/20 to any port 22 proto tcp\n")
-        self.assertEqual(harden.open_ssh_rules(added), [])
+        self.assertEqual(harden.open_rules(added, SSH_NAMES), [])
 
     def test_duplicates(self):
-        self.assertEqual(harden.open_ssh_rules("ufw allow SSH\nufw allow SSH\n"),
+        self.assertEqual(harden.open_rules("ufw allow SSH\nufw allow SSH\n", SSH_NAMES),
                          [['allow', 'SSH']])
+
+
+class TestServices(unittest.TestCase):
+    def test_no_dashboard(self):
+        self.assertEqual(harden.services({'hd-dashboard': {'port': 8080}}, None), [harden.SSH])
+
+    def test_dashboard_default(self):
+        self.assertEqual(harden.services(None, DEFAULTS),
+                         [harden.SSH, ('dashboard', 80, ('80', '80/tcp', 'http'))])
+
+    def test_dashboard_port_of_config(self):
+        config = {'hd-dashboard': {'port': 8080}, 'hd-network': {}}
+        self.assertEqual(harden.dashboard_port(config, DEFAULTS), 8080)
+
+    def test_config_without_dashboard(self):
+        self.assertEqual(harden.dashboard_port({'hd-dashboard': None}, DEFAULTS), 80)
+
+    def test_wrong_port(self):
+        for port in (0, 70000, '80', True, None):
+            self.assertIsNone(harden.dashboard_port({'hd-dashboard': {'port': port}}, DEFAULTS))
+
+    def test_dashboard_on_ssh_port(self):
+        self.assertEqual(harden.services({'hd-dashboard': {'port': 22}}, DEFAULTS), [harden.SSH])
+
+    def test_port_without_service(self):
+        self.assertEqual(harden.service_names(48213), ('48213', '48213/tcp'))
+
+
+class TestOpenServices(unittest.TestCase):
+    FOUND = [harden.SSH, ('dashboard', 80, ('80', '80/tcp', 'http'))]
+
+    def test_dashboard_from_anywhere(self):
+        added = ("ufw allow from 172.16.0.0/16 to any port 22 proto tcp\n"
+                 "ufw allow 80/tcp\n")
+        self.assertEqual(harden.open_services(added, self.FOUND), ['dashboard'])
+        self.assertEqual(harden.open_rules(added, self.FOUND[1][2]), [['allow', '80/tcp']])
+
+    def test_by_service_name(self):
+        added = "ufw allow SSH\nufw allow http\n"
+        self.assertEqual(harden.open_services(added, self.FOUND), ['ssh', 'dashboard'])
+
+    def test_local_networks_alone(self):
+        added = ("ufw allow from 172.16.0.0/16 to any port 22 proto tcp\n"
+                 "ufw allow from 172.16.0.0/16 to any port 80 proto tcp\n"
+                 "ufw allow 443/tcp\n")
+        self.assertEqual(harden.open_services(added, self.FOUND), [])
 
 
 class TestNetwork(unittest.TestCase):

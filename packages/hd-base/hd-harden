@@ -12,8 +12,9 @@ The package hd-base installs this as /usr/sbin/hd-harden.
     hd-harden --modules                  no loading of the modules of rare network protocols
                                          and old file systems
     hd-harden --zfs                      no setuid programs and device files below /home
-    hd-harden --ufw [--network <cidr>]   ssh from the local IPv4 networks alone, in place of
-                                         from anywhere
+    hd-harden --ufw [--network <cidr>]   ssh, and the dashboard when hd-dashboard is
+                                         installed, from the local IPv4 networks alone, in
+                                         place of from anywhere
     hd-harden --all [--network <cidr>]   all of the above
 
 --ssh writes /etc/ssh/sshd_config.d/10-hd-harden.conf from a jinja2 template in
@@ -28,7 +29,7 @@ nodev those of them that are mounted without, as ZFS only does that for the data
 on. --ufw adds a rule of ufw
 that lets ssh in from each IPv4 network of the interfaces that systemd-networkd configures, or
 from the networks given with --network, and then deletes the rules that let ssh in from
-anywhere. The options can be combined, and running them again changes nothing. Run it as root.
+anywhere; the same for the port of hd-dashboard, when that is installed. The options can be combined, and running them again changes nothing. Run it as root.
 
 Without options it shows for each of them whether it is on: off, on, or changed when the file
 it writes has other content, as after an edit by hand or from an older hd-harden; the state of
@@ -43,6 +44,7 @@ import json
 import os
 import pwd
 import re
+import socket
 import subprocess
 import sys
 
@@ -64,13 +66,17 @@ MOUNT_OPTIONS = ("nosuid", "nodev")
 MOUNTINFO = ("/proc/1/mountinfo", "/proc/self/mountinfo")
 # The group whose users can become root, who need a key to log in when root cannot.
 ADMIN_GROUP = "sudo"
-SSH_PORT = "22"
-# The ways a rule of ufw can name ssh: the service of /etc/services, the application profile of
-# openssh-server and the port. Compared in lower case.
-SSH_NAMES = ("ssh", "openssh", "22", "22/tcp")
-# An added rule that lets ssh in from anywhere, as `ufw show added` prints it, such as
+# A service that --ufw lets in from the local networks alone: its name in the messages, its TCP
+# port and the ways a rule of ufw can name it, in lower case.
+SSH = ("ssh", 22, ("ssh", "openssh", "22", "22/tcp"))
+# The settings of hd-dashboard, which has the port of the dashboard: the key hd-dashboard of
+# the configuration over the defaults of the package, which are there when it is installed.
+CONFIG_FILE = "/etc/hyprdebian/config.json"
+DASHBOARD_KEY = "hd-dashboard"
+DASHBOARD_DEFAULTS = "/usr/share/hd-dashboard/defaults.json"
+# An added rule that lets a service in from anywhere, as `ufw show added` prints it, such as
 # "ufw allow SSH": allow or limit, maybe with in, and nothing but the name.
-OPEN_SSH_RULE = re.compile(r"ufw ((?:allow|limit)(?: in)? (\S+))")
+OPEN_RULE = re.compile(r"ufw ((?:allow|limit)(?: in)? (\S+))")
 
 TEMPLATE_DIR = "/usr/share/hd-base/templates"
 TEMPLATES = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATE_DIR),
@@ -267,13 +273,61 @@ def local_networks(links):
     return [str(network) for network in sorted(networks)]
 
 
-def open_ssh_rules(added):
-    """The rules of `ufw show added` that let ssh in from anywhere, as the arguments that follow
-    `ufw delete`, such as ["allow", "SSH"]."""
+def read_json(path):
+    """The JSON content of a file, None when it does not exist or is no JSON."""
+    try:
+        return json.loads(read(path) or b"null")
+    except (ValueError, OSError):
+        return None
+
+
+def dashboard_port(config, defaults):
+    """The port of hd-dashboard: its key of the configuration over its defaults; None when it
+    is not installed, as there are no defaults, or the port is no port."""
+    if not isinstance(defaults, dict):
+        return None
+    settings = dict(defaults)
+    if isinstance(config, dict) and isinstance(config.get(DASHBOARD_KEY), dict):
+        settings.update(config[DASHBOARD_KEY])
+    port = settings.get("port")
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        return None
+    return port
+
+
+def service_names(port):
+    """The ways a rule of ufw can name a TCP port: the port, with /tcp, and its service of
+    /etc/services, such as http for 80."""
+    names = [str(port), f"{port}/tcp"]
+    try:
+        names.append(socket.getservbyport(port, "tcp").lower())
+    except OSError:
+        pass
+    return tuple(names)
+
+
+def services(config, defaults):
+    """The services that --ufw lets in from the local networks alone: ssh, and the dashboard
+    when hd-dashboard is installed, from the configuration and the defaults of hd-dashboard."""
+    found = [SSH]
+    port = dashboard_port(config, defaults)
+    if port is not None and port != SSH[1]:
+        found.append(("dashboard", port, service_names(port)))
+    return found
+
+
+def installed_services():
+    """The services of this system that --ufw lets in from the local networks alone."""
+    return services(read_json(CONFIG_FILE), read_json(DASHBOARD_DEFAULTS))
+
+
+def open_rules(added, names):
+    """The rules of `ufw show added` that let one of the names in from anywhere, as the
+    arguments that follow `ufw delete`, such as ["allow", "SSH"]."""
     rules = []
     for line in added.splitlines():
-        match = OPEN_SSH_RULE.fullmatch(line.strip())
-        if match and match.group(2).lower() in SSH_NAMES:
+        match = OPEN_RULE.fullmatch(line.strip())
+        if match and match.group(2).lower() in names:
             rule = match.group(1).split()
             if rule not in rules:
                 rules.append(rule)
@@ -300,11 +354,12 @@ def harden_ufw(networks):
             fail("No interface of systemd-networkd has an IPv4 network; give it with --network.")
     # The rules for the local networks come first, so a connection from there is never
     # refused. Connections that are open stay open: ufw lets established connections through.
-    for network in networks:
-        ufw("allow", "from", network, "to", "any", "port", SSH_PORT, "proto", "tcp")
-    for rule in open_ssh_rules(ufw("show", "added")):
-        ufw("delete", *rule)
-    print(f"ufw: ssh comes in from {', '.join(networks)} alone.")
+    for name, port, names in installed_services():
+        for network in networks:
+            ufw("allow", "from", network, "to", "any", "port", str(port), "proto", "tcp")
+        for rule in open_rules(ufw("show", "added"), names):
+            ufw("delete", *rule)
+        print(f"ufw: {name} (port {port}) comes in from {', '.join(networks)} alone.")
 
 
 def file_state(path, content):
@@ -331,15 +386,25 @@ def zfs_state():
     return "on", dataset
 
 
+def open_services(added, found):
+    """The names of the services that a rule of `ufw show added` lets in from anywhere."""
+    return [name for name, _, names in found if open_rules(added, names)]
+
+
 def ufw_state():
-    """The state of --ufw: on when no rule lets ssh in from anywhere. Only root can read it."""
+    """The state of --ufw: on when no rule lets ssh or the dashboard in from anywhere, off with
+    the services that one does. Only root can read it."""
     if os.geteuid() != 0:
         return "unknown", "only root can read the rules"
     result = subprocess.run(["ufw", "show", "added"], capture_output=True, text=True,
                             check=False)
     if result.returncode != 0:
         return "unknown", "ufw show added failed"
-    return ("off" if open_ssh_rules(result.stdout) else "on"), ""
+    found = installed_services()
+    opened = open_services(result.stdout, found)
+    if opened:
+        return "off", f"{', '.join(opened)} from anywhere"
+    return "on", ", ".join(name for name, _, _ in found)
 
 
 def collect_state():
@@ -388,14 +453,14 @@ def main():
     parser.add_argument("--zfs", action="store_true",
                         help="no setuid programs and device files on the ZFS dataset of /home")
     parser.add_argument("--ufw", action="store_true",
-                        help="let ssh in from the local IPv4 networks alone, in place of from "
-                        "anywhere")
+                        help="let ssh, and the dashboard when hd-dashboard is installed, in "
+                        "from the local IPv4 networks alone, in place of from anywhere")
     parser.add_argument("--all", action="store_true",
                         help="all of --ssh, --sysctl, --modules, --zfs and --ufw")
     parser.add_argument("--json", action="store_true",
                         help="show what is hardened as a JSON object, for hd-agent")
     parser.add_argument("--network", action="append", type=network, default=[],
-                        help="with --ufw or --all, a network to let ssh in from, such as "
+                        help="with --ufw or --all, a network to let them in from, such as "
                         "192.168.1.0/24, in place of those of the interfaces; may be given "
                         "more than once")
     args = parser.parse_args()

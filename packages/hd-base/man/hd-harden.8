@@ -142,7 +142,9 @@ stays on, for
 .IR ~/.local/bin .
 .TP
 .B \-\-ufw
-Lets ssh in from the local IPv4 networks alone.
+Lets ssh in from the local IPv4 networks alone, and the dashboard too when
+.BR hd-dashboard (7)
+is installed.
 It adds a rule
 .B allow from
 .I network
@@ -174,6 +176,39 @@ stay as they are.
 The new rules come first, so a connection from a local network is never
 refused, and connections that are open stay open, as ufw lets established
 connections through.
+.IP
+When hd-dashboard is installed, as
+.I /usr/share/hd-dashboard/defaults.json
+shows, it does the same for the port of the dashboard: the
+.B port
+of the key
+.B hd-dashboard
+of
+.IR /etc/hyprdebian/config.json ,
+or else that of the defaults, 80.
+It adds a rule
+.B allow from
+.I network
+.B to any port 80 proto tcp
+for each network, and deletes the rules that let the port in from anywhere,
+by the port, the port with
+.B /tcp
+or its service of
+.IR /etc/services ,
+such as
+.BR 80 ,
+.B 80/tcp
+or
+.BR http .
+.IP
+The state of
+.B \-\-ufw
+is
+.B off
+as long as a rule lets ssh or the dashboard in from anywhere, and names them;
+when it is
+.BR on ,
+it names the services it covers.
 .TP
 .B \-\-all
 All of
@@ -192,7 +227,7 @@ With
 .B \-\-ufw
 or
 .BR \-\-all ,
-an IPv4 network to let ssh in from, such as
+an IPv4 network to let ssh and the dashboard in from, such as
 .BR 192.168.1.0/24 ,
 in place of those of the interfaces.
 It may be given more than once.
@@ -251,6 +286,7 @@ The templates of those files.
 .BR hd-base (7),
 .BR hd-agent (8),
 .BR hd-docker (7),
+.BR hd-dashboard (7),
 .BR sshd_config (5),
 .BR sysctl.d (5),
 .BR modprobe.d (5),
